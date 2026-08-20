@@ -20,13 +20,13 @@ Before independent post-reference evidence appears, an honest unsupported capabi
 
 FedSIRA replaces:
 
-[
+$$
 \text{production authority} \leftarrow \text{approval of a source-controlled model}
-]
+$$
 
 with:
 
-[
+$$
 \text{production authority}
 \leftarrow
 \text{independent constructibility}
@@ -34,7 +34,7 @@ with:
 \text{cross-domain transportability}
 +
 \text{direct source-artifact exclusion}.
-]
+$$
 
 ## 1.3 Required mechanism
 
@@ -119,30 +119,30 @@ The study must not claim any of the following:
 
 | Symbol / term           | Definition                                                                                                                                                                    |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (\mathcal D)            | Authenticated experimental administrative-domain set.                                                                                                                         |
+| $\mathcal D$            | Authenticated experimental administrative-domain set.                                                                                                                         |
 | administrative domain   | One authority for Byzantine accounting. In the primary dataset, one physical IoT device is used as an explicit **domain proxy**, not as proof of organizational independence. |
-| (s)                     | Source domain that exposes a proposal-assisted unsupported capability.                                                                                                        |
-| (w_a)                   | Fixed clean/current anchor checkpoint.                                                                                                                                       |
-| (a_s)                   | Source model artifact; committed but assigned zero direct production weight.                                                                                                  |
-| (\mathcal C)            | Fixed Capability Claim Contract.                                                                                                                                             |
-| (j)                     | Reproducer domain.                                                                                                                                                            |
-| (r_j)                   | Reproduction update from domain (j).                                                                                                                                          |
-| (w_j=w_a+r_j)           | Reproduced model.                                                                                                                                                             |
-| (g)                     | Verifier domain.                                                                                                                                                              |
-| (V_g(w_j,\mathcal C))   | `Positive`, `Negative`, or `Abstain` verifier decision.                                                                                                                       |
-| (R^{cert}_{\mathcal C}) | Certified independent reproduction rows.                                                                                                                                      |
-| (A)                     | Fixed robust synthesis operator; this roadmap fixes `Krum`.                                                                                                                  |
-| (r^*)                   | Source-excluded synthesized production update.                                                                                                                                |
-| (f_R)                   | Maximum Byzantine reproduction rows for the primary deterministic profile: **1**.                                                                                             |
-| (f_V)                   | Maximum Byzantine verifier in a primary verifier panel: **1**.                                                                                                                |
-| (h_V)                   | Minimum guaranteed honest positive verifier support: **1**.                                                                                                                   |
-| (q_V)                   | Positive support threshold: **2 of 3** verifier reports.                                                                                                                      |
-| (\tau_k)                | First logical evidence cycle with at least (k) eligible honest non-source evidence holders.                                                                                   |
-| (T_{evidence})          | Information-arrival component of admission delay.                                                                                                                             |
-| (T_{assignment})        | Role-assignment latency after required evidence exists.                                                                                                                       |
-| (T_{reproduce})         | Reproduction-training latency.                                                                                                                                                |
-| (T_{verify})            | External-verification latency.                                                                                                                                                |
-| (T_{synthesize})        | Krum synthesis plus final-gate latency.                                                                                                                                       |
+| $s$                     | Source domain that exposes a proposal-assisted unsupported capability.                                                                                                        |
+| $w_a$                   | Fixed clean/current anchor checkpoint.                                                                                                                                       |
+| $a_s$                   | Source model artifact; committed but assigned zero direct production weight.                                                                                                  |
+| $\mathcal C$            | Fixed Capability Claim Contract.                                                                                                                                             |
+| $j$                     | Reproducer domain.                                                                                                                                                            |
+| $r_j$                   | Reproduction update from domain $j$.                                                                                                                                          |
+| $w_j=w_a+r_j$           | Reproduced model.                                                                                                                                                             |
+| $g$                     | Verifier domain.                                                                                                                                                              |
+| $V_g(w_j,\mathcal C)$   | `Positive`, `Negative`, or `Abstain` verifier decision.                                                                                                                       |
+| $R^{cert}_{\mathcal C}$ | Certified independent reproduction rows.                                                                                                                                      |
+| $A$                     | Fixed robust synthesis operator; this roadmap fixes `Krum`.                                                                                                                  |
+| $r^*$                   | Source-excluded synthesized production update.                                                                                                                                |
+| $f_R$                   | Maximum Byzantine reproduction rows for the primary deterministic profile: **1**.                                                                                             |
+| $f_V$                   | Maximum Byzantine verifier in a primary verifier panel: **1**.                                                                                                                |
+| $h_V$                   | Minimum guaranteed honest positive verifier support: **1**.                                                                                                                   |
+| $q_V$                   | Positive support threshold: **2 of 3** verifier reports.                                                                                                                      |
+| $\tau_k$                | First logical evidence cycle with at least $k$ eligible honest non-source evidence holders.                                                                                   |
+| $T_{evidence}$          | Information-arrival component of admission delay.                                                                                                                             |
+| $T_{assignment}$        | Role-assignment latency after required evidence exists.                                                                                                                       |
+| $T_{reproduce}$         | Reproduction-training latency.                                                                                                                                                |
+| $T_{verify}$            | External-verification latency.                                                                                                                                                |
+| $T_{synthesize}$        | Krum synthesis plus final-gate latency.                                                                                                                                       |
 
 The Byzantine unit is an administrative-domain proxy, never an individual row, packet, or repeated report. Repeated reports from one proxy count once per fixed claim/evidence window.
 
@@ -220,20 +220,20 @@ These are part of the scientific program, not optional debugging cases.
 
 Every claim instance is:
 
-[
+$$
 \mathcal C=(\mathcal S,\mathcal M,\mathcal K,\Gamma,\Beta,\Omega).
-]
+$$
 
 For the primary study the fixed values are:
 
 | Component    | Exact primary definition                                                                                                                                                                              |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (\mathcal S) | Select local post-reference `GAFGYT_COMBO` examples plus the designated supported-control replay rows; sample membership is determined only by the immutable split manifest, domain, label, and role. |
-| (\mathcal M) | `GAFGYT_COMBO` one-vs-rest F1 on the designated fresh evaluation population.                                                                                                                          |
-| (\mathcal K) | Supported-label macro-F1 and benign false-positive rate over the 10 non-target classes.                                                                                                               |
-| (\Gamma)     | Target F1 (\ge 0.80) **and** absolute target-F1 gain over anchor (\ge 0.20). Both conditions are required.                                                                                            |
-| (\Beta)      | Supported macro-F1 drop from anchor (\le 0.02) absolute **and** benign false-alarm-rate increase (\le 0.01) absolute. Both conditions are required.                                                   |
-| (\Omega)     | The fixed N-BaIoT feature schema, nine device-domain proxies, held-out `GAFGYT_COMBO` capability, and the exact replay/split protocol in this roadmap.                                               |
+| $\mathcal S$ | Select local post-reference `GAFGYT_COMBO` examples plus the designated supported-control replay rows; sample membership is determined only by the immutable split manifest, domain, label, and role. |
+| $\mathcal M$ | `GAFGYT_COMBO` one-vs-rest F1 on the designated fresh evaluation population.                                                                                                                          |
+| $\mathcal K$ | Supported-label macro-F1 and benign false-positive rate over the 10 non-target classes.                                                                                                               |
+| $\Gamma$     | Target F1 $\ge 0.80$ **and** absolute target-F1 gain over anchor $\ge 0.20$. Both conditions are required.                                                                                            |
+| $\Beta$      | Supported macro-F1 drop from anchor $\le 0.02$ absolute **and** benign false-alarm-rate increase $\le 0.01$ absolute. Both conditions are required.                                                   |
+| $\Omega$     | The fixed N-BaIoT feature schema, nine device-domain proxies, held-out `GAFGYT_COMBO` capability, and the exact replay/split protocol in this roadmap.                                               |
 
 ## 5.1 Evidence sufficiency
 
@@ -257,7 +257,7 @@ The Capability Claim Contract JSON is hashed before any reproduction begins. Any
 
 ## 5.3 Secondary-dataset claim
 
-The secondary dataset uses the same numerical (\Gamma) and (\Beta) thresholds, the same metric definitions, and the same protocol semantics. Only dataset schema, class vocabulary, and target label change as explicitly defined in Section 10. No result from the secondary dataset may be used to retune the primary configuration.
+The secondary dataset uses the same numerical $\Gamma$ and $\Beta$ thresholds, the same metric definitions, and the same protocol semantics. Only dataset schema, class vocabulary, and target label change as explicitly defined in Section 10. No result from the secondary dataset may be used to retune the primary configuration.
 
 ---
 
@@ -344,7 +344,7 @@ Reproduction candidates are never reordered by their measured quality. Once the 
 
 ### Proposal-assisted mode
 
-1. Receive and immutably commit source artifact (a_s).
+1. Receive and immutably commit source artifact $a_s$.
 2. Record direct production weight `0.0`.
 3. Run the fixed proposal screen on three post-commitment non-source screen domains.
 4. Open the predeclared claim only if at least **2 of 3** adequate screen domains are positive.
@@ -369,46 +369,46 @@ For each screen domain:
 4. apply those boundaries to the held-out target and held-out supported-control losses, then match every held-out target to one held-out supported-control sample in the same loss decile with closest anchor loss, without replacement within that fold; ties use ascending stable sample ID;
 5. concatenate the five held-out-fold match sets and define
 
-[
+$$
 \Delta^M=\operatorname{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in target},
-]
+$$
 
-[
+$$
 \Delta^C=\operatorname{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in matched\ control},
-]
+$$
 
-[
+$$
 A=\Delta^M-\Delta^C.
-]
+$$
 
 A screen-domain decision is `Positive` only when all conditions hold:
 
-* (A\ge0.05) nats/example;
-* source target-F1 gain over anchor (\ge0.20);
-* supported macro-F1 drop (\le0.02);
-* benign false-alarm-rate increase (\le0.01).
+* $A\ge0.05$ nats/example;
+* source target-F1 gain over anchor $\ge0.20$;
+* supported macro-F1 drop $\le0.02$;
+* benign false-alarm-rate increase $\le0.01$.
 
 The screen is an efficiency/selectivity mechanism, not a security theorem.
 
 ## 7.3 Source-independent reproduction
 
-For eligible non-source domain (j):
+For eligible non-source domain $j$:
 
-[
+$$
 r_j=\arg\min_r
 L_{CE}(w_a+r;D_j^{target}\cup D_j^{supported})
 +\lambda D_{stable}(w_a+r,w_a;D_j^{supported})
 +\mu\frac{|r|_2^2}{d},
-]
+$$
 
 where:
 
-* (D_{stable}) is the mean KL divergence `KL(anchor_softmax || reproduction_softmax)` on supported replay rows;
-* (\lambda=1.0);
-* (\mu=10^{-5});
-* (d) is the number of trainable parameters.
+* $D_{stable}$ is the mean KL divergence `KL(anchor_softmax || reproduction_softmax)` on supported replay rows;
+* $\lambda=1.0$;
+* $\mu=10^{-5}$;
+* $d$ is the number of trainable parameters.
 
-The reproduction starts from (w_a), uses the training constants in Section 12, and produces an immutable commitment before verifier assignment.
+The reproduction starts from $w_a$, uses the training constants in Section 12, and produces an immutable commitment before verifier assignment.
 
 ## 7.4 External verification
 
@@ -417,13 +417,13 @@ For each committed reproduction:
 * verifier panel size = **3**;
 * source and reproducer are ineligible;
 * panel members are the first 3 adequate domains in the post-commitment verifier permutation for that row;
-* primary deterministic panel bound (f_V=1);
-* required guaranteed honest positive support (h_V=1);
-* positive threshold (q_V=2).
+* primary deterministic panel bound $f_V=1$;
+* required guaranteed honest positive support $h_V=1$;
+* positive threshold $q_V=2$.
 
 An adequate honest verifier reports:
 
-* `Positive` when both (\Gamma) and (\Beta) pass on its fresh row-verification role;
+* `Positive` when both $\Gamma$ and $\Beta$ pass on its fresh row-verification role;
 * `Negative` otherwise;
 * `Abstain` when evidence minimums fail.
 
@@ -437,26 +437,26 @@ A domain that is evidence-inadequate is skipped without consuming its one allowe
 
 ## 7.6 Robust source-excluded synthesis: Krum
 
-The final synthesis operator is `Krum` with (n=5), (f_R=1). This satisfies the Krum worker-count condition (n\ge2f_R+3).
+The final synthesis operator is `Krum` with $n=5$, $f_R=1$. This satisfies the Krum worker-count condition $n\ge2f_R+3$.
 
-For update vectors (r_1,\ldots,r_5):
+For update vectors $r_1,\ldots,r_5$:
 
-1. compute all squared Euclidean distances (|r_i-r_j|_2^2);
-2. for each (i), select its (n-f_R-2=2) nearest other updates;
-3. define Krum score (s_i) as the sum of those two squared distances;
+1. compute all squared Euclidean distances $|r_i-r_j|_2^2$;
+2. for each $i$, select its $n-f_R-2=2$ nearest other updates;
+3. define Krum score $s_i$ as the sum of those two squared distances;
 4. select the update with minimum score;
 5. ties are broken by lexicographically ascending reproducer-domain ID;
-6. set (r^*=r_{arg\min s_i}).
+6. set $r^*=r_{arg\min s_i}$.
 
 The source artifact never enters this input set.
 
 The admissible primary committee region is therefore:
 
-[
-\mathfrak M_{KRUM}(1)={n:n\ge5},
-]
+$$
+\mathfrak M_{KRUM}(1)=\{n:n\ge5\},
+$$
 
-while the confirmatory implementation fixes (n=5) exactly to prevent post-hoc committee-size choice. The original Krum resilience theorem requires the strict worker-count condition (2f+2<n) and additionally assumes independent identically distributed honest gradient estimators together with a variance-to-gradient condition (Blanchard et al., 2017; Section 41). FedSIRA therefore imports **only the operator definition and its count admissibility requirement** into the fixed synthesis contract. It does not claim that heterogeneous local-training model deltas automatically satisfy the original Krum convergence theorem. Any empirical Byzantine-safety statement in this roadmap remains conditional on the declared evidence model, external reproduction verification/final-gate logic, and the tested heterogeneity envelope.
+while the confirmatory implementation fixes $n=5$ exactly to prevent post-hoc committee-size choice. The original Krum resilience theorem requires the strict worker-count condition $2f+2<n$ and additionally assumes independent identically distributed honest gradient estimators together with a variance-to-gradient condition (Blanchard et al., 2017; Section 41). FedSIRA therefore imports **only the operator definition and its count admissibility requirement** into the fixed synthesis contract. It does not claim that heterogeneous local-training model deltas automatically satisfy the original Krum convergence theorem. Any empirical Byzantine-safety statement in this roadmap remains conditional on the declared evidence model, external reproduction verification/final-gate logic, and the tested heterogeneity envelope.
 
 ## 7.7 Final fresh gate
 
@@ -465,8 +465,8 @@ The resolved production model `w_a + production_update` is evaluated on every ad
 Admission requires all of:
 
 * at least **6 of 8** non-source domains are adequate;
-* median adequate-domain target F1 (\ge0.80);
-* minimum adequate-domain target F1 (\ge0.60);
+* median adequate-domain target F1 $\ge0.80$;
+* minimum adequate-domain target F1 $\ge0.60$;
 * macro supported-label F1, pooled by equal domain weight, drops by no more than **0.02** from anchor;
 * benign false-alarm rate, pooled by equal domain weight, increases by no more than **0.01**;
 * no provenance, path-required verification/certificate, or invariant failure exists. A path that mechanically omits external row verification does not fail merely because no reproduction certificate exists; its resolved-core artifact must instead record that omission explicitly.
@@ -481,7 +481,7 @@ The manuscript theory must include the following exact results and their assumpt
 
 ## 8.1 Pre-independent-evidence indistinguishability
 
-If, for legitimate world (H_L) and Byzantine-mimic world (H_B), every measurable pre-independent-evidence transcript event has equal probability, then every possibly randomized source-only admission rule has equal acceptance probability in both worlds.
+If, for legitimate world $H_L$ and Byzantine-mimic world $H_B$, every measurable pre-independent-evidence transcript event has equal probability, then every possibly randomized source-only admission rule has equal acceptance probability in both worlds.
 
 Required empirical boundary check: identify any trusted side information used by the implementation. If such information changes the transcript law, explicitly state that the theorem premise does not apply to that side information.
 
@@ -495,7 +495,7 @@ For two source artifacts opening the same fixed Capability Claim Contract, the h
 
 ## 8.4 Honest-support counting
 
-For a verifier panel with at most (f) Byzantine positive reports and (q) observed positive reports, at least (q-f) positives are honest. The primary profile uses (q=2,f=1), guaranteeing at least one honest positive.
+For a verifier panel with at most $f$ Byzantine positive reports and $q$ observed positive reports, at least $q-f$ positives are honest. The primary profile uses $q=2,f=1$, guaranteeing at least one honest positive.
 
 ## 8.5 Synthesizer-specific reproduction count
 
@@ -515,21 +515,21 @@ Liveness is conditional on enough honest domains eventually obtaining sufficient
 
 ## 8.7 Independent-evidence delay lower bound
 
-A protocol whose declared safety guarantee requires (k) honest independent evidence holders cannot safely complete before (\tau_k) under the same pre-evidence indistinguishability premise.
+A protocol whose declared safety guarantee requires $k$ honest independent evidence holders cannot safely complete before $\tau_k$ under the same pre-evidence indistinguishability premise.
 
 The empirical delay decomposition is:
 
-[
+$$
 T_{admit}=T_{evidence}+T_{assignment}+T_{reproduce}+T_{verify}+T_{synthesize}.
-]
+$$
 
 ## 8.8 Random-committee contamination calculation
 
 The diagnostic random-committee profile samples 3 verifiers without replacement from 7 eligible non-source/non-reproducer domains with 2 Byzantine domains in the global eligible pool. The exact probability of at least 2 Byzantine verifiers is:
 
-[
+$$
 \frac{\binom{2}{2}\binom{5}{1}}{\binom{7}{3}}=\frac{1}{7}\approx0.142857.
-]
+$$
 
 The tolerated diagnostic contamination risk is fixed to **0.15**. This profile is explicitly diagnostic; the primary security claim uses the deterministic panel-bound profile.
 
@@ -658,17 +658,17 @@ For every available supported-class stream in each domain, assign rows by normal
 
 | Interval        | Role                    |
 | --------------- | ----------------------- |
-| ([0.000,0.395)) | `Anchor Train`          |
-| ([0.395,0.400)) | guard gap; never used   |
-| ([0.400,0.495)) | `Anchor Validation`     |
-| ([0.495,0.500)) | guard gap               |
-| ([0.500,0.645)) | `Post-Reference Replay` |
-| ([0.645,0.650)) | guard gap               |
-| ([0.650,0.745)) | `Row Verification`      |
-| ([0.745,0.750)) | guard gap               |
-| ([0.750,0.845)) | `Final Gate`            |
-| ([0.845,0.850)) | guard gap               |
-| ([0.850,1.000]) | `Report Test`           |
+| $[0.000,0.395)$ | `Anchor Train`          |
+| $[0.395,0.400)$ | guard gap; never used   |
+| $[0.400,0.495)$ | `Anchor Validation`     |
+| $[0.495,0.500)$ | guard gap               |
+| $[0.500,0.645)$ | `Post-Reference Replay` |
+| $[0.645,0.650)$ | guard gap               |
+| $[0.650,0.745)$ | `Row Verification`      |
+| $[0.745,0.750)$ | guard gap               |
+| $[0.750,0.845)$ | `Final Gate`            |
+| $[0.845,0.850)$ | guard gap               |
+| $[0.850,1.000]$ | `Report Test`           |
 
 ## 10.2 Target-class role intervals
 
@@ -676,17 +676,17 @@ For every available `GAFGYT_COMBO` stream:
 
 | Interval        | Role               |
 | --------------- | ------------------ |
-| ([0.000,0.145)) | `Source Proposal`  |
-| ([0.145,0.150)) | guard gap          |
-| ([0.150,0.245)) | `Candidate Screen` |
-| ([0.245,0.250)) | guard gap          |
-| ([0.250,0.445)) | `Reproduction`     |
-| ([0.445,0.450)) | guard gap          |
-| ([0.450,0.595)) | `Row Verification` |
-| ([0.595,0.600)) | guard gap          |
-| ([0.600,0.795)) | `Final Gate`       |
-| ([0.795,0.800)) | guard gap          |
-| ([0.800,1.000]) | `Report Test`      |
+| $[0.000,0.145)$ | `Source Proposal`  |
+| $[0.145,0.150)$ | guard gap          |
+| $[0.150,0.245)$ | `Candidate Screen` |
+| $[0.245,0.250)$ | guard gap          |
+| $[0.250,0.445)$ | `Reproduction`     |
+| $[0.445,0.450)$ | guard gap          |
+| $[0.450,0.595)$ | `Row Verification` |
+| $[0.595,0.600)$ | guard gap          |
+| $[0.600,0.795)$ | `Final Gate`       |
+| $[0.795,0.800)$ | guard gap          |
+| $[0.800,1.000]$ | `Report Test`      |
 
 Only the selected source uses its `Source Proposal` target rows for source-candidate training. Non-source `Source Proposal` rows are unused.
 
@@ -753,18 +753,18 @@ When fewer than the cap exist, use all role-eligible rows. Evidence minimums rem
 
 Compute global feature mean and population standard deviation from **supported-class `Anchor Train` rows only** using aggregated `count`, `sum`, and `sum_of_squares` across domains. Raw rows need not be centralized.
 
-For feature (k):
+For feature $k$:
 
-[
+$$
 \mu_k=\frac{\sum x_k}{N},\qquad
 \sigma_k=\sqrt{\frac{\sum x_k^2}{N}-\mu_k^2}.
-]
+$$
 
-If (\sigma_k=0), use scale 1.0. Transform:
+If $\sigma_k=0$, use scale 1.0. Transform:
 
-[
+$$
 z_k=\operatorname{clip}\left(\frac{x_k-\mu_k}{\sigma_k},-10,10\right).
-]
+$$
 
 The scaler is fixed by hash and reused everywhere. No target/post-reference data influence scaling.
 
@@ -1081,9 +1081,9 @@ The diagnostic profile samples a 3-member panel without replacement from the sev
 
 For a seven-domain pool, the probability of at least two compromised panel members is the hypergeometric quantity
 
-[
+$$
 P_{\ge2}(b)=\frac{\sum_{x=2}^{\min(3,b)}\binom{b}{x}\binom{7-b}{3-x}}{\binom{7}{3}}.
-]
+$$
 
 It equals `0` for `b=0` or `b=1` and exactly `1/7` for `b=2`. The tolerated diagnostic risk `0.15` applies to the `b=2` probability-calibration condition. The random profile never replaces the deterministic panel-bound security profile.
 
@@ -1170,9 +1170,9 @@ For a multi-round ordinary FL/robust-aggregation method, the same selected poiso
 
 Use the same **10%** `GAFGYT_UDP` carrier subset and `Attack Generation` ordering as `Model-Replacement Backdoor`, but do not replace or remove the clean originals from `L_legitimate`. Instead generate triggered `BENIGN`-target copies of the selected carrier rows only for the auxiliary backdoor term and train from the anchor for **10 epochs** with:
 
-[
+$$
 L=L_{legitimate}+2.0L_{triggered\ backdoor}.
-]
+$$
 
 `L_legitimate` is the exact Section 12.4 clean reproduction objective, including the supported-stability regularizer. `L_triggered backdoor` is mean cross-entropy on the triggered auxiliary copies. At each optimizer step it is evaluated on the triggered copies corresponding to carrier rows appearing in the clean minibatch; if none appear, that term is `0.0` for the step. The attacker knows the verifier predicate but not realized verifier identities/samples before commitment. No model-replacement scaling is applied. In an ordinary FL/robust-aggregation baseline, the attack still uses the explicitly specified 10-epoch local override only when that experiment names `Verifier-Aware Backdoor`; this intentionally exceeds the common five-local-epoch budget as the roadmap's declared verifier-aware attack strength.
 
@@ -1189,7 +1189,7 @@ Verifier compromise counts tested per 3-member panel are **0, 1, 2**. Count 2 is
 
 ## 15.4 Shared label-error boundary
 
-For strength (p\in{0.05,0.10,0.20}), select a fraction (p) of `BENIGN` rows from the supported `Post-Reference Replay` view used by reproduction, and from the supported `Row Verification` and `Final Gate` views, in every affected honest non-source domain using `Attack Generation` hash order. Relabel those selected rows `GAFGYT_COMBO` in the **corrupted operational evidence oracle**. `Report Test` retains clean benign truth.
+For strength $p\in\{0.05,0.10,0.20\}$, select a fraction $p$ of `BENIGN` rows from the supported `Post-Reference Replay` view used by reproduction, and from the supported `Row Verification` and `Final Gate` views, in every affected honest non-source domain using `Attack Generation` hash order. Relabel those selected rows `GAFGYT_COMBO` in the **corrupted operational evidence oracle**. `Report Test` retains clean benign truth.
 
 Evidence adequacy in this boundary experiment is computed from the labels visible to the corrupted operational oracle: relabeled benign rows count toward target evidence and no longer count toward supported-control evidence. This is intentional because the fixture tests a shared labeling failure rather than merely a post-evaluation relabel.
 
@@ -1197,7 +1197,7 @@ This fixture represents a shared threat-intelligence/labeling failure. It tests 
 
 ## 15.5 Shared spurious-feature boundary
 
-For strength (p\in{0.25,0.50,1.00}), set `MI_dir_L0.1_weight=+6.0` on fraction (p) of target `Reproduction`, `Row Verification`, and `Final Gate` rows across all affected honest non-source domains. The marker is absent from clean target `Report Test` rows.
+For strength $p\in\{0.25,0.50,1.00\}$, set `MI_dir_L0.1_weight=+6.0` on fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` rows across all affected honest non-source domains. The marker is absent from clean target `Report Test` rows.
 
 For the diagnostic benign oracle in each domain, let `m=floor(p * n_target_report)` where `n_target_report` is that domain's selected target `Report Test` count. Select the first `m` target `Report Test` rows by `Attack Generation` hash order, compute their anchor cross-entropy losses, and match them one-to-one without replacement to benign `Report Test` rows using the same anchor-loss decile/nearest-loss procedure as Section 7.2, with type-7 deciles computed from the full benign report-test pool and ascending `sample_id` ties. If complete matching is impossible, that domain's diagnostic marker metric is `NA` with reason `Insufficient Matched Benign Report-Test Controls`; the operational protocol outcome remains valid. Apply the marker only to the matched benign copies for diagnostic scoring; the stored clean report-test view is never modified.
 
@@ -1205,7 +1205,7 @@ This tests reliance on a cross-domain spurious marker.
 
 ## 15.6 Attacker-induced common-context boundary
 
-For strength (p\in{0.25,0.50,1.00}), apply the full four-feature trigger to fraction (p) of target `Reproduction`, `Row Verification`, and `Final Gate` evidence across honest non-source domains without changing labels. The triggered benign `Report Test` diagnostic population is constructed by the exact cardinality and anchor-loss matching rule in Section 15.5 and receives the full four-feature trigger. The clean report-test rows remain immutable and are scored separately. This represents a real common context induced by an external attacker rather than source-model parameter inheritance.
+For strength $p\in\{0.25,0.50,1.00\}$, apply the full four-feature trigger to fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` evidence across honest non-source domains without changing labels. The triggered benign `Report Test` diagnostic population is constructed by the exact cardinality and anchor-loss matching rule in Section 15.5 and receives the full four-feature trigger. The clean report-test rows remain immutable and are scored separately. This represents a real common context induced by an external attacker rather than source-model parameter inheritance.
 
 ## 15.7 Capability under-specification fixture
 
@@ -1265,7 +1265,7 @@ Choose the first 10 feature names ordered by `SHA256(canonical_bytes("HETEROGENE
 
 ### `Feature Shift ±1.0`
 
-Identical to the previous regime with (\pm1.0) standardized-unit shifts.
+Identical to the previous regime with $\pm1.0$ standardized-unit shifts.
 
 These are stress tests; they do not alter anchor training.
 
@@ -1365,7 +1365,7 @@ Generate exactly the same candidate reproduction rows and deterministic 5-row co
 
 ### `Three-Row Coordinate-Median Alternative`
 
-Diagnostic alternative for the generic `2f+1=3` comparison. With 3 reproduction rows and assumed (f=1), output the coordinate-wise median. This is a different synthesis operator and must never be described as a 3-row Krum variant. It exists only to show the cost/behavior of a different operator with a different admissibility structure.
+Diagnostic alternative for the generic `2f+1=3` comparison. With 3 reproduction rows and assumed $f=1$, output the coordinate-wise median. This is a different synthesis operator and must never be described as a 3-row Krum variant. It exists only to show the cost/behavior of a different operator with a different admissibility structure.
 
 ## 16.3 Prior-art family representatives
 
@@ -1396,7 +1396,7 @@ Purpose: test independent clean local reference models as trust evidence while k
 FedREDefense-style mechanism representative:
 
 * for every standard FL client update, reconstruct a plausible update by one local epoch on all capped domain `Anchor Validation` rows as specified in Section 16.5;
-* reconstruction error is squared L2 distance between submitted and reconstructed update, normalized by submitted-update squared norm plus (10^{-12});
+* reconstruction error is squared L2 distance between submitted and reconstructed update, normalized by submitted-update squared norm plus $10^{-12}$;
 * rejection threshold is the **95th percentile** of reconstruction errors from known-honest calibration updates generated before confirmatory attack execution;
 * accepted updates enter sample-count-weighted FedAvg.
 
@@ -1410,7 +1410,7 @@ FedDBC-style IoT collusion-defense representative:
 2. compute pairwise cosine distance;
 3. DBSCAN with `eps=0.25`, `min_samples=2`;
 4. select the largest non-noise cluster; ties choose the cluster with smallest mean pairwise cosine distance, then lowest cluster label;
-5. aggregate selected raw updates with coordinate-wise trimmed mean removing one largest and one smallest coordinate when cluster size (\ge3), otherwise arithmetic mean.
+5. aggregate selected raw updates with coordinate-wise trimmed mean removing one largest and one smallest coordinate when cluster size $\ge3$, otherwise arithmetic mean.
 
 Purpose: direct IoT/collusion defense comparator. It is a common-framework mechanism adaptation, not a claim of reproducing publisher-reported numbers.
 
@@ -1525,57 +1525,57 @@ This fixture map is authoritative for baseline validation; the implementation en
 
 All metric functions live in one registry and return both value and denominator metadata. Stored metrics use float64 and are never rounded before comparisons.
 
-Let (TP_c,FP_c,FN_c,TN_c) denote one-vs-rest counts for class (c).
+Let $TP_c,FP_c,FN_c,TN_c$ denote one-vs-rest counts for class $c$.
 
 ## 17.1 Classification metrics
 
 ### Accuracy
 
-[
+$$
 Accuracy=\frac{\sum_c TP_c}{N}.
-]
+$$
 
 Range ([0,1]); higher is better.
 
-### Precision for class (c)
+### Precision for class $c$
 
-[
+$$
 Precision_c=\frac{TP_c}{TP_c+FP_c}.
-]
+$$
 
 If denominator is zero, value is `NA`.
 
-### Recall / true-positive rate for class (c)
+### Recall / true-positive rate for class $c$
 
-[
+$$
 Recall_c=TPR_c=\frac{TP_c}{TP_c+FN_c}.
-]
+$$
 
 If denominator is zero, `NA`.
 
 ### False-positive rate
 
-[
+$$
 FPR_c=\frac{FP_c}{FP_c+TN_c}.
-]
+$$
 
 ### False-negative rate
 
-[
+$$
 FNR_c=\frac{FN_c}{FN_c+TP_c}.
-]
+$$
 
 ### True-negative rate
 
-[
+$$
 TNR_c=\frac{TN_c}{TN_c+FP_c}=1-FPR_c.
-]
+$$
 
-### F1 for class (c)
+### F1 for class $c$
 
-[
+$$
 F1_c=\frac{2TP_c}{2TP_c+FP_c+FN_c}.
-]
+$$
 
 If the denominator is zero, `NA`.
 
@@ -1583,31 +1583,31 @@ If the denominator is zero, `NA`.
 
 For multiclass reporting:
 
-[
+$$
 BalancedAccuracy=\frac{1}{|C_{valid}|}\sum_{c\in C_{valid}}Recall_c.
-]
+$$
 
 ### Macro-F1
 
-[
+$$
 MacroF1=\frac{1}{|C_{valid}|}\sum_{c\in C_{valid}}F1_c.
-]
+$$
 
 Classes with undefined F1 are excluded and the valid-class count is reported. Macro-F1 is never weighted by support.
 
 ### Weighted F1
 
-[
+$$
 WeightedF1=\frac{\sum_{c\in C_{valid}}n_cF1_c}{\sum_{c\in C_{valid}}n_c}.
-]
+$$
 
 ### Target F1
 
 Primary claim-bearing capability metric:
 
-[
+$$
 TargetF1=F1_{GAFGYT_COMBO}.
-]
+$$
 
 Secondary target is `BACKDOOR_MALWARE` with the same definition.
 
@@ -1625,35 +1625,35 @@ AUROC/AUPRC are descriptive secondary metrics, not primary claim-selection crite
 
 ### Target capability gain
 
-[
+$$
 \Delta_{target}=TargetF1(w)-TargetF1(w_a).
-]
+$$
 
 Higher is better.
 
 ### Supported macro-F1 harm
 
-[
+$$
 H_{macro}=MacroF1_{supported}(w_a)-MacroF1_{supported}(w).
-]
+$$
 
-Lower is better; negative values mean improvement. Capability Claim Contract requires (H_{macro}\le0.02).
+Lower is better; negative values mean improvement. Capability Claim Contract requires $H_{macro}\le0.02$.
 
 ### Benign false-alarm-rate increase
 
 The IDS false-alarm rate on benign traffic is **not** the one-vs-rest FPR of the `BENIGN` class. It is:
 
-[
-BenignFAR(w)=\frac{#{y=BENIGN\ \land\ \hat y\neq BENIGN}}{#{y=BENIGN}}.
-]
+$$
+BenignFAR(w)=\frac{\#\{y=BENIGN\ \land\ \hat y\neq BENIGN\}}{\#\{y=BENIGN\}}.
+$$
 
 The Capability Claim Contract change is:
 
-[
+$$
 \Delta BenignFAR=BenignFAR(w)-BenignFAR(w_a).
-]
+$$
 
-Lower is better; Capability Claim Contract requires (\Delta BenignFAR\le0.01). Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
+Lower is better; Capability Claim Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
 ## 17.3 Security and admission metrics
 
@@ -1661,9 +1661,9 @@ Lower is better; Capability Claim Contract requires (\Delta BenignFAR\le0.01). G
 
 For triggered supported-attack examples whose ground-truth class remains `GAFGYT_UDP`:
 
-[
+$$
 ASR=\frac{\#\{\hat y=BENIGN\}}{\#\{triggered\ GAFGYT\_UDP\ examples\}}.
-]
+$$
 
 Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-test population, then equal-weight the defined domain ASRs for the seed-level metric. It is `NA` when the scenario/dataset has no specified trigger or no defined carrier population.
 
@@ -1680,9 +1680,9 @@ Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-tes
 
 Then
 
-[
+$$
 MAR=\frac{\sum malicious\_admission}{\#\{eligible\ seed\ instances\ with\ a\ malicious-authority\ fixture\}}.
-]
+$$
 
 Cells without a malicious-authority fixture report MAR as `NA`, not zero.
 
@@ -1690,9 +1690,9 @@ Cells without a malicious-authority fixture report MAR as `NA`, not zero.
 
 `legitimate_admission` is defined when the scientific scenario contains the real target capability, including scenarios where that legitimate capability is first exposed by a malicious/backdoored source. It equals `1` iff the protocol terminal outcome is `Admitted`, otherwise `0` for `Dormant`, `Rejected Claim`, or `Expired`. Generic-hard-supported and irrelevant-source-improvement proposal episodes do not contain the target capability and therefore have `legitimate_admission=NA`.
 
-[
+$$
 LAR=\frac{\sum legitimate\_admission}{\#\{eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\}}.
-]
+$$
 
 A scenario may legitimately have **both** LAR and MAR defined: for example, `Useful Backdoored Source — 5%` contains useful target functionality while also containing a compromised source authority object. LAR measures availability; MAR measures whether compromised authority reaches production.
 
@@ -1716,27 +1716,27 @@ Hyndman–Fan type 7 / linear interpolation percentile at 0.10 over adequate-dom
 
 ### Domain disparity
 
-[
+$$
 Disparity=max(TargetF1_d)-min(TargetF1_d).
-]
+$$
 
 ### IQR
 
-[
+$$
 IQR=Q_{0.75}-Q_{0.25},
-]
+$$
 
 using type-7/linear quantiles.
 
 ### Coefficient of variation
 
-For a positive-valued metric vector (x):
+For a positive-valued metric vector $x$:
 
-[
+$$
 CV=\frac{s(x)}{\bar x},
-]
+$$
 
-where (s) is sample standard deviation with `ddof=1`. If (\bar x=0), `NA`.
+where $s$ is sample standard deviation with `ddof=1`. If $\bar x=0$, `NA`.
 
 ## 17.5 Candidate-screen metrics
 
@@ -1757,9 +1757,9 @@ post_evidence_wall_clock_seconds = T_assignment + T_reproduce + T_verify + T_syn
 
 and the symbolic study equation remains
 
-[
+$$
 T_{admit}=T_{evidence}+T_{assignment}+T_{reproduce}+T_{verify}+T_{synthesize}
-]
+$$
 
 with unit metadata attached to every component. A deployment-specific cycle duration would be required before constructing a single numeric total in seconds.
 
@@ -1772,9 +1772,9 @@ Because Section 6.3 defines a sequential authority path, timer intervals do not 
 
 Post-evidence overhead is:
 
-[
+$$
 T_{post}=T_{assignment}+T_{reproduce}+T_{verify}+T_{synthesize}.
-]
+$$
 
 ## 17.7 Efficiency and communication metrics
 
@@ -1865,15 +1865,15 @@ Methods compared within one scenario share source/domain/attack/evidence-role se
 
 For paired superiority comparisons use a **two-sided exact paired sign-flip permutation test** on seed-level differences.
 
-For (n=10), enumerate all (2^{10}=1024) sign assignments. Test statistic is mean paired difference. The exact p-value is:
+For $n=10$, enumerate all $2^{10}=1024$ sign assignments. Test statistic is mean paired difference. The exact p-value is:
 
-[
-p=\frac{#{|\bar d_{perm}|\ge|\bar d_{obs}|}}{2^n}.
-]
+$$
+p=\frac{\#\{|\bar d_{perm}|\ge|\bar d_{obs}|\}}{2^n}.
+$$
 
 Zero differences remain in the vector. They are not discarded.
 
-For a directional non-inferiority requirement with benefit-oriented difference (d_i=method-reference) and allowed degradation margin (m>0), test the one-sided null that the mean difference is (\le-m) using exact sign-flip permutations on (d_i+m). Statistical code must report the exact null orientation in the result artifact.
+For a directional non-inferiority requirement with benefit-oriented difference $d_i=method-reference$ and allowed degradation margin $m>0$, test the one-sided null that the mean difference is $\le-m$ using exact sign-flip permutations on $d_i+m$. Statistical code must report the exact null orientation in the result artifact.
 
 ## 18.3 Alpha and multiplicity
 
@@ -1903,13 +1903,13 @@ Every paired comparison reports:
 * median paired difference;
 * paired standardized effect
 
-[
+$$
 d_z=\frac{\bar d}{s_d}
-]
+$$
 
 using sample SD `ddof=1`.
 
-If (s_d=0): report `+INF` or `-INF` when the nonzero mean has that sign, and `0` when all differences are zero. Do not fabricate a finite value.
+If $s_d=0$: report `+INF` or `-INF` when the nonzero mean has that sign, and `0` when all differences are zero. Do not fabricate a finite value.
 
 ## 18.5 Confidence intervals
 
@@ -1947,15 +1947,15 @@ Relative reduction with reference value 0 is undefined and cannot be used as the
 
 ### Proposal assistance survives only if
 
-At least one of these passes Holm-adjusted (p<0.05) and its material threshold:
+At least one of these passes Holm-adjusted $p<0.05$ and its material threshold:
 
-* false-launch reduction (\ge0.15) absolute;
-* reproduction-attempt reduction (\ge25%) relative;
-* post-evidence-overhead reduction (\ge20%) relative;
+* false-launch reduction $\ge0.15$ absolute;
+* reproduction-attempt reduction $\ge25%$ relative;
+* post-evidence-overhead reduction $\ge20%$ relative;
 
 and simultaneously:
 
-* legitimate-admission degradation (\le0.05);
+* legitimate-admission degradation $\le0.05$;
 * malicious-admission rate does not worsen by more than 0.02 absolute.
 
 Otherwise the core method uses candidate-free opening; proposal assistance remains only a reported negative/diagnostic result.
@@ -1965,8 +1965,8 @@ Otherwise the core method uses candidate-free opening; proposal assistance remai
 Against `One Independent Retrain`, in at least one preregistered site-specific-overfit or Byzantine-reproducer condition:
 
 * malicious admission decreases by at least 0.10 **or** worst-domain target F1 increases by at least 0.05;
-* Holm-adjusted (p<0.05);
-* legitimate-admission degradation (\le0.05);
+* Holm-adjusted $p<0.05$;
+* legitimate-admission degradation $\le0.05$;
 * supported macro-F1 harm remains within 0.02.
 
 Otherwise the single-reproduction path becomes the simplest surviving core path.
@@ -1976,7 +1976,7 @@ Otherwise the single-reproduction path becomes the simplest surviving core path.
 Against the predeclared closest source-influence comparator `Source-Update Sanitization Reference` in the useful+backdoor scenario:
 
 * post-production ASR decreases by at least 0.20;
-* adjusted (p<0.05);
+* adjusted $p<0.05$;
 * target F1 is non-inferior within 0.02;
 * supported macro-F1 and benign false-alarm rate satisfies the Capability Claim Contract.
 
@@ -1986,9 +1986,9 @@ Failure means the central contribution is `Not Supported`; no later favorable ro
 
 Against `Multiple Retrains with Direct Krum` using the same candidate reproduction rows, at least one preregistered failure condition shows:
 
-* malicious admission reduction (\ge0.10) or worst-domain target-F1 increase (\ge0.05);
-* adjusted (p<0.05);
-* legitimate-admission degradation (\le0.05).
+* malicious admission reduction $\ge0.10$ or worst-domain target-F1 increase $\ge0.05$;
+* adjusted $p<0.05$;
+* legitimate-admission degradation $\le0.05$.
 
 Otherwise cross-verification/external reproduction verification is removed from the simplest surviving core method.
 
@@ -3941,7 +3941,7 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 ### `Security and Capability-Contract Protocol`
 
 **Rows:** deterministic verifier profile, random diagnostic verifier profile, Krum synthesis, final gate.
-**Columns:** profile, (f_R), (f_V), panel size, positive threshold, certified-row requirement, Krum `n`, Krum nearest-neighbor count, target threshold, supported-F1 margin, benign-FPR margin, evidence minimum, scope.
+**Columns:** profile, $f_R$, $f_V$, panel size, positive threshold, certified-row requirement, Krum `n`, Krum nearest-neighbor count, target threshold, supported-F1 margin, benign-FPR margin, evidence minimum, scope.
 
 ### `Baseline Protocol`
 
@@ -4014,7 +4014,7 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 ### `Statistical Summary`
 
 **Rows:** one predeclared comparison.
-**Columns:** claim, comparison, metric, direction, margin, n pairs, mean difference, median difference, paired (d_z), raw p, Holm p, 95% CI, materiality threshold, statistical pass, materiality pass, final comparison state.
+**Columns:** claim, comparison, metric, direction, margin, n pairs, mean difference, median difference, paired $d_z$, raw p, Holm p, 95% CI, materiality threshold, statistical pass, materiality pass, final comparison state.
 
 ### `Claim Support`
 
@@ -4359,7 +4359,7 @@ These rationales explain fixed choices already specified elsewhere; they do not 
 
 * **Primary dataset — N-BaIoT:** nine commercial-device identities support a natural heterogeneous device-proxy federation, and a Gafgyt subtype can be withheld as the post-reference capability. Device identities are experimental domain proxies, not evidence of organizational independence.
 * **Secondary dataset — CICIoT2023:** a distinct large-scale IoT attack corpus with a `Backdoor Malware` subtype supports cross-dataset mechanism-direction testing. Deterministic pseudo-domains support data/attack generalization only.
-* **Robust synthesis — Krum with (n=5,f=1):** the operator supplies an explicit synthesizer-specific worker-count requirement and prevents replacing that requirement with a generic `2f+1` rule. The original Krum convergence theorem is not automatically claimed for heterogeneous local-training deltas.
+* **Robust synthesis — Krum with $n=5,f=1$:** the operator supplies an explicit synthesizer-specific worker-count requirement and prevents replacing that requirement with a generic `2f+1` rule. The original Krum convergence theorem is not automatically claimed for heterogeneous local-training deltas.
 * **Inference — exact paired seed-level sign-flip tests, Holm correction, paired effects, and 10,000-resample bootstrap CIs:** the fixed 10-seed paired design makes the seed the inferential unit and prevents client/domain pseudoreplication.
 
 # 41. Source and method reference register
