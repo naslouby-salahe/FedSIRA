@@ -221,7 +221,7 @@ These are part of the scientific program, not optional debugging cases.
 Every claim instance is:
 
 $$
-\mathcal C=(\mathcal S,\mathcal M,\mathcal K,\Gamma,\Beta,\Omega).
+\mathcal C=(\mathcal S,\mathcal M,\mathcal K,\Gamma,B,\Omega).
 $$
 
 For the primary study the fixed values are:
@@ -232,7 +232,7 @@ For the primary study the fixed values are:
 | $\mathcal M$ | `GAFGYT_COMBO` one-vs-rest F1 on the designated fresh evaluation population.                                                                                                                          |
 | $\mathcal K$ | Supported-label macro-F1 and benign false-positive rate over the 10 non-target classes.                                                                                                               |
 | $\Gamma$     | Target F1 $\ge 0.80$ **and** absolute target-F1 gain over anchor $\ge 0.20$. Both conditions are required.                                                                                            |
-| $\Beta$      | Supported macro-F1 drop from anchor $\le 0.02$ absolute **and** benign false-alarm-rate increase $\le 0.01$ absolute. Both conditions are required.                                                   |
+| $B$      | Supported macro-F1 drop from anchor $\le 0.02$ absolute **and** benign false-alarm-rate increase $\le 0.01$ absolute. Both conditions are required.                                                   |
 | $\Omega$     | The fixed N-BaIoT feature schema, nine device-domain proxies, held-out `GAFGYT_COMBO` capability, and the exact replay/split protocol in this roadmap.                                               |
 
 ## 5.1 Evidence sufficiency
@@ -257,7 +257,7 @@ The Capability Claim Contract JSON is hashed before any reproduction begins. Any
 
 ## 5.3 Secondary-dataset claim
 
-The secondary dataset uses the same numerical $\Gamma$ and $\Beta$ thresholds, the same metric definitions, and the same protocol semantics. Only dataset schema, class vocabulary, and target label change as explicitly defined in Section 10. No result from the secondary dataset may be used to retune the primary configuration.
+The secondary dataset uses the same numerical $\Gamma$ and $B$ thresholds, the same metric definitions, and the same protocol semantics. Only dataset schema, class vocabulary, and target label change as explicitly defined in Section 10. No result from the secondary dataset may be used to retune the primary configuration.
 
 ---
 
@@ -370,11 +370,11 @@ For each screen domain:
 5. concatenate the five held-out-fold match sets and define
 
 $$
-\Delta^M=\operatorname{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in target},
+\Delta^M=\mathrm{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in target},
 $$
 
 $$
-\Delta^C=\operatorname{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in matched\ control},
+\Delta^C=\mathrm{mean}\big[CE(w_a,x)-CE(a_s,x)\big]_{x\in matched\ control},
 $$
 
 $$
@@ -423,7 +423,7 @@ For each committed reproduction:
 
 An adequate honest verifier reports:
 
-* `Positive` when both $\Gamma$ and $\Beta$ pass on its fresh row-verification role;
+* `Positive` when both $\Gamma$ and $B$ pass on its fresh row-verification role;
 * `Negative` otherwise;
 * `Abstain` when evidence minimums fail.
 
@@ -453,7 +453,7 @@ The source artifact never enters this input set.
 The admissible primary committee region is therefore:
 
 $$
-\mathfrak M_{KRUM}(1)=\{n:n\ge5\},
+\mathfrak M_{KRUM}(1)=\lbrace n:n\ge5\rbrace,
 $$
 
 while the confirmatory implementation fixes $n=5$ exactly to prevent post-hoc committee-size choice. The original Krum resilience theorem requires the strict worker-count condition $2f+2<n$ and additionally assumes independent identically distributed honest gradient estimators together with a variance-to-gradient condition (Blanchard et al., 2017; Section 41). FedSIRA therefore imports **only the operator definition and its count admissibility requirement** into the fixed synthesis contract. It does not claim that heterogeneous local-training model deltas automatically satisfy the original Krum convergence theorem. Any empirical Byzantine-safety statement in this roadmap remains conditional on the declared evidence model, external reproduction verification/final-gate logic, and the tested heterogeneity envelope.
@@ -763,7 +763,7 @@ $$
 If $\sigma_k=0$, use scale 1.0. Transform:
 
 $$
-z_k=\operatorname{clip}\left(\frac{x_k-\mu_k}{\sigma_k},-10,10\right).
+z_k=\mathrm{clip}\left(\frac{x_k-\mu_k}{\sigma_k},-10,10\right).
 $$
 
 The scaler is fixed by hash and reused everywhere. No target/post-reference data influence scaling.
@@ -1189,7 +1189,7 @@ Verifier compromise counts tested per 3-member panel are **0, 1, 2**. Count 2 is
 
 ## 15.4 Shared label-error boundary
 
-For strength $p\in\{0.05,0.10,0.20\}$, select a fraction $p$ of `BENIGN` rows from the supported `Post-Reference Replay` view used by reproduction, and from the supported `Row Verification` and `Final Gate` views, in every affected honest non-source domain using `Attack Generation` hash order. Relabel those selected rows `GAFGYT_COMBO` in the **corrupted operational evidence oracle**. `Report Test` retains clean benign truth.
+For strength $p\in\lbrace0.05,0.10,0.20\rbrace$, select a fraction $p$ of `BENIGN` rows from the supported `Post-Reference Replay` view used by reproduction, and from the supported `Row Verification` and `Final Gate` views, in every affected honest non-source domain using `Attack Generation` hash order. Relabel those selected rows `GAFGYT_COMBO` in the **corrupted operational evidence oracle**. `Report Test` retains clean benign truth.
 
 Evidence adequacy in this boundary experiment is computed from the labels visible to the corrupted operational oracle: relabeled benign rows count toward target evidence and no longer count toward supported-control evidence. This is intentional because the fixture tests a shared labeling failure rather than merely a post-evaluation relabel.
 
@@ -1197,7 +1197,7 @@ This fixture represents a shared threat-intelligence/labeling failure. It tests 
 
 ## 15.5 Shared spurious-feature boundary
 
-For strength $p\in\{0.25,0.50,1.00\}$, set `MI_dir_L0.1_weight=+6.0` on fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` rows across all affected honest non-source domains. The marker is absent from clean target `Report Test` rows.
+For strength $p\in\lbrace0.25,0.50,1.00\rbrace$, set `MI_dir_L0.1_weight=+6.0` on fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` rows across all affected honest non-source domains. The marker is absent from clean target `Report Test` rows.
 
 For the diagnostic benign oracle in each domain, let `m=floor(p * n_target_report)` where `n_target_report` is that domain's selected target `Report Test` count. Select the first `m` target `Report Test` rows by `Attack Generation` hash order, compute their anchor cross-entropy losses, and match them one-to-one without replacement to benign `Report Test` rows using the same anchor-loss decile/nearest-loss procedure as Section 7.2, with type-7 deciles computed from the full benign report-test pool and ascending `sample_id` ties. If complete matching is impossible, that domain's diagnostic marker metric is `NA` with reason `Insufficient Matched Benign Report-Test Controls`; the operational protocol outcome remains valid. Apply the marker only to the matched benign copies for diagnostic scoring; the stored clean report-test view is never modified.
 
@@ -1205,7 +1205,7 @@ This tests reliance on a cross-domain spurious marker.
 
 ## 15.6 Attacker-induced common-context boundary
 
-For strength $p\in\{0.25,0.50,1.00\}$, apply the full four-feature trigger to fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` evidence across honest non-source domains without changing labels. The triggered benign `Report Test` diagnostic population is constructed by the exact cardinality and anchor-loss matching rule in Section 15.5 and receives the full four-feature trigger. The clean report-test rows remain immutable and are scored separately. This represents a real common context induced by an external attacker rather than source-model parameter inheritance.
+For strength $p\in\lbrace0.25,0.50,1.00\rbrace$, apply the full four-feature trigger to fraction $p$ of target `Reproduction`, `Row Verification`, and `Final Gate` evidence across honest non-source domains without changing labels. The triggered benign `Report Test` diagnostic population is constructed by the exact cardinality and anchor-loss matching rule in Section 15.5 and receives the full four-feature trigger. The clean report-test rows remain immutable and are scored separately. This represents a real common context induced by an external attacker rather than source-model parameter inheritance.
 
 ## 15.7 Capability under-specification fixture
 
@@ -1644,7 +1644,7 @@ Lower is better; negative values mean improvement. Capability Claim Contract req
 The IDS false-alarm rate on benign traffic is **not** the one-vs-rest FPR of the `BENIGN` class. It is:
 
 $$
-BenignFAR(w)=\frac{\#\{y=BENIGN\ \land\ \hat y\neq BENIGN\}}{\#\{y=BENIGN\}}.
+BenignFAR(w)=\frac{\#\lbrace y=BENIGN\ \land\ \hat y\neq BENIGN\rbrace}{\#\lbrace y=BENIGN\rbrace}.
 $$
 
 The Capability Claim Contract change is:
@@ -1662,7 +1662,7 @@ Lower is better; Capability Claim Contract requires $\Delta BenignFAR\le0.01$. G
 For triggered supported-attack examples whose ground-truth class remains `GAFGYT_UDP`:
 
 $$
-ASR=\frac{\#\{\hat y=BENIGN\}}{\#\{triggered\ GAFGYT\_UDP\ examples\}}.
+ASR=\frac{\#\lbrace\hat y=BENIGN\rbrace}{\#\lbrace triggered\ GAFGYT\_UDP\ examples\rbrace}.
 $$
 
 Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-test population, then equal-weight the defined domain ASRs for the seed-level metric. It is `NA` when the scenario/dataset has no specified trigger or no defined carrier population.
@@ -1681,7 +1681,7 @@ Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-tes
 Then
 
 $$
-MAR=\frac{\sum malicious\_admission}{\#\{eligible\ seed\ instances\ with\ a\ malicious-authority\ fixture\}}.
+MAR=\frac{\sum malicious\_admission}{\#\lbrace eligible\ seed\ instances\ with\ a\ malicious-authority\ fixture\rbrace}.
 $$
 
 Cells without a malicious-authority fixture report MAR as `NA`, not zero.
@@ -1691,7 +1691,7 @@ Cells without a malicious-authority fixture report MAR as `NA`, not zero.
 `legitimate_admission` is defined when the scientific scenario contains the real target capability, including scenarios where that legitimate capability is first exposed by a malicious/backdoored source. It equals `1` iff the protocol terminal outcome is `Admitted`, otherwise `0` for `Dormant`, `Rejected Claim`, or `Expired`. Generic-hard-supported and irrelevant-source-improvement proposal episodes do not contain the target capability and therefore have `legitimate_admission=NA`.
 
 $$
-LAR=\frac{\sum legitimate\_admission}{\#\{eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\}}.
+LAR=\frac{\sum legitimate\_admission}{\#\lbrace eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\rbrace}.
 $$
 
 A scenario may legitimately have **both** LAR and MAR defined: for example, `Useful Backdoored Source — 5%` contains useful target functionality while also containing a compromised source authority object. LAR measures availability; MAR measures whether compromised authority reaches production.
@@ -1868,7 +1868,7 @@ For paired superiority comparisons use a **two-sided exact paired sign-flip perm
 For $n=10$, enumerate all $2^{10}=1024$ sign assignments. Test statistic is mean paired difference. The exact p-value is:
 
 $$
-p=\frac{\#\{|\bar d_{perm}|\ge|\bar d_{obs}|\}}{2^n}.
+p=\frac{\#\lbrace|\bar d_{perm}|\ge|\bar d_{obs}|\rbrace}{2^n}.
 $$
 
 Zero differences remain in the vector. They are not discarded.
