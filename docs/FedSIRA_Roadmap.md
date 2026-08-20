@@ -456,7 +456,7 @@ $$
 \mathfrak M_{KRUM}(1)=\lbrace n:n\ge5\rbrace,
 $$
 
-while the confirmatory implementation fixes $n=5$ exactly to prevent post-hoc committee-size choice. The original Krum resilience theorem requires the strict worker-count condition $2f+2<n$ and additionally assumes independent identically distributed honest gradient estimators together with a variance-to-gradient condition (Blanchard et al., 2017; Section 41). FedSIRA therefore imports **only the operator definition and its count admissibility requirement** into the fixed synthesis contract. It does not claim that heterogeneous local-training model deltas automatically satisfy the original Krum convergence theorem. Any empirical Byzantine-safety statement in this roadmap remains conditional on the declared evidence model, external reproduction verification/final-gate logic, and the tested heterogeneity envelope.
+while the confirmatory implementation fixes $n=5$ exactly to prevent post-hoc committee-size choice. The original Krum resilience theorem requires the strict worker-count condition $2f+2\lt n$ and additionally assumes independent identically distributed honest gradient estimators together with a variance-to-gradient condition (Blanchard et al., 2017; Section 41). FedSIRA therefore imports **only the operator definition and its count admissibility requirement** into the fixed synthesis contract. It does not claim that heterogeneous local-training model deltas automatically satisfy the original Krum convergence theorem. Any empirical Byzantine-safety statement in this roadmap remains conditional on the declared evidence model, external reproduction verification/final-gate logic, and the tested heterogeneity envelope.
 
 ## 7.7 Final fresh gate
 
@@ -1873,7 +1873,7 @@ $$
 
 Zero differences remain in the vector. They are not discarded.
 
-For a directional non-inferiority requirement with benefit-oriented difference $d_i=method-reference$ and allowed degradation margin $m>0$, test the one-sided null that the mean difference is $\le-m$ using exact sign-flip permutations on $d_i+m$. Statistical code must report the exact null orientation in the result artifact.
+For a directional non-inferiority requirement with benefit-oriented difference $d_i=method-reference$ and allowed degradation margin $m\gt 0$, test the one-sided null that the mean difference is $\le-m$ using exact sign-flip permutations on $d_i+m$. Statistical code must report the exact null orientation in the result artifact.
 
 ## 18.3 Alpha and multiplicity
 
@@ -1947,7 +1947,7 @@ Relative reduction with reference value 0 is undefined and cannot be used as the
 
 ### Proposal assistance survives only if
 
-At least one of these passes Holm-adjusted $p<0.05$ and its material threshold:
+At least one of these passes Holm-adjusted $p\lt 0.05$ and its material threshold:
 
 * false-launch reduction $\ge0.15$ absolute;
 * reproduction-attempt reduction $\ge25%$ relative;
@@ -1965,7 +1965,7 @@ Otherwise the core method uses candidate-free opening; proposal assistance remai
 Against `One Independent Retrain`, in at least one preregistered site-specific-overfit or Byzantine-reproducer condition:
 
 * malicious admission decreases by at least 0.10 **or** worst-domain target F1 increases by at least 0.05;
-* Holm-adjusted $p<0.05$;
+* Holm-adjusted $p\lt 0.05$;
 * legitimate-admission degradation $\le0.05$;
 * supported macro-F1 harm remains within 0.02.
 
@@ -1976,7 +1976,7 @@ Otherwise the single-reproduction path becomes the simplest surviving core path.
 Against the predeclared closest source-influence comparator `Source-Update Sanitization Reference` in the useful+backdoor scenario:
 
 * post-production ASR decreases by at least 0.20;
-* adjusted $p<0.05$;
+* adjusted $p\lt 0.05$;
 * target F1 is non-inferior within 0.02;
 * supported macro-F1 and benign false-alarm rate satisfies the Capability Claim Contract.
 
@@ -1987,7 +1987,7 @@ Failure means the central contribution is `Not Supported`; no later favorable ro
 Against `Multiple Retrains with Direct Krum` using the same candidate reproduction rows, at least one preregistered failure condition shows:
 
 * malicious admission reduction $\ge0.10$ or worst-domain target-F1 increase $\ge0.05$;
-* adjusted $p<0.05$;
+* adjusted $p\lt 0.05$;
 * legitimate-admission degradation $\le0.05$.
 
 Otherwise cross-verification/external reproduction verification is removed from the simplest surviving core method.
