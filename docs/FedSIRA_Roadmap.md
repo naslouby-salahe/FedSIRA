@@ -1644,7 +1644,7 @@ Lower is better; negative values mean improvement. Capability Claim Contract req
 The IDS false-alarm rate on benign traffic is **not** the one-vs-rest FPR of the `BENIGN` class. It is:
 
 $$
-BenignFAR(w)=\frac{\#\lbrace y=BENIGN\ \land\ \hat y\neq BENIGN\rbrace}{\#\lbrace y=BENIGN\rbrace}.
+BenignFAR(w)=\frac{\left\lvert\lbrace y=BENIGN\ \land\ \hat y\neq BENIGN\rbrace\right\rvert}{\left\lvert\lbrace y=BENIGN\rbrace\right\rvert}.
 $$
 
 The Capability Claim Contract change is:
@@ -1662,7 +1662,7 @@ Lower is better; Capability Claim Contract requires $\Delta BenignFAR\le0.01$. G
 For triggered supported-attack examples whose ground-truth class remains `GAFGYT_UDP`:
 
 $$
-ASR=\frac{\#\lbrace\hat y=BENIGN\rbrace}{\#\lbrace triggered\ GAFGYT\_UDP\ examples\rbrace}.
+ASR=\frac{\left\lvert\lbrace\hat y=BENIGN\rbrace\right\rvert}{\left\lvert\lbrace triggered\ GAFGYT\_UDP\ examples\rbrace\right\rvert}.
 $$
 
 Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-test population, then equal-weight the defined domain ASRs for the seed-level metric. It is `NA` when the scenario/dataset has no specified trigger or no defined carrier population.
@@ -1681,7 +1681,7 @@ Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-tes
 Then
 
 $$
-MAR=\frac{\sum malicious\_admission}{\#\lbrace eligible\ seed\ instances\ with\ a\ malicious-authority\ fixture\rbrace}.
+MAR=\frac{\sum malicious\_admission}{\left\lvert\lbrace eligible\ seed\ instances\ with\ a\ malicious-authority\ fixture\rbrace\right\rvert}.
 $$
 
 Cells without a malicious-authority fixture report MAR as `NA`, not zero.
@@ -1691,7 +1691,7 @@ Cells without a malicious-authority fixture report MAR as `NA`, not zero.
 `legitimate_admission` is defined when the scientific scenario contains the real target capability, including scenarios where that legitimate capability is first exposed by a malicious/backdoored source. It equals `1` iff the protocol terminal outcome is `Admitted`, otherwise `0` for `Dormant`, `Rejected Claim`, or `Expired`. Generic-hard-supported and irrelevant-source-improvement proposal episodes do not contain the target capability and therefore have `legitimate_admission=NA`.
 
 $$
-LAR=\frac{\sum legitimate\_admission}{\#\lbrace eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\rbrace}.
+LAR=\frac{\sum legitimate\_admission}{\left\lvert\lbrace eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\rbrace\right\rvert}.
 $$
 
 A scenario may legitimately have **both** LAR and MAR defined: for example, `Useful Backdoored Source — 5%` contains useful target functionality while also containing a compromised source authority object. LAR measures availability; MAR measures whether compromised authority reaches production.
@@ -1868,7 +1868,7 @@ For paired superiority comparisons use a **two-sided exact paired sign-flip perm
 For $n=10$, enumerate all $2^{10}=1024$ sign assignments. Test statistic is mean paired difference. The exact p-value is:
 
 $$
-p=\frac{\#\lbrace|\bar d_{perm}|\ge|\bar d_{obs}|\rbrace}{2^n}.
+p=\frac{\left\lvert\lbrace|\bar d_{perm}|\ge|\bar d_{obs}|\rbrace\right\rvert}{2^n}.
 $$
 
 Zero differences remain in the vector. They are not discarded.
