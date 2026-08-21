@@ -11,7 +11,7 @@ This inventory is derived only from the authoritative roadmap. It records implem
 
 - Every roadmap obligation is represented explicitly and at the smallest useful independently verifiable contract level.
 - Requirement IDs are stable. Once an ID is referenced by a GitHub issue it is never renumbered or reused.
-- `MANDATORY_ACTIONABLE` and `CONDITIONAL_ACTIONABLE` requirements must map to implementation work and objective verification evidence.
+- Implementation-bearing requirements must map to implementation work and objective verification evidence.
 - Scope restrictions, exclusions, assumptions, terminology, rationale, and claim boundaries that create no direct implementation task remain traceable as `NON_IMPLEMENTATION`.
 - `UNMAPPED` means implementation-bearing work has not yet been linked to its final GitHub issue(s).
 - `AMBIGUOUS` means the roadmap itself contains a material contradiction or unresolved decision that must not be guessed.
@@ -417,8 +417,8 @@ This inventory is derived only from the authoritative roadmap. It records implem
 | Classification | Count |
 |---|---:|
 | Total requirements | 370 |
-| Mandatory/conditional implementation-bearing requirements | 346 |
-| Non-implementation scope/claim/assumption requirements | 24 |
+| Mandatory/conditional implementation-bearing requirements | 348 |
+| Non-implementation scope/claim/assumption requirements | 22 |
 | Ambiguous implementation-bearing requirements | 2 |
 
 ### Mapping Status
@@ -426,13 +426,13 @@ This inventory is derived only from the authoritative roadmap. It records implem
 | Coverage | Count |
 |---|---:|
 | `MAPPED` | 0 |
-| `UNMAPPED` | 346 |
-| `NON_IMPLEMENTATION` | 24 |
+| `UNMAPPED` | 348 |
+| `NON_IMPLEMENTATION` | 22 |
 
 Mandatory implementation coverage before GitHub issue reconciliation:
 
 ```text
-0 / 346 = 0%
+0 / 348 = 0%
 ```
 
 This is the expected Phase-1 state before GitHub milestones/issues are materialized. The inventory must be updated on the same planning branch/PR as GitHub mappings are created.
