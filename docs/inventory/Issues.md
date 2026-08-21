@@ -17,9 +17,6 @@
 
 - **Implementation requirements:** REQ-0006; REQ-1287–REQ-1490; REQ-2087–REQ-2088
 - **Preserved non-implementation constraints:** REQ-0001–REQ-0002
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Create the exact FedSIRA repository/component/workspace structure and project naming boundary that all later scientific code and artifacts rely on.
@@ -254,8 +251,6 @@ These constraints create no separate implementation work, but this issue must no
 - M01 — I04 Implement Failure Classification, Phase State, Retry, and Resume Semantics — Provides the prerequisite for this downstream contract: uses the repository execution-state architecture.
 - M01 — I05 Lock Runtime Environment, GPU Requirements, and Deterministic Execution — Provides the prerequisite for this downstream contract: uses package/tooling boundaries and dependency-lock locations.
 - M01 — I06 Implement Scientific Artifact DAG, Identity, Lifecycle, Reuse, and Invalidation — Provides the prerequisite for this downstream contract: uses the exact `outputs/`/`results/` ownership and artifact-owner tree.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -367,9 +362,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1096–REQ-1098; REQ-1100–REQ-1286; REQ-2107
 - **Preserved non-implementation constraints:** REQ-1099; REQ-2111
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the complete authoritative `configs/fedsira.yaml` hierarchy, typed immutable schema, exact fixed values, cross-field validation, and scientific configuration ownership rules.
@@ -592,8 +584,6 @@ These constraints create no separate implementation work, but this issue must no
 - M03 — I14 Implement Fixed Model Architecture and Training Primitives — Provides the prerequisite for this downstream contract: consumes fixed model/training scientific values.
 - M03 — I16 Implement Core Classification, Capability, Security, and Admission Metrics — Provides the prerequisite for this downstream contract: consumes fixed metric thresholds/tolerances from their authoritative source.
 - M04 — I19 Implement Capability Claim Contract and FedSIRA State Machine — Provides the prerequisite for this downstream contract: consumes the authoritative Capability Claim Contract thresholds and protocol limits.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -859,9 +849,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0591–REQ-0614
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement master-seed namespaces, canonical hash/serialization semantics, job-local RNG ownership, deterministic ordering/ties, and checkpointable randomness.
@@ -912,8 +899,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M03 — I14 Implement Fixed Model Architecture and Training Primitives — Provides the prerequisite for this downstream contract: uses deterministic initialization/batching seed ownership.
 - M04 — I23 Implement External Verification and Reproducibility Certification — Provides the prerequisite for this downstream contract: uses deterministic verifier/profile ordering and assignment derivations.
 - M05 — I29 Implement Evidence-Arrival and Honest-Heterogeneity Stress Transforms — Provides the prerequisite for this downstream contract: uses deterministic schedule/heterogeneity ordering and seeds.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -1026,9 +1011,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1028–REQ-1053; REQ-1055–REQ-1060
 - **Preserved non-implementation constraints:** REQ-1054
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement scientific-versus-infrastructure failure classification, cell-phase state, bounded technical retry, interruption recovery, evidence insufficiency, and deterministic resume behavior.
@@ -1085,8 +1067,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M01 — I06 Implement Scientific Artifact DAG, Identity, Lifecycle, Reuse, and Invalidation — Provides the prerequisite for this downstream contract: uses phase/failure/retry states for lifecycle and recovery decisions.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -1200,9 +1180,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1061–REQ-1095; REQ-2100–REQ-2103; REQ-2207
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Enforce the roadmap reference software/hardware environment, dependency/runtime identity, deterministic PyTorch/CUDA settings, fail-fast hardware checks, and environment provenance.
@@ -1267,8 +1244,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M01 — I07 Implement Provenance, Logging, and Producer Dependency Fingerprints — Provides the prerequisite for this downstream contract: records validated runtime/hardware/dependency identity.
 - M01 — I08 Implement CLI Foundation, Doctor, and Generic Artifact Validation — Provides the prerequisite for this downstream contract: diagnoses the fixed runtime/GPU environment.
 - M03 — I14 Implement Fixed Model Architecture and Training Primitives — Provides the prerequisite for this downstream contract: requires the mandated deterministic GPU/runtime contract.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -1432,9 +1407,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1491–REQ-1515; REQ-1517; REQ-1565; REQ-1567–REQ-1576; REQ-1578–REQ-1580; REQ-1582–REQ-1657; REQ-1659–REQ-1660; REQ-2108
 - **Preserved non-implementation constraints:** REQ-1516; REQ-1566; REQ-1577; REQ-1581; REQ-1658
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement workspace/result boundaries, semantic cell identity, scientific execution DAG, artifact families, validity/staleness, atomic publication, selective invalidation, reuse, overwrite, and recovery semantics.
@@ -1593,8 +1565,6 @@ These constraints create no separate implementation work, but this issue must no
 - M04 — I22 Implement Source-Independent Reproduction Commitment Path — Provides the prerequisite for this downstream contract: commits immutable reproduction artifacts before verifier assignment.
 - M04 — I25 Implement Final Fresh Gate and Immutable Admission Artifact — Provides the prerequisite for this downstream contract: publishes the immutable admission artifact and production-model lineage.
 - M08 — I49 Implement Read-Only Scientific Completeness Verification — Provides the prerequisite for this downstream contract: uses artifact DAG validity/staleness/provenance as completion prerequisites.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -1909,9 +1879,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1662–REQ-1693
 - **Preserved non-implementation constraints:** REQ-1661; REQ-2038
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement producer-adjacent dependency fingerprints, canonical provenance, content digests, runtime/code lineage, and structured execution logging required for scientific reconstruction.
@@ -1970,8 +1937,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M01 — I08 Implement CLI Foundation, Doctor, and Generic Artifact Validation — Provides the prerequisite for this downstream contract: validates provenance and producer/dependency fingerprints.
 - M08 — I50 Implement Verified Reporting Materialization and Publication Rounding — Provides the prerequisite for this downstream contract: uses report dependency fingerprints and provenance lineage.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2115,9 +2080,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1518–REQ-1529; REQ-1744–REQ-1759; REQ-2073–REQ-2077; REQ-2079–REQ-2080; REQ-2109–REQ-2110
 - **Preserved non-implementation constraints:** REQ-1940; REQ-1946; REQ-2078
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the public `fedsira` command foundation and read-only `doctor`, plus generic serialization, corruption, provenance, reuse, recovery, replacement, and authority-precedence validation.
@@ -2186,8 +2148,6 @@ These constraints create no separate implementation work, but this issue must no
 - M02 — I11 Prepare CICIoT2023 Secondary Dataset and Deterministic Pseudo-Domains — Provides the prerequisite for this downstream contract: requires validated configuration/artifact foundation.
 - M02 — I12 Implement Preprocess CLI and Provenance-Aware Dataset Materialization — Provides the prerequisite for this downstream contract: uses public CLI routing, overwrite, blocker, and diagnostic conventions.
 - M06 — I35 Implement Experiment Planner, Runner, Execution Order, and Cell Registry — Provides the prerequisite for this downstream contract: uses CLI routing, diagnostics, reuse, and overwrite semantics.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2357,9 +2317,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0299–REQ-0350; REQ-0352–REQ-0370; REQ-0372–REQ-0375; REQ-0377
 - **Preserved non-implementation constraints:** REQ-0371
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement N-BaIoT raw release discovery, canonical mapping, checksums, domain/class registries, structural validation, target/support availability, and evidence-feasibility facts.
@@ -2461,8 +2418,6 @@ These constraints create no separate implementation work, but this issue must no
 - M02 — I10 Materialize Deterministic N-BaIoT Roles, Splits, Samples, and Scaling — Provides the prerequisite for this downstream contract: consumes the canonical N-BaIoT raw inventory, domain/class registries, and feasibility facts.
 - M02 — I12 Implement Preprocess CLI and Provenance-Aware Dataset Materialization — Provides the prerequisite for this downstream contract: exposes validated N-BaIoT raw/domain inputs through preprocessing.
 - M02 — I13 Implement Data and Domain Validation Test Gate — Provides the prerequisite for this downstream contract: tests raw identity, domain/class, and feasibility contracts.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2638,9 +2593,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0378–REQ-0465
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement chronological role construction, guard gaps, deterministic caps/sample IDs, leakage barriers, predictor validation, scaling, manifests, and preprocessing fingerprints for the primary dataset.
@@ -2758,8 +2710,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M04 — I21 Implement Claim Opening and Proposal-Assisted Screening — Provides the prerequisite for this downstream contract: uses the fixed screen and matched-control evidence roles.
 - M05 — I28 Implement Epistemic-Failure and Capability-Granularity Boundary Transforms — Provides the prerequisite for this downstream contract: uses primary prepared evidence roles for shared-error/spurious/context fixtures.
 - M05 — I29 Implement Evidence-Arrival and Honest-Heterogeneity Stress Transforms — Provides the prerequisite for this downstream contract: transforms only authorized primary role data and domain identities.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -2950,9 +2900,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0466–REQ-0472; REQ-0474–REQ-0501; REQ-0503–REQ-0509
 - **Preserved non-implementation constraints:** REQ-0137; REQ-0510–REQ-0511; REQ-2047–REQ-2048
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement secondary raw/schema/label validation, canonicalization, finite predictor handling, deterministic pseudo-domain construction, role reuse, and fixed generalization preparation without retuning primary science.
@@ -3029,8 +2976,6 @@ These constraints create no separate implementation work, but this issue must no
 - M05 — I28 Implement Epistemic-Failure and Capability-Granularity Boundary Transforms — Provides the prerequisite for this downstream contract: uses secondary prepared evidence only where the roadmap explicitly permits it.
 - M05 — I29 Implement Evidence-Arrival and Honest-Heterogeneity Stress Transforms — Provides the prerequisite for this downstream contract: reuses locked secondary role semantics where specified.
 - M07 — I47 Run Secondary Generalization and Close the Scientific Result Set — Provides the prerequisite for this downstream contract: uses the locked CICIoT2023 pseudo-domain/generalization preparation.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3159,9 +3104,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1530–REQ-1536
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement `fedsira preprocess` selection, materialization, overwrite/reuse, failure/status behavior, and production of validated dataset artifacts for both datasets.
@@ -3193,8 +3135,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M02 — I13 Implement Data and Domain Validation Test Gate — Provides the prerequisite for this downstream contract: uses the production preprocessing path and its persisted evidence.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3280,9 +3220,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1694–REQ-1705; REQ-1783–REQ-1786
 - **Preserved non-implementation constraints:** REQ-1941
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the complete §28.1 dataset validation suite and the blocking `Data and Domain Evidence Validation` experiment/gate.
@@ -3326,8 +3263,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M03 — I14 Implement Fixed Model Architecture and Training Primitives — Provides the prerequisite for this downstream contract: requires validated prepared datasets and evidence roles.
 - M06 — I35 Implement Experiment Planner, Runner, Execution Order, and Cell Registry — Provides the prerequisite for this downstream contract: requires the blocking data/domain evidence gate.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3447,9 +3382,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0512–REQ-0533; REQ-0535–REQ-0558; REQ-2094–REQ-2098
 - **Preserved non-implementation constraints:** REQ-0534
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the exact classifier architecture, initialization, loss, AdamW, batching, precision, clipping, optimizer lifecycle, parameter representation, and prohibition on implicit consequential defaults.
@@ -3529,8 +3461,6 @@ These constraints create no separate implementation work, but this issue must no
 - M03 — I15 Implement Anchor, Source, and Independent Reproduction Training — Provides the prerequisite for this downstream contract: uses the fixed model/training primitives and canonical parameter representation.
 - M03 — I16 Implement Core Classification, Capability, Security, and Admission Metrics — Provides the prerequisite for this downstream contract: uses canonical logits/probabilities/model outputs.
 - M03 — I18 Validate Model, FL, Metric, and Statistical Numerics — Provides the prerequisite for this downstream contract: validates fixed model/training numerics.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3657,9 +3587,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0559–REQ-0590; REQ-2099
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement deterministic anchor FedAvg, post-reference source candidate training, honest reproduction from anchor/non-source evidence, fixed budgets/objectives, malicious-training override boundary, and no test-role tuning.
@@ -3722,8 +3649,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M04 — I24 Implement Source-Excluded Krum and Single-Reproduction Production Update — Provides the prerequisite for this downstream contract: uses canonical parameter-vector/update representation for synthesis.
 - M05 — I27 Implement Byzantine Source, Reproducer, and Verifier Attack Library — Provides the prerequisite for this downstream contract: uses fixed post-reference/reproduction training primitives and malicious override boundary.
 - M05 — I30 Implement Core Baselines and Comparator Fairness Contracts — Provides the prerequisite for this downstream contract: reuses matched training budgets/checkpoints.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -3840,9 +3765,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0077; REQ-0834–REQ-0873; REQ-0924–REQ-0930; REQ-2090–REQ-2093
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement confusion-derived classification metrics, target/support/benign contract metrics, equal-domain aggregation, admission/certification rates, backdoor/security metrics, and canonical delay components.
@@ -3923,8 +3845,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M04 — I21 Implement Claim Opening and Proposal-Assisted Screening — Provides the prerequisite for this downstream contract: uses exact target/support/benign metrics for screen decisions.
 - M05 — I30 Implement Core Baselines and Comparator Fairness Contracts — Provides the prerequisite for this downstream contract: uses canonical utility/security metrics.
 - M05 — I31 Implement Prior-Art Baselines and Baseline-Specific Validation Fixtures — Provides the prerequisite for this downstream contract: uses canonical capability/security metrics.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4055,9 +3975,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0874–REQ-0880; REQ-0882–REQ-0923
 - **Preserved non-implementation constraints:** REQ-0881
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement candidate-screen, cross-domain distribution, delay/resource/communication metrics, evaluation populations, matched-clean references, NA/undefined handling, false-equivalence diagnostics, and descriptive uncertainty inputs.
@@ -4138,8 +4055,6 @@ These constraints create no separate implementation work, but this issue must no
 - M05 — I30 Implement Core Baselines and Comparator Fairness Contracts — Provides the prerequisite for this downstream contract: uses canonical evaluation populations, timing, and missingness semantics.
 - M05 — I31 Implement Prior-Art Baselines and Baseline-Specific Validation Fixtures — Provides the prerequisite for this downstream contract: uses fixed evaluation/calibration/NA semantics.
 - M07 — I46 Run Admission-Delay and Efficiency Measurements — Provides the prerequisite for this downstream contract: uses canonical delay/resource/communication metrics.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4273,9 +4188,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1706–REQ-1714; REQ-1736–REQ-1743
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement deterministic model/training numerical tests and hand-calculated metric/statistical validation required by §§28.2 and 28.5.
@@ -4320,8 +4232,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: reuses validated model/metric numerical fixtures.
 - M06 — I33 Implement Paired Statistical Inference and Canonical Comparison Registry — Provides the prerequisite for this downstream contract: requires numerically validated metric/statistical primitives.
 - M06 — I35 Implement Experiment Planner, Runner, Execution Order, and Cell Registry — Provides the prerequisite for this downstream contract: requires model/metric numerical validation.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4455,9 +4365,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0007–REQ-0017; REQ-0118–REQ-0136; REQ-0139–REQ-0153; REQ-0155–REQ-0195
 - **Preserved non-implementation constraints:** REQ-0003–REQ-0005; REQ-0154; REQ-2081–REQ-2085
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the immutable Capability Claim Contract, evidence sufficiency, claim identity, state vocabulary/transitions, resource horizon, attempt consumption, dormancy/resume/expiry, and non-negotiable authority-path invariants.
@@ -4580,8 +4487,6 @@ These constraints create no separate implementation work, but this issue must no
 - M04 — I21 Implement Claim Opening and Proposal-Assisted Screening — Provides the prerequisite for this downstream contract: requires immutable claim identity, evidence sufficiency, and legal state transitions.
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests claim/state/resource-horizon invariants.
 - M06 — I34 Implement Mechanical Collapse Survival Rules and Resolved-Core Decision Logic — Provides the prerequisite for this downstream contract: uses the legal resolved-path mechanism/state vocabulary.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4766,9 +4671,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0060; REQ-0062–REQ-0073; REQ-0075–REQ-0076; REQ-0079; REQ-0081–REQ-0086; REQ-0094–REQ-0096; REQ-0099–REQ-0106; REQ-0280; REQ-0282–REQ-0283; REQ-0285–REQ-0288; REQ-0291–REQ-0295
 - **Preserved non-implementation constraints:** REQ-0061; REQ-0078; REQ-0080; REQ-0087–REQ-0093; REQ-0097; REQ-0281; REQ-0284; REQ-0296–REQ-0297; REQ-2049
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Encode the authenticated-domain threat assumptions and implement executable mathematical/counting checks for source exclusion, verifier/Krum admissibility, information limits, non-interference structure, delay lower bound, and diagnostic committee probabilities.
@@ -4854,8 +4756,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests theory/counting/threat-model obligations.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -4996,9 +4896,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0197–REQ-0227; REQ-0615; REQ-0617; REQ-0619–REQ-0628
 - **Preserved non-implementation constraints:** REQ-0228; REQ-0616; REQ-0618
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement proposal-assisted and candidate-free opening, deterministic source/screen selection, matched-control cross-fold screening, adequacy, differential decisions, and Open/Rejected/Dormant outcomes.
@@ -5071,8 +4968,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M04 — I22 Implement Source-Independent Reproduction Commitment Path — Provides the prerequisite for this downstream contract: starts only after a claim is legally opened and consumes the fixed claim/source identity.
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests claim-opening and proposal-screen paths.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5197,9 +5092,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0229–REQ-0236
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement authority-path reproduction opportunity scheduling, honest non-source reproduction invocation, commitment hashing before verifier assignment, consumption semantics, and reproducibility-row identity.
@@ -5232,8 +5124,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 
 - M04 — I23 Implement External Verification and Reproducibility Certification — Provides the prerequisite for this downstream contract: requires committed reproduction rows and their hashes before panel assignment.
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests commitment-before-assignment and reproduction-consumption paths.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5320,9 +5210,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0074; REQ-0237–REQ-0240; REQ-0242–REQ-0256; REQ-0629–REQ-0637; REQ-0639–REQ-0647
 - **Preserved non-implementation constraints:** REQ-0638; REQ-0648
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement post-commitment verifier assignment, freshness and exclusion rules, Positive/Negative/Abstain evaluation, deterministic Byzantine/diagnostic profiles, certification thresholds, and certified-row ordering.
@@ -5388,8 +5275,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M04 — I24 Implement Source-Excluded Krum and Single-Reproduction Production Update — Provides the prerequisite for this downstream contract: consumes only certified source-excluded reproduction rows in canonical order.
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests verifier freshness/exclusion/certification paths.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5504,9 +5389,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0257–REQ-0265
 - **Preserved non-implementation constraints:** REQ-0266–REQ-0267
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement canonical Krum with `n=5,f_R=1`, admissibility, distances/tie rules, source-free synthesis, and the resolved single-reproduction production-update mapping.
@@ -5542,8 +5424,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M04 — I25 Implement Final Fresh Gate and Immutable Admission Artifact — Provides the prerequisite for this downstream contract: consumes the resolved multi-row Krum or single-row production update.
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests Krum/source-exclusion/single-row synthesis paths.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5627,9 +5507,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0268–REQ-0279; REQ-0649–REQ-0668
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the post-synthesis fresh final gate, adequacy and claim predicates, terminal outcomes, production-model identity, and immutable admission artifact with complete upstream lineage.
@@ -5685,8 +5562,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M04 — I26 Implement Protocol Smoke, Invariant, and Mathematical Validation Gate — Provides the prerequisite for this downstream contract: tests final-gate/admission-artifact paths.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -5811,9 +5686,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1541; REQ-1543–REQ-1544; REQ-1715–REQ-1735; REQ-1787–REQ-1789
 - **Preserved non-implementation constraints:** REQ-1542
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement `fedsira smoke`, all protocol/security invariant fixtures, mathematical/counting checks, and the blocking `Protocol Invariant Validation` experiment.
@@ -5873,8 +5745,6 @@ These constraints create no separate implementation work, but this issue must no
 - M05 — I27 Implement Byzantine Source, Reproducer, and Verifier Attack Library — Provides the prerequisite for this downstream contract: requires a protocol path whose invariants are already validated.
 - M05 — I30 Implement Core Baselines and Comparator Fairness Contracts — Provides the prerequisite for this downstream contract: requires the validated protocol/model execution substrate.
 - M06 — I35 Implement Experiment Planner, Runner, Execution Order, and Cell Registry — Provides the prerequisite for this downstream contract: requires the blocking protocol invariant gate.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6033,9 +5903,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0098; REQ-0669–REQ-0690; REQ-0692–REQ-0698; REQ-0700–REQ-0705; REQ-0756–REQ-0772; REQ-0774
 - **Preserved non-implementation constraints:** REQ-0691; REQ-0699
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the fixed adversarial role/scenario registry: useful hidden-backdoor source, Source Copy, model-replacement and verifier-aware reproduction attacks, Byzantine verifier behavior, compromised-role selection, triggers, and attack manifests.
@@ -6119,8 +5986,6 @@ These constraints create no separate implementation work, but this issue must no
 - M05 — I31 Implement Prior-Art Baselines and Baseline-Specific Validation Fixtures — Provides the prerequisite for this downstream contract: reuses attack/backdoor definitions without changing adversary budgets.
 - M05 — I32 Execute Baseline Implementation Validation — Provides the prerequisite for this downstream contract: validates attack-facing baseline paths.
 - M07 — I43 Run Byzantine Reproducer, Verifier, and Bound-Violation Robustness — Provides the prerequisite for this downstream contract: uses the fixed compromised source/reproducer/verifier attack implementations.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6261,9 +6126,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0706–REQ-0710; REQ-0712–REQ-0722; REQ-0724–REQ-0732
 - **Preserved non-implementation constraints:** REQ-0711; REQ-0723
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement shared label-error, shared spurious-feature, attacker-induced common-context, and capability under-specification fixtures with fixed root-cause/cardinality semantics.
@@ -6317,8 +6179,6 @@ These constraints create no separate implementation work, but this issue must no
 - M05 — I29 Implement Evidence-Arrival and Honest-Heterogeneity Stress Transforms — Provides the prerequisite for this downstream contract: reuses fixed transformation/root-cause/cardinality conventions.
 - M05 — I32 Execute Baseline Implementation Validation — Provides the prerequisite for this downstream contract: validates boundary-transform compatibility where required.
 - M07 — I44 Run Dormancy, Epistemic-Failure, and Capability Under-Specification Boundaries — Provides the prerequisite for this downstream contract: uses fixed shared-error/spurious/common-context/under-specification transforms.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6423,9 +6283,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0733–REQ-0755
 - **Preserved non-implementation constraints:** REQ-0773
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement fixed evidence-arrival schedules, natural/quantity-skew/feature-shift heterogeneity regimes, deterministic transformation identities, controlled-episode completion rules, and stress manifests.
@@ -6478,8 +6335,6 @@ These constraints create no separate implementation work, but this issue must no
 - M07 — I44 Run Dormancy, Epistemic-Failure, and Capability Under-Specification Boundaries — Provides the prerequisite for this downstream contract: uses fixed evidence-arrival and controlled-episode semantics.
 - M07 — I45 Run Heterogeneous-Reproduction Boundary Study — Provides the prerequisite for this downstream contract: uses the exact natural/quantity-skew/feature-shift heterogeneity regimes.
 - M07 — I46 Run Admission-Delay and Efficiency Measurements — Provides the prerequisite for this downstream contract: uses the exact evidence-arrival schedules needed to separate information delay from protocol overhead.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6593,9 +6448,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0775–REQ-0777; REQ-0779–REQ-0794; REQ-0831; REQ-0833; REQ-2112–REQ-2150
 - **Preserved non-implementation constraints:** REQ-0778; REQ-0832; REQ-1942; REQ-2151
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the baseline registry common budgets/information rules and the core/simple comparators, including local-only, centralized, FedAvg, review/retrain, candidate-free, direct-Krum, and coordinate-median alternatives under matched fairness.
@@ -6686,8 +6538,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M05 — I31 Implement Prior-Art Baselines and Baseline-Specific Validation Fixtures — Provides the prerequisite for this downstream contract: inherits baseline registry, common budgets/information limits, and fairness rules.
 - M05 — I32 Execute Baseline Implementation Validation — Provides the prerequisite for this downstream contract: validates every core/simple comparator contract.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -6841,9 +6691,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0795–REQ-0830; REQ-2104; REQ-2152–REQ-2201
 - **Preserved non-implementation constraints:** REQ-2202
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement advanced certified-ensemble, local-reference, reconstruction-filter, density-cluster, continual-assessment, recovery, sanitization, and Krum-reference baselines plus all fixed calibration/completion/ablation fixtures.
@@ -6958,8 +6805,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M05 — I32 Execute Baseline Implementation Validation — Provides the prerequisite for this downstream contract: validates every prior-art comparator and baseline-specific fixture.
 - M07 — I43 Run Byzantine Reproducer, Verifier, and Bound-Violation Robustness — Provides the prerequisite for this downstream contract: uses validated robust/baseline comparators where specified.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7120,9 +6965,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1790–REQ-1792
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement and execute the exact seventeen-cell `Baseline Implementation Validation` at engineering seed 900001, preserving invalid/incompatible outcomes as scientific evidence.
@@ -7156,8 +6998,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M06 — I37 Run Single-Reproduction Necessity Experiment — Provides the prerequisite for this downstream contract: requires validated comparator implementations.
 - M06 — I38 Run Source-Artifact Exclusion Necessity Experiment — Provides the prerequisite for this downstream contract: requires validated source-admission/source-excluded comparators.
 - M06 — I39 Run External Verification Necessity Experiment — Provides the prerequisite for this downstream contract: requires validated direct-synthesis and externally verified comparators.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7242,9 +7082,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0931–REQ-0957; REQ-0959–REQ-0969; REQ-0996–REQ-1019; REQ-2105–REQ-2106
 - **Preserved non-implementation constraints:** REQ-0958
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement seed-level pairing, exact sign-flip superiority/non-inferiority tests, Holm families, effects, bootstrap confidence intervals, materiality, failed-pair rules, and canonical comparison identities.
@@ -7335,8 +7172,6 @@ These constraints create no separate implementation work, but this issue must no
 - M06 — I34 Implement Mechanical Collapse Survival Rules and Resolved-Core Decision Logic — Provides the prerequisite for this downstream contract: uses exact paired tests, multiplicity, effects, confidence intervals, and materiality decisions.
 - M06 — I35 Implement Experiment Planner, Runner, Execution Order, and Cell Registry — Provides the prerequisite for this downstream contract: uses canonical comparison identities and completion semantics.
 - M08 — I48 Implement Canonical Claim-Support Registry and Claim Gating — Provides the prerequisite for this downstream contract: uses canonical statistical decisions/materiality/comparison artifacts.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7483,9 +7318,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0970–REQ-0978; REQ-0980–REQ-0983; REQ-0985–REQ-0994
 - **Preserved non-implementation constraints:** REQ-0196; REQ-0979; REQ-0984; REQ-0995
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement preregistered survival rules for proposal assistance, plurality, direct source exclusion, and external verification plus the complete eight-case mechanical resolved-core mapping.
@@ -7540,8 +7372,6 @@ These constraints create no separate implementation work, but this issue must no
 - M06 — I38 Run Source-Artifact Exclusion Necessity Experiment — Provides the prerequisite for this downstream contract: feeds the direct source-exclusion central survival rule.
 - M06 — I39 Run External Verification Necessity Experiment — Provides the prerequisite for this downstream contract: feeds the external-verification survival rule.
 - M06 — I40 Materialize the Resolved FedSIRA Core — Provides the prerequisite for this downstream contract: uses the sole authoritative eight-case resolved-core mapping.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7645,9 +7475,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1537–REQ-1540; REQ-1545–REQ-1557; REQ-1760–REQ-1777; REQ-1780–REQ-1782; REQ-1914–REQ-1939; REQ-2203
 - **Preserved non-implementation constraints:** REQ-1558; REQ-1778–REQ-1779
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement read-only planning, exact-name experiment execution, dependency-ordered workflow, semantic cell enumeration/counts, completion accounting, reuse/recovery, and invalid-baseline preservation.
@@ -7746,8 +7573,6 @@ These constraints create no separate implementation work, but this issue must no
 - M06 — I37 Run Single-Reproduction Necessity Experiment — Provides the prerequisite for this downstream contract: uses the preregistered planner/runner and exact semantic-cell registry.
 - M06 — I38 Run Source-Artifact Exclusion Necessity Experiment — Provides the prerequisite for this downstream contract: uses the preregistered planner/runner and exact semantic-cell registry.
 - M06 — I39 Run External Verification Necessity Experiment — Provides the prerequisite for this downstream contract: uses the preregistered planner/runner and exact semantic-cell registry.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -7950,9 +7775,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0049; REQ-1793–REQ-1798
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement and execute the preregistered `Proposal-Assisted Opening Necessity` matrix and produce the paired evidence consumed by its survival rule.
@@ -7983,8 +7805,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M06 — I40 Materialize the Resolved FedSIRA Core — Provides the prerequisite for this downstream contract: consumes the proposal-assistance decision artifact.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8069,9 +7889,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0050; REQ-1799–REQ-1803
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement and execute the preregistered `Single-Reproduction Necessity` matrix comparing plurality against the fixed single-reproduction alternative.
@@ -8101,8 +7918,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M06 — I40 Materialize the Resolved FedSIRA Core — Provides the prerequisite for this downstream contract: consumes the plurality decision artifact.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8185,9 +8000,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0051; REQ-1804–REQ-1807
 - **Preserved non-implementation constraints:** REQ-1808
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement and execute the preregistered `Source-Artifact Exclusion Necessity` matrix testing the central source-exclusion claim under matched evidence.
@@ -8218,8 +8030,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M06 — I40 Materialize the Resolved FedSIRA Core — Provides the prerequisite for this downstream contract: consumes the direct source-exclusion decision artifact.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8301,9 +8111,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0052; REQ-1809–REQ-1814
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement and execute the preregistered `External Verification Necessity` matrix against direct synthesis from the same committed reproduction opportunities.
@@ -8334,8 +8141,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M06 — I40 Materialize the Resolved FedSIRA Core — Provides the prerequisite for this downstream contract: consumes the external-verification decision artifact.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8421,9 +8226,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1815–REQ-1820
 - **Preserved non-implementation constraints:** REQ-1821; REQ-1943; REQ-2050
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Apply the four collapse decisions mechanically, materialize the unique Resolved FedSIRA Core artifact, and bind all downstream scientific dependencies to that resolved-core artifact identity.
@@ -8466,8 +8268,6 @@ These constraints create no separate implementation work, but this issue must no
 - M07 — I46 Run Admission-Delay and Efficiency Measurements — Provides the prerequisite for this downstream contract: uses the resolved-core artifact.
 - M07 — I47 Run Secondary Generalization and Close the Scientific Result Set — Provides the prerequisite for this downstream contract: uses the resolved-core artifact without secondary retuning.
 - M08 — I48 Implement Canonical Claim-Support Registry and Claim Gating — Provides the prerequisite for this downstream contract: uses the exact Resolved FedSIRA Core identity when gating mechanism-specific claims.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8553,9 +8353,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0048; REQ-1822–REQ-1825; REQ-1827–REQ-1830
 - **Preserved non-implementation constraints:** REQ-1826
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute the Resolved FedSIRA Core across the exact primary confirmatory matrix and produce complete authority-transition/security-utility evidence.
@@ -8589,8 +8386,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M07 — I42 Run Mechanism Ablation Program — Provides the prerequisite for this downstream contract: uses the completed primary full-reference evidence required for matched ablation comparisons.
 - M07 — I47 Run Secondary Generalization and Close the Scientific Result Set — Provides the prerequisite for this downstream contract: requires the primary evidence branch to remain complete and immutable.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8680,9 +8475,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1831–REQ-1857
 - **Preserved non-implementation constraints:** REQ-1858
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute all eighteen preregistered mechanism-ablation variants with matched Full FedSIRA references and preserve confirmatory versus diagnostic interpretation.
@@ -8734,8 +8526,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M07 — I43 Run Byzantine Reproducer, Verifier, and Bound-Violation Robustness — Provides the prerequisite for this downstream contract: follows the authoritative post-ablation execution order.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -8839,9 +8629,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0053; REQ-1859–REQ-1865; REQ-1867–REQ-1872; REQ-1874–REQ-1877
 - **Preserved non-implementation constraints:** REQ-1866; REQ-1873; REQ-1878
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute compromised-reproducer, compromised-verifier, random diagnostic, and above-bound robustness matrices under the declared Byzantine profiles.
@@ -8888,8 +8675,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M07 — I44 Run Dormancy, Epistemic-Failure, and Capability Under-Specification Boundaries — Provides the prerequisite for this downstream contract: follows the authoritative boundary-program execution order after Byzantine robustness.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9000,9 +8785,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0054–REQ-0056; REQ-0107–REQ-0117; REQ-1879–REQ-1884; REQ-1886–REQ-1889
 - **Preserved non-implementation constraints:** REQ-1885; REQ-1890
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute evidence-scarcity/dormancy, shared epistemic-failure, correlated-context, and capability-granularity boundary studies with explicit safe-abstention and false-equivalence outcomes.
@@ -9054,8 +8836,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M07 — I45 Run Heterogeneous-Reproduction Boundary Study — Provides the prerequisite for this downstream contract: continues the ordered scientific failure-boundary program.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9166,9 +8946,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0057; REQ-1891–REQ-1894
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute the ordered honest-heterogeneity regimes and determine the highest supported liveness/synthesis region without post-hoc retuning.
@@ -9197,8 +8974,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M07 — I46 Run Admission-Delay and Efficiency Measurements — Provides the prerequisite for this downstream contract: follows completion of the evidence/heterogeneity boundary program.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9280,9 +9055,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0058; REQ-1895–REQ-1897; REQ-1899–REQ-1900; REQ-1902–REQ-1906
 - **Preserved non-implementation constraints:** REQ-1898; REQ-1901
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute admission-delay decomposition and descriptive resource/communication/timing measurements, separating information-arrival cost from protocol overhead.
@@ -9321,8 +9093,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - M07 — I47 Run Secondary Generalization and Close the Scientific Result Set — Provides the prerequisite for this downstream contract: follows the authoritative delay/efficiency stage and consumes its completed records for result-set closure.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9423,9 +9193,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-0059; REQ-1907–REQ-1912; REQ-2016–REQ-2017
 - **Preserved non-implementation constraints:** REQ-0138; REQ-1913; REQ-1944–REQ-1945; REQ-2014–REQ-2015
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Execute the locked CICIoT2023 generalization program, then enforce complete result-set invariants and experiment-completion definitions across the full scientific program.
@@ -9467,8 +9234,6 @@ These constraints create no separate implementation work, but this issue must no
 
 - M08 — I48 Implement Canonical Claim-Support Registry and Claim Gating — Provides the prerequisite for this downstream contract: requires the complete scientific result set before final claim states are mechanically derived.
 - M08 — I49 Implement Read-Only Scientific Completeness Verification — Provides the prerequisite for this downstream contract: derives expected experiment completion from the complete Section 30 result set.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9590,9 +9355,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1985–REQ-1986; REQ-1995–REQ-2013; REQ-2204
 - **Preserved non-implementation constraints:** REQ-0018–REQ-0047; REQ-0289–REQ-0290; REQ-0298; REQ-0351; REQ-0376; REQ-0473; REQ-0502; REQ-1987–REQ-1994; REQ-2086
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement exact claim IDs/states, evidence-to-claim mappings, support/partial/conditional/null/not-supported logic, boundary enforcement, and report-time claim blocking.
@@ -9689,8 +9451,6 @@ These constraints create no separate implementation work, but this issue must no
 - M08 — I51 Generate Mandatory Manuscript Tables from Verified Evidence — Provides the prerequisite for this downstream contract: uses canonical claim/statistical states for claim-bearing tables.
 - M08 — I52 Generate Mandatory Manuscript Figures from Verified Evidence — Provides the prerequisite for this downstream contract: uses canonical claim/statistical states for claim-bearing figure annotations where applicable.
 - M08 — I53 Close Third-Party Reproducibility and Implementation Readiness — Provides the prerequisite for this downstream contract: requires final claim-state and scope enforcement.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9828,9 +9588,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-2018–REQ-2028
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the project scientific-completeness verifier over expected cells, evidence integrity/provenance, Resolved FedSIRA Core, statistics, and claim-state prerequisites without scientific recomputation.
@@ -9866,8 +9623,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 
 - M08 — I50 Implement Verified Reporting Materialization and Publication Rounding — Provides the prerequisite for this downstream contract: exports only after read-only scientific completeness verification passes.
 - M08 — I53 Close Third-Party Reproducibility and Implementation Readiness — Provides the prerequisite for this downstream contract: requires scientific completeness to be demonstrable read-only.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -9972,9 +9727,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1020–REQ-1027; REQ-1559–REQ-1564; REQ-2029–REQ-2035; REQ-2089
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement manuscript method identity, read-only `fedsira report`, verified `outputs/` to compact `results/` materialization, dependency fingerprints/read-back rules, and publication rounding that never changes full-precision decisions.
@@ -10022,8 +9774,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 - M08 — I51 Generate Mandatory Manuscript Tables from Verified Evidence — Provides the prerequisite for this downstream contract: uses the verified reporting/materialization and rounding layer as the sole manuscript-facing data source.
 - M08 — I52 Generate Mandatory Manuscript Figures from Verified Evidence — Provides the prerequisite for this downstream contract: uses the verified reporting/materialization and rounding layer as the sole manuscript-facing data source.
 - M08 — I53 Close Third-Party Reproducibility and Implementation Readiness — Provides the prerequisite for this downstream contract: requires reproducible report/result materialization.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10143,9 +9893,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1947–REQ-1969; REQ-2205
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement every required protocol/result/statistical/claim table with exact schema, ordering, aggregation, rounding, and machine-readable source lineage.
@@ -10192,8 +9939,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M08 — I53 Close Third-Party Reproducibility and Implementation Readiness — Provides the prerequisite for this downstream contract: requires every mandatory manuscript table and lineage record.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10310,9 +10055,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-1970–REQ-1984; REQ-2206
 - **Preserved non-implementation constraints:** None.
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement every required FedSIRA manuscript figure with exact encodings and verified artifact-backed data sources.
@@ -10351,8 +10093,6 @@ Implement only the following roadmap/inventory requirements. Each bullet is an e
 ### Blocks
 
 - M08 — I53 Close Third-Party Reproducibility and Implementation Readiness — Provides the prerequisite for this downstream contract: requires every mandatory manuscript figure and lineage record.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
@@ -10455,9 +10195,6 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Implementation requirements:** REQ-2036–REQ-2037; REQ-2039–REQ-2046; REQ-2065–REQ-2071
 - **Preserved non-implementation constraints:** REQ-2051–REQ-2064; REQ-2072
-
-Every scope item, acceptance criterion, required output, and claim-bearing behavior in this issue traces to the roadmap authority and inventory requirements listed above or to prerequisite implementation strictly necessary to satisfy them.
-
 ## Objective
 
 Implement the reference-register traceability, third-party reconstruction/manuscript-readiness contract, and cross-project implementation-completion gate required before final scientific reporting.
@@ -10516,8 +10253,6 @@ These constraints create no separate implementation work, but this issue must no
 ### Blocks
 
 - None — this issue is a terminal closure issue in the approved dependency sequence.
-
-Dependencies are satisfied only by valid, provenance-compatible, non-stale evidence or interfaces. An issue number alone is never sufficient.
 ## Implementation Surface
 
 Expected areas affected by this issue:
