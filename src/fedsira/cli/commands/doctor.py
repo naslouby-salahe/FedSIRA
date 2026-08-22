@@ -8,6 +8,8 @@ from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import CanonicalToken
 from fedsira.runtime.environment import EnvironmentMismatch, collect_environment_mismatches
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+
 
 @dataclass(frozen=True)
 class DoctorReport:
@@ -26,7 +28,9 @@ class DoctorReport:
 
 
 def diagnose(config_path: Path = PRODUCTION_CONFIG_PATH) -> DoctorReport:
-    environment_mismatches = collect_environment_mismatches()
+    raw_data_path = REPOSITORY_ROOT / "data" / "raw"
+    rar_archives_present = raw_data_path.exists() and any(raw_data_path.rglob("*.rar"))
+    environment_mismatches = collect_environment_mismatches(REPOSITORY_ROOT, rar_archives_present)
     configuration_loadable = True
     configuration_error: CanonicalToken | None = None
     try:
