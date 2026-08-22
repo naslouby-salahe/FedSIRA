@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "fedsira"
 TESTS_ROOT = REPO_ROOT / "tests"
 CONFIG_PATH = REPO_ROOT / "configs" / "fedsira.yaml"
-COMMON_LITERALS = {0, 1, -1, 2, 4, 8, 100.0, 0.1, 1e-05, 256, 0.25, 0.75, 10.0}
+COMMON_LITERALS = {0, 1, -1, 2, 3, 4, 8, 100.0, 0.1, 1e-05, 256, 0.25, 0.75, 10.0}
 
 YamlValue = Union[None, bool, int, float, str, "list[YamlValue]", "dict[str, YamlValue]"]
 
