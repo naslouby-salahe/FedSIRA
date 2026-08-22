@@ -5,6 +5,7 @@ from fedsira.evaluation.aggregation import (
     domain_disparity,
     equal_weight_domain_mean,
     interquartile_range,
+    minimum_defined_domain_count,
     percentile_10_domain_target_f1,
     quantile_type7,
     worst_domain_target_f1,
@@ -12,6 +13,10 @@ from fedsira.evaluation.aggregation import (
 from fedsira.evaluation.records import MetricResult
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+
+
+def test_minimum_defined_domain_count_matches_generic_80_percent_rule() -> None:
+    assert minimum_defined_domain_count(8, 0.8) == 7
 
 
 def test_quantile_type7_matches_known_values() -> None:

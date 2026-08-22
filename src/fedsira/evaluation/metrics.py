@@ -1,7 +1,14 @@
 from collections.abc import Mapping, Sequence
 
-from fedsira.domain.records import CanonicalToken, NonNegativeInt
-from fedsira.evaluation.records import ConfusionCounts, FalseSameCapabilityReason, MetricResult
+from fedsira.config.schema import CapabilityClaimConfig
+from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt
+from fedsira.evaluation.aggregation import minimum_defined_domain_count
+from fedsira.evaluation.records import (
+    ConfusionCounts,
+    FalseSameCapabilityReason,
+    MetricResult,
+    ProposalOracleLabel,
+)
 
 
 def compute_confusion_counts(
@@ -196,6 +203,56 @@ def attack_success_rate_within_domain(
         1 for index in carrier_indices if predicted_labels[index] == benign_class_token
     )
     return MetricResult(evaded_count / denominator, denominator)
+
+
+def clean_proposal_oracle_label(
+    aggregate_target_f1: MetricResult,
+    target_f1_gain: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+    defined_domain_count: NonNegativeInt,
+    expected_domain_count: PositiveInt,
+    generic_defined_domain_fraction_minimum: float,
+    capability_claim_config: CapabilityClaimConfig,
+) -> ProposalOracleLabel:
+    required_domain_count = minimum_defined_domain_count(
+        expected_domain_count, generic_defined_domain_fraction_minimum
+    )
+    if defined_domain_count < required_domain_count:
+        return ProposalOracleLabel.NA
+    if (
+        aggregate_target_f1.value is None
+        or target_f1_gain.value is None
+        or supported_macro_f1_drop.value is None
+        or benign_far_increase.value is None
+    ):
+        return ProposalOracleLabel.NA
+    if (
+        aggregate_target_f1.value >= capability_claim_config.target_f1_minimum
+        and target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        and benign_far_increase.value
+        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+    ):
+        return ProposalOracleLabel.ORACLE_VALID
+    return ProposalOracleLabel.ORACLE_INVALID
+
+
+def false_launch_rate(
+    false_launch_count: NonNegativeInt, adequate_defined_oracle_count: NonNegativeInt
+) -> MetricResult:
+    if adequate_defined_oracle_count == 0:
+        return MetricResult(None, 0)
+    return MetricResult(
+        false_launch_count / adequate_defined_oracle_count, adequate_defined_oracle_count
+    )
+
+
+def reproduction_attempt_count(
+    domains_with_training_start: frozenset[CanonicalToken],
+    evidence_inadequate_domains: frozenset[CanonicalToken],
+) -> NonNegativeInt:
+    return len(domains_with_training_start - evidence_inadequate_domains)
 
 
 def malicious_admission_rate(malicious_admission_indicators: Sequence[bool]) -> MetricResult:

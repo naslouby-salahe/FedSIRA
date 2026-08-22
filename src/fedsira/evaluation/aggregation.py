@@ -11,6 +11,12 @@ from fedsira.runtime.determinism import derive_uint32
 SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR = "SINGLE_METHOD_MEAN_BOOTSTRAP"
 
 
+def minimum_defined_domain_count(
+    expected_domain_count: PositiveInt, generic_defined_domain_fraction_minimum: float
+) -> PositiveInt:
+    return math.ceil(expected_domain_count * generic_defined_domain_fraction_minimum)
+
+
 def quantile_type7(sorted_values: Sequence[float], probability: float) -> float:
     sample_count = len(sorted_values)
     if sample_count == 1:
