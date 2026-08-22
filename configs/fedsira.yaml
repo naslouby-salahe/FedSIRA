@@ -227,6 +227,7 @@ baselines:
   centralized_reference_epochs: 20
   fedavg_post_reference_rounds: 5
   multiple_model_certified_ensemble_group_count: 3
+  multiple_model_certified_ensemble_post_reference_rounds: 5
   reconstruction_filter:
     reconstruction_local_epochs: 1
     normalization_epsilon: 1.0e-12
@@ -248,6 +249,7 @@ baselines:
   three_row_coordinate_median:
     row_count: 3
     assumed_byzantine_rows: 1
+  krum_robust_aggregation_post_reference_rounds: 5
 metrics_and_statistics:
   metric_aggregation:
     generic_defined_domain_fraction_minimum: 0.8
