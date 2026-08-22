@@ -83,6 +83,13 @@ NBAIOT_CLASS_ORDER: tuple[NBaiotClass, ...] = (
 
 NBAIOT_TARGET_CLASS = NBaiotClass.GAFGYT_COMBO
 
+NBAIOT_TRIGGER_FEATURES: tuple[CanonicalToken, ...] = (
+    "MI_dir_L0.1_weight",
+    "H_L0.1_weight",
+    "HH_L0.1_magnitude",
+    "HpHp_L0.1_mean",
+)
+
 NBAIOT_GAFGYT_BASENAME_CLASS: dict[CanonicalToken, NBaiotClass] = {
     "combo": NBaiotClass.GAFGYT_COMBO,
     "junk": NBaiotClass.GAFGYT_JUNK,
