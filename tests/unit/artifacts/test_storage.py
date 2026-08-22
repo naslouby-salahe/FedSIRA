@@ -1,8 +1,20 @@
+from pathlib import Path
+
 import pytest
 
 from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.records import ArtifactManifest
-from fedsira.artifacts.storage import compute_checksum, publish, replace, retire, verify_checksum
+from fedsira.artifacts.storage import (
+    compute_checksum,
+    is_artifact_complete_and_valid,
+    publish,
+    publish_artifact_to_disk,
+    read_published_manifest,
+    replace,
+    retire,
+    stage_payload,
+    verify_checksum,
+)
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 
@@ -76,3 +88,67 @@ def test_replace_publishes_new_and_retires_old_without_dual_activity() -> None:
 
     assert graph.is_active(published.identity)
     assert not graph.is_active(old.identity)
+
+
+def test_stage_payload_writes_bytes_to_a_new_staged_file(tmp_path: Path) -> None:
+    staged_path = stage_payload(tmp_path / "staging", b"payload")
+    assert staged_path.read_bytes() == b"payload"
+    assert staged_path.parent == tmp_path / "staging"
+
+
+def test_stage_payload_gives_each_call_a_distinct_path(tmp_path: Path) -> None:
+    first = stage_payload(tmp_path / "staging", b"payload")
+    second = stage_payload(tmp_path / "staging", b"payload")
+    assert first != second
+
+
+def test_publish_artifact_to_disk_writes_payload_and_manifest(tmp_path: Path) -> None:
+    payload = b"payload"
+    manifest = staged_manifest("a" * 64, payload)
+    staged_path = stage_payload(tmp_path / "staging", payload)
+    canonical_directory = tmp_path / "canonical"
+
+    published = publish_artifact_to_disk(staged_path, canonical_directory, manifest, payload)
+
+    assert published.lifecycle_state is ArtifactLifecycleState.COMPLETE
+    assert not staged_path.exists()
+    read_back = read_published_manifest(canonical_directory, "a" * 64)
+    assert read_back == published
+
+
+def test_publish_artifact_to_disk_rejects_checksum_mismatch(tmp_path: Path) -> None:
+    manifest = staged_manifest("a" * 64, b"payload")
+    staged_path = stage_payload(tmp_path / "staging", b"tampered")
+    with pytest.raises(ValueError):
+        publish_artifact_to_disk(staged_path, tmp_path / "canonical", manifest, b"tampered")
+
+
+def test_read_published_manifest_returns_none_when_absent(tmp_path: Path) -> None:
+    assert read_published_manifest(tmp_path / "canonical", "a" * 64) is None
+
+
+def test_is_artifact_complete_and_valid_true_after_publish(tmp_path: Path) -> None:
+    payload = b"payload"
+    manifest = staged_manifest("a" * 64, payload)
+    staged_path = stage_payload(tmp_path / "staging", payload)
+    canonical_directory = tmp_path / "canonical"
+    publish_artifact_to_disk(staged_path, canonical_directory, manifest, payload)
+
+    assert is_artifact_complete_and_valid(canonical_directory, "a" * 64)
+
+
+def test_is_artifact_complete_and_valid_false_when_never_published(tmp_path: Path) -> None:
+    assert not is_artifact_complete_and_valid(tmp_path / "canonical", "a" * 64)
+
+
+def test_is_artifact_complete_and_valid_false_when_payload_corrupted(tmp_path: Path) -> None:
+    payload = b"payload"
+    manifest = staged_manifest("a" * 64, payload)
+    staged_path = stage_payload(tmp_path / "staging", payload)
+    canonical_directory = tmp_path / "canonical"
+    publish_artifact_to_disk(staged_path, canonical_directory, manifest, payload)
+
+    payload_path = canonical_directory / f"{'a' * 64}.artifact.bin"
+    payload_path.write_bytes(b"corrupted")
+
+    assert not is_artifact_complete_and_valid(canonical_directory, "a" * 64)

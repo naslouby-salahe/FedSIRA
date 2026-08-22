@@ -1,7 +1,25 @@
 import hashlib
+import json
+from pathlib import Path
 
 import pandas
 
+from fedsira.artifacts.fingerprints import (
+    PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES,
+    compute_artifact_dependency_fingerprint,
+    compute_external_dependency_fingerprint,
+    compute_producer_component_fingerprint,
+    raw_schema_exclusion_manifest_entry_modules,
+)
+from fedsira.artifacts.paths import workspace_root_for_family
+from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts.storage import (
+    compute_checksum,
+    is_artifact_complete_and_valid,
+    publish_artifact_to_disk,
+    read_published_manifest,
+    stage_payload,
+)
 from fedsira.cli.commands import REPOSITORY_ROOT, ScientificPipelineNotImplementedError
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
@@ -41,12 +59,65 @@ from fedsira.datasets.nbaiot.validation import (
     classes_structurally_unavailable,
     validate_target_holder_feasibility,
 )
-from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import CanonicalToken, NonNegativeInt
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ArtifactLifecycleState,
+    DatasetId,
+    ProducerFingerprintFamily,
+)
+from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt
 from fedsira.runtime.determinism import canonical_bytes
 
 
-def _validate_nbaiot_raw_data() -> tuple[str, tuple[str, ...], NonNegativeInt]:
+def _publish_or_reuse_canonical_dataset_manifest(
+    dataset: DatasetId,
+    config: ScientificConfig,
+    dataset_split_view_identities: CanonicalToken,
+    payload_fields: dict[str, CanonicalToken | list[CanonicalToken]],
+) -> tuple[ArtifactManifest, bool]:
+    entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
+    producer_fingerprint = compute_producer_component_fingerprint(entry_modules, schema_version="1")
+    external_fingerprint = compute_external_dependency_fingerprint(
+        entry_modules,
+        PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES[
+            ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
+        ],
+    )
+    identity: ArtifactDigest = compute_artifact_dependency_fingerprint(
+        schema_version="1",
+        scientific_configuration_subset=dataset.value,
+        dataset_split_view_identities=dataset_split_view_identities,
+        semantic_coordinates_and_seed_namespaces=dataset.value,
+        upstream_artifact_identities=(),
+        producer_component_fingerprint=producer_fingerprint,
+        external_dependency_fingerprint=external_fingerprint,
+    )
+    canonical_directory: Path = REPOSITORY_ROOT / workspace_root_for_family(
+        ArtifactFamily.CANONICAL_DATASET_MANIFEST
+    )
+
+    if is_artifact_complete_and_valid(canonical_directory, identity):
+        reused_manifest = read_published_manifest(canonical_directory, identity)
+        if reused_manifest is not None:
+            return reused_manifest, True
+
+    payload = json.dumps(payload_fields, sort_keys=True, default=str).encode("utf-8")
+    staged_manifest = ArtifactManifest(
+        family=ArtifactFamily.CANONICAL_DATASET_MANIFEST,
+        identity=identity,
+        checksum=compute_checksum(payload),
+        lifecycle_state=ArtifactLifecycleState.STAGING,
+        upstream_identities=(),
+    )
+    staging_root = (
+        REPOSITORY_ROOT / config.runtime.repository_layout.execution_workspace / "cache" / "staging"
+    )
+    staged_path = stage_payload(staging_root, payload)
+    published = publish_artifact_to_disk(staged_path, canonical_directory, staged_manifest, payload)
+    return published, False
+
+
+def _validate_nbaiot_raw_data() -> tuple[str, tuple[str, ...], NonNegativeInt, bool]:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "N-BaIoT"
     extraction_cache_root = (
@@ -76,7 +147,17 @@ def _validate_nbaiot_raw_data() -> tuple[str, tuple[str, ...], NonNegativeInt]:
         validate_consistent_predictor_schema(reference_header, observed_header)
         total_role_assignments += len(_assign_roles_for_stream(item, config))
 
-    return manifest_hash, unavailable_classes, total_role_assignments
+    _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
+        DatasetId.N_BAIOT,
+        config,
+        manifest_hash,
+        {
+            "dataset_file_manifest_hash": manifest_hash,
+            "structurally_unavailable_classes": list(unavailable_classes),
+        },
+    )
+
+    return manifest_hash, unavailable_classes, total_role_assignments, reused
 
 
 def _assign_roles_for_stream(
@@ -145,12 +226,15 @@ def _validate_ciciot2023_raw_data() -> (
 
 def execute(dataset: DatasetId | None, overwrite: bool) -> None:
     if dataset is DatasetId.N_BAIOT:
-        manifest_hash, unavailable_classes, total_role_assignments = _validate_nbaiot_raw_data()
+        manifest_hash, unavailable_classes, total_role_assignments, reused = (
+            _validate_nbaiot_raw_data()
+        )
         raise ScientificPipelineNotImplementedError(
             "N-BaIoT raw data discovered and validated "
             f"(dataset_file_manifest_hash={manifest_hash}, "
             f"structurally_unavailable_classes={list(unavailable_classes)}, "
-            f"total_role_assignments={total_role_assignments}); "
+            f"total_role_assignments={total_role_assignments}, "
+            f"canonical_dataset_manifest_reused={reused}); "
             "prepared-view/scaler artifact publication is not implemented until M02 — I10"
         )
     if dataset is DatasetId.CICIOT2023:
