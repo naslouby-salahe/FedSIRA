@@ -123,6 +123,35 @@ class ProducerFingerprintFamily(StrEnum):
     REPORT_SOURCE_EXPORT = "report_source_export"
 
 
+class ClaimOpeningMode(StrEnum):
+    PROPOSAL_ASSISTED = "PROPOSAL_ASSISTED"
+    CANDIDATE_FREE = "CANDIDATE_FREE"
+
+
+class ClaimState(StrEnum):
+    CANDIDATE_SCREEN = "Candidate Screen"
+    CLAIM_OPEN = "Claim Open"
+    REPRODUCTION_PENDING = "Reproduction Pending"
+    VERIFICATION_PENDING = "Verification Pending"
+    SYNTHESIS_PENDING = "Synthesis Pending"
+    ADMITTED = "Admitted"
+    DORMANT = "Dormant"
+    REJECTED_CLAIM = "Rejected Claim"
+    EXPIRED = "Expired"
+
+
+class DormantOrigin(StrEnum):
+    CANDIDATE_SCREEN = "CANDIDATE_SCREEN"
+    REPRODUCTION_PENDING = "REPRODUCTION_PENDING"
+    SYNTHESIS_PENDING = "SYNTHESIS_PENDING"
+
+
+class TernaryOutcome(StrEnum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    ABSTAIN = "ABSTAIN"
+
+
 class ProvenanceValidationOutcome(StrEnum):
     PARTIAL_OR_STALE_PAYLOAD = "partial_or_stale_payload"
     SCIENTIFIC_CONFIGURATION_MISMATCH = "scientific_configuration_mismatch"
