@@ -1,9 +1,11 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import DatasetId
+from fedsira.evaluation.records import MetricResult
 from fedsira.protocol.claim_contract import (
     CapabilityClaimContract,
     build_capability_claim_contract,
+    capability_claim_contract_passes,
     compute_claim_identity,
     reproduction_evidence_is_adequate,
     screen_evidence_is_adequate,
@@ -83,6 +85,45 @@ def test_screen_evidence_adequacy_boundary() -> None:
     minimum_target = EVIDENCE_MINIMA.proposal_screen_target_examples
     assert screen_evidence_is_adequate(minimum_target, EVIDENCE_MINIMA)
     assert not screen_evidence_is_adequate(minimum_target - 1, EVIDENCE_MINIMA)
+
+
+def test_capability_claim_contract_passes_requires_both_gamma_and_beta() -> None:
+    contract = _contract()
+    passing = capability_claim_contract_passes(
+        contract,
+        MetricResult(contract.target_f1_minimum, 10),
+        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
+        MetricResult(contract.supported_macro_f1_drop_maximum, 10),
+        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+    )
+    assert passing
+    failing_gamma = capability_claim_contract_passes(
+        contract,
+        MetricResult(contract.target_f1_minimum - 0.01, 10),
+        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
+        MetricResult(contract.supported_macro_f1_drop_maximum, 10),
+        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+    )
+    assert not failing_gamma
+    failing_beta = capability_claim_contract_passes(
+        contract,
+        MetricResult(contract.target_f1_minimum, 10),
+        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
+        MetricResult(contract.supported_macro_f1_drop_maximum + 0.01, 10),
+        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+    )
+    assert not failing_beta
+
+
+def test_capability_claim_contract_passes_na_metric_is_not_passing() -> None:
+    contract = _contract()
+    assert not capability_claim_contract_passes(
+        contract,
+        MetricResult(None, 0),
+        MetricResult(1.0, 10),
+        MetricResult(0.0, 10),
+        MetricResult(0.0, 10),
+    )
 
 
 def test_validate_source_excluded_production_weight_rejects_nonzero() -> None:

@@ -12,6 +12,7 @@ from fedsira.protocol.reproduction import (
     handle_inadequate_domain,
     handle_no_adequate_unconsumed_domain,
     next_reproducer_domain,
+    select_compromised_reproducers,
     validate_commitment_exists_before_verifier_assignment,
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
@@ -139,3 +140,15 @@ def test_validate_commitment_exists_before_verifier_assignment() -> None:
     validate_commitment_exists_before_verifier_assignment("d" * 64)
     with pytest.raises(ValueError, match="commitment"):
         validate_commitment_exists_before_verifier_assignment(None)
+
+
+def test_select_compromised_reproducers_takes_first_feasible_in_order() -> None:
+    order = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
+    feasible = frozenset({DOMAIN_B, DOMAIN_C})
+    assert select_compromised_reproducers(order, feasible, 1) == (DOMAIN_B,)
+    assert select_compromised_reproducers(order, feasible, 2) == (DOMAIN_B, DOMAIN_C)
+
+
+def test_select_compromised_reproducers_returns_none_when_infeasible() -> None:
+    order = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
+    assert select_compromised_reproducers(order, frozenset({DOMAIN_A}), 2) is None

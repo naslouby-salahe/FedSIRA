@@ -8,7 +8,7 @@ import torch
 
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_HASH_TOKEN, NBaiotDomain
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed
+from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed, PositiveInt
 from fedsira.runtime.determinism import canonical_bytes
 
 REPRODUCTION_COMMITMENT_SEPARATOR = "REPRODUCTION_COMMITMENT"
@@ -100,3 +100,14 @@ def validate_commitment_exists_before_verifier_assignment(
 ) -> None:
     if commitment_hash is None:
         raise ValueError("verifier assignment requires an existing reproduction commitment")
+
+
+def select_compromised_reproducers(
+    reproducer_order: Sequence[NBaiotDomain],
+    attack_feasible_domains: frozenset[NBaiotDomain],
+    requested_compromised_count: PositiveInt,
+) -> tuple[NBaiotDomain, ...] | None:
+    feasible_in_order = [domain for domain in reproducer_order if domain in attack_feasible_domains]
+    if len(feasible_in_order) < requested_compromised_count:
+        return None
+    return tuple(feasible_in_order[:requested_compromised_count])
