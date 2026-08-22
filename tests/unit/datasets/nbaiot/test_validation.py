@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
@@ -12,7 +14,11 @@ from fedsira.datasets.nbaiot.validation import (
 
 def _file(domain: NBaiotDomain, class_id: NBaiotClass) -> DiscoveredCsvFile:
     return DiscoveredCsvFile(
-        domain=domain, class_id=class_id, relative_path="x.csv", file_sha256="a" * 64
+        domain=domain,
+        class_id=class_id,
+        relative_path="x.csv",
+        file_sha256="a" * 64,
+        absolute_path=Path("x.csv"),
     )
 
 

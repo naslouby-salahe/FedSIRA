@@ -30,6 +30,7 @@ class DiscoveredCsvFile:
     class_id: NBaiotClass
     relative_path: CanonicalToken
     file_sha256: ArtifactDigest
+    absolute_path: Path
 
 
 def compute_file_checksum(path: Path) -> ArtifactDigest:
@@ -82,6 +83,7 @@ def _discover_attack_csv_files(
                 class_id=class_id,
                 relative_path=csv_path.relative_to(device_directory).as_posix(),
                 file_sha256=compute_file_checksum(csv_path),
+                absolute_path=csv_path,
             )
         )
     return tuple(discovered)
@@ -106,6 +108,7 @@ def discover_primary_csv_files(
                     class_id=NBaiotClass.BENIGN,
                     relative_path=benign_csv.relative_to(device_directory).as_posix(),
                     file_sha256=compute_file_checksum(benign_csv),
+                    absolute_path=benign_csv,
                 )
             )
 
