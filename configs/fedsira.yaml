@@ -1,0 +1,318 @@
+datasets:
+  primary:
+    name: N-BaIoT
+    uci_dataset_id: 442
+    doi: 10.24432/C5RC8J
+    target_class: GAFGYT_COMBO
+    minimum_target_holding_domains: 7
+    supported_metric_minimum_report_examples_per_class: 100
+    role_intervals:
+      supported:
+        Anchor Train:
+        - 0.0
+        - 0.395
+        Anchor Validation:
+        - 0.4
+        - 0.495
+        Post-Reference Replay:
+        - 0.5
+        - 0.645
+        Row Verification:
+        - 0.65
+        - 0.745
+        Final Gate:
+        - 0.75
+        - 0.845
+        Report Test:
+        - 0.85
+        - 1.0
+      target:
+        Source Proposal:
+        - 0.0
+        - 0.145
+        Candidate Screen:
+        - 0.15
+        - 0.245
+        Reproduction:
+        - 0.25
+        - 0.445
+        Row Verification:
+        - 0.45
+        - 0.595
+        Final Gate:
+        - 0.6
+        - 0.795
+        Report Test:
+        - 0.8
+        - 1.0
+    sampling_caps_per_domain:
+      anchor_train_per_supported_class: 4000
+      anchor_validation_per_supported_class: 1000
+      source_proposal_target: 4000
+      source_proposal_supported_replay_per_supported_class: 400
+      candidate_screen_target: 1000
+      reproduction_target: 4000
+      reproduction_supported_replay_per_supported_class: 400
+      row_verification_target: 2000
+      row_verification_supported_per_supported_class: 200
+      final_gate_target: 2000
+      final_gate_supported_per_supported_class: 200
+      report_test_target: 2000
+      report_test_benign: 2000
+      report_test_other_supported_per_class: 500
+    scaling:
+      zero_standard_deviation_scale: 1.0
+      clip_min: -10.0
+      clip_max: 10.0
+  secondary:
+    name: CICIoT2023
+    target_class: BACKDOOR_MALWARE
+    pseudo_domain_partition_salt: 730201
+capability_claim:
+  target_f1_minimum: 0.8
+  target_f1_gain_over_anchor_minimum: 0.2
+  supported_macro_f1_drop_maximum: 0.02
+  benign_false_alarm_rate_increase_maximum: 0.01
+  candidate_free_anchor_target_f1_maximum: 0.5
+  evidence_minima:
+    reproduction_target_examples: 2000
+    reproduction_supported_control_examples: 2000
+    verification_target_examples: 1000
+    verification_supported_control_examples: 1000
+    proposal_screen_target_examples: 500
+protocol:
+  claim_opening:
+    screen_domains: 3
+    required_positive_screen_domains: 2
+    candidate_free_required_adequate_domains: 2
+  proposal_screen:
+    fold_count: 5
+    differential_minimum_nats_per_example: 0.05
+    matched_controls_per_target: 1
+  resource_horizon:
+    maximum_logical_evidence_cycles: 30
+    measurement_cycle_start: 0
+    measurement_cycle_end: 12
+  verification:
+    panel_size: 3
+    maximum_byzantine_verifiers_per_panel: 1
+    required_positive_reports: 2
+  synthesis:
+    committee_size: 5
+    maximum_byzantine_reproduction_rows: 1
+  final_gate:
+    minimum_adequate_non_source_domains: 6
+    median_target_f1_minimum: 0.8
+    minimum_domain_target_f1: 0.6
+    supported_macro_f1_drop_maximum: 0.02
+    benign_false_alarm_rate_increase_maximum: 0.01
+  diagnostic_random_verifier_profile:
+    byzantine_domain_count: 2
+    panel_size: 3
+    required_positive_reports: 2
+    tolerated_contamination_risk: 0.15
+model:
+  optimizer:
+    anchor_and_standard_fl_learning_rate: 0.001
+    post_reference_learning_rate: 0.0005
+    betas:
+    - 0.9
+    - 0.999
+    epsilon: 1.0e-08
+    weight_decay: 0.0001
+  training:
+    batch_size: 256
+    gradient_global_l2_clip: 5.0
+  anchor_fedavg:
+    rounds: 20
+    local_epochs_per_round: 1
+    client_dropout: 0.0
+    checkpoint_cadence_rounds: 1
+    evaluation_cadence_rounds: 1
+  post_reference:
+    local_epochs: 5
+    stability_kl_temperature: 1.0
+    stability_weight: 1.0
+    delta_l2_weight: 1.0e-05
+  verifier_aware_backdoor_override:
+    local_epochs: 10
+    triggered_backdoor_loss_weight: 2.0
+seeds_and_determinism:
+  master_seeds:
+  - 1103
+  - 1217
+  - 1321
+  - 1427
+  - 1543
+  - 1667
+  - 1777
+  - 1879
+  - 1999
+  - 2081
+  analysis_seed: 424242
+  smoke_seed: 900001
+attacks_and_boundaries:
+  hidden_source_backdoor:
+    trigger_value_after_standardization: 6.0
+    confirmatory_poison_fraction: 0.05
+    poison_fraction_sweep:
+    - 0.01
+    - 0.05
+    - 0.1
+  byzantine_reproduction:
+    compromised_counts:
+    - 0
+    - 1
+    - 2
+    model_replacement:
+      poison_fraction: 0.1
+      delta_scale: 5.0
+    verifier_aware:
+      delta_scale: 1.0
+  byzantine_verifier:
+    compromise_counts:
+    - 0
+    - 1
+    - 2
+    behaviors:
+    - False Positive
+    - False Negative
+  shared_label_error:
+    strengths:
+    - 0.05
+    - 0.1
+    - 0.2
+  shared_spurious_feature:
+    strengths:
+    - 0.25
+    - 0.5
+    - 1.0
+    value_after_standardization: 6.0
+  attacker_induced_common_context:
+    strengths:
+    - 0.25
+    - 0.5
+    - 1.0
+  capability_under_specification:
+    root_cause_hash_modulus: 2
+    shift_value_after_standardization: 3.0
+    contracts:
+    - Broad Target Only
+    - Root-Cause A Scoped
+    - Root-Cause B Scoped
+    mixtures:
+    - Balanced 50/50
+    - A-Dominant 80/20
+  heterogeneity:
+    quantity_skew_multipliers:
+    - 1.0
+    - 0.9
+    - 0.8
+    - 0.7
+    - 0.6
+    - 0.5
+    - 0.4
+    - 0.3
+    - 0.2
+    feature_shift_selected_feature_count: 10
+    feature_shift_magnitudes:
+    - 0.5
+    - 1.0
+  clean_oracle_materiality:
+    target_f1_decrease: 0.02
+    supported_macro_f1_drop: 0.02
+    benign_false_alarm_rate_increase: 0.01
+baselines:
+  local_only_reference_epochs: 20
+  centralized_reference_epochs: 20
+  fedavg_post_reference_rounds: 5
+  multiple_model_certified_ensemble_group_count: 3
+  reconstruction_filter:
+    reconstruction_local_epochs: 1
+    normalization_epsilon: 1.0e-12
+    calibration_percentile: 95.0
+  density_cluster_trimmed_mean:
+    dbscan_epsilon: 0.25
+    dbscan_min_samples: 2
+    trim_each_tail_count: 1
+    minimum_cluster_size_for_trimming: 3
+  secure_continual_assessment_post_reference_rounds: 5
+  recovery_after_source_admission:
+    backdoor_alarm_percentile: 95.0
+    recovery_rounds: 5
+  source_update_sanitization:
+    coordinate_bound_percentile: 95.0
+  parameter_similarity:
+    required_committed_rows: 5
+    cosine_similarity_minimum: 0.9
+  three_row_coordinate_median:
+    row_count: 3
+    assumed_byzantine_rows: 1
+metrics_and_statistics:
+  metric_aggregation:
+    generic_defined_domain_fraction_minimum: 0.8
+  multiplicity:
+    family_wise_alpha: 0.05
+  bootstrap:
+    confidence_level: 0.95
+    resamples: 10000
+  materiality:
+    target_f1_gain_minimum: 0.02
+    supported_macro_f1_noninferiority_margin: 0.02
+    benign_false_alarm_rate_noninferiority_margin: 0.01
+    source_exclusion_asr_reduction_minimum: 0.2
+    malicious_admission_reduction_minimum: 0.1
+    legitimate_admission_noninferiority_margin: 0.05
+    worst_domain_target_f1_gain_minimum: 0.05
+    false_launch_reduction_minimum: 0.15
+    reproduction_attempt_relative_reduction_minimum: 0.25
+    post_evidence_overhead_relative_reduction_minimum: 0.2
+    proposal_malicious_admission_worsening_maximum: 0.02
+  technical_completion:
+    minimum_complete_pairs_for_claim_support: 9
+  publication_rounding:
+    f1_accuracy_rates_decimals: 3
+    percentage_decimals: 1
+    effect_size_decimals: 3
+    p_value_significant_digits: 4
+    p_value_display_floor: 0.0001
+    seconds_decimals: 2
+    byte_units: IEC
+    byte_decimals: 2
+runtime:
+  repository_layout:
+    source: src/fedsira
+    tests: tests
+    raw_data: data/raw
+    external_data: /external/datasets
+    execution_workspace: outputs
+    manuscript_results: results
+  data_loader:
+    workers: 0
+    pin_memory: true
+    persistent_workers: false
+  timeouts_seconds:
+    dataset_preprocessing: 7200
+    scientific_cell_phase: 7200
+    experiment_analysis_or_report: 1800
+    final_export_verification: 1800
+  automatic_infrastructure_retries_per_cell_phase: 1
+  timing:
+    warmup_forward_passes: 1
+  same_environment_absolute_metric_tolerance: 1.0e-06
+claim_support_thresholds:
+  byzantine_operating_region:
+    maximum_malicious_admissions_within_bound: 0
+  safe_dormancy:
+    maximum_permanent_singleton_admissions: 0
+  capability_granularity_boundary:
+    false_same_capability_certification_rate_minimum: 0.1
+  heterogeneity_boundary:
+    legitimate_admission_change_from_natural_maximum: 0.05
+    worst_domain_target_f1_change_from_natural_maximum: 0.05
+  secondary_generalization:
+    target_f1_noninferiority_margin: 0.02
+    malicious_admission_worsening_maximum: 0.05
+validation_tolerances:
+  random_committee_probability_absolute: 1.0e-12
+  delay_component_sum_seconds_absolute: 1.0e-09

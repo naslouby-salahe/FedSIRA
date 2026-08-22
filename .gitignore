@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# FedSIRA generated computational workspace
+outputs/*
+!outputs/.gitkeep
+results/*
+!results/.gitkeep

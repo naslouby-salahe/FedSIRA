@@ -1,0 +1,2 @@
+class ScientificPipelineNotImplementedError(Exception):
+    pass
