@@ -1,11 +1,23 @@
+import pytest
 from typer.testing import CliRunner
 
+from fedsira.cli.commands import doctor
 from fedsira.cli.main import app
+from fedsira.runtime.environment import EnvironmentMismatch
 
 runner = CliRunner()
 
 
-def test_doctor_exits_zero_when_environment_and_config_are_valid() -> None:
+def _no_mismatches(
+    _workspace_path: object, _rar_archives_present: object
+) -> tuple[EnvironmentMismatch, ...]:
+    return ()
+
+
+def test_doctor_exits_zero_when_environment_and_config_are_valid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(doctor, "collect_environment_mismatches", _no_mismatches)
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     assert "project stage" in result.stdout
