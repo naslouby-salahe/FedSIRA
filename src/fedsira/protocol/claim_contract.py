@@ -13,6 +13,7 @@ from fedsira.domain.records import (
     PositiveInt,
     Probability,
 )
+from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import canonical_bytes
 
 CLAIM_IDENTITY_SEPARATOR = "FedSIRA|capability_claim_contract_identity"
@@ -115,6 +116,28 @@ def screen_evidence_is_adequate(
     target_example_count: NonNegativeInt, evidence_minima: EvidenceMinimaConfig
 ) -> bool:
     return target_example_count >= evidence_minima.proposal_screen_target_examples
+
+
+def capability_claim_contract_passes(
+    contract: CapabilityClaimContract,
+    target_f1: MetricResult,
+    target_f1_gain: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+) -> bool:
+    if (
+        target_f1.value is None
+        or target_f1_gain.value is None
+        or supported_macro_f1_drop.value is None
+        or benign_far_increase.value is None
+    ):
+        return False
+    return (
+        target_f1.value >= contract.target_f1_minimum
+        and target_f1_gain.value >= contract.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value <= contract.supported_macro_f1_drop_maximum
+        and benign_far_increase.value <= contract.benign_false_alarm_rate_increase_maximum
+    )
 
 
 def validate_source_excluded_production_weight(
