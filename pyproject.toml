@@ -30,6 +30,7 @@ dev = [
     "vulture==2.13",
     "deptry==0.20.0",
     "import-linter==2.1",
+    "pandas-stubs==2.2.3.241009",
 ]
 
 [build-system]
@@ -70,6 +71,32 @@ reportUnknownMemberType = false
 root = "src/fedsira/runtime/environment.py"
 reportUnknownMemberType = false
 reportAttributeAccessIssue = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/models/mlp.py"
+reportUnknownMemberType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/cli/commands/preprocess.py"
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/datasets/ciciot2023/acquisition.py"
+reportUnknownMemberType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/datasets/ciciot2023/preprocessing.py"
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/datasets/nbaiot/preprocessing.py"
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
 
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
