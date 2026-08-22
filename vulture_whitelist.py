@@ -200,6 +200,7 @@ scientific_cell_phase
 experiment_analysis_or_report
 final_export_verification
 warmup_forward_passes
+forward
 repository_layout
 data_loader
 timeouts_seconds
