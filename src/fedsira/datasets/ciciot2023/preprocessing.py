@@ -2,12 +2,16 @@ import hashlib
 
 import pandas
 
+from fedsira.config.schema import RoleIntervals
 from fedsira.datasets.ciciot2023.schema import (
     ROW_IDENTIFIER_CANONICAL_TOKENS,
+    TARGET_LABEL,
     canonicalize_token,
     hash_to_pseudo_domain,
     is_row_identifier_column,
 )
+from fedsira.datasets.common import Role, role_for_normalized_position
+from fedsira.datasets.roles import supported_role_windows, target_role_windows
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt, PositiveInt
 from fedsira.runtime.determinism import canonical_bytes
 
@@ -56,4 +60,26 @@ def assign_pseudo_domains(
             dataset_manifest_hash, canonical_label, stable_row_id, pseudo_domain_partition_salt
         )
         for stable_row_id in stable_row_ids
+    )
+
+
+def order_group_by_stable_row_id(
+    stable_row_ids: tuple[ArtifactDigest, ...],
+) -> tuple[ArtifactDigest, ...]:
+    return tuple(sorted(stable_row_ids))
+
+
+def assign_group_local_roles(
+    canonical_label: CanonicalToken,
+    stable_row_ids_ascending: tuple[ArtifactDigest, ...],
+    role_intervals: RoleIntervals,
+) -> tuple[Role | None, ...]:
+    is_target = canonical_label == TARGET_LABEL
+    windows = (
+        target_role_windows(role_intervals) if is_target else supported_role_windows(role_intervals)
+    )
+    group_size = len(stable_row_ids_ascending)
+    return tuple(
+        role_for_normalized_position(group_local_index / group_size, windows)
+        for group_local_index in range(group_size)
     )
