@@ -31,8 +31,10 @@ from fedsira.datasets.ciciot2023.acquisition import (
     validate_consistent_header,
 )
 from fedsira.datasets.ciciot2023.preprocessing import (
+    assign_group_local_roles,
     assign_pseudo_domains,
     compute_stable_row_id,
+    order_group_by_stable_row_id,
     resolve_predictor_columns,
 )
 from fedsira.datasets.ciciot2023.schema import canonical_class_registry, canonicalize_label
@@ -176,7 +178,9 @@ def _assign_roles_for_stream(
 
 
 def _validate_ciciot2023_raw_data() -> (
-    tuple[NonNegativeInt, tuple[CanonicalToken, ...], NonNegativeInt, NonNegativeInt]
+    tuple[
+        NonNegativeInt, tuple[CanonicalToken, ...], NonNegativeInt, NonNegativeInt, NonNegativeInt
+    ]
 ):
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_root = (
@@ -210,18 +214,36 @@ def _validate_ciciot2023_raw_data() -> (
         canonical_bytes(reference_path.name, reference_file_sha256)
     ).hexdigest()
     reference_relative_path = reference_path.relative_to(csv_root).as_posix()
-    stable_row_ids = tuple(
-        compute_stable_row_id(reference_relative_path, reference_file_sha256, row_index)
-        for row_index in range(len(reference_sample))
-    )
-    pseudo_domains = assign_pseudo_domains(
-        dataset_manifest_hash,
-        canonicalize_label(str(reference_sample[label_column].iloc[0])),
-        stable_row_ids,
-        config.datasets.secondary.pseudo_domain_partition_salt,
-    )
 
-    return len(discovered), registry, len(predictor_columns), len(set(pseudo_domains))
+    rows_by_group: dict[tuple[CanonicalToken, NonNegativeInt], list[ArtifactDigest]] = {}
+    for row_index in range(len(reference_sample)):
+        stable_row_id = compute_stable_row_id(
+            reference_relative_path, reference_file_sha256, row_index
+        )
+        canonical_label = canonicalize_label(str(reference_sample[label_column].iloc[row_index]))
+        pseudo_domain = assign_pseudo_domains(
+            dataset_manifest_hash,
+            canonical_label,
+            (stable_row_id,),
+            config.datasets.secondary.pseudo_domain_partition_salt,
+        )[0]
+        rows_by_group.setdefault((canonical_label, pseudo_domain), []).append(stable_row_id)
+
+    total_group_local_role_assignments = 0
+    for (canonical_label, _pseudo_domain), stable_row_ids in rows_by_group.items():
+        ordered = order_group_by_stable_row_id(tuple(stable_row_ids))
+        roles = assign_group_local_roles(
+            canonical_label, ordered, config.datasets.primary.role_intervals
+        )
+        total_group_local_role_assignments += sum(1 for role in roles if role is not None)
+
+    return (
+        len(discovered),
+        registry,
+        len(predictor_columns),
+        len(rows_by_group),
+        total_group_local_role_assignments,
+    )
 
 
 def execute(dataset: DatasetId | None, overwrite: bool) -> None:
@@ -238,13 +260,19 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
             "prepared-view/scaler artifact publication is not implemented until M02 — I10"
         )
     if dataset is DatasetId.CICIOT2023:
-        file_count, class_registry, predictor_count, pseudo_domain_count = (
-            _validate_ciciot2023_raw_data()
-        )
+        (
+            file_count,
+            class_registry,
+            predictor_count,
+            group_count,
+            group_local_role_assignments,
+        ) = _validate_ciciot2023_raw_data()
         raise ScientificPipelineNotImplementedError(
             f"CICIoT2023 raw data discovered and validated (files={file_count}, "
             f"class_registry={list(class_registry)}, predictor_count={predictor_count}, "
-            f"reference_pseudo_domains_observed={pseudo_domain_count}); role/scaler "
+            f"reference_label_pseudo_domain_groups={group_count}, "
+            f"reference_group_local_role_assignments={group_local_role_assignments}); "
+            "role/scaler "
             "materialization is not implemented until M02 — I12"
         )
     raise ScientificPipelineNotImplementedError(
