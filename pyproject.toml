@@ -1,0 +1,116 @@
+[project]
+name = "fedsira"
+version = "0.1.0"
+requires-python = "==3.11.9"
+dependencies = [
+    "torch==2.9.0",
+    "numpy==2.1.3",
+    "pandas==2.2.3",
+    "scipy==1.14.1",
+    "scikit-learn==1.5.2",
+    "pyarrow==17.0.0",
+    "pydantic==2.9.2",
+    "typer==0.12.5",
+    "click==8.1.7",
+    "rich==13.9.4",
+    "matplotlib==3.9.2",
+    "statsmodels==0.14.4",
+    "pyyaml==6.0.2",
+]
+
+[project.scripts]
+fedsira = "fedsira.cli.main:app"
+
+[dependency-groups]
+dev = [
+    "pytest==8.3.3",
+    "ruff==0.7.4",
+    "pyright==1.1.389",
+    "nox==2024.10.9",
+    "vulture==2.13",
+    "deptry==0.20.0",
+    "import-linter==2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fedsira"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+extend-exclude = ["vulture_whitelist.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/unit/domain/test_records.py" = ["B010"]
+"tests/unit/config/test_loading.py" = ["B010"]
+"tests/unit/artifacts/test_records.py" = ["B010"]
+"tests/unit/artifacts/test_provenance.py" = ["B010"]
+"src/fedsira/cli/main.py" = ["B008"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.11"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/runtime/determinism.py"
+reportUnknownMemberType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/runtime/environment.py"
+reportUnknownMemberType = false
+reportAttributeAccessIssue = false
+
+[tool.deptry]
+extend_exclude = ["noxfile.py"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["pyarrow", "matplotlib", "statsmodels", "scikit-learn", "torch", "numpy", "pandas", "scipy", "click"]
+
+[tool.importlinter]
+root_package = "fedsira"
+
+[[tool.importlinter.contracts]]
+name = "domain has no application/execution dependencies"
+type = "forbidden"
+source_modules = ["fedsira.domain"]
+forbidden_modules = [
+    "fedsira.cli",
+    "fedsira.reporting",
+    "fedsira.runtime",
+    "fedsira.artifacts",
+    "fedsira.experiments",
+    "fedsira.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "config has no application/execution dependencies"
+type = "forbidden"
+source_modules = ["fedsira.config"]
+forbidden_modules = [
+    "fedsira.cli",
+    "fedsira.reporting",
+    "fedsira.runtime",
+    "fedsira.artifacts",
+    "fedsira.experiments",
+]
+
+[[tool.importlinter.contracts]]
+name = "cli stays thin: no scientific/artifact logic implemented in cli"
+type = "forbidden"
+source_modules = ["fedsira.cli"]
+forbidden_modules = [
+    "fedsira.learning",
+    "fedsira.protocol",
+    "fedsira.analysis",
+]
