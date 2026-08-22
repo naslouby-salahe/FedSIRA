@@ -1,18 +1,33 @@
 import pytest
+import torch
 
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 from fedsira.domain.enums import ClaimState
 from fedsira.protocol.reproduction import (
     ReproductionAttempt,
+    compute_reproduction_commitment_hash,
     consumed_domains,
     handle_adequate_domain_trained,
     handle_inadequate_domain,
     handle_no_adequate_unconsumed_domain,
     next_reproducer_domain,
+    validate_commitment_exists_before_verifier_assignment,
     validate_reproduction_start_checkpoint,
+    validate_reproduction_starts_from_anchor,
 )
 
 DOMAIN_A, DOMAIN_B, DOMAIN_C = NBAIOT_DOMAIN_ORDER[:3]
+CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+POST_REFERENCE_CONFIG = CONFIG.model.post_reference
+
+
+def test_reproduction_stability_weight_is_1_0() -> None:
+    assert POST_REFERENCE_CONFIG.stability_weight == 1.0
+
+
+def test_reproduction_delta_l2_weight_is_1e_5() -> None:
+    assert POST_REFERENCE_CONFIG.delta_l2_weight == 1e-5
 
 
 def test_consumed_domains_only_counts_trained_attempts() -> None:
@@ -86,3 +101,41 @@ def test_validate_reproduction_start_checkpoint_rejects_source_derived_checkpoin
             "source-checkpoint", frozenset({"source-checkpoint"})
         )
     validate_reproduction_start_checkpoint("anchor-checkpoint", frozenset({"source-checkpoint"}))
+
+
+def test_validate_reproduction_starts_from_anchor() -> None:
+    anchor = torch.tensor([1.0, 2.0, 3.0])
+    validate_reproduction_starts_from_anchor(anchor.clone(), anchor)
+    with pytest.raises(ValueError, match="anchor"):
+        validate_reproduction_starts_from_anchor(torch.tensor([0.0, 2.0, 3.0]), anchor)
+
+
+def test_compute_reproduction_commitment_hash_is_deterministic() -> None:
+    parameters = torch.tensor([1.0, 2.0, 3.0])
+    first = compute_reproduction_commitment_hash(DOMAIN_A, "c" * 64, 42, parameters)
+    second = compute_reproduction_commitment_hash(DOMAIN_A, "c" * 64, 42, parameters)
+    assert first == second
+    assert len(first) == 64
+
+
+def test_compute_reproduction_commitment_hash_changes_with_parameters() -> None:
+    baseline = compute_reproduction_commitment_hash(
+        DOMAIN_A, "c" * 64, 42, torch.tensor([1.0, 2.0, 3.0])
+    )
+    changed = compute_reproduction_commitment_hash(
+        DOMAIN_A, "c" * 64, 42, torch.tensor([1.0, 2.0, 3.1])
+    )
+    assert baseline != changed
+
+
+def test_compute_reproduction_commitment_hash_changes_with_domain() -> None:
+    parameters = torch.tensor([1.0, 2.0, 3.0])
+    baseline = compute_reproduction_commitment_hash(DOMAIN_A, "c" * 64, 42, parameters)
+    changed = compute_reproduction_commitment_hash(DOMAIN_B, "c" * 64, 42, parameters)
+    assert baseline != changed
+
+
+def test_validate_commitment_exists_before_verifier_assignment() -> None:
+    validate_commitment_exists_before_verifier_assignment("d" * 64)
+    with pytest.raises(ValueError, match="commitment"):
+        validate_commitment_exists_before_verifier_assignment(None)

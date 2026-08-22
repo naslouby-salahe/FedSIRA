@@ -98,6 +98,10 @@ reportUnknownMemberType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
 
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/protocol/reproduction.py"
+reportUnknownMemberType = false
+
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
 
