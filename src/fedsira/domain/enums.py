@@ -146,6 +146,10 @@ class DormantOrigin(StrEnum):
     SYNTHESIS_PENDING = "SYNTHESIS_PENDING"
 
 
+class VerificationOmissionMarker(StrEnum):
+    EXTERNAL_VERIFICATION_NOT_USED = "External Verification Not Used"
+
+
 class TernaryOutcome(StrEnum):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
