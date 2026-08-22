@@ -20,6 +20,10 @@ class _SteppableOptimizer(Protocol):
     def step(self) -> None: ...
 
 
+def step_optimizer(optimizer: optim.AdamW) -> None:
+    cast(_SteppableOptimizer, optimizer).step()
+
+
 def build_loss_function() -> nn.CrossEntropyLoss:
     return nn.CrossEntropyLoss(weight=None, reduction="mean", label_smoothing=0.0)
 
@@ -73,9 +77,23 @@ def train_one_epoch(
         loss = loss_function(logits, labels)
         loss.backward()
         clip_gradients(model, training_config)
-        cast(_SteppableOptimizer, optimizer).step()
+        step_optimizer(optimizer)
         total_loss += float(loss.detach())
     return total_loss / len(batches)
+
+
+def ordered_batch_indices(
+    sample_ids: Sequence[CanonicalToken],
+    training_seed: DerivedSeed,
+    epoch: EpochIndex,
+    batch_size: int,
+) -> tuple[torch.Tensor, ...]:
+    sample_id_to_index = {sample_id: index for index, sample_id in enumerate(sample_ids)}
+    ordered_batches = ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
+    return tuple(
+        torch.tensor([sample_id_to_index[sample_id] for sample_id in batch_sample_ids])
+        for batch_sample_ids in ordered_batches
+    )
 
 
 def build_epoch_batches(
@@ -86,13 +104,10 @@ def build_epoch_batches(
     epoch: EpochIndex,
     batch_size: int,
 ) -> tuple[tuple[torch.Tensor, torch.Tensor], ...]:
-    sample_id_to_index = {sample_id: index for index, sample_id in enumerate(sample_ids)}
-    ordered_batches = ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
-    batches: list[tuple[torch.Tensor, torch.Tensor]] = []
-    for batch_sample_ids in ordered_batches:
-        indices = torch.tensor([sample_id_to_index[sample_id] for sample_id in batch_sample_ids])
-        batches.append((features[indices], labels[indices]))
-    return tuple(batches)
+    return tuple(
+        (features[indices], labels[indices])
+        for indices in ordered_batch_indices(sample_ids, training_seed, epoch, batch_size)
+    )
 
 
 def train_epochs_with_deterministic_batch_order(

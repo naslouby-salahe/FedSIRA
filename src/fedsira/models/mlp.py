@@ -45,3 +45,13 @@ class FedSIRAClassifier(nn.Module):
 
 def trainable_parameter_count(model: FedSIRAClassifier) -> PositiveInt:
     return sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
+
+
+def flatten_trainable_parameters(model: FedSIRAClassifier) -> torch.Tensor:
+    return torch.cat(
+        [
+            parameter.reshape(-1)
+            for _, parameter in model.named_parameters()
+            if parameter.requires_grad
+        ]
+    )
