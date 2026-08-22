@@ -90,6 +90,11 @@ reportUnknownMemberType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
 
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/baselines/calibration.py"
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
 

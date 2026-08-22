@@ -370,6 +370,7 @@ class BaselinesConfig(FrozenModel):
     centralized_reference_epochs: PositiveInt
     fedavg_post_reference_rounds: PositiveInt
     multiple_model_certified_ensemble_group_count: PositiveInt
+    multiple_model_certified_ensemble_post_reference_rounds: PositiveInt
     reconstruction_filter: ReconstructionFilterConfig
     density_cluster_trimmed_mean: DensityClusterTrimmedMeanConfig
     secure_continual_assessment_post_reference_rounds: PositiveInt
@@ -377,6 +378,7 @@ class BaselinesConfig(FrozenModel):
     source_update_sanitization: SourceUpdateSanitizationConfig
     parameter_similarity: ParameterSimilarityConfig
     three_row_coordinate_median: ThreeRowCoordinateMedianConfig
+    krum_robust_aggregation_post_reference_rounds: PositiveInt
 
 
 class MetricAggregationConfig(FrozenModel):
