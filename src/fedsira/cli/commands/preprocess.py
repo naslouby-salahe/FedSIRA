@@ -1,6 +1,27 @@
+import hashlib
+
+import pandas
+
 from fedsira.cli.commands import REPOSITORY_ROOT, ScientificPipelineNotImplementedError
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
+from fedsira.datasets.ciciot2023.acquisition import (
+    compute_file_checksum,
+    discover_secondary_csv_files,
+    read_csv_header,
+    resolve_label_column,
+    validate_consistent_header,
+)
+from fedsira.datasets.ciciot2023.preprocessing import (
+    assign_pseudo_domains,
+    compute_stable_row_id,
+    resolve_predictor_columns,
+)
+from fedsira.datasets.ciciot2023.schema import canonical_class_registry, canonicalize_label
+from fedsira.datasets.ciciot2023.validation import (
+    validate_label_collisions,
+    validate_target_label_present,
+)
 from fedsira.datasets.nbaiot.acquisition import (
     DiscoveredCsvFile,
     compute_dataset_manifest_hash,
@@ -21,7 +42,8 @@ from fedsira.datasets.nbaiot.validation import (
     validate_target_holder_feasibility,
 )
 from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import NonNegativeInt
+from fedsira.domain.records import CanonicalToken, NonNegativeInt
+from fedsira.runtime.determinism import canonical_bytes
 
 
 def _validate_nbaiot_raw_data() -> tuple[str, tuple[str, ...], NonNegativeInt]:
@@ -72,6 +94,55 @@ def _assign_roles_for_stream(
     )
 
 
+def _validate_ciciot2023_raw_data() -> (
+    tuple[NonNegativeInt, tuple[CanonicalToken, ...], NonNegativeInt, NonNegativeInt]
+):
+    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    csv_root = (
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.raw_data
+        / "CIC_IOT_Dataset2023"
+        / "CSV"
+        / "MERGED_CSV"
+    )
+    discovered = discover_secondary_csv_files(csv_root)
+    reference_header = read_csv_header(discovered[0])
+    label_column = resolve_label_column(reference_header)
+
+    observed_raw_labels: set[str] = set()
+    for path in discovered:
+        observed_header = read_csv_header(path)
+        validate_consistent_header(reference_header, observed_header)
+        labels = pandas.read_csv(path, usecols=[label_column])[label_column]
+        observed_raw_labels.update(str(label) for label in labels.unique())
+
+    validate_label_collisions(frozenset(observed_raw_labels))
+    canonical_labels = frozenset(canonicalize_label(label) for label in observed_raw_labels)
+    validate_target_label_present(canonical_labels)
+    registry = canonical_class_registry(canonical_labels)
+
+    reference_path = discovered[0]
+    reference_file_sha256 = compute_file_checksum(reference_path)
+    reference_sample = pandas.read_csv(reference_path, nrows=1500)
+    predictor_columns = resolve_predictor_columns(reference_header, label_column, reference_sample)
+    dataset_manifest_hash = hashlib.sha256(
+        canonical_bytes(reference_path.name, reference_file_sha256)
+    ).hexdigest()
+    reference_relative_path = reference_path.relative_to(csv_root).as_posix()
+    stable_row_ids = tuple(
+        compute_stable_row_id(reference_relative_path, reference_file_sha256, row_index)
+        for row_index in range(len(reference_sample))
+    )
+    pseudo_domains = assign_pseudo_domains(
+        dataset_manifest_hash,
+        canonicalize_label(str(reference_sample[label_column].iloc[0])),
+        stable_row_ids,
+        config.datasets.secondary.pseudo_domain_partition_salt,
+    )
+
+    return len(discovered), registry, len(predictor_columns), len(set(pseudo_domains))
+
+
 def execute(dataset: DatasetId | None, overwrite: bool) -> None:
     if dataset is DatasetId.N_BAIOT:
         manifest_hash, unavailable_classes, total_role_assignments = _validate_nbaiot_raw_data()
@@ -81,6 +152,16 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
             f"structurally_unavailable_classes={list(unavailable_classes)}, "
             f"total_role_assignments={total_role_assignments}); "
             "prepared-view/scaler artifact publication is not implemented until M02 — I10"
+        )
+    if dataset is DatasetId.CICIOT2023:
+        file_count, class_registry, predictor_count, pseudo_domain_count = (
+            _validate_ciciot2023_raw_data()
+        )
+        raise ScientificPipelineNotImplementedError(
+            f"CICIoT2023 raw data discovered and validated (files={file_count}, "
+            f"class_registry={list(class_registry)}, predictor_count={predictor_count}, "
+            f"reference_pseudo_domains_observed={pseudo_domain_count}); role/scaler "
+            "materialization is not implemented until M02 — I12"
         )
     raise ScientificPipelineNotImplementedError(
         "fedsira preprocess is not implemented until the M02 dataset-preparation milestone"
