@@ -9,7 +9,7 @@ from fedsira.domain.records import (
     NonNegativeInt,
     PositiveInt,
 )
-from fedsira.evaluation.aggregation import quantile_type7
+from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.runtime.determinism import canonical_bytes
 
 SCREEN_FOLD_SEPARATOR = "SCREEN_FOLD"
@@ -31,46 +31,24 @@ def screen_fold_index(
     return int.from_bytes(digest[0:8], byteorder="big", signed=False) % fold_count
 
 
-def _decile_boundaries(control_losses: Sequence[float]) -> tuple[float, ...]:
-    sorted_losses = sorted(control_losses)
-    return tuple(quantile_type7(sorted_losses, decile / 10.0) for decile in range(1, 10))
-
-
-def _decile_bin(loss: float, boundaries: tuple[float, ...]) -> int:
-    bin_index = 0
-    for boundary in boundaries:
-        if loss <= boundary:
-            break
-        bin_index += 1
-    return bin_index
-
-
 def match_held_out_fold(
     held_out_targets: Sequence[ScreenLossObservation],
     held_out_controls: Sequence[ScreenLossObservation],
     other_fold_controls: Sequence[ScreenLossObservation],
 ) -> tuple[tuple[ScreenLossObservation, ScreenLossObservation], ...] | None:
-    boundaries = _decile_boundaries(
-        [observation.anchor_loss for observation in other_fold_controls]
+    targets_by_id = {observation.sample_id: observation for observation in held_out_targets}
+    controls_by_id = {observation.sample_id: observation for observation in held_out_controls}
+    matched_ids = match_nearest_within_decile(
+        [(observation.sample_id, observation.anchor_loss) for observation in held_out_targets],
+        [(observation.sample_id, observation.anchor_loss) for observation in held_out_controls],
+        [observation.anchor_loss for observation in other_fold_controls],
     )
-    controls_by_bin: dict[int, list[ScreenLossObservation]] = {}
-    for control in held_out_controls:
-        controls_by_bin.setdefault(_decile_bin(control.anchor_loss, boundaries), []).append(control)
-    for bin_controls in controls_by_bin.values():
-        bin_controls.sort(key=lambda observation: observation.sample_id)
-
-    matches: list[tuple[ScreenLossObservation, ScreenLossObservation]] = []
-    for target in sorted(held_out_targets, key=lambda observation: observation.sample_id):
-        candidates = controls_by_bin.get(_decile_bin(target.anchor_loss, boundaries), [])
-        if not candidates:
-            return None
-        best_control = min(
-            candidates,
-            key=lambda control: (abs(control.anchor_loss - target.anchor_loss), control.sample_id),
-        )
-        candidates.remove(best_control)
-        matches.append((target, best_control))
-    return tuple(matches)
+    if matched_ids is None:
+        return None
+    return tuple(
+        (targets_by_id[target_id], controls_by_id[control_id])
+        for target_id, control_id in matched_ids
+    )
 
 
 def proposal_screen_differential(

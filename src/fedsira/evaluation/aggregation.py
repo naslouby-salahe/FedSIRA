@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import MasterSeed, PositiveInt, Probability
+from fedsira.domain.records import CanonicalToken, MasterSeed, PositiveInt, Probability
 from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 
@@ -30,6 +30,43 @@ def quantile_type7(sorted_values: Sequence[float], probability: float) -> float:
     return sorted_values[lower_index] + fraction * (
         sorted_values[upper_index] - sorted_values[lower_index]
     )
+
+
+def decile_boundaries(boundary_values: Sequence[float]) -> tuple[float, ...]:
+    sorted_values = sorted(boundary_values)
+    return tuple(quantile_type7(sorted_values, decile / 10.0) for decile in range(1, 10))
+
+
+def decile_bin(value: float, boundaries: Sequence[float]) -> int:
+    bin_index = 0
+    for boundary in boundaries:
+        if value <= boundary:
+            break
+        bin_index += 1
+    return bin_index
+
+
+def match_nearest_within_decile(
+    targets: Sequence[tuple[CanonicalToken, float]],
+    candidates: Sequence[tuple[CanonicalToken, float]],
+    boundary_values: Sequence[float],
+) -> tuple[tuple[CanonicalToken, CanonicalToken], ...] | None:
+    boundaries = decile_boundaries(boundary_values)
+    candidates_by_bin: dict[int, list[tuple[CanonicalToken, float]]] = {}
+    for row_id, loss in candidates:
+        candidates_by_bin.setdefault(decile_bin(loss, boundaries), []).append((row_id, loss))
+    for bin_candidates in candidates_by_bin.values():
+        bin_candidates.sort(key=lambda item: item[0])
+
+    matches: list[tuple[CanonicalToken, CanonicalToken]] = []
+    for target_id, target_loss in sorted(targets, key=lambda item: item[0]):
+        pool = candidates_by_bin.get(decile_bin(target_loss, boundaries), [])
+        if not pool:
+            return None
+        best = min(pool, key=lambda item: (abs(item[1] - target_loss), item[0]))
+        pool.remove(best)
+        matches.append((target_id, best[0]))
+    return tuple(matches)
 
 
 def equal_weight_domain_mean(

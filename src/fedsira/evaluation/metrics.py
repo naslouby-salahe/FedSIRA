@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 
-from fedsira.config.schema import CapabilityClaimConfig
+from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
 from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt, Probability
 from fedsira.evaluation.aggregation import minimum_defined_domain_count
 from fedsira.evaluation.records import (
@@ -361,6 +361,29 @@ def macro_auroc(auroc_by_class: Mapping[CanonicalToken, MetricResult]) -> Metric
 
 def macro_auprc(auprc_by_class: Mapping[CanonicalToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(auprc_by_class)
+
+
+def clean_oracle_degradation_is_material(
+    target_f1_delta: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+    clean_oracle_materiality_config: CleanOracleMaterialityConfig,
+) -> bool:
+    if (
+        target_f1_delta.value is not None
+        and target_f1_delta.value <= -clean_oracle_materiality_config.target_f1_decrease
+    ):
+        return True
+    if (
+        supported_macro_f1_drop.value is not None
+        and supported_macro_f1_drop.value >= clean_oracle_materiality_config.supported_macro_f1_drop
+    ):
+        return True
+    return (
+        benign_far_increase.value is not None
+        and benign_far_increase.value
+        >= clean_oracle_materiality_config.benign_false_alarm_rate_increase
+    )
 
 
 def is_false_same_capability_certification(

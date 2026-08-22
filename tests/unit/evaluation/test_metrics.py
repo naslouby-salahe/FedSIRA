@@ -7,6 +7,7 @@ from fedsira.evaluation.metrics import (
     balanced_accuracy,
     benign_false_alarm_rate,
     benign_false_alarm_rate_increase,
+    clean_oracle_degradation_is_material,
     clean_proposal_oracle_label,
     compute_confusion_counts,
     compute_confusion_counts_by_class,
@@ -286,3 +287,33 @@ def test_is_false_same_capability_certification_is_exclusive_or() -> None:
     assert is_false_same_capability_certification(False, True)
     assert not is_false_same_capability_certification(True, True)
     assert not is_false_same_capability_certification(False, False)
+
+
+def test_clean_oracle_degradation_is_material_on_any_threshold_exceeded() -> None:
+    materiality_config = CONFIG.attacks_and_boundaries.clean_oracle_materiality
+    not_material = clean_oracle_degradation_is_material(
+        MetricResult(0.0, 10), MetricResult(0.0, 10), MetricResult(0.0, 10), materiality_config
+    )
+    assert not not_material
+    material_on_target = clean_oracle_degradation_is_material(
+        MetricResult(-materiality_config.target_f1_decrease, 10),
+        MetricResult(0.0, 10),
+        MetricResult(0.0, 10),
+        materiality_config,
+    )
+    assert material_on_target
+    material_on_supported = clean_oracle_degradation_is_material(
+        MetricResult(0.0, 10),
+        MetricResult(materiality_config.supported_macro_f1_drop, 10),
+        MetricResult(0.0, 10),
+        materiality_config,
+    )
+    assert material_on_supported
+
+
+def test_clean_oracle_degradation_is_material_na_metrics_are_not_material() -> None:
+    materiality_config = CONFIG.attacks_and_boundaries.clean_oracle_materiality
+    result = clean_oracle_degradation_is_material(
+        MetricResult(None, 0), MetricResult(None, 0), MetricResult(None, 0), materiality_config
+    )
+    assert not result
