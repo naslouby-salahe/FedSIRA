@@ -4,6 +4,8 @@ import importlib.metadata
 import importlib.util
 from pathlib import Path
 
+import torch
+
 from fedsira.domain.enums import DatasetId, ProducerFingerprintFamily
 from fedsira.domain.records import ArtifactDigest, CanonicalToken
 from fedsira.runtime.determinism import canonical_bytes
@@ -288,6 +290,22 @@ def _imported_top_level_packages(tree: ast.Module) -> set[str]:
     return packages
 
 
+def compute_cuda_environment_fingerprint() -> ArtifactDigest:
+    if not torch.cuda.is_available():
+        return hashlib.sha256(canonical_bytes("cuda_unavailable")).hexdigest()
+    major, minor = torch.cuda.get_device_capability(0)
+    cudnn_version = torch.backends.cudnn.version()
+    return hashlib.sha256(
+        canonical_bytes(
+            torch.version.cuda or "",
+            cudnn_version if cudnn_version is not None else 0,
+            f"{major}.{minor}",
+            torch.backends.cudnn.deterministic,
+            torch.backends.cudnn.benchmark,
+        )
+    ).hexdigest()
+
+
 def compute_external_dependency_fingerprint(
     entry_modules: tuple[CanonicalToken, ...], relevant_import_names: tuple[str, ...]
 ) -> ArtifactDigest:
@@ -302,4 +320,6 @@ def compute_external_dependency_fingerprint(
         distribution_name = IMPORT_NAME_TO_DISTRIBUTION_NAME.get(import_name, import_name)
         version = importlib.metadata.version(distribution_name)
         hasher.update(canonical_bytes(import_name, version))
+    if "torch" in actually_relevant:
+        hasher.update(canonical_bytes(compute_cuda_environment_fingerprint()))
     return hasher.hexdigest()
