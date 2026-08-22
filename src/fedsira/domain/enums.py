@@ -150,6 +150,11 @@ class VerificationOmissionMarker(StrEnum):
     EXTERNAL_VERIFICATION_NOT_USED = "External Verification Not Used"
 
 
+class ByzantineVerifierBehavior(StrEnum):
+    FALSE_POSITIVE = "False Positive"
+    FALSE_NEGATIVE = "False Negative"
+
+
 class TernaryOutcome(StrEnum):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
