@@ -257,7 +257,7 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
             f"structurally_unavailable_classes={list(unavailable_classes)}, "
             f"total_role_assignments={total_role_assignments}, "
             f"canonical_dataset_manifest_reused={reused}); "
-            "prepared-view/scaler artifact publication is not implemented until M02 — I10"
+            "prepared-view/scaler artifact publication is not yet implemented"
         )
     if dataset is DatasetId.CICIOT2023:
         (
@@ -272,9 +272,8 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
             f"class_registry={list(class_registry)}, predictor_count={predictor_count}, "
             f"reference_label_pseudo_domain_groups={group_count}, "
             f"reference_group_local_role_assignments={group_local_role_assignments}); "
-            "role/scaler "
-            "materialization is not implemented until M02 — I12"
+            "role/scaler materialization is not yet implemented"
         )
     raise ScientificPipelineNotImplementedError(
-        "fedsira preprocess is not implemented until the M02 dataset-preparation milestone"
+        "fedsira preprocess is not yet implemented for this dataset"
     )

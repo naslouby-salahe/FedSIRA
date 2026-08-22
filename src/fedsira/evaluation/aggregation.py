@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import MasterSeed, PositiveInt
+from fedsira.domain.records import MasterSeed, PositiveInt, Probability
 from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 
@@ -12,7 +12,7 @@ SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR = "SINGLE_METHOD_MEAN_BOOTSTRAP"
 
 
 def minimum_defined_domain_count(
-    expected_domain_count: PositiveInt, generic_defined_domain_fraction_minimum: float
+    expected_domain_count: PositiveInt, generic_defined_domain_fraction_minimum: Probability
 ) -> PositiveInt:
     return math.ceil(expected_domain_count * generic_defined_domain_fraction_minimum)
 

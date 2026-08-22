@@ -4,8 +4,6 @@ from pathlib import Path
 
 from _repo import SRC_ROOT, iter_python_files, parse
 
-BOUNDARY_PACKAGES = ("domain", "config", "artifacts")
-
 
 def public_top_level_functions(tree: ast.Module) -> list[ast.FunctionDef]:
     return [
@@ -45,11 +43,10 @@ def violations_in_tree(tree: ast.Module) -> list[str]:
 
 def test_public_boundary_functions_are_fully_annotated() -> None:
     offenders: list[str] = []
-    for package in BOUNDARY_PACKAGES:
-        for path in iter_python_files(SRC_ROOT / package):
-            tree = parse(path)
-            for name in violations_in_tree(tree):
-                offenders.append(f"{path.relative_to(SRC_ROOT.parent.parent)}:{name}")
+    for path in iter_python_files(SRC_ROOT):
+        tree = parse(path)
+        for name in violations_in_tree(tree):
+            offenders.append(f"{path.relative_to(SRC_ROOT.parent.parent)}:{name}")
     assert not offenders, f"Unannotated public boundary members: {offenders}"
 
 
