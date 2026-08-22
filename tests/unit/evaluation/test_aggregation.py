@@ -4,9 +4,12 @@ from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_confi
 from fedsira.evaluation.aggregation import (
     bootstrap_percentile_confidence_interval,
     coefficient_of_variation,
+    decile_bin,
+    decile_boundaries,
     domain_disparity,
     equal_weight_domain_mean,
     interquartile_range,
+    match_nearest_within_decile,
     minimum_defined_domain_count,
     percentile_10_domain_target_f1,
     quantile_type7,
@@ -124,3 +127,27 @@ def test_bootstrap_confidence_interval_na_on_empty_input() -> None:
     bootstrap_config = CONFIG.metrics_and_statistics.bootstrap
     analysis_seed = CONFIG.seeds_and_determinism.analysis_seed
     assert bootstrap_percentile_confidence_interval([], bootstrap_config, analysis_seed) is None
+
+
+def test_decile_boundaries_and_bin_are_consistent() -> None:
+    values = [float(v) for v in range(1, 11)]
+    boundaries = decile_boundaries(values)
+    assert len(boundaries) == 9
+    assert decile_bin(0.5, boundaries) == 0
+    assert decile_bin(10.0, boundaries) == 9
+
+
+def test_match_nearest_within_decile_matches_by_closest_value() -> None:
+    boundary_values = [float(v) for v in range(1, 11)]
+    targets = [("t1", 1.0)]
+    candidates = [("c1", 0.9)] + [(f"c{i}", float(i)) for i in range(2, 11)]
+    matched = match_nearest_within_decile(targets, candidates, boundary_values)
+    assert matched == (("t1", "c1"),)
+
+
+def test_match_nearest_within_decile_returns_none_without_replacement_when_bin_is_empty() -> None:
+    targets = [("t1", 100.0)]
+    candidates = [("c1", 1.0)]
+    assert (
+        match_nearest_within_decile(targets, candidates, [float(v) for v in range(1, 11)]) is None
+    )

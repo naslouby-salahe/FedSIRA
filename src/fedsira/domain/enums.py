@@ -146,6 +146,23 @@ class DormantOrigin(StrEnum):
     SYNTHESIS_PENDING = "SYNTHESIS_PENDING"
 
 
+class RootCause(StrEnum):
+    A = "ROOT_CAUSE_A"
+    B = "ROOT_CAUSE_B"
+
+
+class CapabilityContractScope(StrEnum):
+    BROAD_TARGET_ONLY = "Broad Target Only"
+    ROOT_CAUSE_A_SCOPED = "Root-Cause A Scoped"
+    ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"
+
+
+class EvaluationInsufficiencyReason(StrEnum):
+    INSUFFICIENT_MATCHED_BENIGN_REPORT_TEST_CONTROLS = (
+        "Insufficient Matched Benign Report-Test Controls"
+    )
+
+
 class VerificationOmissionMarker(StrEnum):
     EXTERNAL_VERIFICATION_NOT_USED = "External Verification Not Used"
 
