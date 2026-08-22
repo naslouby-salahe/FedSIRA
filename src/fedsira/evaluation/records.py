@@ -20,6 +20,12 @@ class ConfusionCounts:
     true_negative: NonNegativeInt
 
 
+class ProposalOracleLabel(StrEnum):
+    ORACLE_VALID = "ORACLE_VALID"
+    ORACLE_INVALID = "ORACLE_INVALID"
+    NA = "NA"
+
+
 class FalseSameCapabilityReason(StrEnum):
     NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION = "No Cross-Root-Cause Equivalence Assertion"
 

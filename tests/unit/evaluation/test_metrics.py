@@ -1,3 +1,4 @@
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.evaluation.metrics import (
     accuracy,
     attack_success_rate_within_domain,
@@ -6,10 +7,12 @@ from fedsira.evaluation.metrics import (
     balanced_accuracy,
     benign_false_alarm_rate,
     benign_false_alarm_rate_increase,
+    clean_proposal_oracle_label,
     compute_confusion_counts,
     compute_confusion_counts_by_class,
     dormant_claim_rate,
     f1_for_class,
+    false_launch_rate,
     false_negative_rate_for_class,
     false_positive_rate_for_class,
     false_same_capability_certification_rate,
@@ -19,6 +22,7 @@ from fedsira.evaluation.metrics import (
     precision_for_class,
     recall_for_class,
     reproduction_abstention_rate,
+    reproduction_attempt_count,
     supported_macro_f1_harm,
     target_capability_gain,
     target_f1,
@@ -26,7 +30,9 @@ from fedsira.evaluation.metrics import (
     verifier_abstention_rate,
     weighted_f1,
 )
-from fedsira.evaluation.records import FalseSameCapabilityReason
+from fedsira.evaluation.records import FalseSameCapabilityReason, MetricResult, ProposalOracleLabel
+
+CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
 
 def test_confusion_counts_partition_all_examples() -> None:
@@ -117,8 +123,6 @@ def test_target_f1_selects_target_class() -> None:
 
 
 def test_target_capability_gain_is_na_when_either_side_undefined() -> None:
-    from fedsira.evaluation.records import MetricResult
-
     assert target_capability_gain(MetricResult(None, 0), MetricResult(0.5, 10)).value is None
     result = target_capability_gain(MetricResult(0.8, 10), MetricResult(0.6, 10))
     assert result.value is not None
@@ -126,8 +130,6 @@ def test_target_capability_gain_is_na_when_either_side_undefined() -> None:
 
 
 def test_supported_macro_f1_harm_direction() -> None:
-    from fedsira.evaluation.records import MetricResult
-
     result = supported_macro_f1_harm(MetricResult(0.9, 10), MetricResult(0.85, 10))
     assert result.value is not None
     assert abs(result.value - 0.05) < 1e-9
@@ -147,8 +149,6 @@ def test_benign_false_alarm_rate_na_when_no_benign_examples() -> None:
 
 
 def test_benign_false_alarm_rate_increase() -> None:
-    from fedsira.evaluation.records import MetricResult
-
     result = benign_false_alarm_rate_increase(MetricResult(0.05, 100), MetricResult(0.02, 100))
     assert result.value is not None
     assert abs(result.value - 0.03) < 1e-9
@@ -221,3 +221,60 @@ def test_false_same_capability_certification_rate_numeric() -> None:
     result, reason = false_same_capability_certification_rate(2, 8, is_scoped_contract=False)
     assert result.value == 0.25
     assert reason is None
+
+
+def test_clean_proposal_oracle_label_na_below_defined_domain_threshold() -> None:
+    capability_claim_config = CONFIG.capability_claim
+    label = clean_proposal_oracle_label(
+        MetricResult(0.9, 10),
+        MetricResult(0.3, 10),
+        MetricResult(0.0, 10),
+        MetricResult(0.0, 10),
+        defined_domain_count=5,
+        expected_domain_count=8,
+        generic_defined_domain_fraction_minimum=0.8,
+        capability_claim_config=capability_claim_config,
+    )
+    assert label == ProposalOracleLabel.NA
+
+
+def test_clean_proposal_oracle_label_valid_when_all_thresholds_pass() -> None:
+    capability_claim_config = CONFIG.capability_claim
+    label = clean_proposal_oracle_label(
+        MetricResult(0.85, 10),
+        MetricResult(0.25, 10),
+        MetricResult(0.01, 10),
+        MetricResult(0.005, 10),
+        defined_domain_count=7,
+        expected_domain_count=8,
+        generic_defined_domain_fraction_minimum=0.8,
+        capability_claim_config=capability_claim_config,
+    )
+    assert label == ProposalOracleLabel.ORACLE_VALID
+
+
+def test_clean_proposal_oracle_label_invalid_when_a_threshold_fails() -> None:
+    capability_claim_config = CONFIG.capability_claim
+    label = clean_proposal_oracle_label(
+        MetricResult(0.5, 10),
+        MetricResult(0.25, 10),
+        MetricResult(0.01, 10),
+        MetricResult(0.005, 10),
+        defined_domain_count=7,
+        expected_domain_count=8,
+        generic_defined_domain_fraction_minimum=0.8,
+        capability_claim_config=capability_claim_config,
+    )
+    assert label == ProposalOracleLabel.ORACLE_INVALID
+
+
+def test_false_launch_rate() -> None:
+    assert false_launch_rate(0, 0).value is None
+    result = false_launch_rate(1, 4)
+    assert result.value == 0.25
+
+
+def test_reproduction_attempt_count_excludes_evidence_inadequate_domains() -> None:
+    started = frozenset({"A", "B", "C"})
+    inadequate = frozenset({"B"})
+    assert reproduction_attempt_count(started, inadequate) == 2
