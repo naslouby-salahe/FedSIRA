@@ -198,7 +198,8 @@ def _validate_ciciot2023_raw_data() -> (
     for path in discovered:
         observed_header = read_csv_header(path)
         validate_consistent_header(reference_header, observed_header)
-        labels = pandas.read_csv(path, usecols=[label_column])[label_column]
+        label_frame: pandas.DataFrame = pandas.read_csv(path, usecols=[label_column])
+        labels: pandas.Series[str] = label_frame[label_column]
         observed_raw_labels.update(str(label) for label in labels.unique())
 
     validate_label_collisions(frozenset(observed_raw_labels))
@@ -208,7 +209,7 @@ def _validate_ciciot2023_raw_data() -> (
 
     reference_path = discovered[0]
     reference_file_sha256 = compute_file_checksum(reference_path)
-    reference_sample = pandas.read_csv(reference_path, nrows=1500)
+    reference_sample: pandas.DataFrame = pandas.read_csv(reference_path, nrows=1500)
     predictor_columns = resolve_predictor_columns(reference_header, label_column, reference_sample)
     dataset_manifest_hash = hashlib.sha256(
         canonical_bytes(reference_path.name, reference_file_sha256)
@@ -220,7 +221,8 @@ def _validate_ciciot2023_raw_data() -> (
         stable_row_id = compute_stable_row_id(
             reference_relative_path, reference_file_sha256, row_index
         )
-        canonical_label = canonicalize_label(str(reference_sample[label_column].iloc[row_index]))
+        label_column_series: pandas.Series[str] = reference_sample[label_column]
+        canonical_label = canonicalize_label(str(label_column_series.iloc[row_index]))
         pseudo_domain = assign_pseudo_domains(
             dataset_manifest_hash,
             canonical_label,

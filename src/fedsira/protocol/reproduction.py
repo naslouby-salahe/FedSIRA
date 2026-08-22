@@ -1,6 +1,8 @@
 import hashlib
+import struct
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol, cast
 
 import torch
 
@@ -10,6 +12,10 @@ from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed
 from fedsira.runtime.determinism import canonical_bytes
 
 REPRODUCTION_COMMITMENT_SEPARATOR = "REPRODUCTION_COMMITMENT"
+
+
+class _ListConvertibleTensor(Protocol):
+    def tolist(self) -> list[float]: ...
 
 
 @dataclass(frozen=True)
@@ -76,9 +82,10 @@ def compute_reproduction_commitment_hash(
     training_seed: DerivedSeed,
     reproduced_flat_parameters: torch.Tensor,
 ) -> ArtifactDigest:
-    parameter_bytes = (
-        reproduced_flat_parameters.detach().to(torch.float32).contiguous().numpy().tobytes()
-    )
+    flat_values = cast(
+        _ListConvertibleTensor, reproduced_flat_parameters.detach().to(torch.float64)
+    ).tolist()
+    parameter_bytes = struct.pack(f">{len(flat_values)}d", *flat_values)
     header = canonical_bytes(
         REPRODUCTION_COMMITMENT_SEPARATOR,
         NBAIOT_DOMAIN_HASH_TOKEN[reproducer_domain],
