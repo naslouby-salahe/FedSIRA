@@ -3,12 +3,11 @@ from pathlib import Path
 
 from rich.console import Console
 
+from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import CanonicalToken
 from fedsira.runtime.environment import EnvironmentMismatch, collect_environment_mismatches
-
-REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
 @dataclass(frozen=True)
