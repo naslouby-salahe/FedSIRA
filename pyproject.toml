@@ -79,28 +79,16 @@ reportUnknownMemberType = false
 [[tool.pyright.executionEnvironments]]
 root = "src/fedsira/cli/commands/preprocess.py"
 reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
 
 [[tool.pyright.executionEnvironments]]
 root = "src/fedsira/datasets/ciciot2023/acquisition.py"
 reportUnknownMemberType = false
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/ciciot2023/preprocessing.py"
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
 root = "src/fedsira/datasets/nbaiot/preprocessing.py"
 reportUnknownMemberType = false
 reportUnknownVariableType = false
 reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/protocol/reproduction.py"
-reportUnknownMemberType = false
 
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
