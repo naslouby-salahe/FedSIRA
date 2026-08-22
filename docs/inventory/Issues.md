@@ -4,7 +4,7 @@
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Create the exact FedSIRA repository/component/workspace structure and project naming boundary that all later scientific code and artifacts rely on.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -315,7 +315,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement the complete authoritative `configs/fedsira.yaml` hierarchy, typed immutable schema, exact fixed values, cross-field validation, and scientific configuration ownership rules.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -610,7 +610,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement master-seed namespaces, canonical hash/serialization semantics, job-local RNG ownership, deterministic ordering/ties, and checkpointable randomness.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -774,7 +774,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement scientific-versus-infrastructure failure classification, cell-phase state, bounded technical retry, interruption recovery, evidence insufficiency, and deterministic resume behavior.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -944,7 +944,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Enforce the roadmap reference software/hardware environment, dependency/runtime identity, deterministic PyTorch/CUDA settings, fail-fast hardware checks, and environment provenance.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -1162,7 +1162,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement workspace/result boundaries, semantic cell identity, scientific execution DAG, artifact families, validity/staleness, atomic publication, selective invalidation, reuse, overwrite, and recovery semantics.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -1407,7 +1407,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement producer-adjacent dependency fingerprints, canonical provenance, content digests, runtime/code lineage, and structured execution logging required for scientific reconstruction.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -1605,7 +1605,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M01 — Scientific Configuration, Determinism, and Artifact Foundation
 - **Primary deliverable:** Implement the public `fedsira` command foundation and read-only `doctor`, plus generic serialization, corruption, provenance, reuse, recovery, replacement, and authority-precedence validation.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -1840,7 +1840,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M02 — Validated Dataset and Evidence-Role Preparation
 - **Primary deliverable:** Implement N-BaIoT raw release discovery, canonical mapping, checksums, domain/class registries, structural validation, target/support availability, and evidence-feasibility facts.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -2117,7 +2117,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M02 — Validated Dataset and Evidence-Role Preparation
 - **Primary deliverable:** Implement chronological role construction, guard gaps, deterministic caps/sample IDs, leakage barriers, predictor validation, scaling, manifests, and preprocessing fingerprints for the primary dataset.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -2425,7 +2425,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M02 — Validated Dataset and Evidence-Role Preparation
 - **Primary deliverable:** Implement secondary raw/schema/label validation, canonicalization, finite predictor handling, deterministic pseudo-domain construction, role reuse, and fixed generalization preparation without retuning primary science.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -2634,7 +2634,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M02 — Validated Dataset and Evidence-Role Preparation
 - **Primary deliverable:** Implement `fedsira preprocess` selection, materialization, overwrite/reuse, failure/status behavior, and production of validated dataset artifacts for both datasets.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -2748,7 +2748,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M02 — Validated Dataset and Evidence-Role Preparation
 - **Primary deliverable:** Implement the complete §28.1 dataset validation suite and the blocking `Data and Domain Evidence Validation` experiment/gate.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -2910,7 +2910,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M03 — Deterministic Model Training and Evaluation Core
 - **Primary deliverable:** Implement the exact classifier architecture, initialization, loss, AdamW, batching, precision, clipping, optimizer lifecycle, parameter representation, and prohibition on implicit consequential defaults.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -3114,7 +3114,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M03 — Deterministic Model Training and Evaluation Core
 - **Primary deliverable:** Implement deterministic anchor FedAvg, post-reference source candidate training, honest reproduction from anchor/non-source evidence, fixed budgets/objectives, malicious-training override boundary, and no test-role tuning.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -3289,7 +3289,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M03 — Deterministic Model Training and Evaluation Core
 - **Primary deliverable:** Implement confusion-derived classification metrics, target/support/benign contract metrics, equal-domain aggregation, admission/certification rates, backdoor/security metrics, and canonical delay components.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -3501,7 +3501,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M03 — Deterministic Model Training and Evaluation Core
 - **Primary deliverable:** Implement candidate-screen, cross-domain distribution, delay/resource/communication metrics, evaluation populations, matched-clean references, NA/undefined handling, false-equivalence diagnostics, and descriptive uncertainty inputs.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -3717,7 +3717,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M03 — Deterministic Model Training and Evaluation Core
 - **Primary deliverable:** Implement deterministic model/training numerical tests and hand-calculated metric/statistical validation required by §§28.2 and 28.5.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -3884,7 +3884,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement the immutable Capability Claim Contract, evidence sufficiency, claim identity, state vocabulary/transitions, resource horizon, attempt consumption, dormancy/resume/expiry, and non-negotiable authority-path invariants.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -4196,7 +4196,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Encode the authenticated-domain threat assumptions and implement executable mathematical/counting checks for source exclusion, verifier/Krum admissibility, information limits, non-interference structure, delay lower bound, and diagnostic committee probabilities.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -4422,7 +4422,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement proposal-assisted and candidate-free opening, deterministic source/screen selection, matched-control cross-fold screening, adequacy, differential decisions, and Open/Rejected/Dormant outcomes.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -4622,7 +4622,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement authority-path reproduction opportunity scheduling, honest non-source reproduction invocation, commitment hashing before verifier assignment, consumption semantics, and reproducibility-row identity.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -4734,7 +4734,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement post-commitment verifier assignment, freshness and exclusion rules, Positive/Negative/Abstain evaluation, deterministic Byzantine/diagnostic profiles, certification thresholds, and certified-row ordering.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -4919,7 +4919,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement canonical Krum with `n=5,f_R=1`, admissibility, distances/tie rules, source-free synthesis, and the resolved single-reproduction production-update mapping.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -5036,7 +5036,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement the post-synthesis fresh final gate, adequacy and claim predicates, terminal outcomes, production-model identity, and immutable admission artifact with complete upstream lineage.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -5213,7 +5213,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M04 — FedSIRA Admission Protocol and Authority Path
 - **Primary deliverable:** Implement `fedsira smoke`, all protocol/security invariant fixtures, mathematical/counting checks, and the blocking `Protocol Invariant Validation` experiment.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -5426,7 +5426,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement the fixed adversarial role/scenario registry: useful hidden-backdoor source, Source Copy, model-replacement and verifier-aware reproduction attacks, Byzantine verifier behavior, compromised-role selection, triggers, and attack manifests.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -5653,7 +5653,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement shared label-error, shared spurious-feature, attacker-induced common-context, and capability under-specification fixtures with fixed root-cause/cardinality semantics.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -5811,7 +5811,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement fixed evidence-arrival schedules, natural/quantity-skew/feature-shift heterogeneity regimes, deterministic transformation identities, controlled-episode completion rules, and stress manifests.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -5966,7 +5966,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement the baseline registry common budgets/information rules and the core/simple comparators, including local-only, centralized, FedAvg, review/retrain, candidate-free, direct-Krum, and coordinate-median alternatives under matched fairness.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -6204,7 +6204,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement advanced certified-ensemble, local-reference, reconstruction-filter, density-cluster, continual-assessment, recovery, sanitization, and Krum-reference baselines plus all fixed calibration/completion/ablation fixtures.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -6495,7 +6495,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M05 — Adversarial Mechanisms and Baseline Suite
 - **Primary deliverable:** Implement and execute the exact seventeen-cell `Baseline Implementation Validation` at engineering seed 900001, preserving invalid/incompatible outcomes as scientific evidence.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -6603,7 +6603,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement seed-level pairing, exact sign-flip superiority/non-inferiority tests, Holm families, effects, bootstrap confidence intervals, materiality, failed-pair rules, and canonical comparison identities.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -6842,7 +6842,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement preregistered survival rules for proposal assistance, plurality, direct source exclusion, and external verification plus the complete eight-case mechanical resolved-core mapping.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -7001,7 +7001,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement read-only planning, exact-name experiment execution, dependency-ordered workflow, semantic cell enumeration/counts, completion accounting, reuse/recovery, and invalid-baseline preservation.
-- **Issue type:** Infrastructure
+- **Issue type:** Infrastructure / Implementation
 
 ## Roadmap Authority
 
@@ -7304,7 +7304,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement and execute the preregistered `Proposal-Assisted Opening Necessity` matrix and produce the paired evidence consumed by its survival rule.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -7418,7 +7418,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement and execute the preregistered `Single-Reproduction Necessity` matrix comparing plurality against the fixed single-reproduction alternative.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -7529,7 +7529,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement and execute the preregistered `Source-Artifact Exclusion Necessity` matrix testing the central source-exclusion claim under matched evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -7640,7 +7640,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Implement and execute the preregistered `External Verification Necessity` matrix against direct synthesis from the same committed reproduction opportunities.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -7754,7 +7754,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M06 — Collapse Experiments and Resolved Core
 - **Primary deliverable:** Apply the four collapse decisions mechanically, materialize the unique Resolved FedSIRA Core artifact, and bind all downstream scientific dependencies to that resolved-core artifact identity.
-- **Issue type:** Implementation
+- **Issue type:** Implementation / Validation
 
 ## Roadmap Authority
 
@@ -7882,7 +7882,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute the Resolved FedSIRA Core across the exact primary confirmatory matrix and produce complete authority-transition/security-utility evidence.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8005,7 +8005,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute all eighteen preregistered mechanism-ablation variants with matched Full FedSIRA references and preserve confirmatory versus diagnostic interpretation.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8156,7 +8156,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute compromised-reproducer, compromised-verifier, random diagnostic, and above-bound robustness matrices under the declared Byzantine profiles.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8311,7 +8311,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute evidence-scarcity/dormancy, shared epistemic-failure, correlated-context, and capability-granularity boundary studies with explicit safe-abstention and false-equivalence outcomes.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8475,7 +8475,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute the ordered honest-heterogeneity regimes and determine the highest supported liveness/synthesis region without post-hoc retuning.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8583,7 +8583,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute admission-delay decomposition and descriptive resource/communication/timing measurements, separating information-arrival cost from protocol overhead.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8719,7 +8719,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M07 — Confirmatory and Boundary Evidence Program
 - **Primary deliverable:** Execute the locked CICIoT2023 generalization program, then enforce complete result-set invariants and experiment-completion definitions across the full scientific program.
-- **Issue type:** Experiment
+- **Issue type:** Experiment / Validation
 
 ## Roadmap Authority
 
@@ -8858,7 +8858,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement exact claim IDs/states, evidence-to-claim mappings, support/partial/conditional/null/not-supported logic, boundary enforcement, and report-time claim blocking.
-- **Issue type:** Reporting
+- **Issue type:** Reporting / Validation
 
 ## Roadmap Authority
 
@@ -9118,7 +9118,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement the project scientific-completeness verifier over expected cells, evidence integrity/provenance, Resolved FedSIRA Core, statistics, and claim-state prerequisites without scientific recomputation.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
@@ -9254,7 +9254,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement manuscript method identity, read-only `fedsira report`, verified `outputs/` to compact `results/` materialization, dependency fingerprints/read-back rules, and publication rounding that never changes full-precision decisions.
-- **Issue type:** Reporting
+- **Issue type:** Reporting / Validation
 
 ## Roadmap Authority
 
@@ -9419,7 +9419,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement every required protocol/result/statistical/claim table with exact schema, ordering, aggregation, rounding, and machine-readable source lineage.
-- **Issue type:** Reporting
+- **Issue type:** Reporting / Validation
 
 ## Roadmap Authority
 
@@ -9585,7 +9585,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement every required FedSIRA manuscript figure with exact encodings and verified artifact-backed data sources.
-- **Issue type:** Reporting
+- **Issue type:** Reporting / Validation
 
 ## Roadmap Authority
 
@@ -9723,7 +9723,7 @@ Every file, artifact, manifest, checkpoint, record, table, figure, CLI result, o
 
 - **Milestone:** M08 — Claims, Reporting, and Reproducibility Closure
 - **Primary deliverable:** Implement the reference-register traceability, third-party reconstruction/manuscript-readiness contract, and cross-project implementation-completion gate required before final scientific reporting.
-- **Issue type:** Validation
+- **Issue type:** Validation / Statistical Analysis
 
 ## Roadmap Authority
 
