@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 
 from fedsira.config.schema import CapabilityClaimConfig
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt
+from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt, Probability
 from fedsira.evaluation.aggregation import minimum_defined_domain_count
 from fedsira.evaluation.records import (
     ConfusionCounts,
@@ -46,7 +46,8 @@ def compute_confusion_counts_by_class(
 
 
 def accuracy(
-    confusion_counts_by_class: Mapping[CanonicalToken, ConfusionCounts], sample_count: int
+    confusion_counts_by_class: Mapping[CanonicalToken, ConfusionCounts],
+    sample_count: NonNegativeInt,
 ) -> MetricResult:
     if sample_count == 0:
         return MetricResult(None, 0)
@@ -212,7 +213,7 @@ def clean_proposal_oracle_label(
     benign_far_increase: MetricResult,
     defined_domain_count: NonNegativeInt,
     expected_domain_count: PositiveInt,
-    generic_defined_domain_fraction_minimum: float,
+    generic_defined_domain_fraction_minimum: Probability,
     capability_claim_config: CapabilityClaimConfig,
 ) -> ProposalOracleLabel:
     required_domain_count = minimum_defined_domain_count(

@@ -1,7 +1,7 @@
 import itertools
 from collections.abc import Sequence
 
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, Probability
+from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveFloat, Probability
 
 
 def enumerate_sign_flip_assignments(sample_count: NonNegativeInt) -> tuple[tuple[float, ...], ...]:
@@ -26,7 +26,7 @@ def exact_sign_flip_two_sided_p_value(paired_differences: Sequence[float]) -> Pr
 
 
 def exact_sign_flip_non_inferiority_p_value(
-    paired_differences: Sequence[float], margin: float
+    paired_differences: Sequence[float], margin: PositiveFloat
 ) -> Probability:
     shifted_differences = [difference + margin for difference in paired_differences]
     sample_count = len(shifted_differences)

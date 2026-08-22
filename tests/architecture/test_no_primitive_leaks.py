@@ -6,7 +6,6 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
 DOMAIN_CONCEPT_SUFFIXES = ("_id", "_seed", "_hash", "_digest", "_path", "_token")
 PRIMITIVE_ANNOTATION_NAMES = {"str", "int", "float", "bool"}
-BOUNDARY_PACKAGES = ("domain", "config", "artifacts")
 
 
 def leak_violations(tree: ast.Module) -> list[str]:
@@ -29,11 +28,10 @@ def leak_violations(tree: ast.Module) -> list[str]:
 
 def test_no_primitive_leaks_for_domain_concepts() -> None:
     offenders: list[str] = []
-    for package in BOUNDARY_PACKAGES:
-        for path in iter_python_files(SRC_ROOT / package):
-            tree = parse(path)
-            for violation in leak_violations(tree):
-                offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
+    for path in iter_python_files(SRC_ROOT):
+        tree = parse(path)
+        for violation in leak_violations(tree):
+            offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
     assert not offenders, f"Primitive-typed domain concepts: {offenders}"
 
 

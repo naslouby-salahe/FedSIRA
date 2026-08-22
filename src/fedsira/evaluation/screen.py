@@ -2,7 +2,13 @@ import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from fedsira.domain.records import CanonicalToken, DerivedSeed, NonNegativeInt, PositiveInt
+from fedsira.domain.records import (
+    CanonicalToken,
+    DerivedSeed,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveInt,
+)
 from fedsira.evaluation.aggregation import quantile_type7
 from fedsira.runtime.determinism import canonical_bytes
 
@@ -12,8 +18,8 @@ SCREEN_FOLD_SEPARATOR = "SCREEN_FOLD"
 @dataclass(frozen=True)
 class ScreenLossObservation:
     sample_id: CanonicalToken
-    anchor_loss: float
-    source_loss: float
+    anchor_loss: NonNegativeFloat
+    source_loss: NonNegativeFloat
 
 
 def screen_fold_index(

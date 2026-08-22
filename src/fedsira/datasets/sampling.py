@@ -1,10 +1,16 @@
 import hashlib
 from collections.abc import Sequence
 
-from fedsira.domain.records import UINT32_MODULUS, ArtifactDigest, CanonicalToken, NonNegativeInt
+from fedsira.domain.records import (
+    UINT32_MODULUS,
+    ArtifactDigest,
+    CanonicalToken,
+    DerivedSeed,
+    NonNegativeInt,
+)
 from fedsira.runtime.determinism import canonical_bytes
 
-PREPROCESSING_SAMPLE_ORDER_SEED: int = (
+PREPROCESSING_SAMPLE_ORDER_SEED: DerivedSeed = (
     int.from_bytes(
         hashlib.sha256(b"FedSIRA|preprocess_sample_order|1").digest()[0:8], byteorder="big"
     )

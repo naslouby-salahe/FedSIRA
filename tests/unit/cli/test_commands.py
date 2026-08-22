@@ -39,7 +39,7 @@ def test_preprocess_accepts_only_roadmap_dataset_identities() -> None:
 def test_preprocess_routes_and_reports_not_yet_implemented() -> None:
     result = runner.invoke(app, ["preprocess", "N-BaIoT"])
     assert result.exit_code == 1
-    assert "not implemented" in result.stdout
+    assert "not yet implemented" in result.stdout
     assert "dataset_file_manifest_hash=" in result.stdout
 
 
