@@ -1,7 +1,9 @@
 import re
+from collections.abc import Sequence
 from enum import StrEnum
 
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import CanonicalToken, NamespaceSeed
+from fedsira.runtime.determinism import deterministic_order
 
 
 class NBaiotDomain(StrEnum):
@@ -127,3 +129,18 @@ def resolve_attack_class(
     if family == "mirai":
         return NBAIOT_MIRAI_BASENAME_CLASS.get(basename)
     return None
+
+
+_DOMAIN_BY_HASH_TOKEN: dict[CanonicalToken, NBaiotDomain] = {
+    token: domain for domain, token in NBAIOT_DOMAIN_HASH_TOKEN.items()
+}
+
+
+def deterministic_domain_order(
+    domains: Sequence[NBaiotDomain],
+    domain_separator: CanonicalToken,
+    order_namespace_seed: NamespaceSeed,
+) -> tuple[NBaiotDomain, ...]:
+    tokens = tuple(NBAIOT_DOMAIN_HASH_TOKEN[domain] for domain in domains)
+    ordered_tokens = deterministic_order(tokens, domain_separator, order_namespace_seed)
+    return tuple(_DOMAIN_BY_HASH_TOKEN[token] for token in ordered_tokens)
