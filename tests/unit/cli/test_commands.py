@@ -1,11 +1,13 @@
 import pytest
 from typer.testing import CliRunner
 
-from fedsira.cli.commands import doctor
+from fedsira.cli.commands import doctor, preprocess
 from fedsira.cli.main import app
 from fedsira.runtime.environment import EnvironmentMismatch
 
 runner = CliRunner()
+
+REAL_NBAIOT_ROOT = preprocess.REPOSITORY_ROOT / "data" / "raw" / "N-BaIoT"
 
 
 def _no_mismatches(
@@ -33,10 +35,12 @@ def test_preprocess_accepts_only_roadmap_dataset_identities() -> None:
     assert result.exit_code != 0
 
 
+@pytest.mark.skipif(not REAL_NBAIOT_ROOT.is_dir(), reason="real N-BaIoT raw data not available")
 def test_preprocess_routes_and_reports_not_yet_implemented() -> None:
     result = runner.invoke(app, ["preprocess", "N-BaIoT"])
     assert result.exit_code == 1
     assert "not implemented" in result.stdout
+    assert "dataset_file_manifest_hash=" in result.stdout
 
 
 def test_plan_routes_and_reports_not_yet_implemented() -> None:
