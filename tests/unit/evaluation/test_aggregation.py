@@ -1,3 +1,5 @@
+import numpy
+
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.evaluation.aggregation import (
     bootstrap_percentile_confidence_interval,
@@ -87,6 +89,35 @@ def test_bootstrap_confidence_interval_is_deterministic_and_brackets_mean() -> N
     assert first is not None
     lower, upper = first
     assert lower <= sum(values) / len(values) <= upper
+
+
+def test_quantile_type7_matches_numpy_linear_method_for_arbitrary_probabilities() -> None:
+    values = [3.0, 7.0, 1.0, 9.0, 4.0, 2.0, 8.0, 6.0, 5.0]
+    sorted_values = sorted(values)
+    for probability in (0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0):
+        expected = float(numpy.quantile(values, probability, method="linear"))
+        actual = quantile_type7(sorted_values, probability)
+        assert abs(actual - expected) < 1e-12
+
+
+def test_coefficient_of_variation_uses_ddof_1_hand_fixture() -> None:
+    values = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0]
+    mean = sum(values) / len(values)
+    variance_ddof_1 = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
+    expected = (variance_ddof_1**0.5) / mean
+    result = coefficient_of_variation(values)
+    assert result.value is not None
+    assert abs(result.value - expected) < 1e-9
+    numpy_sample_sd = float(numpy.std(values, ddof=1))
+    assert abs(result.value - numpy_sample_sd / mean) < 1e-9
+
+
+def test_equal_weight_domain_mean_treats_each_domain_as_one_inference_unit() -> None:
+    small_domain = MetricResult(0.5, 3)
+    large_domain = MetricResult(0.9, 3000)
+    result = equal_weight_domain_mean([small_domain, large_domain], 2)
+    assert result.value == 0.7
+    assert result.denominator == 2
 
 
 def test_bootstrap_confidence_interval_na_on_empty_input() -> None:
