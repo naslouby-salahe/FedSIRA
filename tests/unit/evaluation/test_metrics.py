@@ -16,6 +16,7 @@ from fedsira.evaluation.metrics import (
     false_negative_rate_for_class,
     false_positive_rate_for_class,
     false_same_capability_certification_rate,
+    is_false_same_capability_certification,
     legitimate_admission_rate,
     macro_f1,
     malicious_admission_rate,
@@ -278,3 +279,10 @@ def test_reproduction_attempt_count_excludes_evidence_inadequate_domains() -> No
     started = frozenset({"A", "B", "C"})
     inadequate = frozenset({"B"})
     assert reproduction_attempt_count(started, inadequate) == 2
+
+
+def test_is_false_same_capability_certification_is_exclusive_or() -> None:
+    assert is_false_same_capability_certification(True, False)
+    assert is_false_same_capability_certification(False, True)
+    assert not is_false_same_capability_certification(True, True)
+    assert not is_false_same_capability_certification(False, False)

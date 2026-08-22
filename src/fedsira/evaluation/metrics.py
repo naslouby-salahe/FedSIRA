@@ -363,6 +363,12 @@ def macro_auprc(auprc_by_class: Mapping[CanonicalToken, MetricResult]) -> Metric
     return _mean_of_defined_values(auprc_by_class)
 
 
+def is_false_same_capability_certification(
+    a_scoped_predicate_passes: bool, b_scoped_predicate_passes: bool
+) -> bool:
+    return a_scoped_predicate_passes != b_scoped_predicate_passes
+
+
 def false_same_capability_certification_rate(
     false_certification_count: NonNegativeInt,
     broad_certified_row_count: NonNegativeInt,
