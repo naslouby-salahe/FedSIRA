@@ -23,8 +23,8 @@ def discover_secondary_csv_files(csv_root: Path) -> tuple[Path, ...]:
 
 
 def read_csv_header(path: Path) -> tuple[CanonicalToken, ...]:
-    header = pandas.read_csv(path, nrows=0).columns
-    return tuple(str(name).strip() for name in header)
+    header_frame: pandas.DataFrame = pandas.read_csv(path, nrows=0)
+    return tuple(str(name).strip() for name in header_frame.columns)
 
 
 def resolve_label_column(header: tuple[CanonicalToken, ...]) -> CanonicalToken:

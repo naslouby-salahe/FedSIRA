@@ -42,7 +42,8 @@ def resolve_predictor_columns(
             continue
         canonical = canonicalize_token(column)
         if canonical in ROW_IDENTIFIER_CANONICAL_TOKENS:
-            values = tuple(int(value) for value in sample[column])
+            column_series: pandas.Series[int] = sample[column]
+            values = tuple(int(value) for value in column_series)
             if is_row_identifier_column(canonical, values):
                 continue
         predictors.append(column)

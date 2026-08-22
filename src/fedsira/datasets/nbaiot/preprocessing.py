@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas
+from pandas.io.parsers import TextFileReader
 
 from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.common import (
@@ -55,8 +56,8 @@ def classify_row_finiteness(values: Sequence[float]) -> DatasetExclusionReason |
 
 
 def read_predictor_header(path: Path) -> tuple[CanonicalToken, ...]:
-    header = pandas.read_csv(path, nrows=0).columns
-    return tuple(str(name).strip() for name in header)
+    header_frame: pandas.DataFrame = pandas.read_csv(path, nrows=0)
+    return tuple(str(name).strip() for name in header_frame.columns)
 
 
 def count_csv_data_rows(path: Path) -> NonNegativeInt:
@@ -65,18 +66,20 @@ def count_csv_data_rows(path: Path) -> NonNegativeInt:
 
 
 def validate_all_predictors_finite(path: Path, ordered_header: tuple[CanonicalToken, ...]) -> None:
-    for chunk in pandas.read_csv(path, usecols=list(ordered_header), chunksize=100_000):
-        nonnumeric_columns = [
-            column
-            for column in chunk.columns
-            if not pandas.api.types.is_numeric_dtype(chunk[column])
+    reader: TextFileReader = pandas.read_csv(path, usecols=list(ordered_header), chunksize=100_000)
+    chunk_frame: pandas.DataFrame
+    for chunk_frame in reader:
+        nonnumeric_columns: list[CanonicalToken] = [
+            str(column)
+            for column in chunk_frame.columns
+            if not pandas.api.types.is_numeric_dtype(chunk_frame[column])
         ]
         if nonnumeric_columns:
             raise ValueError(
                 f"{DatasetExclusionReason.UNPARSEABLE_PREDICTOR.value} in {path}: "
                 f"non-numeric predictor columns {nonnumeric_columns}"
             )
-        for row_index, row in enumerate(chunk.itertuples(index=False)):
+        for row_index, row in enumerate(chunk_frame.itertuples(index=False, name=None)):
             reason = classify_row_finiteness(row)
             if reason is not None:
                 raise ValueError(
