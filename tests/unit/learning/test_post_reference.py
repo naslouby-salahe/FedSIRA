@@ -11,6 +11,7 @@ from fedsira.learning.post_reference import (
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
 from fedsira.models.mlp import FedSIRAClassifier, flatten_trainable_parameters
+from fedsira.runtime.determinism import seed_job_local_rng_streams
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer
@@ -72,6 +73,45 @@ def test_post_reference_training_step_with_zero_supported_examples_uses_zero_sta
         trainable_parameter_count=sum(p.numel() for p in current_model.parameters()),
     )
     assert not math.isnan(loss)
+
+
+def test_post_reference_training_step_zero_supported_matches_ce_and_delta_l2_exactly() -> None:
+    anchor_model = FedSIRAClassifier(input_width=4, output_width=2)
+    current_model = FedSIRAClassifier(input_width=4, output_width=2)
+    current_model.load_state_dict(anchor_model.state_dict())
+    optimizer = build_optimizer(
+        current_model, OPTIMIZER_CONFIG.post_reference_learning_rate, OPTIMIZER_CONFIG
+    )
+    loss_function = build_loss_function()
+    features = torch.randn(6, 4)
+    labels = torch.randint(0, 2, (6,))
+    is_supported = torch.zeros(6, dtype=torch.bool)
+    anchor_flat = flatten_trainable_parameters(anchor_model).detach()
+    parameter_count = sum(p.numel() for p in current_model.parameters())
+
+    seed_job_local_rng_streams(0)
+    with torch.no_grad():
+        expected_ce_loss = float(loss_function(current_model(features), labels))
+    expected_delta_l2 = float(
+        compute_delta_l2(current_model, anchor_flat).detach() / parameter_count
+    )
+
+    seed_job_local_rng_streams(0)
+    loss = post_reference_training_step(
+        anchor_model,
+        current_model,
+        optimizer,
+        loss_function,
+        TRAINING_CONFIG,
+        POST_REFERENCE_CONFIG,
+        features,
+        labels,
+        is_supported,
+        anchor_flat,
+        trainable_parameter_count=parameter_count,
+    )
+    expected_total = expected_ce_loss + POST_REFERENCE_CONFIG.delta_l2_weight * expected_delta_l2
+    assert abs(loss - expected_total) < 1e-6
 
 
 def test_run_post_reference_training_runs_the_configured_epoch_count() -> None:

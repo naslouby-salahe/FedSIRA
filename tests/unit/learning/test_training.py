@@ -1,3 +1,5 @@
+import math
+
 import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -7,6 +9,7 @@ from fedsira.learning.training import (
     build_optimizer,
     clip_gradients,
     ordered_minibatches,
+    step_optimizer,
     train_epochs_with_deterministic_batch_order,
     train_one_epoch,
 )
@@ -141,3 +144,91 @@ def test_train_epochs_with_deterministic_batch_order_runs_the_configured_epoch_c
         local_epochs=3,
     )
     assert len(epoch_losses) == 3
+
+
+def test_one_batch_forward_backward_remains_finite() -> None:
+    model = FedSIRAClassifier(input_width=4, output_width=2)
+    optimizer = build_optimizer(
+        model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
+    )
+    loss_function = build_loss_function()
+    features = torch.randn(8, 4)
+    labels = torch.randint(0, 2, (8,))
+
+    optimizer.zero_grad(set_to_none=True)
+    logits = model(features)
+    assert torch.isfinite(logits).all()
+    loss = loss_function(logits, labels)
+    assert math.isfinite(float(loss.detach()))
+    loss.backward()
+    for parameter in model.parameters():
+        assert parameter.grad is not None
+        assert torch.isfinite(parameter.grad).all()
+    clip_gradients(model, TRAINING_CONFIG)
+    step_optimizer(optimizer)
+    for parameter in model.parameters():
+        assert torch.isfinite(parameter).all()
+
+
+def test_checkpoint_restore_reproduces_predictions_within_tight_tolerance() -> None:
+    model = FedSIRAClassifier(input_width=4, output_width=2)
+    optimizer = build_optimizer(
+        model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
+    )
+    loss_function = build_loss_function()
+    features = torch.randn(12, 4)
+    labels = torch.randint(0, 2, (12,))
+    for _ in range(3):
+        optimizer.zero_grad(set_to_none=True)
+        logits = model(features)
+        loss = loss_function(logits, labels)
+        loss.backward()
+        step_optimizer(optimizer)
+
+    checkpoint = {name: tensor.clone() for name, tensor in model.state_dict().items()}
+    model.eval()
+    with torch.no_grad():
+        original_predictions = model(features).clone()
+
+    restored_model = FedSIRAClassifier(input_width=4, output_width=2)
+    restored_model.load_state_dict(checkpoint)
+    restored_model.eval()
+    with torch.no_grad():
+        restored_predictions = restored_model(features)
+
+    assert torch.allclose(original_predictions, restored_predictions, atol=1e-6)
+
+
+def test_optimizer_state_persists_across_epochs_within_one_invocation() -> None:
+    model = FedSIRAClassifier(input_width=4, output_width=2)
+    optimizer = build_optimizer(
+        model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
+    )
+    loss_function = build_loss_function()
+    features = torch.randn(8, 4)
+    labels = torch.randint(0, 2, (8,))
+    batches = [(features, labels)]
+
+    train_one_epoch(model, optimizer, loss_function, TRAINING_CONFIG, batches)
+    first_parameter = next(model.parameters())
+    assert optimizer.state[first_parameter]["step"] == 1
+
+    train_one_epoch(model, optimizer, loss_function, TRAINING_CONFIG, batches)
+    assert optimizer.state[first_parameter]["step"] == 2
+
+
+def test_fresh_optimizer_per_round_resets_adamw_state() -> None:
+    model = FedSIRAClassifier(input_width=4, output_width=2)
+    stale_optimizer = build_optimizer(
+        model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
+    )
+    loss_function = build_loss_function()
+    features = torch.randn(8, 4)
+    labels = torch.randint(0, 2, (8,))
+    train_one_epoch(model, stale_optimizer, loss_function, TRAINING_CONFIG, [(features, labels)])
+    assert len(stale_optimizer.state) > 0
+
+    fresh_optimizer = build_optimizer(
+        model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
+    )
+    assert len(fresh_optimizer.state) == 0
