@@ -1,4 +1,7 @@
-from fedsira.artifacts.fingerprints import compute_artifact_dependency_fingerprint
+from fedsira.artifacts.fingerprints import (
+    compute_artifact_dependency_fingerprint,
+    compute_cuda_environment_fingerprint,
+)
 
 
 def fingerprint(
@@ -51,3 +54,13 @@ def test_fingerprint_is_unambiguously_length_prefixed_across_field_boundaries() 
     combined = fingerprint(scientific_configuration_subset="ab", dataset_split_view_identities="")
     split = fingerprint(scientific_configuration_subset="a", dataset_split_view_identities="b")
     assert combined != split
+
+
+def test_cuda_environment_fingerprint_is_deterministic() -> None:
+    assert compute_cuda_environment_fingerprint() == compute_cuda_environment_fingerprint()
+
+
+def test_cuda_environment_fingerprint_is_a_sha256_hex_digest() -> None:
+    digest = compute_cuda_environment_fingerprint()
+    assert len(digest) == 64
+    bytes.fromhex(digest)
