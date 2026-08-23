@@ -6,6 +6,7 @@ from torch.nn import functional as torch_functional
 
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
 from fedsira.domain.records import CanonicalToken, DerivedSeed, NonNegativeFloat, PositiveInt
+from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
 from fedsira.models.mlp import (
     FedSIRAClassifier,
@@ -17,10 +18,9 @@ from fedsira.models.mlp import (
 def compute_stability_kl(
     anchor_logits: torch.Tensor, current_logits: torch.Tensor, temperature: float
 ) -> torch.Tensor:
-    anchor_log_probs = torch_functional.log_softmax(anchor_logits / temperature, dim=-1)
+    anchor_probs = probabilities_for_samples(anchor_logits / temperature)
     current_log_probs = torch_functional.log_softmax(current_logits / temperature, dim=-1)
-    anchor_probs = anchor_log_probs.exp()
-    per_example_kl = (anchor_probs * (anchor_log_probs - current_log_probs)).sum(dim=-1)
+    per_example_kl = (anchor_probs * (anchor_probs.log() - current_log_probs)).sum(dim=-1)
     return per_example_kl.mean()
 
 
@@ -48,7 +48,7 @@ def post_reference_training_step(
     current_model.train()
     optimizer.zero_grad(set_to_none=True)
 
-    current_logits = current_model(features)
+    current_logits = logits_for_samples(current_model, features, keep_gradients=True)
     ce_loss = loss_function(current_logits, labels)
 
     supported_mask = is_supported.bool()
