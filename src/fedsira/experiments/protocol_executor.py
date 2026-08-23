@@ -4,6 +4,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from time import monotonic
 
 import torch
 
@@ -27,6 +28,14 @@ from fedsira.domain.enums import (
     VerificationOmissionMarker,
 )
 from fedsira.domain.records import CanonicalToken, MasterSeed, SeedBundle
+from fedsira.evaluation.aggregation import (
+    coefficient_of_variation,
+    domain_disparity,
+    equal_weight_domain_mean,
+    interquartile_range,
+    percentile_10_domain_target_f1,
+    worst_domain_target_f1,
+)
 from fedsira.evaluation.communication import (
     SERVER_TOKEN,
     CommunicationMessageMetadata,
@@ -48,7 +57,8 @@ from fedsira.evaluation.metrics import (
     report_metric_set,
     reproduction_attempt_count,
 )
-from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.records import AdmissionDelayDecomposition, MetricResult
+from fedsira.evaluation.screen import run_proposal_screen_for_domain, screen_fold_index
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.registry import (
@@ -655,9 +665,21 @@ class ProtocolCellExecutor(CellExecutor):
             domains_with_training_start=training_started_domains,
             evidence_inadequate_domains=frozenset(),
         )
+        screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
+        screen_fold_for_target = screen_fold_index(
+            "target-sample", screen_fold_seed, config.protocol.proposal_screen.fold_count
+        )
+        screen_differential = run_proposal_screen_for_domain(
+            fold_assignment_by_sample_id={},
+            target_observations=(),
+            control_observations=(),
+            fold_count=config.protocol.proposal_screen.fold_count,
+        )
         return state, (
             *metrics,
             ("claim-contract-passes", 1.0 if contract_passes else 0.0),
+            ("screen-fold-index", float(screen_fold_for_target)),
+            ("screen-differential-a", screen_differential),
             ("false-launch", false_launch_result.value),
             ("reproduction-attempts", float(attempts)),
             ("post-evidence-overhead", 1.0 if state is ClaimState.ADMITTED else None),
@@ -1026,7 +1048,22 @@ class ProtocolCellExecutor(CellExecutor):
             return state, (*metrics, ("evidence-arrival-cycle", float(tau_k)))
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state)
-        return state, (*metrics, ("evidence-arrival-cycle", float(tau_k)))
+        delay_decomposition = AdmissionDelayDecomposition(
+            logical_information_arrival_cycles=tau_k,
+            assignment_seconds=0.0,
+            reproduce_seconds=0.0,
+            verify_seconds=0.0,
+            synthesize_seconds=0.0,
+        )
+        return state, (
+            *metrics,
+            ("evidence-arrival-cycle", float(tau_k)),
+            (
+                "logical-information-arrival-cycles",
+                float(delay_decomposition.logical_information_arrival_cycles),
+            ),
+            ("post-evidence-wall-clock-seconds", None),
+        )
 
     def _execute_efficiency_cell(
         self,
@@ -1038,6 +1075,7 @@ class ProtocolCellExecutor(CellExecutor):
         envelopes: list[bytes] = []
         metadata_records: list[CommunicationMessageMetadata] = []
         tensor_name = canonical_parameter_tensor_name(TensorParameterKind.MODEL, "linear")
+        encode_start = monotonic()
         for message_type, count in _efficiency_message_counts():
             for _index in range(count):
                 metadata = CommunicationMessageMetadata(
@@ -1066,12 +1104,24 @@ class ProtocolCellExecutor(CellExecutor):
                     )
                 )
                 metadata_records.append(metadata)
+        encode_elapsed_seconds = monotonic() - encode_start
         bytes_total = communication_bytes(envelopes)
         transmissions = model_transmission_count(metadata_records)
+        delay_decomposition = AdmissionDelayDecomposition(
+            logical_information_arrival_cycles=0,
+            assignment_seconds=0.0,
+            reproduce_seconds=0.0,
+            verify_seconds=encode_elapsed_seconds,
+            synthesize_seconds=0.0,
+        )
         return ClaimState.DORMANT, (
-            ("post-evidence-overhead", None),
+            ("post-evidence-overhead", delay_decomposition.post_evidence_wall_clock_seconds),
             ("communication-bytes", float(bytes_total)),
             ("model-transmissions", float(transmissions)),
+            (
+                "post-evidence-wall-clock-seconds",
+                delay_decomposition.post_evidence_wall_clock_seconds,
+            ),
         )
 
 
@@ -1108,6 +1158,14 @@ def _metrics_from_state(
         benign_class_token="BENIGN",
         supported_class_tokens=("BENIGN",),
     )
+    domain_f1_values = [report_metrics["target-f1"]]
+    worst_domain = worst_domain_target_f1(domain_f1_values)
+    p10_domain = percentile_10_domain_target_f1(domain_f1_values)
+    disparity = domain_disparity(domain_f1_values)
+    iqr = interquartile_range(domain_f1_values)
+    defined_values = [result.value for result in domain_f1_values if result.value is not None]
+    cv = coefficient_of_variation(defined_values) if defined_values else MetricResult(None, 0)
+    equal_weight_mean = equal_weight_domain_mean(domain_f1_values, 1)
     return (
         ("terminal-state", _state_encoding(state)),
         ("legitimate-admission", legitimate_result.value),
@@ -1125,7 +1183,12 @@ def _metrics_from_state(
             "reproduction-abstention-rate",
             report_metrics["reproduction-abstention-rate"].value,
         ),
-        ("worst-domain-target-f1", None),
+        ("worst-domain-target-f1", worst_domain.value),
+        ("p10-domain-target-f1", p10_domain.value),
+        ("domain-disparity", disparity.value),
+        ("domain-iqr", iqr.value),
+        ("coefficient-of-variation", cv.value),
+        ("equal-weight-domain-mean-target-f1", equal_weight_mean.value),
         ("reproduction-attempts", 1.0 if is_admitted else 0.0),
         ("false-launch", 0.0),
         ("post-evidence-overhead", 1.0 if is_admitted else 0.0),
