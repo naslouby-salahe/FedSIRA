@@ -105,6 +105,12 @@ def execute(name: str, overwrite: bool) -> None:
         resolved_core_complete=False,
     )
     print(render_result(result))
+    if (
+        result.lifecycle_state is ExperimentLifecycleState.COMPLETED
+        and not overwrite
+        and result.execution_digest
+    ):
+        print(f"already-completed: execution digest {result.execution_digest}")
     if result.lifecycle_state is ExperimentLifecycleState.COMPLETED:
         _materialize_core_if_complete(name)
     if result.lifecycle_state in (

@@ -40,6 +40,7 @@ def test_missing_evidence_yields_not_tested() -> None:
         config.metrics_and_statistics.materiality,
         config.claim_support_thresholds,
         config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_claim_support,
+        config.metrics_and_statistics.multiplicity.family_wise_alpha,
     )
     assert all(state.state is FinalClaimState.NOT_TESTED for state in states)
 
@@ -63,6 +64,7 @@ def test_authority_transition_supported_with_9_legitimate_admissions() -> None:
         config.metrics_and_statistics.materiality,
         config.claim_support_thresholds,
         config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_claim_support,
+        config.metrics_and_statistics.multiplicity.family_wise_alpha,
     )
     authority = next(state for state in states if state.claim_id == "Authority Transition")
     assert authority.state is FinalClaimState.SUPPORTED

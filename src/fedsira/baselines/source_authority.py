@@ -21,6 +21,21 @@ def client_review_direct_admission_production_is_source(
     return torch.equal(production_update, source_update)
 
 
+def validate_client_review_composite_screen(roles: tuple[Role, ...]) -> None:
+    if roles != CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES:
+        raise ValueError(
+            "client review must use the fixed composite screen view: "
+            "target Candidate Screen rows plus supported Post-Reference Replay rows"
+        )
+
+
+def validate_client_review_reviewer_count(reviewer_count: int) -> None:
+    if reviewer_count != CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT:
+        raise ValueError(
+            f"client review requires exactly {CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT} reviewers"
+        )
+
+
 def client_review_then_retrain_should_discard_source_weights(review_outcome: ClaimState) -> bool:
     return review_outcome is ClaimState.ADMITTED
 

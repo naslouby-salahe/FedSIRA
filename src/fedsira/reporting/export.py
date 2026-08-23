@@ -9,6 +9,7 @@ from fedsira.analysis.claims import ClaimEvidence, ClaimStateResult, derive_clai
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import CanonicalToken
+from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.execution import ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.reporting import tables as table_renderers
@@ -40,6 +41,7 @@ def derive_claim_states_for_export(
         config.metrics_and_statistics.materiality,
         config.claim_support_thresholds,
         config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_claim_support,
+        config.metrics_and_statistics.multiplicity.family_wise_alpha,
     )
 
 
@@ -87,7 +89,11 @@ def export_project_summary(
     lifecycle_states: Mapping[CanonicalToken, ExperimentLifecycleState],
     config_path: Path,
     verification: CompletenessVerificationResult,
+    collapse_decisions: Sequence[CollapseDecision] | None = None,
+    resolved_core: ResolvedCore | None = None,
 ) -> ReportExportResult:
+    config = load_scientific_config(config_path)
+    rounding = config.metrics_and_statistics.publication_rounding
     project_root = _results_root() / "project_summary"
     tables_root = project_root / "tables" / "main"
     claim_root = project_root / "claim_registry"
@@ -104,6 +110,15 @@ def export_project_summary(
     plan_path.write_text(plan_table)
     exported.append(plan_path)
     materialized_tables.append("Experiment Plan")
+
+    if collapse_decisions is not None and resolved_core is not None:
+        collapse_table = table_renderers.render_collapse_decisions_table(
+            collapse_decisions, resolved_core, rounding
+        )
+        collapse_path = tables_root / "Collapse Decisions.md"
+        collapse_path.write_text(collapse_table)
+        exported.append(collapse_path)
+        materialized_tables.append("Collapse Decisions")
 
     claim_table = table_renderers.render_claim_support_table(claim_states)
     claim_path = claim_root / "Claim Support.md"

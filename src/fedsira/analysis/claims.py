@@ -299,6 +299,7 @@ def derive_claim_states(
     materiality_config: MaterialityConfig,
     claim_support_thresholds: ClaimSupportThresholdsConfig,
     minimum_complete_pairs_for_claim_support: NonNegativeInt,
+    family_wise_alpha: Probability,
 ) -> tuple[ClaimStateResult, ...]:
     states: list[ClaimStateResult] = []
 
@@ -337,6 +338,7 @@ def derive_claim_states(
             claim_support_thresholds,
             minimum_complete_pairs_for_claim_support,
             required_comparison_state,
+            family_wise_alpha,
         )
         states.append(
             ClaimStateResult(
@@ -356,6 +358,7 @@ def _derive_claim_state(
     claim_support_thresholds: ClaimSupportThresholdsConfig,
     minimum_complete_pairs_for_claim_support: NonNegativeInt,
     required_comparison_state: bool | None,
+    family_wise_alpha: Probability,
 ) -> FinalClaimState:
     if definition.primary_metric is not None and required_comparison_state is False:
         return FinalClaimState.NOT_SUPPORTED
@@ -457,6 +460,13 @@ def _derive_claim_state(
     if definition.claim_id == "Secondary Generalization":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.NOT_TESTED
+        applicable_p_values = [
+            p_value for p_value in evidence.comparison_p_values.values() if p_value is not None
+        ]
+        if applicable_p_values and any(
+            p_value >= family_wise_alpha for p_value in applicable_p_values
+        ):
+            return FinalClaimState.NOT_SUPPORTED
         if evidence.secondary_generalization_passes:
             return FinalClaimState.SUPPORTED
         return FinalClaimState.NOT_SUPPORTED

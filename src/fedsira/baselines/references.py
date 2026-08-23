@@ -2,7 +2,10 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.baselines.registry import STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND
+from fedsira.baselines.registry import (
+    STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND,
+    STANDARD_FL_BASELINE_ROUNDS,
+)
 from fedsira.config.schema import BaselinesConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
@@ -42,6 +45,10 @@ def centralized_reference_pooled_rows(
 
 def fedavg_reference_post_reference_rounds(baselines_config: BaselinesConfig) -> PositiveInt:
     return baselines_config.fedavg_post_reference_rounds
+
+
+def standard_fl_anchor_rounds() -> PositiveInt:
+    return STANDARD_FL_BASELINE_ROUNDS
 
 
 def fedavg_reference_post_reference_local_epochs() -> PositiveInt:

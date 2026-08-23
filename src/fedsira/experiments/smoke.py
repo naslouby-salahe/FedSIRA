@@ -168,7 +168,27 @@ def run_smoke_suite(
         *_protocol_invariants(config),
         *_mathematical_invariants(config, fixture_config),
     )
-    return SmokeSuiteResult(checks=checks)
+    result = SmokeSuiteResult(checks=checks)
+    _persist_smoke_record(result, overwrite)
+    return result
+
+
+def _persist_smoke_record(result: SmokeSuiteResult, overwrite: bool) -> None:
+    import json
+
+    record_path = Path("outputs") / "preprocessing" / "validation" / "smoke_record.json"
+    if record_path.exists() and not overwrite:
+        return
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": SMOKE_RECORD_SCHEMA_VERSION,
+        "passed": result.passed,
+        "checks": [
+            {"name": check.name, "passed": check.passed, "detail": check.detail}
+            for check in result.checks
+        ],
+    }
+    record_path.write_text(json.dumps(payload, sort_keys=True, indent=2))
 
 
 def render_smoke(result: SmokeSuiteResult) -> str:
