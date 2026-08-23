@@ -1,7 +1,8 @@
-from fedsira.cli.commands import ScientificPipelineNotImplementedError
+from fedsira.experiments.smoke import render_smoke, run_smoke_suite
 
 
 def execute(overwrite: bool) -> None:
-    raise ScientificPipelineNotImplementedError(
-        "fedsira smoke is not yet implemented: the invariant suite is not available"
-    )
+    result = run_smoke_suite(overwrite=overwrite)
+    print(render_smoke(result))
+    if not result.passed:
+        raise SystemExit(1)
