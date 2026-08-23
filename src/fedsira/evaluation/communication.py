@@ -71,10 +71,8 @@ def _canonical_json_bytes(payload: Mapping[str, CommunicationJsonValue]) -> byte
     return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def _length_prefixed(payload: bytes) -> bytes:
-    return (
-        len(payload).to_bytes(METADATA_LENGTH_PREFIX_BYTES, byteorder="big", signed=False) + payload
-    )
+def _length_prefixed(payload: bytes, prefix_bytes: NonNegativeInt) -> bytes:
+    return len(payload).to_bytes(prefix_bytes, byteorder="big", signed=False) + payload
 
 
 def encode_message_metadata(metadata: CommunicationMessageMetadata) -> bytes:
@@ -90,7 +88,7 @@ def encode_message_metadata(metadata: CommunicationMessageMetadata) -> bytes:
         "claim_contract_hash": metadata.claim_contract_hash,
         "payload_tensor_count": metadata.payload_tensor_count,
     }
-    return _length_prefixed(_canonical_json_bytes(payload))
+    return _length_prefixed(_canonical_json_bytes(payload), METADATA_LENGTH_PREFIX_BYTES)
 
 
 def encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> bytes:
@@ -100,7 +98,7 @@ def encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> bytes:
         "shape": list(tensor_metadata.shape),
         "nbytes": tensor_metadata.nbytes,
     }
-    return _length_prefixed(_canonical_json_bytes(payload))
+    return _length_prefixed(_canonical_json_bytes(payload), TENSOR_METADATA_LENGTH_PREFIX_BYTES)
 
 
 def encode_message_envelope(

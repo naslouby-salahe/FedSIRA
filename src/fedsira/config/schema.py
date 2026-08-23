@@ -518,6 +518,10 @@ class ScientificConfig(FrozenModel):
 
 class TestFixtureConfig(FrozenModel):
     fixture_format_version: PositiveInt
+    holm_fixture_raw_p_values: tuple[tuple[NonEmptyLabel, Probability], ...]
+    holm_fixture_adjusted_p_values: tuple[tuple[NonEmptyLabel, Probability], ...]
+    sign_flip_sample_count: PositiveInt
+    sign_flip_expected_p_value: Probability
 
 
 class SmokeConfig(FrozenModel):

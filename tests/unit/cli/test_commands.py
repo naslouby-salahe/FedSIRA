@@ -35,22 +35,18 @@ def test_preprocess_accepts_only_roadmap_dataset_identities() -> None:
     assert result.exit_code != 0
 
 
-@pytest.mark.skipif(not REAL_NBAIOT_ROOT.is_dir(), reason="real N-BaIoT raw data not available")
-def test_preprocess_routes_and_reports_not_yet_implemented() -> None:
-    result = runner.invoke(app, ["preprocess", "N-BaIoT"])
-    assert result.exit_code == 1
-    assert "not yet implemented" in result.stdout
-    assert "dataset_file_manifest_hash=" in result.stdout
-
-
-def test_plan_routes_and_reports_not_yet_implemented() -> None:
+def test_plan_prints_section_31_counts() -> None:
     result = runner.invoke(app, ["plan"])
-    assert result.exit_code == 1
+    assert result.exit_code == 0
+    assert "total cells: 1989" in result.stdout
+    assert "pre-core cells: 299" in result.stdout
+    assert "post-core cells: 1690" in result.stdout
 
 
-def test_smoke_routes_and_reports_not_yet_implemented() -> None:
+def test_smoke_runs_and_passes() -> None:
     result = runner.invoke(app, ["smoke"])
-    assert result.exit_code == 1
+    assert result.exit_code == 0
+    assert "result: PASSED" in result.stdout
 
 
 def test_run_requires_an_experiment_name() -> None:
@@ -58,12 +54,18 @@ def test_run_requires_an_experiment_name() -> None:
     assert result.exit_code != 0
 
 
-def test_run_routes_and_reports_not_yet_implemented() -> None:
+def test_run_unknown_experiment_fails() -> None:
     result = runner.invoke(app, ["run", "some-experiment"])
-    assert result.exit_code == 1
+    assert result.exit_code != 0
 
 
-def test_report_routes_and_reports_not_yet_implemented() -> None:
+def test_run_rejects_post_core_experiment_without_resolved_core() -> None:
+    result = runner.invoke(app, ["run", "Primary Confirmatory Evaluation"])
+    assert result.exit_code != 0
+    assert "Blocked" in result.stdout
+
+
+def test_report_export_produces_summary() -> None:
     result = runner.invoke(app, ["report"])
     assert result.exit_code == 1
 

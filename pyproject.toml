@@ -95,6 +95,14 @@ root = "src/fedsira/baselines/calibration.py"
 reportMissingTypeStubs = false
 reportUnknownMemberType = false
 
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/cli/main.py"
+reportUnknownMemberType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/reporting/figures.py"
+reportUnknownMemberType = false
+
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
 
@@ -138,3 +146,4 @@ forbidden_modules = [
     "fedsira.protocol",
     "fedsira.analysis",
 ]
+allow_indirect_imports = true

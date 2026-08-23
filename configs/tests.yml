@@ -1,1 +1,17 @@
 fixture_format_version: 1
+holm_fixture_raw_p_values:
+- - c
+  - 0.01
+- - a
+  - 0.04
+- - b
+  - 0.03
+holm_fixture_adjusted_p_values:
+- - c
+  - 0.03
+- - b
+  - 0.06
+- - a
+  - 0.06
+sign_flip_sample_count: 10
+sign_flip_expected_p_value: 0.001953125
