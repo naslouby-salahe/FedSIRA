@@ -1,0 +1,111 @@
+from pathlib import Path
+
+import pandas
+import pytest
+
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
+from fedsira.datasets.nbaiot.preprocessing import NBAIOT_PRIMARY_PREDICTOR_COUNT
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotClass
+from fedsira.domain.enums import SeedNamespace
+from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.protocol_executor import ProtocolCellExecutor
+from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
+from fedsira.experiments.registry import PRIMARY_CONFIRMATORY_EVALUATION_NAME, PrimaryScenario
+from fedsira.protocol.source_selection import select_source_domain, source_selection_order
+from fedsira.runtime.determinism import namespace_seed
+
+CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+CLASSES = (NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO, NBaiotClass.GAFGYT_JUNK)
+CLASS_OFFSETS = {
+    NBaiotClass.BENIGN: 0.0,
+    NBaiotClass.GAFGYT_JUNK: 30.0,
+    NBaiotClass.GAFGYT_COMBO: 300.0,
+}
+
+
+def _feature_names() -> list[str]:
+    return [f"feature_{index:03d}" for index in range(NBAIOT_PRIMARY_PREDICTOR_COUNT)]
+
+
+def _write_csv(path: Path, row_count: int, offset: float) -> None:
+    frame = pandas.DataFrame(
+        {name: [offset + index * 0.0001 for index in range(row_count)] for name in _feature_names()}
+    )
+    frame.to_csv(path, index=False)
+
+
+@pytest.fixture(scope="module")
+def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("protocol-executor-real-evidence")
+    discovered: list[DiscoveredCsvFile] = []
+    for domain_index, domain in enumerate(NBAIOT_DOMAIN_ORDER):
+        for class_id in CLASSES:
+            relative_path = f"{class_id.value}.csv"
+            absolute_path = root / "raw" / domain.value / relative_path
+            absolute_path.parent.mkdir(parents=True, exist_ok=True)
+            offset = domain_index * 0.001 + CLASS_OFFSETS[class_id]
+            _write_csv(absolute_path, row_count=3000, offset=offset)
+            discovered.append(
+                DiscoveredCsvFile(
+                    domain=domain,
+                    class_id=class_id,
+                    relative_path=relative_path,
+                    file_sha256=f"{domain_index}{class_id.value}".ljust(64, "0")[:64],
+                    absolute_path=absolute_path,
+                )
+            )
+    prepared = root / "prepared"
+    materialize_nbaiot_prepared_views(discovered, CONFIG, prepared, root / "scaler", overwrite=True)
+    return prepared
+
+
+def _primary_cell(master_seed: int) -> ScientificCell:
+    return ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method="Resolved FedSIRA Core",
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=master_seed,
+    )
+
+
+def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    outcome = executor.execute_cell(_primary_cell(1), CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    first = executor.execute_cell(_primary_cell(2), CONFIG)
+    second = executor.execute_cell(_primary_cell(2), CONFIG)
+    assert first.terminal_state == second.terminal_state
+    assert first.metrics == second.metrics
+
+
+def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_root: Path) -> None:
+    master_seed = 3
+    anchor = train_anchor(prepared_root, CONFIG, master_seed)
+    assert anchor is not None
+    source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
+    source_order = source_selection_order(source_selection_namespace_seed)
+    source_domain = select_source_domain(
+        source_order,
+        frozenset(NBAIOT_DOMAIN_ORDER),
+        requires_gafgyt_udp_carrier=False,
+        domains_with_gafgyt_udp=frozenset(),
+    )
+    adequate_domains = non_source_domains(source_domain)
+    assert len(adequate_domains) == 8
+    for domain in adequate_domains:
+        metrics = evaluate_domain(
+            prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE
+        )
+        assert metrics is not None
+        assert metrics.target_f1.value is not None
+        assert metrics.supported_macro_f1.value is not None
+        assert metrics.benign_far.value is not None

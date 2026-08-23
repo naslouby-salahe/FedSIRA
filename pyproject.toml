@@ -97,6 +97,12 @@ reportUnknownVariableType = false
 reportUnknownArgumentType = false
 
 [[tool.pyright.executionEnvironments]]
+root = "src/fedsira/experiments/real_evidence.py"
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+
+[[tool.pyright.executionEnvironments]]
 root = "tests/unit/datasets/nbaiot/test_materialization.py"
 reportUnknownMemberType = false
 reportUnknownVariableType = false

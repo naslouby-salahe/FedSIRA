@@ -55,3 +55,14 @@ def flatten_trainable_parameters(model: FedSIRAClassifier) -> torch.Tensor:
             if parameter.requires_grad
         ]
     )
+
+
+def load_flat_trainable_parameters(model: FedSIRAClassifier, flat_parameters: torch.Tensor) -> None:
+    offset = 0
+    with torch.no_grad():
+        for _, parameter in model.named_parameters():
+            if not parameter.requires_grad:
+                continue
+            count = parameter.numel()
+            parameter.copy_(flat_parameters[offset : offset + count].reshape(parameter.shape))
+            offset += count
