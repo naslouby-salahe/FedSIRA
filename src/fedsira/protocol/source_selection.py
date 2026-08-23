@@ -5,9 +5,10 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     deterministic_domain_order,
 )
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import NamespaceSeed
 
-SOURCE_SELECTION_SEPARATOR = "SOURCE_SELECTION"
+SOURCE_SELECTION_SEPARATOR = SeedNamespace.SOURCE_SELECTION.value
 
 
 def source_selection_order(

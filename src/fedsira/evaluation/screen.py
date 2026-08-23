@@ -2,6 +2,7 @@ import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     CanonicalToken,
     DerivedSeed,
@@ -12,7 +13,7 @@ from fedsira.domain.records import (
 from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.runtime.determinism import canonical_bytes
 
-SCREEN_FOLD_SEPARATOR = "SCREEN_FOLD"
+SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
 
 
 @dataclass(frozen=True)

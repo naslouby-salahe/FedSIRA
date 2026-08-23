@@ -5,13 +5,18 @@ from pathlib import Path
 import pandas
 
 from fedsira.artifacts.fingerprints import (
+    DATASET_PACKAGE_NAME,
     PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES,
     compute_artifact_dependency_fingerprint,
     compute_external_dependency_fingerprint,
     compute_producer_component_fingerprint,
     raw_schema_exclusion_manifest_entry_modules,
 )
-from fedsira.artifacts.paths import workspace_root_for_family
+from fedsira.artifacts.paths import (
+    prepared_evidence_root,
+    prepared_feature_root,
+    workspace_root_for_family,
+)
 from fedsira.artifacts.records import ArtifactManifest
 from fedsira.artifacts.storage import (
     compute_checksum,
@@ -188,7 +193,9 @@ def _validate_ciciot2023_raw_data() -> (
 def execute(dataset: DatasetId | None, overwrite: bool) -> None:
     if dataset is DatasetId.N_BAIOT:
         config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-        raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "N-BaIoT"
+        raw_root = (
+            REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
+        )
         extraction_cache_root = (
             REPOSITORY_ROOT
             / config.runtime.repository_layout.execution_workspace
@@ -222,8 +229,10 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
             },
         )
 
-        prepared_root = REPOSITORY_ROOT / "outputs" / "preprocessing" / "prepared" / "nbaiot"
-        scaler_root = REPOSITORY_ROOT / "outputs" / "preprocessing" / "features"
+        prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
+            DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
+        )
+        scaler_root = REPOSITORY_ROOT / prepared_feature_root()
         from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
 
         views, moments = materialize_nbaiot_prepared_views(

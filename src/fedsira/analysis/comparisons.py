@@ -5,7 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config.schema import BootstrapConfig, MaterialityConfig, MultiplicityConfig
+from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.records import CanonicalToken, MasterSeed, Probability
 from fedsira.evaluation.aggregation import bootstrap_percentile_confidence_interval
 from fedsira.evaluation.statistics import (
@@ -25,9 +27,20 @@ from fedsira.experiments.registry import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationVariant,
+    ClaimFamily,
+    ExperimentClass,
+    ExternalVerificationCondition,
     HeterogeneityRegime,
+    OpeningMode,
+    PluralityCondition,
+    PrimaryScenario,
+    ProposalEpisode,
+    ReproducerCondition,
     RootCauseMixture,
     SecondaryScenario,
+    SourceExclusionMethod,
+    VerifierCondition,
 )
 
 
@@ -53,21 +66,6 @@ class ComparisonTestKind(StrEnum):
 class ComparisonOrientation(StrEnum):
     HIGHER_IS_BETTER = "higher_is_better"
     LOWER_IS_BETTER = "lower_is_better"
-
-
-class ClaimFamily(StrEnum):
-    PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"
-    PLURALITY_NECESSITY = "plurality necessity"
-    SOURCE_EXCLUSION_CENTRAL_CLAIM = "source-exclusion central claim"
-    EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"
-    PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"
-    REPRODUCER_ROBUSTNESS = "reproducer robustness"
-    VERIFIER_ROBUSTNESS = "verifier robustness"
-    MECHANISM_ABLATION = "mechanism ablation"
-    HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY = (
-        "heterogeneity/failure-boundary secondary comparisons"
-    )
-    SECONDARY_GENERALIZATION = "secondary generalization"
 
 
 @dataclass(frozen=True)
@@ -290,9 +288,9 @@ def _definition(
 
 
 PRIMARY_SCENARIOS: tuple[CanonicalToken, ...] = (
-    "Legitimate Unsupported Capability",
-    "Useful Backdoored Source — 5%",
-    "One Byzantine Post-Reference Participant",
+    PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+    PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+    PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT.value,
 )
 
 
@@ -301,13 +299,13 @@ def _proposal_screen_comparisons(
 ) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
-    method = "Proposal-Assisted"
-    reference = "Candidate-Free"
+    method = OpeningMode.PROPOSAL_ASSISTED.value
+    reference = OpeningMode.CANDIDATE_FREE.value
     return (
         _definition(
             family,
             experiment,
-            "Generic Hard Supported Examples",
+            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
             method,
             reference,
             "false-launch",
@@ -318,7 +316,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Irrelevant Source Improvement",
+            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
             method,
             reference,
             "false-launch",
@@ -329,7 +327,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Legitimate Target Capability",
+            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
             method,
             reference,
             "reproduction-attempts",
@@ -340,7 +338,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Generic Hard Supported Examples",
+            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
             method,
             reference,
             "reproduction-attempts",
@@ -351,7 +349,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Irrelevant Source Improvement",
+            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
             method,
             reference,
             "reproduction-attempts",
@@ -362,7 +360,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Useful Backdoored Source — 5%",
+            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
             method,
             reference,
             "reproduction-attempts",
@@ -373,7 +371,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Legitimate Target Capability",
+            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
             method,
             reference,
             "post-evidence-overhead",
@@ -384,7 +382,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Generic Hard Supported Examples",
+            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
             method,
             reference,
             "post-evidence-overhead",
@@ -395,7 +393,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Irrelevant Source Improvement",
+            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
             method,
             reference,
             "post-evidence-overhead",
@@ -406,7 +404,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Useful Backdoored Source — 5%",
+            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
             method,
             reference,
             "post-evidence-overhead",
@@ -417,7 +415,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Legitimate Target Capability",
+            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
             method,
             reference,
             "legitimate-admission",
@@ -428,7 +426,7 @@ def _proposal_screen_comparisons(
         _definition(
             family,
             experiment,
-            "Useful Backdoored Source — 5%",
+            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
             method,
             reference,
             "malicious-admission",
@@ -443,10 +441,10 @@ def _plurality_comparisons(materiality: MaterialityConfig) -> tuple[ComparisonDe
     family = ClaimFamily.PLURALITY_NECESSITY
     experiment = SINGLE_REPRODUCTION_NECESSITY_NAME
     method = "Full Plurality Path"
-    reference = "One Independent Retrain"
+    reference = BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value
     conditions = (
-        "Honest Site-Specific Feature Shift — 1.0",
-        "One Byzantine Source-Copy Reproducer",
+        PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
     )
     return tuple(
         _definition(
@@ -482,9 +480,9 @@ def _source_exclusion_comparisons(
 ) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
     experiment = SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
-    scenario = "Useful Backdoored Source — 5%"
-    method = "Full FedSIRA"
-    reference = "Source-Update Sanitization Reference"
+    scenario = PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value
+    method = SourceExclusionMethod.FULL_FEDSIRA.value
+    reference = BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value
     return (
         _definition(
             family,
@@ -538,12 +536,12 @@ def _external_verification_comparisons(
 ) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY
     experiment = EXTERNAL_VERIFICATION_NECESSITY_NAME
-    method = "Full FedSIRA"
-    reference = "Multiple Retrains with Direct Krum"
+    method = SourceExclusionMethod.FULL_FEDSIRA.value
+    reference = BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
     conditions = (
-        "Honest Site-Specific Feature Shift — 1.0",
-        "One Byzantine Source-Copy Reproducer",
-        "One Verifier-Aware Backdoor Reproducer",
+        PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+        ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER.value,
     )
     return tuple(
         _definition(
@@ -581,19 +579,19 @@ def _primary_baseline_comparisons(
     experiment = PRIMARY_CONFIRMATORY_EVALUATION_NAME
     method = "Resolved FedSIRA Core"
     comparators = (
-        "FedAvg Reference",
-        "Client Review with Direct Source Admission",
-        "Client Review then One Independent Retrain",
-        "One Independent Retrain",
-        "Multiple Retrains with Direct Krum",
-        "Multiple-Model Certified Ensemble",
-        "Independent Local Reference with Source Admission",
-        "Update Reconstruction Filter",
-        "Density-Cluster Trimmed Mean",
-        "Secure Continual Assessment Reference",
-        "Recovery after Source Admission",
-        "Source-Update Sanitization Reference",
-        "Krum Robust Aggregation Reference",
+        BaselineIdentity.FEDAVG_REFERENCE.value,
+        BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
+        BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
+        BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value,
+        BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
+        BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
+        BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
+        BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
+        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
     )
     definitions: list[ComparisonDefinition] = []
     for comparator in comparators:
@@ -686,17 +684,17 @@ def _reproducer_robustness_comparisons(
     experiment = COMPROMISED_REPRODUCER_ROBUSTNESS_NAME
     method = "Resolved FedSIRA Core"
     comparators = (
-        "One Independent Retrain",
-        "Multiple Retrains with Direct Krum",
-        "Krum Robust Aggregation Reference",
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
     )
     conditions = (
-        "One Source Copy",
-        "One Model-Replacement Backdoor",
-        "One Verifier-Aware Backdoor",
-        "Two Source Copies",
-        "Two Model-Replacement Backdoors",
-        "Two Verifier-Aware Backdoors",
+        ReproducerCondition.ONE_SOURCE_COPY.value,
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value,
+        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR.value,
+        ReproducerCondition.TWO_SOURCE_COPIES.value,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS.value,
+        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS.value,
     )
     definitions: list[ComparisonDefinition] = []
     for comparator in comparators:
@@ -745,7 +743,7 @@ def _reproducer_robustness_comparisons(
             _definition(
                 family,
                 experiment,
-                "CLEAN",
+                ReproducerCondition.CLEAN.value,
                 method,
                 comparator,
                 "legitimate-admission",
@@ -758,7 +756,7 @@ def _reproducer_robustness_comparisons(
             _definition(
                 family,
                 experiment,
-                "CLEAN",
+                ReproducerCondition.CLEAN.value,
                 method,
                 comparator,
                 "target-f1",
@@ -779,9 +777,9 @@ def _verifier_robustness_comparisons(
         _definition(
             family,
             experiment,
-            "One False Positive",
-            "One False Positive",
-            "All Honest",
+            VerifierCondition.ONE_FALSE_POSITIVE.value,
+            VerifierCondition.ONE_FALSE_POSITIVE.value,
+            VerifierCondition.ALL_HONEST.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
             ComparisonTestKind.SUPERIORITY,
@@ -790,9 +788,9 @@ def _verifier_robustness_comparisons(
         _definition(
             family,
             experiment,
-            "Two False Positives",
-            "Two False Positives",
-            "All Honest",
+            VerifierCondition.TWO_FALSE_POSITIVES.value,
+            VerifierCondition.TWO_FALSE_POSITIVES.value,
+            VerifierCondition.ALL_HONEST.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
             ComparisonTestKind.SUPERIORITY,
@@ -801,9 +799,9 @@ def _verifier_robustness_comparisons(
         _definition(
             family,
             experiment,
-            "One False Negative",
-            "One False Negative",
-            "All Honest",
+            VerifierCondition.ONE_FALSE_NEGATIVE.value,
+            VerifierCondition.ONE_FALSE_NEGATIVE.value,
+            VerifierCondition.ALL_HONEST.value,
             "legitimate-admission",
             ComparisonOrientation.HIGHER_IS_BETTER,
             ComparisonTestKind.NON_INFERIORITY,
@@ -812,9 +810,9 @@ def _verifier_robustness_comparisons(
         _definition(
             family,
             experiment,
-            "Two False Negatives",
-            "Two False Negatives",
-            "All Honest",
+            VerifierCondition.TWO_FALSE_NEGATIVES.value,
+            VerifierCondition.TWO_FALSE_NEGATIVES.value,
+            VerifierCondition.ALL_HONEST.value,
             "legitimate-admission",
             ComparisonOrientation.HIGHER_IS_BETTER,
             ComparisonTestKind.NON_INFERIORITY,
@@ -828,66 +826,86 @@ def _ablation_comparisons(
 ) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.MECHANISM_ABLATION
     experiment = MECHANISM_ABLATION_NAME
-    scenario = "Ablation"
+    scenario = ExperimentClass.ABLATION.value
     variants = (
-        ("No Proposal Screen", "reproduction-attempts", ComparisonOrientation.LOWER_IS_BETTER),
-        ("Raw Target-F1 Screen Only", "false-launch", ComparisonOrientation.LOWER_IS_BETTER),
-        ("No Matched Control", "false-launch", ComparisonOrientation.LOWER_IS_BETTER),
-        ("Source Release after Peer Review", "asr", ComparisonOrientation.LOWER_IS_BETTER),
         (
-            "Source Release after Full External Check",
+            AblationVariant.NO_PROPOSAL_SCREEN.value,
+            "reproduction-attempts",
+            ComparisonOrientation.LOWER_IS_BETTER,
+        ),
+        (
+            AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
+            "false-launch",
+            ComparisonOrientation.LOWER_IS_BETTER,
+        ),
+        (
+            AblationVariant.NO_MATCHED_CONTROL.value,
+            "false-launch",
+            ComparisonOrientation.LOWER_IS_BETTER,
+        ),
+        (
+            AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value,
             "asr",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "One Independent Reproduction",
+            AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value,
+            "asr",
+            ComparisonOrientation.LOWER_IS_BETTER,
+        ),
+        (
+            AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value,
             "worst-domain-target-f1",
             ComparisonOrientation.HIGHER_IS_BETTER,
         ),
         (
-            "Multiple Reproductions without Cross-Verification",
+            AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "Same-Context Verification Only",
+            AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value,
             "legitimate-admission",
             ComparisonOrientation.HIGHER_IS_BETTER,
         ),
-        ("No Origin Exclusion", "asr", ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.NO_ORIGIN_EXCLUSION.value, "asr", ComparisonOrientation.LOWER_IS_BETTER),
         (
-            "Parameter-Similarity Certification",
+            AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value,
             "legitimate-admission",
             ComparisonOrientation.HIGHER_IS_BETTER,
         ),
         (
-            "Candidate-Free Reproduction",
+            AblationVariant.CANDIDATE_FREE_REPRODUCTION.value,
             "post-evidence-overhead",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "Direct Krum of Retrains",
+            AblationVariant.DIRECT_KRUM_OF_RETRAINS.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "Generic Three-Row Threshold",
+            AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "Random Committee Profile",
+            AblationVariant.RANDOM_COMMITTEE_PROFILE.value,
             "malicious-admission",
             ComparisonOrientation.LOWER_IS_BETTER,
         ),
         (
-            "No Final Synthesis Gate",
+            AblationVariant.NO_FINAL_SYNTHESIS_GATE.value,
             "worst-domain-target-f1",
             ComparisonOrientation.HIGHER_IS_BETTER,
         ),
-        ("Byzantine Reproducer Copies Source", "asr", ComparisonOrientation.LOWER_IS_BETTER),
         (
-            "Capability-Contract Granularity",
+            AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE.value,
+            "asr",
+            ComparisonOrientation.LOWER_IS_BETTER,
+        ),
+        (
+            AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value,
             "false-same-capability-certification-rate",
             ComparisonOrientation.HIGHER_IS_BETTER,
         ),
@@ -918,7 +936,7 @@ def _ablation_comparisons(
             experiment,
             scenario,
             variant,
-            "Full FedSIRA",
+            SourceExclusionMethod.FULL_FEDSIRA.value,
             metric,
             orientation,
             ComparisonTestKind.SUPERIORITY,
@@ -944,7 +962,7 @@ def _heterogeneity_boundary_comparisons(
                 HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
                 regime,
                 regime,
-                "Natural",
+                HeterogeneityRegime.NATURAL.value,
                 "legitimate-admission",
                 ComparisonOrientation.HIGHER_IS_BETTER,
                 ComparisonTestKind.SUPERIORITY,
@@ -957,7 +975,7 @@ def _heterogeneity_boundary_comparisons(
                 HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
                 regime,
                 regime,
-                "Natural",
+                HeterogeneityRegime.NATURAL.value,
                 "worst-domain-target-f1",
                 ComparisonOrientation.HIGHER_IS_BETTER,
                 ComparisonTestKind.SUPERIORITY,
@@ -973,7 +991,7 @@ def _heterogeneity_boundary_comparisons(
                 family,
                 CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
                 mixture,
-                "Broad Target Only",
+                CapabilityContractScope.BROAD_TARGET_ONLY.value,
                 "zero",
                 "false-same-capability-certification-rate",
                 ComparisonOrientation.HIGHER_IS_BETTER,
@@ -990,7 +1008,10 @@ def _secondary_generalization_comparisons(
     family = ClaimFamily.SECONDARY_GENERALIZATION
     experiment = SECONDARY_DATASET_GENERALIZATION_NAME
     method = "Resolved FedSIRA Core"
-    comparators = ("One Independent Retrain", "Multiple Retrains with Direct Krum")
+    comparators = (
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+    )
     scenarios = (
         SecondaryScenario.LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY.value,
         SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,

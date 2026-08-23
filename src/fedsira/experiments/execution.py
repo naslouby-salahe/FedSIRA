@@ -8,7 +8,6 @@ from pathlib import Path
 import pydantic
 
 from fedsira.analysis.comparisons import (
-    ClaimFamily,
     ComparisonFamilyResult,
     ComparisonOrientation,
     ComparisonResult,
@@ -23,12 +22,14 @@ from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_confi
 from fedsira.config.schema import ScientificConfig
 from fedsira.domain.enums import (
     CellPhaseState,
+    DatasetId,
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
 )
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, MasterSeed
 from fedsira.experiments.planning import ScientificCell, build_plan
+from fedsira.experiments.registry import ClaimFamily
 from fedsira.experiments.validation import (
     validate_cell_phase_sequence,
     validate_cell_terminal_record,
@@ -82,7 +83,7 @@ class CellExecutionOutcome:
 
     @property
     def completed(self) -> bool:
-        return self.terminal_state == "Completed"
+        return self.terminal_state == ExperimentLifecycleState.COMPLETED.value
 
 
 @dataclass(frozen=True)
@@ -171,7 +172,7 @@ def comparison_results_for_experiment(
     )
     if not definitions:
         return ()
-    dataset_id = "N-BaIoT"
+    dataset_id = DatasetId.N_BAIOT.value
     seed_metrics: dict[tuple[PairingKey, CanonicalToken], dict[CanonicalToken, float | None]] = {}
     for outcome in outcomes:
         pairing = PairingKey(
@@ -285,7 +286,8 @@ def run_experiment(
     for prereq in planned.prerequisites:
         prereq_outcomes = store.read_all_outcomes(prereq)
         if prereq_outcomes and all(
-            outcome.terminal_state == "Completed" for outcome in prereq_outcomes
+            outcome.terminal_state == ExperimentLifecycleState.COMPLETED.value
+            for outcome in prereq_outcomes
         ):
             prerequisite_states[prereq] = ExperimentLifecycleState.COMPLETED
         else:
@@ -315,7 +317,7 @@ def run_experiment(
         )
         terminal_phase = (
             CellPhaseState.COMPLETED
-            if outcome.terminal_state == "Completed"
+            if outcome.terminal_state == ExperimentLifecycleState.COMPLETED.value
             else CellPhaseState.FAILED
         )
         validate_cell_terminal_record(cell, terminal_phase)
@@ -323,7 +325,7 @@ def run_experiment(
         outcomes.append(outcome)
 
     comparison_results = comparison_results_for_experiment(experiment, outcomes, config)
-    lifecycle_state = _derive_lifecycle_state(outcomes)
+    lifecycle_state = derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
     completed_digest = execution_record_digest(outcomes)
     return ExperimentExecutionResult(
         experiment=experiment,
@@ -334,18 +336,20 @@ def run_experiment(
     )
 
 
-def _derive_lifecycle_state(outcomes: Sequence[CellExecutionOutcome]) -> ExperimentLifecycleState:
-    if not outcomes:
+def derive_lifecycle_state(terminal_states: Sequence[str]) -> ExperimentLifecycleState:
+    if not terminal_states:
         return ExperimentLifecycleState.NOT_STARTED
-    terminal_states = {outcome.terminal_state for outcome in outcomes}
-    if terminal_states & {"Invalid", "Failed"}:
+    terminal_state_set = set(terminal_states)
+    invalid_state = ExperimentLifecycleState.INVALID.value
+    failed_state = ExperimentLifecycleState.FAILED.value
+    if terminal_state_set & {invalid_state, failed_state}:
         return (
             ExperimentLifecycleState.INVALID
-            if "Invalid" in terminal_states
+            if invalid_state in terminal_state_set
             else ExperimentLifecycleState.FAILED
         )
-    completed_count = sum(1 for outcome in outcomes if outcome.completed)
-    if completed_count == len(outcomes):
+    completed_state = ExperimentLifecycleState.COMPLETED.value
+    if all(state == completed_state for state in terminal_states):
         return ExperimentLifecycleState.COMPLETED
     return ExperimentLifecycleState.RUNNING
 

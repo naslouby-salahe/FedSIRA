@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(git status && git log --oneline -15 && git remote -v && git rev-list --left-right --count origin/main...main 2>/dev/null; git branch -vv)",
+      "Shell(gh:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

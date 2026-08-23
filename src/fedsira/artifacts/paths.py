@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
-from fedsira.domain.records import ExperimentId
+from fedsira.domain.records import CanonicalToken, ExperimentId
 
 ARTIFACT_FAMILY_PATH_SCOPE: dict[ArtifactFamily, ArtifactPathScope] = {
     ArtifactFamily.RAW_DATASET_IDENTITY: ArtifactPathScope.PREPROCESSING,
@@ -30,6 +30,18 @@ ARTIFACT_FAMILY_PATH_SCOPE: dict[ArtifactFamily, ArtifactPathScope] = {
 
 OUTPUTS_ROOT = Path("outputs")
 RESULTS_ROOT = Path("results")
+
+
+def prepared_evidence_root(dataset: CanonicalToken) -> Path:
+    return OUTPUTS_ROOT / "preprocessing" / "prepared" / dataset
+
+
+def prepared_feature_root() -> Path:
+    return OUTPUTS_ROOT / "preprocessing" / "features"
+
+
+def smoke_record_path() -> Path:
+    return OUTPUTS_ROOT / "preprocessing" / "validation" / "smoke_record.json"
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:

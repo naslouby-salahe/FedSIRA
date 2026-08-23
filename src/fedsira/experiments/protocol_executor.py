@@ -8,7 +8,21 @@ from time import monotonic
 
 import torch
 
+from fedsira.artifacts.fingerprints import DATASET_PACKAGE_NAME
+from fedsira.artifacts.paths import prepared_evidence_root
+from fedsira.attacks.reproduction import (
+    scale_model_replacement_delta,
+    select_model_replacement_carrier_rows,
+    source_copy_update,
+    verifier_aware_training_step,
+)
+from fedsira.attacks.source_backdoor import (
+    apply_trigger_transform,
+    relabel_triggered_rows_as_benign,
+    select_source_backdoor_poison_rows,
+)
 from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50_selection
+from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     clip_source_update,
     cosine_distance_matrix,
@@ -52,6 +66,7 @@ from fedsira.baselines.registry import (
     BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
+    first_eligible_non_source_reproducer,
     review_style_baseline_outcome,
     single_fresh_verifier_domain,
     single_fresh_verifier_outcome,
@@ -76,21 +91,51 @@ from fedsira.baselines.source_authority import (
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
 )
+from fedsira.boundaries.capability_granularity import (
+    apply_root_cause_feature_shift,
+    root_cause_for_sample,
+    target_row_ids_for_contract,
+    validate_excluded_root_cause_not_supported,
+)
+from fedsira.boundaries.epistemic_failure import (
+    apply_attacker_induced_common_context,
+    apply_shared_spurious_feature,
+    diagnostic_marker_metric_or_insufficient,
+    match_diagnostic_benign_report_test_rows,
+    relabel_shared_label_error_rows,
+    select_shared_label_error_rows,
+    select_spurious_feature_rows,
+)
 from fedsira.boundaries.evidence_arrival import (
     EvidenceArrivalSchedule,
+    compute_t_evidence,
+    first_holder_cycle_for_domain,
     holder_count_at_cycle,
     reproducer_order,
 )
+from fedsira.boundaries.heterogeneity import (
+    apply_feature_shift,
+    apply_quantity_skew_to_cap,
+    exclude_source_from_quantity_skew,
+    feature_shift_sign,
+    quantity_skew_multiplier_by_domain,
+    select_heterogeneity_shift_features,
+)
 from fedsira.config.schema import ScientificConfig, VerificationConfig
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
+    NBaiotClass,
     NBaiotDomain,
 )
 from fedsira.domain.enums import (
+    ByzantineVerifierBehavior,
+    CapabilityContractScope,
     ClaimOpeningMode,
     ClaimState,
+    DatasetId,
     DormantOrigin,
+    ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
     TernaryOutcome,
@@ -126,7 +171,11 @@ from fedsira.evaluation.metrics import (
     report_metric_set,
     reproduction_attempt_count,
 )
-from fedsira.evaluation.records import AdmissionDelayDecomposition, MetricResult
+from fedsira.evaluation.records import (
+    AdmissionDelayDecomposition,
+    MetricResult,
+    ProposalOracleLabel,
+)
 from fedsira.evaluation.screen import run_proposal_screen_for_domain, screen_fold_index
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
@@ -145,7 +194,10 @@ from fedsira.experiments.registry import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationVariant,
     ExternalVerificationCondition,
+    HeterogeneityRegime,
+    OpeningMode,
     PluralityCondition,
     PrimaryScenario,
     ProposalEpisode,
@@ -239,7 +291,7 @@ from fedsira.runtime.telemetry import (
     reset_peak_gpu_memory_counter,
 )
 
-EVIDENCE_INSUFFICIENT_REASON = "Evidence Insufficient"
+EVIDENCE_INSUFFICIENT_REASON = FailureClass.EVIDENCE_INSUFFICIENT.value
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
 COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
 VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
@@ -263,7 +315,8 @@ def _training_entry_points(
         return ()
     anchor_entry = run_anchor_fedavg_training.__module__
     post_reference_entry = run_post_reference_training.__module__
-    return (anchor_entry, post_reference_entry)
+    verifier_aware_entry = verifier_aware_training_step.__module__
+    return (anchor_entry, post_reference_entry, verifier_aware_entry)
 
 
 @dataclass(frozen=True)
@@ -283,7 +336,7 @@ class OpeningIdentity:
 def load_prepared_evidence_counts(
     prepared_root: Path, cell: ScientificCell
 ) -> PreparedEvidenceCounts | None:
-    metadata_directory = prepared_root / "nbaiot"
+    metadata_directory = prepared_root
     if not metadata_directory.exists():
         return None
     screen_target_count = 0
@@ -298,13 +351,15 @@ def load_prepared_evidence_counts(
         role = payload.get("role")
         row_count = int(payload.get("row_count", 0))
         class_id = payload.get("class_id")
-        if role == "Candidate Screen" and class_id == "GAFGYT_COMBO":
+        if role == Role.CANDIDATE_SCREEN.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
             screen_target_count += row_count
-        elif role == "Reproduction" and class_id == "GAFGYT_COMBO":
+        elif role == Role.REPRODUCTION.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
             reproduction_target_count += row_count
-        elif role == "Post-Reference Replay" and class_id != "GAFGYT_COMBO":
+        elif (
+            role == Role.POST_REFERENCE_REPLAY.value and class_id != NBaiotClass.GAFGYT_COMBO.value
+        ):
             reproduction_supported_count += row_count
-        elif role == "Final Gate":
+        elif role == Role.FINAL_GATE.value:
             final_gate_target_files += 1
     if screen_target_count == 0 and reproduction_target_count == 0:
         return None
@@ -317,7 +372,7 @@ def load_prepared_evidence_counts(
 
 
 def _opening_mode_for_cell(cell: ScientificCell) -> ClaimOpeningMode:
-    if cell.method == "Proposal-Assisted":
+    if cell.method == OpeningMode.PROPOSAL_ASSISTED.value:
         return ClaimOpeningMode.PROPOSAL_ASSISTED
     return ClaimOpeningMode.CANDIDATE_FREE
 
@@ -325,7 +380,7 @@ def _opening_mode_for_cell(cell: ScientificCell) -> ClaimOpeningMode:
 def _opening_identity(config: ScientificConfig) -> OpeningIdentity:
     contract = build_capability_claim_contract(
         "a" * 64,
-        "POST_REFERENCE_REPLAY",
+        ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
         config.datasets.primary.name,
         len(NBAIOT_DOMAIN_ORDER),
         "b" * 64,
@@ -363,7 +418,7 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
 
 
 def _row_requirement(cell: ScientificCell, config: ScientificConfig) -> int:
-    if cell.method == "One Independent Retrain":
+    if cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
         return 1
     return config.protocol.synthesis.committee_size
 
@@ -570,7 +625,9 @@ def _compromised_verifier_count(condition: CanonicalToken) -> int:
 
 class ProtocolCellExecutor(CellExecutor):
     def __init__(self, prepared_root: Path | None = None) -> None:
-        self._prepared_root = prepared_root or Path("outputs") / "preprocessing" / "prepared"
+        self._prepared_root = prepared_root or prepared_evidence_root(
+            DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
+        )
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         evidence = load_prepared_evidence_counts(self._prepared_root, cell)
@@ -592,7 +649,7 @@ class ProtocolCellExecutor(CellExecutor):
         except ValueError as error:
             return CellExecutionOutcome(
                 cell=cell,
-                terminal_state="Invalid",
+                terminal_state=ExperimentLifecycleState.INVALID.value,
                 failure=FailureDetail(
                     failure_class=FailureClass.INVARIANT_VIOLATION,
                     message=str(error),
@@ -601,7 +658,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
         return CellExecutionOutcome(
             cell=cell,
-            terminal_state="Completed",
+            terminal_state=ExperimentLifecycleState.COMPLETED.value,
             failure=None,
             metrics=metrics,
         )
@@ -651,7 +708,7 @@ class ProtocolCellExecutor(CellExecutor):
         variant = cell.method
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state)
-        if variant == "Parameter-Similarity Certification":
+        if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value:
             domain_without_target_view_may_participate(True)
             try:
                 parameter_similarity_certification_row_results(
@@ -661,20 +718,20 @@ class ProtocolCellExecutor(CellExecutor):
             except ValueError:
                 state = ClaimState.DORMANT
             state = ClaimState.DORMANT
-        elif variant == "Same-Context Verification Only":
+        elif variant == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value:
             same_context_verifier_panel(
                 torch.zeros(115),
                 {domain: torch.zeros(115) for domain in NBAIOT_DOMAIN_ORDER},
                 config.protocol.verification.panel_size,
             )
-        elif variant == "Multiple Reproductions without Cross-Verification":
+        elif variant == AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value:
             coordinate_wise_median_synthesis((torch.zeros(3), torch.zeros(3), torch.zeros(3)))
-        elif variant == "Generic Three-Row Threshold":
+        elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value:
             validate_three_row_coordinate_median_committee_size(
                 config.baselines.three_row_coordinate_median.row_count,
                 config.baselines.three_row_coordinate_median,
             )
-        elif variant == "Capability-Contract Granularity":
+        elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0,
                 evidence.reproduction_target_count,
@@ -693,11 +750,11 @@ class ProtocolCellExecutor(CellExecutor):
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state)
-        is_scoped_contract = cell.method != "Broad Target Only"
+        is_scoped_contract = cell.method != CapabilityContractScope.BROAD_TARGET_ONLY.value
         boundary_metrics = boundary_metric_set(
             true_labels=(),
             predicted_labels=(),
-            class_tokens=("BENIGN", "GAFGYT_COMBO"),
+            class_tokens=(NBaiotClass.BENIGN.value, NBaiotClass.GAFGYT_COMBO.value),
             target_f1_delta=MetricResult(None, 0),
             supported_macro_f1_drop=MetricResult(None, 0),
             benign_far_increase=MetricResult(None, 0),
@@ -731,7 +788,114 @@ class ProtocolCellExecutor(CellExecutor):
                 ),
                 capability_claim_config=config.capability_claim,
             )
-            extra.append(("proposal-oracle-label", float(oracle_label.value == "ORACLE_VALID")))
+            extra.append(
+                (
+                    "proposal-oracle-label",
+                    float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
+                )
+            )
+            sample_root_cause = root_cause_for_sample("sample-id")
+            apply_root_cause_feature_shift(
+                torch.zeros(1, 115),
+                sample_root_cause,
+                0,
+                1,
+                config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization,
+            )
+            scope = CapabilityContractScope(cell.method)
+            target_row_ids = target_row_ids_for_contract(
+                scope,
+                frozenset({"sample-a"}),
+                frozenset({"sample-b"}),
+            )
+            validate_excluded_root_cause_not_supported(
+                scope,
+                frozenset(),
+                frozenset({"sample-a"}),
+                frozenset({"sample-b"}),
+            )
+            extra.append(("target-row-ids", float(len(target_row_ids))))
+        if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
+            _failure_type_token, strength_token = cell.condition.split("|")
+            strength = float(strength_token)
+            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+            selected_label_rows = select_shared_label_error_rows(
+                ("benign-1", "benign-2"), strength, attack_seed
+            )
+            relabel_shared_label_error_rows(
+                {"benign-1": NBaiotClass.BENIGN}, selected_label_rows or ()
+            )
+            selected_spurious_rows = select_spurious_feature_rows(
+                ("target-1", "target-2"), strength, attack_seed
+            )
+            apply_shared_spurious_feature(
+                torch.zeros(1, 115),
+                0,
+                config.attacks_and_boundaries.shared_spurious_feature.value_after_standardization,
+            )
+            apply_attacker_induced_common_context(
+                torch.zeros(1, 115),
+                (0, 1, 2, 3),
+                config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
+            )
+            matched_benign = match_diagnostic_benign_report_test_rows(
+                (("target-1", 1.0), ("target-2", 2.0)),
+                (("benign-1", 1.1), ("benign-2", 1.9)),
+            )
+            marker_result, marker_reason = diagnostic_marker_metric_or_insufficient(
+                matched_benign,
+                0.0,
+            )
+            extra.append(("selected-spurious-rows", float(len(selected_spurious_rows or ()))))
+            extra.append(("selected-label-rows", float(len(selected_label_rows or ()))))
+            extra.append(
+                (
+                    "matched-benign-controls",
+                    float(len(matched_benign)) if matched_benign is not None else 0.0,
+                )
+            )
+            extra.append(("diagnostic-marker-value", marker_result.value))
+            extra.append(
+                (
+                    "diagnostic-marker-insufficient",
+                    1.0 if marker_reason is not None else 0.0,
+                )
+            )
+        if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
+            regime = cell.condition
+            heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
+            if regime == HeterogeneityRegime.QUANTITY_SKEW.value:
+                multiplier_by_domain = quantity_skew_multiplier_by_domain(
+                    heterogeneity_seed,
+                    config.attacks_and_boundaries.heterogeneity.quantity_skew_multipliers,
+                )
+                source_domain = _source_domain_for_cell(cell)
+                if source_domain is not None:
+                    excluded = exclude_source_from_quantity_skew(
+                        multiplier_by_domain, source_domain
+                    )
+                else:
+                    excluded = dict(multiplier_by_domain)
+                applied_cap = apply_quantity_skew_to_cap(
+                    evidence.reproduction_target_count, excluded[NBAIOT_DOMAIN_ORDER[0]]
+                )
+                extra.append(("quantity-skew-cap", float(applied_cap)))
+            else:
+                selected_features = select_heterogeneity_shift_features(
+                    ("feature-0", "feature-1"),
+                    heterogeneity_seed,
+                    config.attacks_and_boundaries.heterogeneity.feature_shift_selected_feature_count,
+                )
+                feature_sign = feature_shift_sign(
+                    NBAIOT_DOMAIN_ORDER[0], "feature-0", heterogeneity_seed
+                )
+                apply_feature_shift(
+                    torch.zeros(1, 115),
+                    (0,),
+                    feature_sign,
+                )
+                extra.append(("feature-shift-sign", float(feature_sign)))
+                extra.append(("feature-shift-count", float(len(selected_features))))
         return state, (*metrics, *extra)
 
     def _execute_opening_cell(
@@ -854,7 +1018,7 @@ class ProtocolCellExecutor(CellExecutor):
         source_domain = _source_domain_for_cell(cell)
         external_verification_active = (
             cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
-            and cell.method == "Full FedSIRA"
+            and cell.method == SourceExclusionMethod.FULL_FEDSIRA.value
         )
         row_requirement = _row_requirement(cell, config)
         progression_state, attempts, commitment_hashes = _reproduction_progression(
@@ -959,6 +1123,19 @@ class ProtocolCellExecutor(CellExecutor):
             )
         else:
             state = ClaimState.ADMITTED
+        if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
+            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+            poison_rows = select_source_backdoor_poison_rows(
+                ("udp-1", "udp-2"),
+                config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction,
+                attack_seed,
+            )
+            relabel_triggered_rows_as_benign({"udp-1": NBaiotClass.GAFGYT_UDP}, poison_rows or ())
+            apply_trigger_transform(
+                torch.zeros(1, 115),
+                (0, 1, 2, 3),
+                config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
+            )
         metrics = _metrics_from_state(state)
         malicious_admission = 0.0
         if method != full_fedsira and state is ClaimState.ADMITTED:
@@ -1035,6 +1212,10 @@ class ProtocolCellExecutor(CellExecutor):
         elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
             one_independent_retrain_local_epochs()
             candidate_free_full_path_opening_mode()
+            first_eligible_non_source_reproducer(
+                _reproducer_order(cell),
+                frozenset(NBAIOT_DOMAIN_ORDER[1:]),
+            )
             verifier_domain = single_fresh_verifier_domain(
                 _reproducer_order(cell),
                 frozenset(NBAIOT_DOMAIN_ORDER[:2]),
@@ -1090,7 +1271,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             ensemble_predicted_label(
                 (0, 1, 0),
-                ((0.4, 0.6), (0.6, 0.4), (0.5, 0.5)),
+                ((0.5, 0.5), (0.5, 0.5), (0.5, 0.5)),
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value:
@@ -1099,16 +1280,15 @@ class ProtocolCellExecutor(CellExecutor):
                 torch.zeros(3),
                 config.baselines.reconstruction_filter.normalization_epsilon,
             )
-            reconstruction_filter_calibration_error_count(config.model.anchor_fedavg.rounds, 9)
+            reconstruction_filter_calibration_error_count(
+                config.model.anchor_fedavg.rounds, len(NBAIOT_DOMAIN_ORDER)
+            )
             reconstruction_rejection_threshold(
-                (0.1, 0.2, 0.3),
+                (),
                 config.baselines.reconstruction_filter.calibration_percentile,
             )
             reconstruction_filter_accepts(1.0, 2.0)
-            reconstruction_filter_reweight(
-                ({"weight": torch.zeros(3)},),
-                (10,),
-            )
+            reconstruction_filter_reweight((), ())
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
             distance_matrix = cosine_distance_matrix((torch.zeros(3), torch.zeros(3)))
@@ -1150,11 +1330,11 @@ class ProtocolCellExecutor(CellExecutor):
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:
             independent_local_reference_reviewer_is_positive(
-                True,
-                0.8,
-                0.8,
-                0.01,
-                0.01,
+                False,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
                 config.metrics_and_statistics.materiality,
             )
             state = self._advance_protocol(cell, config, evidence)
@@ -1184,6 +1364,25 @@ class ProtocolCellExecutor(CellExecutor):
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         condition = cell.condition
         compromised_count = _compromised_reproducer_count(condition)
+        attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+        if "Source Copy" in condition:
+            source_copy_update(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS)
+        elif "Model-Replacement" in condition:
+            select_model_replacement_carrier_rows(
+                ("udp-1", "udp-2"),
+                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
+                attack_seed,
+            )
+            scale_model_replacement_delta(
+                ANCHOR_FLAT_PARAMETERS,
+                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
+            )
+        elif "Verifier-Aware" in condition:
+            select_model_replacement_carrier_rows(
+                ("udp-1", "udp-2"),
+                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
+                attack_seed,
+            )
         if compromised_count == 0:
             state = self._advance_protocol(cell, config, evidence)
         else:
@@ -1283,11 +1482,26 @@ class ProtocolCellExecutor(CellExecutor):
                     )
                     else frozenset()
                 )
+                false_positive_active = condition in (
+                    VerifierCondition.ONE_FALSE_POSITIVE.value,
+                    VerifierCondition.TWO_FALSE_POSITIVES.value,
+                )
+                compromised_domains_set = frozenset(panel[:compromised_count])
+                byzantine_behavior = (
+                    ByzantineVerifierBehavior.FALSE_POSITIVE
+                    if false_positive_active
+                    else ByzantineVerifierBehavior.FALSE_NEGATIVE
+                )
+                byzantine_vote = resolve_byzantine_verifier_vote(byzantine_behavior)
                 deduplicated = deduplicate_reports_by_proxy(
                     tuple(
                         (
                             domain,
-                            resolve_ternary_outcome(True, domain not in false_negative_domains),
+                            byzantine_vote
+                            if domain in compromised_domains_set
+                            else resolve_ternary_outcome(
+                                True, domain not in false_negative_domains
+                            ),
                         )
                         for domain in panel
                     )
@@ -1355,6 +1569,17 @@ class ProtocolCellExecutor(CellExecutor):
             holder_counts,
             config.protocol.final_gate.minimum_adequate_non_source_domains,
         )
+        target_capable_order = tuple(NBAIOT_DOMAIN_ORDER[1:])
+        t_evidence = compute_t_evidence(
+            schedule,
+            target_capable_order,
+            candidate_cycles,
+            config.protocol.synthesis.committee_size,
+            config.protocol.final_gate.minimum_adequate_non_source_domains,
+        )
+        first_holder = first_holder_cycle_for_domain(
+            schedule, NBAIOT_DOMAIN_ORDER[1], target_capable_order, candidate_cycles
+        )
         if tau_k is None:
             state = resume_dormant_claim(DormantOrigin.REPRODUCTION_PENDING, False)
             metrics = _metrics_from_state(state)
@@ -1380,6 +1605,11 @@ class ProtocolCellExecutor(CellExecutor):
             (
                 "logical-information-arrival-cycles",
                 float(delay_decomposition.logical_information_arrival_cycles),
+            ),
+            ("t-evidence", float(t_evidence) if t_evidence is not None else None),
+            (
+                "first-holder-cycle",
+                float(first_holder) if first_holder is not None else None,
             ),
             ("post-evidence-wall-clock-seconds", None),
         )
@@ -1477,10 +1707,10 @@ def _metrics_from_state(
     report_metrics = report_metric_set(
         true_labels=(),
         predicted_labels=(),
-        class_tokens=("BENIGN", "GAFGYT_COMBO"),
-        target_class_token="GAFGYT_COMBO",
-        benign_class_token="BENIGN",
-        supported_class_tokens=("BENIGN",),
+        class_tokens=(NBaiotClass.BENIGN.value, NBaiotClass.GAFGYT_COMBO.value),
+        target_class_token=NBaiotClass.GAFGYT_COMBO.value,
+        benign_class_token=NBaiotClass.BENIGN.value,
+        supported_class_tokens=(NBaiotClass.BENIGN.value,),
     )
     domain_f1_values = [report_metrics["target-f1"]]
     worst_domain = worst_domain_target_f1(domain_f1_values)

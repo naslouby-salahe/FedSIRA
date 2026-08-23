@@ -10,6 +10,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     deterministic_domain_order,
 )
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     CanonicalToken,
     NamespaceSeed,
@@ -19,7 +20,7 @@ from fedsira.domain.records import (
 )
 from fedsira.runtime.determinism import canonical_bytes, deterministic_order
 
-QUANTITY_SKEW_SEPARATOR = "HETEROGENEITY"
+QUANTITY_SKEW_SEPARATOR = SeedNamespace.HETEROGENEITY.value
 HETEROGENEITY_FEATURE_ORDER_SEPARATOR = "HETEROGENEITY_FEATURE_ORDER"
 HETEROGENEITY_FEATURE_SIGN_SEPARATOR = "HETEROGENEITY_FEATURE_SIGN"
 

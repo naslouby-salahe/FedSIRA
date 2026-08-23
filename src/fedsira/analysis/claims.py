@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from fedsira.config.schema import ClaimSupportThresholdsConfig, MaterialityConfig
 from fedsira.domain.records import CanonicalToken, NonNegativeInt, Probability
+from fedsira.experiments.registry import ClaimFamily
 
 
 class FinalClaimState(StrEnum):
@@ -236,7 +237,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Secondary-Dataset Generalization",),
         primary_metric="target-f1",
-        required_comparison="secondary generalization",
+        required_comparison=ClaimFamily.SECONDARY_GENERALIZATION.value,
     ),
     ClaimDefinition(
         claim_id="IoT IDS Application",

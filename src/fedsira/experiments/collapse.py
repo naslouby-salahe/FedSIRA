@@ -8,6 +8,7 @@ from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.config.schema import MaterialityConfig, MultiplicityConfig
 from fedsira.domain.enums import ClaimOpeningMode
 from fedsira.domain.records import CanonicalToken, Probability
+from fedsira.experiments.registry import ClaimFamily
 
 
 class CollapseDecisionKind(StrEnum):
@@ -368,10 +369,10 @@ def materialize_resolved_core(
 
 
 _FAMILY_TO_DECISION_KIND: dict[CanonicalToken, CollapseDecisionKind] = {
-    "proposal-screen necessity": CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-    "plurality necessity": CollapseDecisionKind.PLURALITY,
-    "source-exclusion central claim": CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-    "external reproduction verification necessity": CollapseDecisionKind.EXTERNAL_VERIFICATION,
+    ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value: CollapseDecisionKind.PROPOSAL_ASSISTANCE,
+    ClaimFamily.PLURALITY_NECESSITY.value: CollapseDecisionKind.PLURALITY,
+    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value: CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
+    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value: CollapseDecisionKind.EXTERNAL_VERIFICATION,
 }
 
 
@@ -379,6 +380,9 @@ def collapse_decision_from_comparison_families(
     family_name: CanonicalToken,
     comparison_results: Sequence[ComparisonFamilyResult],
     alpha: Probability,
+    evaluation: CollapseEvaluationInput | None = None,
+    materiality_config: MaterialityConfig | None = None,
+    multiplicity_config: MultiplicityConfig | None = None,
 ) -> CollapseDecision:
     kind = _FAMILY_TO_DECISION_KIND[family_name]
     primary_effect: CanonicalToken | None = None
@@ -393,11 +397,43 @@ def collapse_decision_from_comparison_families(
                 adjusted_p_value = comparison.adjusted_p_value
                 primary_effect = comparison.definition.metric
     survives = adjusted_p_value is not None and adjusted_p_value < alpha
+    constraint_passes = True
+    if (
+        evaluation is not None
+        and materiality_config is not None
+        and multiplicity_config is not None
+    ):
+        named_p_values = tuple(
+            (comparison.definition.canonical_name, comparison.adjusted_p_value)
+            for family in comparison_results
+            for comparison in family.comparisons
+            if comparison.adjusted_p_value is not None
+        )
+        if kind is CollapseDecisionKind.PROPOSAL_ASSISTANCE:
+            decision = evaluate_proposal_survival(
+                evaluation, materiality_config, multiplicity_config, named_p_values
+            )
+        elif kind is CollapseDecisionKind.PLURALITY:
+            decision = evaluate_plurality_survival(
+                evaluation, materiality_config, multiplicity_config, named_p_values
+            )
+        elif kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION:
+            decision = evaluate_source_exclusion_survival(
+                evaluation, materiality_config, multiplicity_config, named_p_values
+            )
+        else:
+            decision = evaluate_external_verification_survival(
+                evaluation, materiality_config, multiplicity_config, named_p_values
+            )
+        survives = decision.survives
+        primary_effect = decision.primary_material_effect
+        adjusted_p_value = decision.adjusted_p_value
+        constraint_passes = decision.constraint_passes
     return CollapseDecision(
         kind=kind,
         survives=survives,
         primary_material_effect=primary_effect,
         adjusted_p_value=adjusted_p_value,
-        constraint_passes=True,
+        constraint_passes=constraint_passes,
         reason="mechanical collapse rule",
     )

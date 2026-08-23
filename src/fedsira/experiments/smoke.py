@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from fedsira.artifacts.paths import smoke_record_path
 from fedsira.config.loading import (
     PRODUCTION_CONFIG_PATH,
     TEST_FIXTURE_CONFIG_PATH,
@@ -176,7 +177,7 @@ def run_smoke_suite(
 def _persist_smoke_record(result: SmokeSuiteResult, overwrite: bool) -> None:
     import json
 
-    record_path = Path("outputs") / "preprocessing" / "validation" / "smoke_record.json"
+    record_path = smoke_record_path()
     if record_path.exists() and not overwrite:
         return
     record_path.parent.mkdir(parents=True, exist_ok=True)

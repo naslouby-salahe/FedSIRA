@@ -2,10 +2,11 @@ from collections.abc import Sequence
 from enum import StrEnum
 
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import NamespaceSeed, NonNegativeInt, PositiveInt
 from fedsira.protocol.theory import first_cycle_with_minimum_eligible_evidence_holders
 
-REPRODUCER_ORDER_SEPARATOR = "REPRODUCER_ORDER"
+REPRODUCER_ORDER_SEPARATOR = SeedNamespace.REPRODUCER_ORDER.value
 
 _GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[tuple[NonNegativeInt, NonNegativeInt], ...] = (
     (0, 0),

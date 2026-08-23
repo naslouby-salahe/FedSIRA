@@ -16,7 +16,7 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES
+from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily
 
 
 def render_result(result: ExperimentExecutionResult) -> str:
@@ -56,10 +56,10 @@ def _materialize_core_if_complete(experiment: str) -> None:
     decisions: list[CollapseDecision] = []
     alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
     collapse_family_names = (
-        "proposal-screen necessity",
-        "plurality necessity",
-        "source-exclusion central claim",
-        "external reproduction verification necessity",
+        ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
+        ClaimFamily.PLURALITY_NECESSITY.value,
+        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
+        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
     )
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(collapse_experiment)

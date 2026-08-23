@@ -6,9 +6,10 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     deterministic_domain_order,
 )
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import NamespaceSeed, NonNegativeInt, PositiveInt
 
-DOMAIN_PARTITION_SEPARATOR = "DOMAIN_PARTITION"
+DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 
 
 def certified_ensemble_post_reference_rounds(baselines_config: BaselinesConfig) -> PositiveInt:
