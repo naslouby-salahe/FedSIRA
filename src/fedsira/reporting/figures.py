@@ -10,6 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as pyplot
 
 from fedsira.analysis.comparisons import ComparisonFamilyResult
+from fedsira.domain.enums import ClaimState
 from fedsira.domain.records import CanonicalToken
 
 MANDATORY_FIGURE_NAMES: tuple[CanonicalToken, ...] = (
@@ -124,17 +125,27 @@ def render_evidence_arrival_trajectory(
 ) -> Path:
     figure, axis = pyplot.subplots(figsize=(8, 5))
     cycles = sorted(state_fractions_by_cycle)
-    states = ("Dormant", "Verification Pending", "Admitted", "Expired")
-    for state in states:
-        axis.plot(
-            cycles,
-            [state_fractions_by_cycle[cycle].get(state, 0.0) for cycle in cycles],
-            marker="o",
-            label=state,
-        )
-    axis.set_xlabel("logical evidence cycle")
-    axis.set_ylabel("fraction of seed instances")
-    axis.legend()
+    states = (
+        ClaimState.DORMANT.value,
+        ClaimState.VERIFICATION_PENDING.value,
+        ClaimState.ADMITTED.value,
+        ClaimState.EXPIRED.value,
+    )
+    if not cycles:
+        axis.text(0.5, 0.5, "no evidence", ha="center", va="center")
+        axis.set_xlabel("logical evidence cycle")
+        axis.set_ylabel("fraction of seed instances")
+    else:
+        for state in states:
+            axis.plot(
+                cycles,
+                [state_fractions_by_cycle[cycle].get(state, 0.0) for cycle in cycles],
+                marker="o",
+                label=state,
+            )
+        axis.set_xlabel("logical evidence cycle")
+        axis.set_ylabel("fraction of seed instances")
+        axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     pyplot.close(figure)

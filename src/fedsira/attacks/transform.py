@@ -1,10 +1,11 @@
 import math
 from collections.abc import Sequence
 
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import CanonicalToken, NamespaceSeed, NonNegativeInt, Probability
 from fedsira.runtime.determinism import deterministic_order
 
-ATTACK_GENERATION_SEPARATOR = "ATTACK_GENERATION"
+ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
 
 
 def fraction_to_transform_count(

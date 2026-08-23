@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fedsira.analysis.claims import ClaimEvidence, ClaimStateResult, derive_claim_states
+from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import CanonicalToken
@@ -92,6 +93,8 @@ def export_project_summary(
     verification: CompletenessVerificationResult,
     collapse_decisions: Sequence[CollapseDecision] | None = None,
     resolved_core: ResolvedCore | None = None,
+    comparison_results: Sequence[ComparisonFamilyResult] = (),
+    telemetry: Mapping[CanonicalToken, Mapping[CanonicalToken, float]] | None = None,
 ) -> ReportExportResult:
     config = load_scientific_config(config_path)
     rounding = config.metrics_and_statistics.publication_rounding
@@ -132,6 +135,18 @@ def export_project_summary(
     schematic_path = figures_root / "FedSIRA Protocol Schematic.png"
     figure_renderers.render_protocol_schematic(schematic_path)
     exported.append(schematic_path)
+    security_utility_path = figures_root / "Security Utility Tradeoff.png"
+    figure_renderers.render_security_utility_tradeoff(comparison_results, security_utility_path)
+    exported.append(security_utility_path)
+    evidence_trajectory_path = figures_root / "Evidence Arrival Trajectory.png"
+    figure_renderers.render_evidence_arrival_trajectory({}, evidence_trajectory_path)
+    exported.append(evidence_trajectory_path)
+    if telemetry is not None:
+        efficiency_path = figures_root / "Efficiency Profile.png"
+        figure_renderers.render_efficiency_profile(
+            telemetry, "elapsed-seconds-per-cell", efficiency_path
+        )
+        exported.append(efficiency_path)
 
     reproducibility_summary = {
         "schema_version": EXPORT_SCHEMA_VERSION,

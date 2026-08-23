@@ -12,6 +12,7 @@ from fedsira.experiments.registry import (
     POST_CORE_EXPERIMENT_NAMES,
     ExperimentClass,
     ExperimentDefinition,
+    experiment_names,
 )
 
 
@@ -163,6 +164,10 @@ def build_plan(
         smoke_seed = smoke_seed or config.seeds_and_determinism.smoke_seed
     planned: list[PlannedExperiment] = []
     for definition in EXPERIMENT_REGISTRY:
+        if definition.name not in experiment_names():
+            raise RuntimeError(
+                f"registry returned name outside experiment_names: {definition.name}"
+            )
         if definition.experiment_class not in (
             ExperimentClass.VALIDATION,
             ExperimentClass.EXPLORATORY,

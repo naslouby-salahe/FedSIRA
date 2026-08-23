@@ -14,13 +14,18 @@ from fedsira.experiments.execution import (
     ExperimentExecutionResult,
     PersistedFailureDetail,
     comparison_results_for_experiment,
+    derive_lifecycle_state,
 )
 from fedsira.experiments.planning import (
     ScientificCell,
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, EXPERIMENT_REGISTRY
+from fedsira.experiments.registry import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    EXPERIMENT_REGISTRY,
+    ClaimFamily,
+)
 from fedsira.reporting.export import (
     derive_claim_states_for_export,
     export_experiment_report,
@@ -59,15 +64,9 @@ def execute(name: str | None, overwrite: bool) -> None:
         if not outcomes:
             lifecycle_states[definition.name] = ExperimentLifecycleState.NOT_STARTED
             continue
-        states = {outcome.terminal_state for outcome in outcomes}
-        if "Invalid" in states:
-            lifecycle_states[definition.name] = ExperimentLifecycleState.INVALID
-        elif "Failed" in states:
-            lifecycle_states[definition.name] = ExperimentLifecycleState.FAILED
-        elif states == {"Completed"}:
-            lifecycle_states[definition.name] = ExperimentLifecycleState.COMPLETED
-        else:
-            lifecycle_states[definition.name] = ExperimentLifecycleState.RUNNING
+        lifecycle_states[definition.name] = derive_lifecycle_state(
+            tuple(outcome.terminal_state for outcome in outcomes)
+        )
 
     count_verification = verify_planned_cell_count_satisfied(plan, terminal_counts)
     completion_verification = verify_experiments_completed(
@@ -127,17 +126,10 @@ def _load_experiment_result(name: str, store: ExecutionRecordStore) -> Experimen
             )
         )
     comparison_results = comparison_results_for_experiment(name, outcomes, config)
-    states = {outcome.terminal_state for outcome in outcomes}
     if not outcomes:
         lifecycle = ExperimentLifecycleState.NOT_STARTED
-    elif "Invalid" in states:
-        lifecycle = ExperimentLifecycleState.INVALID
-    elif "Failed" in states:
-        lifecycle = ExperimentLifecycleState.FAILED
-    elif states == {"Completed"}:
-        lifecycle = ExperimentLifecycleState.COMPLETED
     else:
-        lifecycle = ExperimentLifecycleState.RUNNING
+        lifecycle = derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
     return ExperimentExecutionResult(
         experiment=name,
         lifecycle_state=lifecycle,
@@ -160,10 +152,10 @@ def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecis
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
     collapse_family_names = (
-        "proposal-screen necessity",
-        "plurality necessity",
-        "source-exclusion central claim",
-        "external reproduction verification necessity",
+        ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
+        ClaimFamily.PLURALITY_NECESSITY.value,
+        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
+        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
     )
     decisions: list[CollapseDecision] = []
     for experiment in COLLAPSE_EXPERIMENT_NAMES:

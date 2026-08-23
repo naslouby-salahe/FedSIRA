@@ -3,11 +3,11 @@ from dataclasses import dataclass
 
 from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
-from fedsira.domain.enums import ClaimOpeningMode, ClaimState
+from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
 from fedsira.domain.records import NamespaceSeed, NonNegativeFloat, PositiveInt
 from fedsira.evaluation.records import MetricResult
 
-SCREEN_DOMAIN_ORDER_SEPARATOR = "SCREEN_DOMAIN_ORDER"
+SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 
 
 @dataclass(frozen=True)

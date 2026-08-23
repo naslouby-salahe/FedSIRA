@@ -4,11 +4,12 @@ import torch
 
 from fedsira.config.schema import BaselinesConfig, ThreeRowCoordinateMedianConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import DerivedSeed, MasterSeed, PositiveInt, RoundIndex
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 from fedsira.runtime.determinism import derive_uint32
 
-CLIENT_SAMPLING_SEPARATOR = "CLIENT_SAMPLING"
+CLIENT_SAMPLING_SEPARATOR = SeedNamespace.CLIENT_SAMPLING.value
 
 
 def direct_krum_committee_rows(

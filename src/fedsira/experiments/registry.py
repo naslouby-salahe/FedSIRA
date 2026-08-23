@@ -15,6 +15,21 @@ from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt
 ExperimentId = CanonicalToken
 
 
+class ClaimFamily(StrEnum):
+    PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"
+    PLURALITY_NECESSITY = "plurality necessity"
+    SOURCE_EXCLUSION_CENTRAL_CLAIM = "source-exclusion central claim"
+    EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"
+    PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"
+    REPRODUCER_ROBUSTNESS = "reproducer robustness"
+    VERIFIER_ROBUSTNESS = "verifier robustness"
+    MECHANISM_ABLATION = "mechanism ablation"
+    HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY = (
+        "heterogeneity/failure-boundary secondary comparisons"
+    )
+    SECONDARY_GENERALIZATION = "secondary generalization"
+
+
 class ExperimentClass(StrEnum):
     VALIDATION = "Validation"
     EXPLORATORY = "Exploratory"
@@ -267,7 +282,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(episode.value for episode in ProposalEpisode),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=80,
-        claim_family="proposal-screen necessity",
+        claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -277,7 +292,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in PluralityCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family="plurality necessity",
+        claim_family=ClaimFamily.PLURALITY_NECESSITY.value,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -287,17 +302,20 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family="source-exclusion central claim",
+        claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
         name=EXTERNAL_VERIFICATION_NECESSITY_NAME,
         experiment_class=ExperimentClass.EXPLORATORY,
-        methods=("Full FedSIRA", "Multiple Retrains with Direct Krum"),
+        methods=(
+            SourceExclusionMethod.FULL_FEDSIRA.value,
+            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ),
         conditions=tuple(condition.value for condition in ExternalVerificationCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=80,
-        claim_family="external reproduction verification necessity",
+        claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -322,7 +340,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(scenario.value for scenario in PrimaryScenario),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=420,
-        claim_family="primary baseline superiority",
+        claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY.value,
         prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
     ),
     ExperimentDefinition(
@@ -332,7 +350,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=("Ablation",),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=180,
-        claim_family="mechanism ablation",
+        claim_family=ClaimFamily.MECHANISM_ABLATION.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -347,7 +365,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in ReproducerCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=280,
-        claim_family="reproducer robustness",
+        claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -357,13 +375,16 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in VerifierCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=100,
-        claim_family="verifier robustness",
+        claim_family=ClaimFamily.VERIFIER_ROBUSTNESS.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
         name=BYZANTINE_BOUND_VIOLATION_NAME,
         experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=("Resolved FedSIRA Core", "Multiple Retrains with Direct Krum"),
+        methods=(
+            SourceExclusionMethod.FULL_FEDSIRA.value,
+            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ),
         conditions=tuple(condition.value for condition in BoundCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=80,
@@ -391,7 +412,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         ),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=90,
-        claim_family="heterogeneity/failure-boundary secondary comparisons",
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -401,7 +422,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(mixture.value for mixture in RootCauseMixture),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family="heterogeneity/failure-boundary secondary comparisons",
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -416,7 +437,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(regime.value for regime in HeterogeneityRegime),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=160,
-        claim_family="heterogeneity/failure-boundary secondary comparisons",
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -461,7 +482,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(scenario.value for scenario in SecondaryScenario),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=100,
-        claim_family="secondary generalization",
+        claim_family=ClaimFamily.SECONDARY_GENERALIZATION.value,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         dataset=DatasetId.CICIOT2023,
     ),

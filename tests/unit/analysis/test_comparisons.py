@@ -1,5 +1,4 @@
 from fedsira.analysis.comparisons import (
-    ClaimFamily,
     ComparisonTestKind,
     apply_holm_adjustment,
     build_comparison_registry,
@@ -7,6 +6,7 @@ from fedsira.analysis.comparisons import (
     evaluate_comparison,
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.experiments.registry import ClaimFamily
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from fedsira.config.schema import VerificationConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
-from fedsira.domain.enums import ClaimState, TernaryOutcome
+from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
 from fedsira.domain.records import (
     ArtifactDigest,
     DerivedSeed,
@@ -13,9 +13,9 @@ from fedsira.domain.records import (
 )
 from fedsira.runtime.determinism import derive_uint32
 
-VERIFIER_ASSIGNMENT_SEPARATOR = "VERIFIER_ASSIGNMENT"
-BYZANTINE_SELECTION_SEPARATOR = "BYZANTINE_SELECTION"
-COMMITTEE_DRAW_SEPARATOR = "COMMITTEE_DRAW"
+VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
+BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value
+COMMITTEE_DRAW_SEPARATOR = SeedNamespace.COMMITTEE_DRAW.value
 
 
 def verifier_is_eligible(
