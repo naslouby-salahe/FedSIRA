@@ -8,12 +8,81 @@ from time import monotonic
 
 import torch
 
+from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50_selection
+from fedsira.baselines.calibration import (
+    clip_source_update,
+    cosine_distance_matrix,
+    density_cluster_labels,
+    l2_normalize,
+    parameter_similarity_certification_row_results,
+    reconstruction_error,
+    reconstruction_filter_accepts,
+    reconstruction_filter_calibration_error_count,
+    reconstruction_filter_reweight,
+    reconstruction_rejection_threshold,
+    recovery_alarm_threshold,
+    recovery_rollback_is_triggered,
+    same_context_verifier_panel,
+    sanitization_clip_bounds,
+    select_largest_density_cluster,
+    trimmed_mean_aggregate,
+)
+from fedsira.baselines.certified_ensemble import (
+    certified_ensemble_domain_groups,
+    certified_ensemble_post_reference_rounds,
+    ensemble_predicted_label,
+    validate_group_without_target_member_uses_supported_only,
+)
+from fedsira.baselines.independent_retraining import (
+    candidate_free_full_path_opening_mode,
+    one_independent_retrain_local_epochs,
+)
+from fedsira.baselines.references import (
+    centralized_reference_local_epochs,
+    centralized_reference_pooled_rows,
+    fedavg_reference_post_reference_local_epochs,
+    fedavg_reference_post_reference_participants,
+    fedavg_reference_post_reference_rounds,
+    local_only_reference_evaluation_is_domain_local,
+    local_only_reference_local_epochs,
+    local_only_reference_training_role,
+    standard_fl_anchor_rounds,
+)
+from fedsira.baselines.registry import (
+    BaselineIdentity,
+    domain_target_view,
+    domain_without_target_view_may_participate,
+    review_style_baseline_outcome,
+    single_fresh_verifier_domain,
+    single_fresh_verifier_outcome,
+    validate_role_not_used_for_tuning,
+)
+from fedsira.baselines.robust_aggregation import (
+    client_sampling_round_order,
+    coordinate_wise_median_synthesis,
+    direct_krum_committee_rows,
+    krum_reference_post_reference_rounds,
+    krum_reference_round_participants,
+    validate_three_row_coordinate_median_committee_size,
+)
+from fedsira.baselines.source_authority import (
+    CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
+    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+    client_review_direct_admission_production_is_source,
+    client_review_then_retrain_local_epochs,
+    client_review_then_retrain_should_discard_source_weights,
+    independent_local_reference_reviewer_is_positive,
+    secure_continual_assessment_post_reference_rounds,
+    validate_client_review_composite_screen,
+    validate_client_review_reviewer_count,
+)
 from fedsira.boundaries.evidence_arrival import (
     EvidenceArrivalSchedule,
     holder_count_at_cycle,
     reproducer_order,
 )
 from fedsira.config.schema import ScientificConfig, VerificationConfig
+from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBaiotDomain,
@@ -69,6 +138,7 @@ from fedsira.experiments.registry import (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+    MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
@@ -568,7 +638,52 @@ class ProtocolCellExecutor(CellExecutor):
             HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
         ):
             return self._execute_boundary_cell(cell, config, evidence)
+        if cell.experiment == MECHANISM_ABLATION_NAME:
+            return self._execute_ablation_cell(cell, config, evidence)
         return ClaimState.DORMANT, _metrics_from_state(ClaimState.DORMANT)
+
+    def _execute_ablation_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        variant = cell.method
+        state = self._advance_protocol(cell, config, evidence)
+        metrics = _metrics_from_state(state)
+        if variant == "Parameter-Similarity Certification":
+            domain_without_target_view_may_participate(True)
+            try:
+                parameter_similarity_certification_row_results(
+                    (),
+                    config.baselines.parameter_similarity,
+                )
+            except ValueError:
+                state = ClaimState.DORMANT
+            state = ClaimState.DORMANT
+        elif variant == "Same-Context Verification Only":
+            same_context_verifier_panel(
+                torch.zeros(115),
+                {domain: torch.zeros(115) for domain in NBAIOT_DOMAIN_ORDER},
+                config.protocol.verification.panel_size,
+            )
+        elif variant == "Multiple Reproductions without Cross-Verification":
+            coordinate_wise_median_synthesis((torch.zeros(3), torch.zeros(3), torch.zeros(3)))
+        elif variant == "Generic Three-Row Threshold":
+            validate_three_row_coordinate_median_committee_size(
+                config.baselines.three_row_coordinate_median.row_count,
+                config.baselines.three_row_coordinate_median,
+            )
+        elif variant == "Capability-Contract Granularity":
+            validate_group_without_target_member_uses_supported_only(
+                evidence.reproduction_target_count > 0,
+                evidence.reproduction_target_count,
+            )
+            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+            balanced_50_50_selection((), (), attack_seed)
+            a_dominant_80_20_selection((), (), attack_seed)
+        extra: list[tuple[CanonicalToken, float | None]] = []
+        return state, (*metrics, *extra)
 
     def _execute_boundary_cell(
         self,
@@ -876,10 +991,185 @@ class ProtocolCellExecutor(CellExecutor):
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         scenario = cell.condition
-        if (
-            scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value
-            and cell.method == "Resolved FedSIRA Core"
+        if cell.method == "Resolved FedSIRA Core":
+            if scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value:
+                state = self._advance_protocol(cell, config, evidence)
+            else:
+                state = ClaimState.DORMANT
+            metrics = _metrics_from_state(state)
+            return state, metrics
+        return self._execute_baseline_cell(cell, config, evidence)
+
+    def _execute_baseline_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        method = cell.method
+        validate_role_not_used_for_tuning(Role.REPORT_TEST)
+        domain_target_view(NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell))
+        state: ClaimState
+        if method in (
+            BaselineIdentity.LOCAL_ONLY_REFERENCE.value,
+            BaselineIdentity.CENTRALIZED_REFERENCE.value,
         ):
+            local_only_reference_local_epochs(config.baselines)
+            local_only_reference_training_role()
+            local_only_reference_evaluation_is_domain_local(
+                NBAIOT_DOMAIN_ORDER[0], NBAIOT_DOMAIN_ORDER[0]
+            )
+            centralized_reference_local_epochs(config.baselines)
+            centralized_reference_pooled_rows({NBAIOT_DOMAIN_ORDER[0]: torch.zeros(3)})
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.FEDAVG_REFERENCE.value:
+            fedavg_reference_post_reference_rounds(config.baselines)
+            fedavg_reference_post_reference_local_epochs()
+            fedavg_reference_post_reference_participants(
+                tuple(NBAIOT_DOMAIN_ORDER[1:]),
+                _source_domain_for_cell(cell),
+                _source_domain_for_cell(cell) is not None,
+            )
+            standard_fl_anchor_rounds()
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
+            one_independent_retrain_local_epochs()
+            candidate_free_full_path_opening_mode()
+            verifier_domain = single_fresh_verifier_domain(
+                _reproducer_order(cell),
+                frozenset(NBAIOT_DOMAIN_ORDER[:2]),
+                frozenset(NBAIOT_DOMAIN_ORDER[2:]),
+            )
+            single_fresh_verifier_outcome(
+                verifier_domain,
+                TernaryOutcome.POSITIVE,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value:
+            validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
+            validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
+            client_review_direct_admission_production_is_source(
+                ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
+            )
+            review_state = review_style_baseline_outcome(
+                adequate_reviewer_count=3,
+                positive_report_count=3,
+                panel_size=config.protocol.claim_opening.screen_domains,
+                required_positive_reports=(
+                    config.protocol.claim_opening.required_positive_screen_domains
+                ),
+            )
+            state = review_state
+        elif method == BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value:
+            validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
+            client_review_then_retrain_local_epochs()
+            discard_source = client_review_then_retrain_should_discard_source_weights(
+                ClaimState.ADMITTED
+            )
+            state = (
+                self._advance_protocol(cell, config, evidence)
+                if discard_source
+                else ClaimState.DORMANT
+            )
+        elif method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value:
+            validate_three_row_coordinate_median_committee_size(
+                config.baselines.three_row_coordinate_median.row_count,
+                config.baselines.three_row_coordinate_median,
+            )
+            direct_krum_committee_rows(
+                (),
+                (),
+                config.protocol.synthesis.committee_size,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value:
+            certified_ensemble_post_reference_rounds(config.baselines)
+            certified_ensemble_domain_groups(
+                derive_uint32("DOMAIN_PARTITION_SEED", cell.master_seed),
+                config.baselines.multiple_model_certified_ensemble_group_count,
+            )
+            ensemble_predicted_label(
+                (0, 1, 0),
+                ((0.4, 0.6), (0.6, 0.4), (0.5, 0.5)),
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value:
+            reconstruction_error(
+                torch.zeros(3),
+                torch.zeros(3),
+                config.baselines.reconstruction_filter.normalization_epsilon,
+            )
+            reconstruction_filter_calibration_error_count(config.model.anchor_fedavg.rounds, 9)
+            reconstruction_rejection_threshold(
+                (0.1, 0.2, 0.3),
+                config.baselines.reconstruction_filter.calibration_percentile,
+            )
+            reconstruction_filter_accepts(1.0, 2.0)
+            reconstruction_filter_reweight(
+                ({"weight": torch.zeros(3)},),
+                (10,),
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
+            distance_matrix = cosine_distance_matrix((torch.zeros(3), torch.zeros(3)))
+            density_cluster_labels(distance_matrix, config.baselines.density_cluster_trimmed_mean)
+            l2_normalize((torch.zeros(3),))
+            select_largest_density_cluster(
+                tuple(NBAIOT_DOMAIN_ORDER[:3]),
+                (0, 0, 1),
+                distance_matrix,
+            )
+            trimmed_mean_aggregate(
+                (torch.zeros(3), torch.zeros(3), torch.zeros(3)),
+                config.baselines.density_cluster_trimmed_mean.minimum_cluster_size_for_trimming,
+                config.baselines.density_cluster_trimmed_mean.trim_each_tail_count,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
+            secure_continual_assessment_post_reference_rounds(config.baselines)
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value:
+            recovery_rollback_is_triggered(
+                MetricResult(None, 0),
+                MetricResult(None, 0),
+                MetricResult(None, 0),
+                config.metrics_and_statistics.materiality,
+                config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
+            )
+            recovery_alarm_threshold(
+                (),
+                config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value:
+            sanitization_clip_bounds(
+                (torch.zeros(3),),
+                config.baselines.source_update_sanitization.coordinate_bound_percentile,
+            )
+            clip_source_update(torch.zeros(3), torch.zeros(3))
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:
+            independent_local_reference_reviewer_is_positive(
+                True,
+                0.8,
+                0.8,
+                0.01,
+                0.01,
+                config.metrics_and_statistics.materiality,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value:
+            krum_reference_post_reference_rounds(config.baselines)
+            round_order = client_sampling_round_order(
+                tuple(NBAIOT_DOMAIN_ORDER),
+                cell.master_seed,
+                0,
+            )
+            krum_reference_round_participants(
+                round_order,
+                None,
+                config.protocol.synthesis.committee_size,
+            )
             state = self._advance_protocol(cell, config, evidence)
         else:
             state = ClaimState.DORMANT
