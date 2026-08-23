@@ -79,6 +79,17 @@ def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root:
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
 
 
+def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    outcome = executor.execute_cell(_primary_cell(4), CONFIG)
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] != 0.0
+    assert metrics["target-f1"] is not None
+    assert metrics["worst-domain-target-f1"] is not None
+
+
 def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) -> None:
     executor = ProtocolCellExecutor(prepared_root=prepared_root)
     first = executor.execute_cell(_primary_cell(2), CONFIG)
