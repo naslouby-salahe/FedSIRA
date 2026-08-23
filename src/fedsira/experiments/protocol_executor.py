@@ -4,7 +4,6 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from time import monotonic
 
 import torch
 
@@ -290,6 +289,7 @@ from fedsira.runtime.telemetry import (
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,
 )
+from fedsira.runtime.timing import ElapsedTimer
 
 EVIDENCE_INSUFFICIENT_REASON = FailureClass.EVIDENCE_INSUFFICIENT.value
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
@@ -1624,7 +1624,7 @@ class ProtocolCellExecutor(CellExecutor):
         envelopes: list[bytes] = []
         metadata_records: list[CommunicationMessageMetadata] = []
         tensor_name = canonical_parameter_tensor_name(TensorParameterKind.MODEL, "linear")
-        encode_start = monotonic()
+        timer = ElapsedTimer()
         for message_type, count in _efficiency_message_counts():
             for _index in range(count):
                 metadata = CommunicationMessageMetadata(
@@ -1653,7 +1653,7 @@ class ProtocolCellExecutor(CellExecutor):
                     )
                 )
                 metadata_records.append(metadata)
-        encode_elapsed_seconds = monotonic() - encode_start
+        encode_elapsed_seconds = timer.elapsed_seconds()
         bytes_total = communication_bytes(envelopes)
         transmissions = model_transmission_count(metadata_records)
         delay_decomposition = AdmissionDelayDecomposition(
