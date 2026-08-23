@@ -114,7 +114,7 @@ ORDINARY_POST_REFERENCE_DATA_ACCESS: Final[PostReferenceDataAccess] = PostRefere
 def domain_target_view(
     domain: NBaiotDomain,
     source_domain: NBaiotDomain | None,
-    data_access: PostReferenceDataAccess,
+    data_access: PostReferenceDataAccess = ORDINARY_POST_REFERENCE_DATA_ACCESS,
 ) -> Role:
     if domain == source_domain:
         return data_access.source_target_view

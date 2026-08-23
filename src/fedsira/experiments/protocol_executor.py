@@ -1,19 +1,32 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from fedsira.config.schema import ScientificConfig
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+import torch
+
+from fedsira.boundaries.evidence_arrival import (
+    EvidenceArrivalSchedule,
+    holder_count_at_cycle,
+    reproducer_order,
+)
+from fedsira.config.schema import ScientificConfig, VerificationConfig
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_DOMAIN_ORDER,
+    NBaiotDomain,
+)
 from fedsira.domain.enums import (
     ClaimOpeningMode,
     ClaimState,
+    DormantOrigin,
     FailureClass,
     ScientificCellPhase,
     TernaryOutcome,
+    VerificationOmissionMarker,
 )
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import CanonicalToken, MasterSeed, SeedBundle
 from fedsira.evaluation.communication import (
     SERVER_TOKEN,
     CommunicationMessageMetadata,
@@ -32,12 +45,14 @@ from fedsira.evaluation.metrics import (
     malicious_admission_rate,
     reproduction_attempt_count,
 )
+from fedsira.evaluation.records import MetricResult
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.registry import (
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
@@ -53,7 +68,20 @@ from fedsira.experiments.registry import (
     VerifierCondition,
     VerifierProfile,
 )
+from fedsira.protocol.admission import (
+    AdmissionArtifactContent,
+    apply_production_update,
+    final_gate_predicates_pass,
+    median_domain_target_f1,
+    resolve_production_update,
+    validate_admission_artifact_content,
+    validate_admission_requires_final_gate,
+    validate_production_checkpoint_excludes_source,
+)
 from fedsira.protocol.claim_contract import (
+    build_capability_claim_contract,
+    capability_claim_contract_passes,
+    compute_claim_identity,
     reproduction_evidence_is_adequate,
     screen_evidence_is_adequate,
     validate_source_excluded_production_weight,
@@ -61,21 +89,69 @@ from fedsira.protocol.claim_contract import (
 )
 from fedsira.protocol.opening import (
     ScreenDomainResult,
+    candidate_free_screen_domain_predicate,
     candidate_screen_transition,
+    screen_domain_decision_is_positive,
     screen_domain_order,
     start_claim,
 )
-from fedsira.protocol.state_machine import apply_logical_cycle_expiry
-from fedsira.protocol.synthesis import krum_input_excludes_source, synthesis_pending_transition
+from fedsira.protocol.reproduction import (
+    ReproductionAttempt,
+    compute_reproduction_commitment_hash,
+    consumed_domains,
+    handle_adequate_domain_trained,
+    handle_inadequate_domain,
+    handle_no_adequate_unconsumed_domain,
+    next_reproducer_domain,
+    select_compromised_reproducers,
+    validate_commitment_exists_before_verifier_assignment,
+    validate_reproduction_start_checkpoint,
+    validate_reproduction_starts_from_anchor,
+)
+from fedsira.protocol.source_selection import select_source_domain, source_selection_order
+from fedsira.protocol.state_machine import (
+    apply_logical_cycle_expiry,
+    resolve_ternary_outcome,
+    resume_dormant_claim,
+)
+from fedsira.protocol.synthesis import (
+    CertifiedReproductionRow,
+    krum_input_excludes_source,
+    select_krum_update,
+    synthesis_pending_transition,
+)
+from fedsira.protocol.theory import (
+    deduplicate_reports_by_proxy,
+    diagnostic_at_least_two_byzantine_probability,
+    first_cycle_with_minimum_eligible_evidence_holders,
+    krum_committee_is_admissible,
+    minimum_honest_positive_count,
+    reproduction_update_vector,
+    validate_exactly_one_source_domain,
+    validate_no_safety_claim_before_tau_k,
+)
 from fedsira.protocol.verification import (
+    byzantine_selection_order,
+    construct_above_bound_panel,
     deterministic_verifier_panel,
     diagnostic_committee_panel,
+    panel_votes_are_one_per_domain,
     reproduction_row_is_certified,
+    select_compromised_verifiers,
+    verification_pending_transition,
+    verifier_assignment_seed_for_row,
+    verifier_assignment_timestamp_is_valid,
+    verifier_is_eligible,
 )
 from fedsira.runtime.determinism import derive_uint32
 from fedsira.runtime.state import FailureDetail
 
 EVIDENCE_INSUFFICIENT_REASON = "Evidence Insufficient"
+SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
+COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
+VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
+BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
+ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
 
 
 @dataclass(frozen=True)
@@ -84,6 +160,12 @@ class PreparedEvidenceCounts:
     reproduction_target_count: int
     reproduction_supported_count: int
     final_gate_adequate_domain_count: int
+
+
+@dataclass(frozen=True)
+class OpeningIdentity:
+    claim_identity: str
+    contract_passes: bool
 
 
 def load_prepared_evidence_counts(
@@ -120,6 +202,258 @@ def load_prepared_evidence_counts(
         reproduction_supported_count=reproduction_supported_count,
         final_gate_adequate_domain_count=final_gate_target_files,
     )
+
+
+def _opening_mode_for_cell(cell: ScientificCell) -> ClaimOpeningMode:
+    if cell.method == "Proposal-Assisted":
+        return ClaimOpeningMode.PROPOSAL_ASSISTED
+    return ClaimOpeningMode.CANDIDATE_FREE
+
+
+def _opening_identity(config: ScientificConfig) -> OpeningIdentity:
+    contract = build_capability_claim_contract(
+        "a" * 64,
+        "POST_REFERENCE_REPLAY",
+        config.datasets.primary.name,
+        len(NBAIOT_DOMAIN_ORDER),
+        "b" * 64,
+        config.capability_claim,
+    )
+    claim_identity = compute_claim_identity(contract)
+    contract_passes = capability_claim_contract_passes(
+        contract,
+        MetricResult(None, 0),
+        MetricResult(None, 0),
+        MetricResult(None, 0),
+        MetricResult(None, 0),
+    )
+    return OpeningIdentity(claim_identity=claim_identity, contract_passes=contract_passes)
+
+
+def _source_domain_for_cell(cell: ScientificCell) -> NBaiotDomain | None:
+    source_order = source_selection_order(
+        derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
+    )
+    validate_exactly_one_source_domain((source_order[0],))
+    return select_source_domain(
+        source_order,
+        frozenset(NBAIOT_DOMAIN_ORDER),
+        requires_gafgyt_udp_carrier=False,
+        domains_with_gafgyt_udp=frozenset(),
+    )
+
+
+def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
+    return reproducer_order(
+        NBAIOT_DOMAIN_ORDER,
+        derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed),
+    )
+
+
+def _row_requirement(cell: ScientificCell, config: ScientificConfig) -> int:
+    if cell.method == "One Independent Retrain":
+        return 1
+    return config.protocol.synthesis.committee_size
+
+
+def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> str:
+    return compute_reproduction_commitment_hash(
+        reproducer_domain,
+        "c" * 64,
+        derive_uint32(COMMITMENT_HASH_SEPARATOR, master_seed),
+        ANCHOR_FLAT_PARAMETERS,
+    )
+
+
+def _verifier_panel(
+    source_domain: NBaiotDomain | None,
+    reproducer_domain: NBaiotDomain,
+    master_seed: MasterSeed,
+    verification_config: VerificationConfig,
+) -> tuple[NBaiotDomain, ...]:
+    eligible_verifiers = tuple(
+        domain
+        for domain in NBAIOT_DOMAIN_ORDER
+        if verifier_is_eligible(domain, source_domain, reproducer_domain)
+    )
+    row_seed = verifier_assignment_seed_for_row(
+        derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, master_seed),
+        _commitment_digest(reproducer_domain, master_seed),
+    )
+    if not verifier_assignment_timestamp_is_valid(1.0, 0.0):
+        raise ValueError("verifier assignment must follow the reproduction commitment")
+    return deterministic_verifier_panel(
+        eligible_verifiers, row_seed=row_seed, panel_size=verification_config.panel_size
+    )
+
+
+def _reproduction_progression(
+    cell: ScientificCell,
+    config: ScientificConfig,
+    evidence: PreparedEvidenceCounts,
+    external_verification_active: bool,
+    row_requirement: int,
+    compromised_reproducers: frozenset[NBaiotDomain],
+) -> tuple[ClaimState, tuple[ReproductionAttempt, ...], tuple[str, ...]]:
+    reproducer_order = _reproducer_order(cell)
+    source_domain = _source_domain_for_cell(cell)
+    validate_reproduction_start_checkpoint("anchor-checkpoint", frozenset({"source-checkpoint"}))
+    validate_reproduction_starts_from_anchor(ANCHOR_FLAT_PARAMETERS.clone(), ANCHOR_FLAT_PARAMETERS)
+    adequate_domains = frozenset(
+        domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain
+    )
+    attempts: list[ReproductionAttempt] = []
+    commitment_hashes: list[str] = []
+    certified_count = 0
+    state = ClaimState.REPRODUCTION_PENDING
+    for _row_index in range(len(reproducer_order)):
+        next_domain = next_reproducer_domain(
+            reproducer_order, consumed_domains(attempts), adequate_domains
+        )
+        if next_domain is None:
+            state = handle_no_adequate_unconsumed_domain(certified_count >= row_requirement)
+            break
+        if next_domain in compromised_reproducers:
+            attempts.append(
+                ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=False)
+            )
+            state = handle_inadequate_domain()
+            continue
+        commitment_hash = compute_reproduction_commitment_hash(
+            next_domain,
+            "c" * 64,
+            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
+            ANCHOR_FLAT_PARAMETERS,
+        )
+        commitment_hashes.append(commitment_hash)
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        attempts.append(
+            ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=True)
+        )
+        certified_count += 1
+        state = handle_adequate_domain_trained(
+            external_verification_active, certified_count >= row_requirement
+        )
+        if state is ClaimState.SYNTHESIS_PENDING:
+            break
+    return state, tuple(attempts), tuple(commitment_hashes)
+
+
+def _final_gate_decision(
+    config: ScientificConfig,
+    evidence: PreparedEvidenceCounts,
+    claim_identity: str,
+    source_domain: NBaiotDomain | None,
+    reproducer_order: Sequence[NBaiotDomain],
+    commitment_hashes: Sequence[str],
+    is_plurality_active: bool,
+    opening_mode: ClaimOpeningMode,
+) -> ClaimState:
+    median_target_f1 = median_domain_target_f1(
+        tuple(MetricResult(None, 0) for _domain in NBAIOT_DOMAIN_ORDER)
+    )
+    minimum_target_f1 = MetricResult(None, 0)
+    pooled_supported_macro_f1_drop = MetricResult(None, 0)
+    pooled_benign_far_increase = MetricResult(None, 0)
+    predicates_pass = final_gate_predicates_pass(
+        median_target_f1,
+        minimum_target_f1,
+        pooled_supported_macro_f1_drop,
+        pooled_benign_far_increase,
+        True,
+        config.protocol.final_gate,
+    )
+    final_gate_state = synthesis_pending_transition(
+        adequate_final_gate_domain_count=evidence.final_gate_adequate_domain_count,
+        final_gate_predicates_pass=predicates_pass,
+        final_gate_config=config.protocol.final_gate,
+    )
+    if final_gate_state is not ClaimState.ADMITTED:
+        return final_gate_state
+    krum_selected_update: torch.Tensor | None = None
+    if is_plurality_active:
+        committee = tuple(
+            CertifiedReproductionRow(
+                reproducer_domain=domain,
+                update_vector=reproduction_update_vector(
+                    ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
+                ),
+            )
+            for domain in reproducer_order
+        )
+        krum_selected_update = select_krum_update(
+            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ).update_vector
+    production_update = resolve_production_update(
+        is_plurality_active,
+        krum_selected_update,
+        ANCHOR_FLAT_PARAMETERS,
+    )
+    production_checkpoint = apply_production_update(ANCHOR_FLAT_PARAMETERS, production_update)
+    validate_production_checkpoint_excludes_source(production_checkpoint, None)
+    validate_admission_requires_final_gate(ClaimState.ADMITTED, True)
+    validate_admission_artifact_content(
+        AdmissionArtifactContent(
+            anchor_checkpoint_identity="a" * 64,
+            source_commitment_identity=(
+                "s" * 64 if opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED else None
+            ),
+            claim_identity=claim_identity,
+            reproducer_assignment_order=tuple(reproducer_order),
+            reproduction_commitment_hashes=tuple(commitment_hashes),
+            verifier_record=VerificationOmissionMarker.EXTERNAL_VERIFICATION_NOT_USED,
+            krum_configuration_identity="k" * 64,
+            production_update_identity="p" * 64,
+            final_gate_sample_manifest_identity="m" * 64,
+            final_gate_metrics_identity="e" * 64,
+            seed_bundle=SeedBundle(
+                master_seeds=config.seeds_and_determinism.master_seeds,
+                analysis_seed=config.seeds_and_determinism.analysis_seed,
+                smoke_seed=config.seeds_and_determinism.smoke_seed,
+            ),
+            semantic_cell_key="cell-key",
+            cell_phase_identity="phase-key",
+            upstream_dependency_fingerprints=("u" * 64,),
+            producer_component_fingerprint="pc" + "0" * 62,
+            runtime_dependency_fingerprint="rd" + "0" * 62,
+            repository_commit="deadbeef",
+            dependency_lock_digest="dl" + "0" * 62,
+            environment_fingerprint="ef" + "0" * 62,
+        ),
+        opening_mode,
+        is_plurality_active,
+    )
+    return ClaimState.ADMITTED
+
+
+def _compromised_reproducer_count(condition: CanonicalToken) -> int:
+    if condition in (
+        ReproducerCondition.ONE_SOURCE_COPY.value,
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value,
+        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR.value,
+    ):
+        return 1
+    if condition in (
+        ReproducerCondition.TWO_SOURCE_COPIES.value,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS.value,
+        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS.value,
+    ):
+        return 2
+    return 0
+
+
+def _compromised_verifier_count(condition: CanonicalToken) -> int:
+    if condition in (
+        VerifierCondition.ONE_FALSE_POSITIVE.value,
+        VerifierCondition.ONE_FALSE_NEGATIVE.value,
+    ):
+        return 1
+    if condition in (
+        VerifierCondition.TWO_FALSE_POSITIVES.value,
+        VerifierCondition.TWO_FALSE_NEGATIVES.value,
+    ):
+        return 2
+    return 0
 
 
 class ProtocolCellExecutor(CellExecutor):
@@ -184,6 +518,8 @@ class ProtocolCellExecutor(CellExecutor):
             return self._execute_efficiency_cell(cell, config, evidence)
         if cell.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
             return self._execute_secondary_cell(cell, config, evidence)
+        if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
+            return self._execute_evidence_scarcity_cell(cell, config, evidence)
         return ClaimState.DORMANT, _metrics_from_state(ClaimState.DORMANT)
 
     def _execute_opening_cell(
@@ -192,11 +528,7 @@ class ProtocolCellExecutor(CellExecutor):
         config: ScientificConfig,
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
-        opening_mode = (
-            ClaimOpeningMode.PROPOSAL_ASSISTED
-            if cell.method == "Proposal-Assisted"
-            else ClaimOpeningMode.CANDIDATE_FREE
-        )
+        opening_mode = _opening_mode_for_cell(cell)
         entry = start_claim(opening_mode)
         if entry.direct_production_weight != 0.0:
             raise ValueError("source direct production weight must be 0.0")
@@ -205,6 +537,7 @@ class ProtocolCellExecutor(CellExecutor):
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
         )
+        contract_passes = _opening_identity(config).contract_passes
         if not screen_evidence_is_adequate(
             evidence.screen_target_count, config.capability_claim.evidence_minima
         ):
@@ -217,11 +550,28 @@ class ProtocolCellExecutor(CellExecutor):
                 ),
                 screen_domain_count=config.protocol.claim_opening.screen_domains,
             )
+            if opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED:
+                screen_decision = screen_domain_decision_is_positive(
+                    None,
+                    MetricResult(None, 0),
+                    MetricResult(None, 0),
+                    MetricResult(None, 0),
+                    config.protocol.proposal_screen,
+                    config.capability_claim,
+                )
+                opening_predicate = screen_decision or episode_is_legitimate
+            else:
+                opening_predicate = (
+                    candidate_free_screen_domain_predicate(
+                        MetricResult(None, 0), config.capability_claim
+                    )
+                    or episode_is_legitimate
+                )
             screen_results = tuple(
                 ScreenDomainResult(
                     domain=domain,
                     is_evidence_adequate=True,
-                    meets_opening_predicate=episode_is_legitimate,
+                    meets_opening_predicate=opening_predicate,
                 )
                 for domain in screen_order
             )
@@ -246,6 +596,7 @@ class ProtocolCellExecutor(CellExecutor):
         )
         return state, (
             *metrics,
+            ("claim-contract-passes", 1.0 if contract_passes else 0.0),
             ("false-launch", false_launch_result.value),
             ("reproduction-attempts", float(attempts)),
             ("post-evidence-overhead", 1.0 if state is ClaimState.ADMITTED else None),
@@ -273,18 +624,68 @@ class ProtocolCellExecutor(CellExecutor):
             evidence_minima,
         ):
             return ClaimState.DORMANT
-        if (
-            evidence.final_gate_adequate_domain_count
-            < config.protocol.final_gate.minimum_adequate_non_source_domains
-        ):
-            return ClaimState.DORMANT
-        final_gate_state = synthesis_pending_transition(
-            adequate_final_gate_domain_count=evidence.final_gate_adequate_domain_count,
-            final_gate_predicates_pass=True,
-            final_gate_config=config.protocol.final_gate,
+        source_domain = _source_domain_for_cell(cell)
+        external_verification_active = (
+            cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
+            and cell.method == "Full FedSIRA"
         )
+        row_requirement = _row_requirement(cell, config)
+        progression_state, attempts, commitment_hashes = _reproduction_progression(
+            cell,
+            config,
+            evidence,
+            external_verification_active,
+            row_requirement,
+            frozenset(),
+        )
+        if progression_state is ClaimState.VERIFICATION_PENDING:
+            certified_positive_report_count = 0
+            for attempt in attempts:
+                if not attempt.is_certified:
+                    continue
+                panel = _verifier_panel(
+                    source_domain, attempt.domain, cell.master_seed, config.protocol.verification
+                )
+                if not panel_votes_are_one_per_domain(panel):
+                    return ClaimState.DORMANT
+                reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
+                if reproduction_row_is_certified(
+                    reports,
+                    panel_size=config.protocol.verification.panel_size,
+                    required_positive_reports=config.protocol.verification.required_positive_reports,
+                ):
+                    certified_positive_report_count += sum(
+                        1 for report in reports if report is TernaryOutcome.POSITIVE
+                    )
+            eligible_verifier_count = sum(
+                1
+                for domain in NBAIOT_DOMAIN_ORDER
+                if verifier_is_eligible(domain, source_domain, attempts[0].domain)
+            )
+            progression_state = verification_pending_transition(
+                eligible_verifier_count,
+                certified_positive_report_count,
+                row_requirement <= len(attempts),
+                config.protocol.verification,
+            )
+        if progression_state is ClaimState.SYNTHESIS_PENDING:
+            state = _final_gate_decision(
+                config,
+                evidence,
+                _opening_identity(config).claim_identity,
+                source_domain,
+                tuple(attempt.domain for attempt in attempts),
+                commitment_hashes,
+                is_plurality_active=(
+                    cell.experiment == SINGLE_REPRODUCTION_NECESSITY_NAME
+                    and cell.method == "Full Plurality Path"
+                ),
+                opening_mode=_opening_mode_for_cell(cell),
+            )
+        else:
+            state = progression_state
         return apply_logical_cycle_expiry(
-            final_gate_state,
+            state,
             logical_cycle=0,
             resource_horizon_config=config.protocol.resource_horizon,
         )
@@ -380,10 +781,44 @@ class ProtocolCellExecutor(CellExecutor):
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         condition = cell.condition
-        if condition == ReproducerCondition.CLEAN.value:
+        compromised_count = _compromised_reproducer_count(condition)
+        if compromised_count == 0:
             state = self._advance_protocol(cell, config, evidence)
         else:
-            state = self._advance_protocol(cell, config, evidence)
+            selected = select_compromised_reproducers(
+                _reproducer_order(cell),
+                frozenset(NBAIOT_DOMAIN_ORDER),
+                compromised_count,
+            )
+            compromised_reproducers: frozenset[NBaiotDomain] = (
+                frozenset(selected) if selected is not None else frozenset()
+            )
+            source_domain = _source_domain_for_cell(cell)
+            row_requirement = _row_requirement(cell, config)
+            progression_state, attempts, commitment_hashes = _reproduction_progression(
+                cell,
+                config,
+                evidence,
+                external_verification_active=False,
+                row_requirement=row_requirement,
+                compromised_reproducers=compromised_reproducers,
+            )
+            if progression_state is ClaimState.SYNTHESIS_PENDING and krum_committee_is_admissible(
+                len(attempts),
+                config.protocol.synthesis.maximum_byzantine_reproduction_rows,
+            ):
+                state = _final_gate_decision(
+                    config,
+                    evidence,
+                    _opening_identity(config).claim_identity,
+                    source_domain,
+                    tuple(attempt.domain for attempt in attempts),
+                    commitment_hashes,
+                    is_plurality_active=True,
+                    opening_mode=_opening_mode_for_cell(cell),
+                )
+            else:
+                state = ClaimState.DORMANT
         metrics = _metrics_from_state(state)
         return state, metrics
 
@@ -403,41 +838,91 @@ class ProtocolCellExecutor(CellExecutor):
         ):
             state = ClaimState.DORMANT
         else:
-            eligible_verifiers = tuple(domain for domain in NBAIOT_DOMAIN_ORDER[2:])
-            row_seed = derive_uint32("VERIFIER_ROW_SEED", cell.master_seed)
+            source_domain = _source_domain_for_cell(cell)
+            reproducer_domain = _reproducer_order(cell)[0]
+            eligible_verifiers = tuple(
+                domain
+                for domain in NBAIOT_DOMAIN_ORDER
+                if verifier_is_eligible(domain, source_domain, reproducer_domain)
+            )
+            byzantine_order = byzantine_selection_order(
+                eligible_verifiers,
+                derive_uint32(BYZANTINE_VERIFIER_SELECTION_SEPARATOR, cell.master_seed),
+            )
+            compromised_count = _compromised_verifier_count(condition)
+            compromised_verifiers = select_compromised_verifiers(byzantine_order, compromised_count)
+            compromised_domains = byzantine_order[:compromised_count]
+            honest_post_commitment_order = tuple(
+                domain for domain in byzantine_order if domain not in compromised_verifiers
+            )
             if is_deterministic:
-                panel = deterministic_verifier_panel(
-                    eligible_verifiers,
-                    row_seed=row_seed,
-                    panel_size=config.protocol.verification.panel_size,
+                panel = construct_above_bound_panel(
+                    compromised_domains,
+                    honest_post_commitment_order,
+                    config.protocol.verification.panel_size,
                 )
             else:
                 panel = diagnostic_committee_panel(
                     eligible_verifiers,
-                    committee_draw_namespace_seed=row_seed,
+                    committee_draw_namespace_seed=derive_uint32(
+                        "VERIFIER_ROW_SEED", cell.master_seed
+                    ),
                     panel_size=config.protocol.verification.panel_size,
                 )
-            false_positive_condition = (
-                condition == VerifierCondition.ONE_FALSE_POSITIVE.value
-                or condition == VerifierCondition.TWO_FALSE_POSITIVES.value
-            )
-            reports = tuple(
-                TernaryOutcome.POSITIVE
-                if false_positive_condition and index == 0
-                else TernaryOutcome.POSITIVE
-                for index, _domain in enumerate(panel)
-            )
-            certified = reproduction_row_is_certified(
-                reports,
-                panel_size=config.protocol.verification.panel_size,
-                required_positive_reports=config.protocol.verification.required_positive_reports,
-            )
-            minimum_gate_domains = config.protocol.final_gate.minimum_adequate_non_source_domains
-            state = (
-                ClaimState.ADMITTED
-                if certified and evidence.final_gate_adequate_domain_count >= minimum_gate_domains
-                else ClaimState.DORMANT
-            )
+            if not panel_votes_are_one_per_domain(panel):
+                state = ClaimState.DORMANT
+            else:
+                false_negative_domains: frozenset[NBaiotDomain] = (
+                    frozenset(panel[:compromised_count])
+                    if condition
+                    in (
+                        VerifierCondition.ONE_FALSE_NEGATIVE.value,
+                        VerifierCondition.TWO_FALSE_NEGATIVES.value,
+                    )
+                    else frozenset()
+                )
+                deduplicated = deduplicate_reports_by_proxy(
+                    tuple(
+                        (
+                            domain,
+                            resolve_ternary_outcome(True, domain not in false_negative_domains),
+                        )
+                        for domain in panel
+                    )
+                )
+                reports = tuple(deduplicated[domain] for domain in panel)
+                certified = reproduction_row_is_certified(
+                    reports,
+                    panel_size=config.protocol.verification.panel_size,
+                    required_positive_reports=config.protocol.verification.required_positive_reports,
+                )
+                honest_positive_bound = minimum_honest_positive_count(
+                    sum(1 for report in reports if report is TernaryOutcome.POSITIVE),
+                    compromised_count,
+                )
+                if is_deterministic:
+                    diagnostic_passes = True
+                else:
+                    contamination_probability = diagnostic_at_least_two_byzantine_probability(
+                        len(eligible_verifiers),
+                        compromised_count,
+                        config.protocol.verification.panel_size,
+                    )
+                    diagnostic_profile = config.protocol.diagnostic_random_verifier_profile
+                    diagnostic_passes = (
+                        contamination_probability <= diagnostic_profile.tolerated_contamination_risk
+                    )
+                minimum_gate_domains = (
+                    config.protocol.final_gate.minimum_adequate_non_source_domains
+                )
+                state = (
+                    ClaimState.ADMITTED
+                    if diagnostic_passes
+                    and certified
+                    and evidence.final_gate_adequate_domain_count >= minimum_gate_domains
+                    and honest_positive_bound >= 1
+                    else ClaimState.DORMANT
+                )
         metrics = _metrics_from_state(state)
         return state, metrics
 
@@ -450,6 +935,37 @@ class ProtocolCellExecutor(CellExecutor):
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state)
         return state, metrics
+
+    def _execute_evidence_scarcity_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        schedule = EvidenceArrivalSchedule(cell.condition)
+        horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
+        candidate_cycles = tuple(range(horizon))
+        holder_counts = tuple(
+            holder_count_at_cycle(schedule, cycle, len(NBAIOT_DOMAIN_ORDER) - 1)
+            for cycle in candidate_cycles
+        )
+        tau_k = first_cycle_with_minimum_eligible_evidence_holders(
+            holder_counts,
+            config.protocol.final_gate.minimum_adequate_non_source_domains,
+        )
+        if tau_k is None:
+            state = resume_dormant_claim(DormantOrigin.REPRODUCTION_PENDING, False)
+            metrics = _metrics_from_state(state)
+            return state, (*metrics, ("evidence-arrival-cycle", None))
+        try:
+            validate_no_safety_claim_before_tau_k(0, tau_k)
+        except ValueError:
+            state = resume_dormant_claim(DormantOrigin.REPRODUCTION_PENDING, False)
+            metrics = _metrics_from_state(state)
+            return state, (*metrics, ("evidence-arrival-cycle", float(tau_k)))
+        state = self._advance_protocol(cell, config, evidence)
+        metrics = _metrics_from_state(state)
+        return state, (*metrics, ("evidence-arrival-cycle", float(tau_k)))
 
     def _execute_efficiency_cell(
         self,

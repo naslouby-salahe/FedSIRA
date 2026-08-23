@@ -6,6 +6,7 @@ from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
 from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.records import CanonicalToken
+from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.planning import ExperimentPlan
 
 MANUSCRIPT_TABLE_NAMES: tuple[CanonicalToken, ...] = (
@@ -132,4 +133,34 @@ def render_claim_support_table(claim_states: Sequence[ClaimStateResult]) -> str:
         if state.state not in known_states:
             raise ValueError(f"unknown claim state {state.state}")
         rows.append(f"| {state.claim_id} | {state.scope} | {state.state.value} |")
+    return "\n".join((header, separator, *rows))
+
+
+def render_collapse_decisions_table(
+    decisions: Sequence[CollapseDecision],
+    resolved_core: ResolvedCore,
+    rounding: PublicationRoundingConfig,
+) -> str:
+    header = (
+        "| mechanism | primary material effect | adjusted p | liveness/safety constraint | "
+        "survival rule | observed outcome | core action |"
+    )
+    separator = "| --- | --- | ---: | --- | --- | --- | --- |"
+    rows: list[str] = []
+    for decision in decisions:
+        p_value = "NA" if decision.adjusted_p_value is None else f"{decision.adjusted_p_value:.4f}"
+        constraint = "pass" if decision.constraint_passes else "fail"
+        outcome = "survives" if decision.survives else "removed"
+        rows.append(
+            f"| {decision.kind.value} | "
+            f"{decision.primary_material_effect or 'NA'} | {p_value} | "
+            f"{constraint} | mechanical | {outcome} | {outcome} |"
+        )
+    source_influence = (
+        "source-excluded" if resolved_core.direct_source_exclusion_survives else "source-influenced"
+    )
+    rows.append(
+        f"| resolved core | {resolved_core.identity_token} | — | "
+        f"{source_influence} | mapping | — | {resolved_core.production_update_rule} |"
+    )
     return "\n".join((header, separator, *rows))

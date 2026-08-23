@@ -347,6 +347,12 @@ def materialize_resolved_core(
     core = resolve_core_mapping(
         proposal.survives, plurality.survives, external_verification.survives
     )
+    expected_cases = resolve_all_eight_cases()
+    expected = expected_cases[
+        (proposal.survives, plurality.survives, external_verification.survives)
+    ]
+    if expected.identity_token != core.identity_token:
+        raise ValueError("resolved-core mapping deviates from the fixed Section 18.7 table")
     return ResolvedCore(
         proposal_assistance_survives=core.proposal_assistance_survives,
         plurality_survives=core.plurality_survives,

@@ -2,6 +2,12 @@ from pathlib import Path
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.experiments.collapse import (
+    CollapseDecision,
+    ResolvedCore,
+    collapse_decision_from_comparison_families,
+    materialize_resolved_core,
+)
 from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
@@ -14,7 +20,7 @@ from fedsira.experiments.planning import (
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.experiments.registry import EXPERIMENT_REGISTRY
+from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, EXPERIMENT_REGISTRY
 from fedsira.reporting.export import (
     derive_claim_states_for_export,
     export_experiment_report,
@@ -86,6 +92,8 @@ def execute(name: str | None, overwrite: bool) -> None:
         lifecycle_states,
         PRODUCTION_CONFIG_PATH,
         verification,
+        collapse_decisions=_load_collapse_decisions(store),
+        resolved_core=_load_resolved_core(store),
     )
     for path in export.exported_paths:
         print(f"exported {path}")
@@ -143,3 +151,54 @@ def _to_failure_detail(failure: PersistedFailureDetail | None) -> FailureDetail 
         message=failure.message,
         cell_phase=failure.cell_phase,
     )
+
+
+def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecision, ...] | None:
+    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
+    collapse_family_names = (
+        "proposal-screen necessity",
+        "plurality necessity",
+        "source-exclusion central claim",
+        "external reproduction verification necessity",
+    )
+    decisions: list[CollapseDecision] = []
+    for experiment in COLLAPSE_EXPERIMENT_NAMES:
+        records = store.read_all_outcomes(experiment)
+        if not records:
+            return None
+        outcomes = tuple(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=record.experiment,
+                    method=record.method,
+                    condition=record.condition,
+                    master_seed=record.master_seed,
+                ),
+                terminal_state=record.terminal_state,
+                failure=None,
+                metrics=record.metrics,
+            )
+            for record in records
+        )
+        comparison_results = comparison_results_for_experiment(experiment, outcomes, config)
+        family_names = {family.family.value for family in comparison_results}
+        matched_family = next(
+            (family for family in family_names if family in collapse_family_names),
+            None,
+        )
+        if matched_family is None:
+            return None
+        decisions.append(
+            collapse_decision_from_comparison_families(matched_family, comparison_results, alpha)
+        )
+    if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
+        return None
+    return tuple(decisions)
+
+
+def _load_resolved_core(store: ExecutionRecordStore) -> ResolvedCore | None:
+    decisions = _load_collapse_decisions(store)
+    if decisions is None:
+        return None
+    return materialize_resolved_core(decisions)

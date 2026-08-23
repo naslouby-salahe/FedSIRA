@@ -233,6 +233,14 @@ def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
     nominal_blocks = plan_cell_count_by_program_block()
     observed_pre_core = plan.pre_core_cell_count
     observed_post_core = plan.post_core_cell_count
+    for planned in plan.experiments:
+        expected_nominal = planned.definition.nominal_cell_count
+        observed = len(planned.cells)
+        if observed != expected_nominal:
+            raise ValueError(
+                f"experiment {planned.definition.name} plans {observed} cells but "
+                f"its nominal Section 31 count is {expected_nominal}"
+            )
     if observed_pre_core != nominal_blocks["pre_core_subtotal"]:
         raise ValueError(
             f"pre-core planned cell count {observed_pre_core} does not match "
