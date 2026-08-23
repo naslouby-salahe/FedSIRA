@@ -12,6 +12,7 @@ from fedsira.domain.records import CanonicalToken
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.execution import ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.reporting import figures as figure_renderers
 from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import validate_mandatory_figures_covered
 from fedsira.reporting.tables import MANUSCRIPT_TABLE_NAMES
@@ -125,6 +126,12 @@ def export_project_summary(
     claim_path.write_text(claim_table)
     exported.append(claim_path)
     materialized_tables.append("Claim Support")
+
+    figures_root = project_root / "figures" / "main"
+    figures_root.mkdir(parents=True, exist_ok=True)
+    schematic_path = figures_root / "FedSIRA Protocol Schematic.png"
+    figure_renderers.render_protocol_schematic(schematic_path)
+    exported.append(schematic_path)
 
     reproducibility_summary = {
         "schema_version": EXPORT_SCHEMA_VERSION,

@@ -33,6 +33,7 @@ from fedsira.reporting.verification import (
     verify_claim_states_derivable,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
+    verify_no_stale_ancestors,
     verify_planned_cell_count_satisfied,
 )
 from fedsira.runtime.state import FailureDetail
@@ -77,12 +78,14 @@ def execute(name: str | None, overwrite: bool) -> None:
     )
     claim_states = derive_claim_states_for_export()
     claim_verification = verify_claim_states_derivable(len(claim_states), len(claim_states))
+    stale_ancestor_verification = verify_no_stale_ancestors(())
 
     combined_failures = (
         *count_verification.failures,
         *completion_verification.failures,
         *terminal_verification.failures,
         *claim_verification.failures,
+        *stale_ancestor_verification.failures,
     )
     verification = _CompletenessResult(passed=not combined_failures, failures=combined_failures)
 

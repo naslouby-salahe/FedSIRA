@@ -22,6 +22,7 @@ from fedsira.analysis.comparisons import (
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
 from fedsira.domain.enums import (
+    CellPhaseState,
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
@@ -29,6 +30,8 @@ from fedsira.domain.enums import (
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, MasterSeed
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.experiments.validation import (
+    validate_cell_phase_sequence,
+    validate_cell_terminal_record,
     validate_condition_vocabulary,
     validate_experiment_name_is_registered,
     validate_experiment_prerequisites_met,
@@ -303,6 +306,19 @@ def run_experiment(
             )
             continue
         outcome = executor.execute_cell(cell, config)
+        validate_cell_phase_sequence(
+            (
+                ScientificCellPhase.PREPARE,
+                ScientificCellPhase.PROTOCOL_EVALUATION,
+                ScientificCellPhase.METRIC_AGGREGATION,
+            )
+        )
+        terminal_phase = (
+            CellPhaseState.COMPLETED
+            if outcome.terminal_state == "Completed"
+            else CellPhaseState.FAILED
+        )
+        validate_cell_terminal_record(cell, terminal_phase)
         store.write_outcome(outcome)
         outcomes.append(outcome)
 

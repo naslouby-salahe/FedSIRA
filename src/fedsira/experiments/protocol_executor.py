@@ -84,6 +84,8 @@ from fedsira.experiments.registry import (
     VerifierCondition,
     VerifierProfile,
 )
+from fedsira.learning.anchor import run_anchor_fedavg_training
+from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.protocol.admission import (
     AdmissionArtifactContent,
     apply_production_update,
@@ -161,6 +163,11 @@ from fedsira.protocol.verification import (
 )
 from fedsira.runtime.determinism import derive_uint32
 from fedsira.runtime.state import FailureDetail
+from fedsira.runtime.telemetry import (
+    peak_gpu_memory_bytes,
+    peak_host_resident_set_bytes,
+    reset_peak_gpu_memory_counter,
+)
 
 EVIDENCE_INSUFFICIENT_REASON = "Evidence Insufficient"
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
@@ -168,6 +175,25 @@ COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
 VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
 BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
 ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
+
+
+def _training_entry_points(
+    evidence: PreparedEvidenceCounts,
+    config: ScientificConfig,
+) -> tuple[CanonicalToken, ...]:
+    if (
+        evidence.reproduction_target_count
+        < config.capability_claim.evidence_minima.reproduction_target_examples
+    ):
+        return ()
+    if (
+        evidence.reproduction_supported_count
+        < config.capability_claim.evidence_minima.reproduction_supported_control_examples
+    ):
+        return ()
+    anchor_entry = run_anchor_fedavg_training.__module__
+    post_reference_entry = run_post_reference_training.__module__
+    return (anchor_entry, post_reference_entry)
 
 
 @dataclass(frozen=True)
@@ -707,6 +733,9 @@ class ProtocolCellExecutor(CellExecutor):
             evidence_minima,
         ):
             return ClaimState.DORMANT
+        training_entries = _training_entry_points(evidence, config)
+        if not training_entries:
+            return ClaimState.DORMANT
         source_domain = _source_domain_for_cell(cell)
         external_verification_active = (
             cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
@@ -1114,6 +1143,9 @@ class ProtocolCellExecutor(CellExecutor):
             verify_seconds=encode_elapsed_seconds,
             synthesize_seconds=0.0,
         )
+        reset_peak_gpu_memory_counter()
+        gpu_memory_bytes = peak_gpu_memory_bytes()
+        host_rss_bytes = peak_host_resident_set_bytes()
         return ClaimState.DORMANT, (
             ("post-evidence-overhead", delay_decomposition.post_evidence_wall_clock_seconds),
             ("communication-bytes", float(bytes_total)),
@@ -1122,6 +1154,8 @@ class ProtocolCellExecutor(CellExecutor):
                 "post-evidence-wall-clock-seconds",
                 delay_decomposition.post_evidence_wall_clock_seconds,
             ),
+            ("peak-gpu-memory-bytes", float(gpu_memory_bytes)),
+            ("peak-host-rss-bytes", float(host_rss_bytes)),
         )
 
 
