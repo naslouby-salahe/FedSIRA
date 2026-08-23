@@ -97,7 +97,8 @@ def materialize_nbaiot_prepared_views(
             )
             sample_id_by_row[assignment.original_row_index] = assignment.sample_id
 
-        frame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
+        frame: pandas.DataFrame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
+        raw_rows = tuple(frame[list(feature_names)].itertuples(index=False, name=None))
         for role, selected_rows in selected_rows_by_role.items():
             if not selected_rows:
                 continue
@@ -105,7 +106,7 @@ def materialize_nbaiot_prepared_views(
             labels: list[CanonicalToken] = []
             sample_ids: list[ArtifactDigest] = []
             for original_row_index in selected_rows:
-                raw_row = frame.iloc[original_row_index]
+                raw_row = raw_rows[original_row_index]
                 standardized_row = standardize_row(raw_row, moments, scaling_config)
                 features.append(standardized_row)
                 labels.append(item.class_id.value)
@@ -132,6 +133,7 @@ def materialize_nbaiot_prepared_views(
             "row_count": view.row_count,
         }
         (prepared_root / _view_key(view)).with_suffix(".json").write_text(_stable_json(payload))
+        _write_prepared_view_parquet(prepared_root, view, tuple(moments.feature_names))
     scaler_payload = {
         "schema_version": SCALER_SCHEMA_VERSION,
         "feature_names": list(moments.feature_names),
@@ -166,7 +168,7 @@ def _accumulate_anchor_train_statistics(
         for assignment in assignments
         if assignment.role is Role.ANCHOR_TRAIN
     }
-    frame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
+    frame: pandas.DataFrame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
     selected_frame = frame.iloc[sorted(anchor_train_rows)]
     statistics = existing.get(item.class_id.value)
     return accumulate_feature_statistics(
@@ -177,6 +179,23 @@ def _accumulate_anchor_train_statistics(
 def _view_key(view: PreparedView) -> str:
     domain_token = NBAIOT_DOMAIN_HASH_TOKEN[view.domain]
     return f"{domain_token}_{view.class_id.value}_{ROLE_HASH_TOKEN[view.role]}"
+
+
+def view_parquet_path(prepared_root: Path, view_key: CanonicalToken) -> Path:
+    return prepared_root / f"{view_key}.parquet"
+
+
+def _write_prepared_view_parquet(
+    prepared_root: Path, view: PreparedView, feature_names: tuple[CanonicalToken, ...]
+) -> None:
+    columns: dict[str, list[ArtifactDigest] | list[CanonicalToken] | list[float]] = {
+        "sample_id": list(view.sample_ids),
+        "label": list(view.labels),
+    }
+    for feature_index, feature_name in enumerate(feature_names):
+        columns[feature_name] = [row[feature_index] for row in view.features]
+    frame = pandas.DataFrame(columns)
+    frame.to_parquet(view_parquet_path(prepared_root, _view_key(view)), index=False)
 
 
 def _stable_json(
