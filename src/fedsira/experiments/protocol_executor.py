@@ -39,24 +39,30 @@ from fedsira.evaluation.communication import (
     model_transmission_count,
 )
 from fedsira.evaluation.metrics import (
+    boundary_metric_set,
+    clean_proposal_oracle_label,
     dormant_claim_rate,
     false_launch_rate,
     legitimate_admission_rate,
     malicious_admission_rate,
+    report_metric_set,
     reproduction_attempt_count,
 )
 from fedsira.evaluation.records import MetricResult
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.registry import (
+    CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
+    HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
+    SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     ExternalVerificationCondition,
@@ -520,7 +526,62 @@ class ProtocolCellExecutor(CellExecutor):
             return self._execute_secondary_cell(cell, config, evidence)
         if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
             return self._execute_evidence_scarcity_cell(cell, config, evidence)
+        if cell.experiment in (
+            SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+            CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+            HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+        ):
+            return self._execute_boundary_cell(cell, config, evidence)
         return ClaimState.DORMANT, _metrics_from_state(ClaimState.DORMANT)
+
+    def _execute_boundary_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        state = self._advance_protocol(cell, config, evidence)
+        metrics = _metrics_from_state(state)
+        is_scoped_contract = cell.method != "Broad Target Only"
+        boundary_metrics = boundary_metric_set(
+            true_labels=(),
+            predicted_labels=(),
+            class_tokens=("BENIGN", "GAFGYT_COMBO"),
+            target_f1_delta=MetricResult(None, 0),
+            supported_macro_f1_drop=MetricResult(None, 0),
+            benign_far_increase=MetricResult(None, 0),
+            clean_oracle_materiality_config=config.attacks_and_boundaries.clean_oracle_materiality,
+            is_scoped_contract=is_scoped_contract,
+            a_scoped_predicate_passes=False,
+            b_scoped_predicate_passes=False,
+        )
+        macro_auroc = boundary_metrics.macro_auroc
+        macro_auprc = boundary_metrics.macro_auprc
+        material_degradation = boundary_metrics.clean_oracle_degradation_is_material
+        false_same_equivalence = boundary_metrics.false_same_equivalence_check
+        false_same_rate = boundary_metrics.false_same_capability_rate
+        extra: list[tuple[CanonicalToken, float | None]] = [
+            ("macro-auroc", macro_auroc.value),
+            ("macro-auprc", macro_auprc.value),
+            ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),
+            ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),
+            ("false-same-capability-rate", false_same_rate.value),
+        ]
+        if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
+            oracle_label = clean_proposal_oracle_label(
+                aggregate_target_f1=MetricResult(None, 0),
+                target_f1_gain=MetricResult(None, 0),
+                supported_macro_f1_drop=MetricResult(None, 0),
+                benign_far_increase=MetricResult(None, 0),
+                defined_domain_count=0,
+                expected_domain_count=8,
+                generic_defined_domain_fraction_minimum=(
+                    config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum
+                ),
+                capability_claim_config=config.capability_claim,
+            )
+            extra.append(("proposal-oracle-label", float(oracle_label.value == "ORACLE_VALID")))
+        return state, (*metrics, *extra)
 
     def _execute_opening_cell(
         self,
@@ -1039,12 +1100,31 @@ def _metrics_from_state(
     dormant_result = dormant_claim_rate(
         dormant_claim_count=1 if is_dormant else 0, eligible_claim_count=1
     )
+    report_metrics = report_metric_set(
+        true_labels=(),
+        predicted_labels=(),
+        class_tokens=("BENIGN", "GAFGYT_COMBO"),
+        target_class_token="GAFGYT_COMBO",
+        benign_class_token="BENIGN",
+        supported_class_tokens=("BENIGN",),
+    )
     return (
         ("terminal-state", _state_encoding(state)),
         ("legitimate-admission", legitimate_result.value),
-        ("target-f1", None),
-        ("supported-macro-f1-harm", None),
-        ("benign-far-increase", None),
+        ("target-f1", report_metrics["target-f1"].value),
+        ("target-f1-gain", report_metrics["target-f1-gain"].value),
+        ("supported-macro-f1-harm", report_metrics["supported-macro-f1-harm"].value),
+        ("benign-far-increase", report_metrics["benign-far-increase"].value),
+        ("asr", report_metrics["asr"].value),
+        ("accuracy", report_metrics["accuracy"].value),
+        ("macro-f1", report_metrics["macro-f1"].value),
+        ("weighted-f1", report_metrics["weighted-f1"].value),
+        ("balanced-accuracy", report_metrics["balanced-accuracy"].value),
+        ("verifier-abstention-rate", report_metrics["verifier-abstention-rate"].value),
+        (
+            "reproduction-abstention-rate",
+            report_metrics["reproduction-abstention-rate"].value,
+        ),
         ("worst-domain-target-f1", None),
         ("reproduction-attempts", 1.0 if is_admitted else 0.0),
         ("false-launch", 0.0),

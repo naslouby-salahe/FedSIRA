@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
 from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt, Probability
@@ -9,6 +10,16 @@ from fedsira.evaluation.records import (
     MetricResult,
     ProposalOracleLabel,
 )
+
+
+@dataclass(frozen=True)
+class BoundaryMetricSet:
+    macro_auroc: MetricResult
+    macro_auprc: MetricResult
+    clean_oracle_degradation_is_material: bool | None
+    false_same_capability_rate: MetricResult
+    false_same_capability_reason: FalseSameCapabilityReason | None
+    false_same_equivalence_check: bool
 
 
 def compute_confusion_counts(
@@ -410,3 +421,128 @@ def false_same_capability_certification_rate(
         ),
         None,
     )
+
+
+def boundary_metric_set(
+    true_labels: Sequence[CanonicalToken],
+    predicted_labels: Sequence[CanonicalToken],
+    class_tokens: Sequence[CanonicalToken],
+    target_f1_delta: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+    clean_oracle_materiality_config: CleanOracleMaterialityConfig,
+    false_certification_count: NonNegativeInt = 0,
+    broad_certified_row_count: NonNegativeInt = 0,
+    is_scoped_contract: bool = False,
+    a_scoped_predicate_passes: bool = False,
+    b_scoped_predicate_passes: bool = False,
+) -> BoundaryMetricSet:
+    auroc_by_class = {
+        token: auroc_one_vs_rest(
+            [label == token for label in true_labels],
+            [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+        )
+        for token in class_tokens
+    }
+    auprc_by_class = {
+        token: auprc_one_vs_rest(
+            [label == token for label in true_labels],
+            [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+        )
+        for token in class_tokens
+    }
+    material_degradation = clean_oracle_degradation_is_material(
+        target_f1_delta,
+        supported_macro_f1_drop,
+        benign_far_increase,
+        clean_oracle_materiality_config,
+    )
+    false_same_rate, reason = false_same_capability_certification_rate(
+        false_certification_count, broad_certified_row_count, is_scoped_contract
+    )
+    false_same_equivalence = is_false_same_capability_certification(
+        a_scoped_predicate_passes, b_scoped_predicate_passes
+    )
+    return BoundaryMetricSet(
+        macro_auroc=macro_auroc(auroc_by_class),
+        macro_auprc=macro_auprc(auprc_by_class),
+        clean_oracle_degradation_is_material=material_degradation,
+        false_same_capability_rate=false_same_rate,
+        false_same_capability_reason=reason,
+        false_same_equivalence_check=false_same_equivalence,
+    )
+
+
+def report_metric_set(
+    true_labels: Sequence[CanonicalToken],
+    predicted_labels: Sequence[CanonicalToken],
+    class_tokens: Sequence[CanonicalToken],
+    target_class_token: CanonicalToken,
+    benign_class_token: CanonicalToken,
+    supported_class_tokens: Sequence[CanonicalToken],
+    anchor_target_f1: MetricResult | None = None,
+    anchor_supported_macro_f1: MetricResult | None = None,
+    anchor_benign_far: MetricResult | None = None,
+    triggered_mask: Sequence[bool] | None = None,
+    triggered_source_class_token: CanonicalToken | None = None,
+) -> dict[CanonicalToken, MetricResult]:
+    counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
+    f1_by_class = {token: f1_for_class(counts) for token, counts in counts_by_class.items()}
+    recall_by_class = {token: recall_for_class(counts) for token, counts in counts_by_class.items()}
+    supported_f1 = {
+        token: f1_by_class[token] for token in supported_class_tokens if token in f1_by_class
+    }
+    current_target_f1 = f1_by_class.get(target_class_token) or MetricResult(None, 0)
+    current_supported_macro = macro_f1(supported_f1)
+    current_benign_far = benign_false_alarm_rate(true_labels, predicted_labels, benign_class_token)
+    gain = (
+        target_capability_gain(current_target_f1, anchor_target_f1)
+        if anchor_target_f1 is not None
+        else MetricResult(None, 0)
+    )
+    supported_harm = (
+        supported_macro_f1_harm(anchor_supported_macro_f1, current_supported_macro)
+        if anchor_supported_macro_f1 is not None
+        else MetricResult(None, 0)
+    )
+    benign_far_increase = (
+        MetricResult(current_benign_far.value - anchor_benign_far.value, 1)
+        if anchor_benign_far is not None
+        and current_benign_far.value is not None
+        and anchor_benign_far.value is not None
+        else MetricResult(None, 0)
+    )
+    support_by_class = {
+        token: sum(1 for label in true_labels if label == token) for token in class_tokens
+    }
+    asr = (
+        attack_success_rate_within_domain(
+            true_labels,
+            predicted_labels,
+            triggered_mask,
+            triggered_source_class_token or target_class_token,
+            benign_class_token,
+        )
+        if triggered_mask is not None
+        else MetricResult(None, 0)
+    )
+    class_metrics: dict[CanonicalToken, MetricResult] = {}
+    for token, counts in counts_by_class.items():
+        class_metrics[f"{token}:precision"] = precision_for_class(counts)
+        class_metrics[f"{token}:fpr"] = false_positive_rate_for_class(counts)
+        class_metrics[f"{token}:fnr"] = false_negative_rate_for_class(counts)
+        class_metrics[f"{token}:tnr"] = true_negative_rate_for_class(counts)
+    return {
+        "accuracy": accuracy(counts_by_class, len(true_labels)),
+        "macro-f1": macro_f1(f1_by_class),
+        "weighted-f1": weighted_f1(f1_by_class, support_by_class),
+        "balanced-accuracy": balanced_accuracy(recall_by_class),
+        "target-f1": current_target_f1,
+        "target-f1-gain": gain,
+        "supported-macro-f1-harm": supported_harm,
+        "benign-far-increase": benign_far_increase,
+        "asr": asr,
+        "verifier-abstention-rate": verifier_abstention_rate(0, 0),
+        "reproduction-abstention-rate": reproduction_abstention_rate(0, 0),
+        **class_metrics,
+    }
