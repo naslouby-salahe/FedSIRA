@@ -10,6 +10,7 @@ from fedsira.evaluation.records import (
     MetricResult,
     ProposalOracleLabel,
 )
+from fedsira.evaluation.validation import validate_metric_class_membership
 
 
 @dataclass(frozen=True)
@@ -486,6 +487,9 @@ def report_metric_set(
     triggered_mask: Sequence[bool] | None = None,
     triggered_source_class_token: CanonicalToken | None = None,
 ) -> dict[CanonicalToken, MetricResult]:
+    validate_metric_class_membership(
+        class_tokens, target_class_token, benign_class_token, supported_class_tokens
+    )
     counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
     f1_by_class = {token: f1_for_class(counts) for token, counts in counts_by_class.items()}
     recall_by_class = {token: recall_for_class(counts) for token, counts in counts_by_class.items()}
