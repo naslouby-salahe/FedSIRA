@@ -1,6 +1,11 @@
 import torch
 
-from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
+from fedsira.models.mlp import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    load_flat_trainable_parameters,
+    trainable_parameter_count,
+)
 
 
 def test_forward_produces_the_dataset_derived_output_width() -> None:
@@ -63,3 +68,22 @@ def test_trainable_parameter_count_matches_manual_sum() -> None:
     model = FedSIRAClassifier(input_width=115, output_width=11)
     manual = sum(p.numel() for p in model.parameters() if p.requires_grad)
     assert trainable_parameter_count(model) == manual
+
+
+def test_load_flat_trainable_parameters_round_trips_through_flatten() -> None:
+    source_model = FedSIRAClassifier(input_width=115, output_width=11)
+    flat = flatten_trainable_parameters(source_model)
+    target_model = FedSIRAClassifier(input_width=115, output_width=11)
+    load_flat_trainable_parameters(target_model, flat)
+    assert torch.equal(flatten_trainable_parameters(target_model), flat)
+
+
+def test_load_flat_trainable_parameters_changes_forward_output() -> None:
+    model = FedSIRAClassifier(input_width=115, output_width=11)
+    inputs = torch.zeros(2, 115)
+    model.eval()
+    with torch.no_grad():
+        before = model(inputs).clone()
+        load_flat_trainable_parameters(model, torch.ones_like(flatten_trainable_parameters(model)))
+        after = model(inputs)
+    assert not torch.allclose(before, after)

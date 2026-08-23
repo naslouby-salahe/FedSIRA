@@ -169,6 +169,7 @@ from fedsira.evaluation.metrics import (
     malicious_admission_rate,
     report_metric_set,
     reproduction_attempt_count,
+    supported_macro_f1_harm,
 )
 from fedsira.evaluation.records import (
     AdmissionDelayDecomposition,
@@ -178,6 +179,14 @@ from fedsira.evaluation.records import (
 from fedsira.evaluation.screen import run_proposal_screen_for_domain, screen_fold_index
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.real_evidence import (
+    RealAnchor,
+    certified_domain_delta_committee,
+    evaluate_domain,
+    non_source_domains,
+    real_evidence_available,
+    train_anchor,
+)
 from fedsira.experiments.registry import (
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
@@ -506,6 +515,66 @@ def _reproduction_progression(
     return state, tuple(attempts), tuple(commitment_hashes)
 
 
+def _real_final_gate_metrics(
+    prepared_root: Path,
+    config: ScientificConfig,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+    production_checkpoint: torch.Tensor,
+) -> tuple[int, MetricResult, MetricResult, MetricResult, MetricResult]:
+    candidate_domains = non_source_domains(source_domain)
+    adequate_domains = tuple(
+        domain
+        for domain in candidate_domains
+        if evaluate_domain(prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE)
+        is not None
+    )
+    if not adequate_domains:
+        return (
+            0,
+            MetricResult(None, 0),
+            MetricResult(None, 0),
+            MetricResult(None, 0),
+            MetricResult(None, 0),
+        )
+    target_f1_values: list[MetricResult] = []
+    supported_f1_harms: list[MetricResult] = []
+    benign_far_increases: list[MetricResult] = []
+    for domain in adequate_domains:
+        anchor_metrics = evaluate_domain(
+            prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE
+        )
+        production_metrics = evaluate_domain(
+            prepared_root, anchor, production_checkpoint, domain, Role.FINAL_GATE
+        )
+        if anchor_metrics is None or production_metrics is None:
+            continue
+        target_f1_values.append(production_metrics.target_f1)
+        supported_f1_harms.append(
+            supported_macro_f1_harm(
+                anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
+            )
+        )
+        if (
+            anchor_metrics.benign_far.value is not None
+            and production_metrics.benign_far.value is not None
+        ):
+            benign_far_increases.append(
+                MetricResult(
+                    production_metrics.benign_far.value - anchor_metrics.benign_far.value, 1
+                )
+            )
+        else:
+            benign_far_increases.append(MetricResult(None, 0))
+    return (
+        len(adequate_domains),
+        median_domain_target_f1(target_f1_values),
+        worst_domain_target_f1(target_f1_values),
+        equal_weight_domain_mean(supported_f1_harms, 1),
+        equal_weight_domain_mean(benign_far_increases, 1),
+    )
+
+
 def _final_gate_decision(
     config: ScientificConfig,
     evidence: PreparedEvidenceCounts,
@@ -515,13 +584,62 @@ def _final_gate_decision(
     commitment_hashes: Sequence[str],
     is_plurality_active: bool,
     opening_mode: ClaimOpeningMode,
+    prepared_root: Path,
+    master_seed: MasterSeed,
+    anchor: RealAnchor | None,
 ) -> ClaimState:
-    median_target_f1 = median_domain_target_f1(
-        tuple(MetricResult(None, 0) for _domain in NBAIOT_DOMAIN_ORDER)
+    base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
+    committee_deltas = (
+        certified_domain_delta_committee(
+            prepared_root, config, master_seed, anchor, reproducer_order
+        )
+        if anchor is not None
+        else {}
     )
-    minimum_target_f1 = MetricResult(None, 0)
-    pooled_supported_macro_f1_drop = MetricResult(None, 0)
-    pooled_benign_far_increase = MetricResult(None, 0)
+    krum_selected_update: torch.Tensor | None = None
+    if is_plurality_active:
+        committee = tuple(
+            CertifiedReproductionRow(
+                reproducer_domain=domain,
+                update_vector=committee_deltas.get(
+                    domain,
+                    reproduction_update_vector(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS),
+                ),
+            )
+            for domain in reproducer_order
+        )
+        krum_selected_update = select_krum_update(
+            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ).update_vector
+    single_reproduction_update = (
+        committee_deltas.get(reproducer_order[0], ANCHOR_FLAT_PARAMETERS)
+        if reproducer_order
+        else ANCHOR_FLAT_PARAMETERS
+    )
+    production_update = resolve_production_update(
+        is_plurality_active,
+        krum_selected_update,
+        single_reproduction_update,
+    )
+    production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+    if anchor is not None:
+        (
+            adequate_final_gate_domain_count,
+            median_target_f1,
+            minimum_target_f1,
+            pooled_supported_macro_f1_drop,
+            pooled_benign_far_increase,
+        ) = _real_final_gate_metrics(
+            prepared_root, config, anchor, source_domain, production_checkpoint
+        )
+    else:
+        adequate_final_gate_domain_count = evidence.final_gate_adequate_domain_count
+        median_target_f1 = median_domain_target_f1(
+            tuple(MetricResult(None, 0) for _domain in NBAIOT_DOMAIN_ORDER)
+        )
+        minimum_target_f1 = MetricResult(None, 0)
+        pooled_supported_macro_f1_drop = MetricResult(None, 0)
+        pooled_benign_far_increase = MetricResult(None, 0)
     predicates_pass = final_gate_predicates_pass(
         median_target_f1,
         minimum_target_f1,
@@ -531,32 +649,12 @@ def _final_gate_decision(
         config.protocol.final_gate,
     )
     final_gate_state = synthesis_pending_transition(
-        adequate_final_gate_domain_count=evidence.final_gate_adequate_domain_count,
+        adequate_final_gate_domain_count=adequate_final_gate_domain_count,
         final_gate_predicates_pass=predicates_pass,
         final_gate_config=config.protocol.final_gate,
     )
     if final_gate_state is not ClaimState.ADMITTED:
         return final_gate_state
-    krum_selected_update: torch.Tensor | None = None
-    if is_plurality_active:
-        committee = tuple(
-            CertifiedReproductionRow(
-                reproducer_domain=domain,
-                update_vector=reproduction_update_vector(
-                    ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
-                ),
-            )
-            for domain in reproducer_order
-        )
-        krum_selected_update = select_krum_update(
-            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
-        ).update_vector
-    production_update = resolve_production_update(
-        is_plurality_active,
-        krum_selected_update,
-        ANCHOR_FLAT_PARAMETERS,
-    )
-    production_checkpoint = apply_production_update(ANCHOR_FLAT_PARAMETERS, production_update)
     validate_production_checkpoint_excludes_source(production_checkpoint, None)
     validate_admission_requires_final_gate(ClaimState.ADMITTED, True)
     validate_admission_artifact_content(
@@ -628,6 +726,16 @@ class ProtocolCellExecutor(CellExecutor):
         self._prepared_root = prepared_root or prepared_evidence_root(
             DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
         )
+        self._real_anchor_cache: dict[MasterSeed, RealAnchor | None] = {}
+
+    def _real_anchor(self, config: ScientificConfig, master_seed: MasterSeed) -> RealAnchor | None:
+        if master_seed not in self._real_anchor_cache:
+            self._real_anchor_cache[master_seed] = (
+                train_anchor(self._prepared_root, config, master_seed)
+                if real_evidence_available(self._prepared_root)
+                else None
+            )
+        return self._real_anchor_cache[master_seed]
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         evidence = load_prepared_evidence_counts(self._prepared_root, cell)
@@ -1072,6 +1180,9 @@ class ProtocolCellExecutor(CellExecutor):
                     and cell.method == "Full Plurality Path"
                 ),
                 opening_mode=_opening_mode_for_cell(cell),
+                prepared_root=self._prepared_root,
+                master_seed=cell.master_seed,
+                anchor=self._real_anchor(config, cell.master_seed),
             )
         else:
             state = progression_state
@@ -1417,6 +1528,9 @@ class ProtocolCellExecutor(CellExecutor):
                     commitment_hashes,
                     is_plurality_active=True,
                     opening_mode=_opening_mode_for_cell(cell),
+                    prepared_root=self._prepared_root,
+                    master_seed=cell.master_seed,
+                    anchor=self._real_anchor(config, cell.master_seed),
                 )
             else:
                 state = ClaimState.DORMANT
