@@ -222,3 +222,7 @@ outputs/*
 !outputs/.gitkeep
 results/*
 !results/.gitkeep
+
+# Session/tool artifacts
+.commandcode/
+prompt.md
