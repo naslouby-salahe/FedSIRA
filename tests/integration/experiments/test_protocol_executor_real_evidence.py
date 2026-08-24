@@ -753,3 +753,19 @@ def test_no_final_synthesis_gate_ablation_admits_immediately_after_krum(
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] == 1.0
     assert metrics["worst-domain-target-f1"] is not None
+
+
+def test_random_committee_profile_ablation_delegates_to_verifier_robustness_mechanism(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.RANDOM_COMMITTEE_PROFILE.value,
+        condition="Ablation",
+        master_seed=25,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}

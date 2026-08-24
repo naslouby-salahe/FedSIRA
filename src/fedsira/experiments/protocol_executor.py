@@ -1587,6 +1587,13 @@ class ProtocolCellExecutor(CellExecutor):
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         variant = cell.method
+        if variant == AblationVariant.RANDOM_COMMITTEE_PROFILE.value:
+            verifier_cell = replace(
+                cell,
+                method=VerifierProfile.RANDOM_COMMITTEE_DIAGNOSTIC.value,
+                condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
+            )
+            return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         extra: list[tuple[CanonicalToken, float | None]] = []
