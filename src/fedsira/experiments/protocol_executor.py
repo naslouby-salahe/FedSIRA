@@ -531,6 +531,46 @@ def _reproduction_progression(
     return state, tuple(attempts), tuple(commitment_hashes)
 
 
+def _single_verifier_progression(
+    cell: ScientificCell,
+    config: ScientificConfig,
+    source_domain: NBaiotDomain | None,
+) -> tuple[ClaimState, tuple[ReproductionAttempt, ...], tuple[str, ...]]:
+    reproducer_order = _reproducer_order(cell)
+    adequate_domains = frozenset(
+        domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain
+    )
+    consumed: set[NBaiotDomain] = set()
+    while True:
+        next_domain = first_eligible_non_source_reproducer(
+            reproducer_order, adequate_domains - frozenset(consumed)
+        )
+        if next_domain is None:
+            return ClaimState.DORMANT, (), ()
+        consumed.add(next_domain)
+        commitment_hash = compute_reproduction_commitment_hash(
+            next_domain,
+            "c" * 64,
+            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
+            ANCHOR_FLAT_PARAMETERS,
+        )
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        panel_order = _verifier_panel(
+            source_domain, next_domain, cell.master_seed, config.protocol.verification
+        )
+        verifier_domain = single_fresh_verifier_domain(
+            panel_order, frozenset(), frozenset(panel_order)
+        )
+        if verifier_domain is None:
+            continue
+        verifier_outcome = single_fresh_verifier_outcome(
+            verifier_domain, resolve_ternary_outcome(True, True)
+        )
+        if verifier_outcome is ClaimState.ADMITTED:
+            attempt = ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=True)
+            return ClaimState.SYNTHESIS_PENDING, (attempt,), (commitment_hash,)
+
+
 def _real_final_gate_metrics(
     prepared_root: Path,
     config: ScientificConfig,
@@ -1406,52 +1446,68 @@ class ProtocolCellExecutor(CellExecutor):
             if self._resolved_core is None:
                 return ClaimState.DORMANT
             external_verification_active = self._resolved_core.external_verification_survives
+            single_verifier_active = (
+                external_verification_active and not self._resolved_core.plurality_survives
+            )
         elif direct_krum_active or coordinate_median_active:
             external_verification_active = False
+            single_verifier_active = False
+        elif cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
+            external_verification_active = True
+            single_verifier_active = True
         else:
             external_verification_active = (
                 cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
                 and cell.method == SourceExclusionMethod.FULL_FEDSIRA.value
             )
+            single_verifier_active = False
         row_requirement = _row_requirement(cell, config, self._resolved_core)
-        progression_state, attempts, commitment_hashes = _reproduction_progression(
-            cell,
-            config,
-            evidence,
-            external_verification_active,
-            row_requirement,
-            frozenset(),
-        )
-        if progression_state is ClaimState.VERIFICATION_PENDING:
-            certified_positive_report_count = 0
-            for attempt in attempts:
-                if not attempt.is_certified:
-                    continue
-                panel = _verifier_panel(
-                    source_domain, attempt.domain, cell.master_seed, config.protocol.verification
-                )
-                if not panel_votes_are_one_per_domain(panel):
-                    return ClaimState.DORMANT
-                reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
-                if reproduction_row_is_certified(
-                    reports,
-                    panel_size=config.protocol.verification.panel_size,
-                    required_positive_reports=config.protocol.verification.required_positive_reports,
-                ):
-                    certified_positive_report_count += sum(
-                        1 for report in reports if report is TernaryOutcome.POSITIVE
+        if single_verifier_active:
+            progression_state, attempts, commitment_hashes = _single_verifier_progression(
+                cell, config, source_domain
+            )
+        else:
+            progression_state, attempts, commitment_hashes = _reproduction_progression(
+                cell,
+                config,
+                evidence,
+                external_verification_active,
+                row_requirement,
+                frozenset(),
+            )
+            if progression_state is ClaimState.VERIFICATION_PENDING:
+                certified_positive_report_count = 0
+                for attempt in attempts:
+                    if not attempt.is_certified:
+                        continue
+                    panel = _verifier_panel(
+                        source_domain,
+                        attempt.domain,
+                        cell.master_seed,
+                        config.protocol.verification,
                     )
-            eligible_verifier_count = sum(
-                1
-                for domain in NBAIOT_DOMAIN_ORDER
-                if verifier_is_eligible(domain, source_domain, attempts[0].domain)
-            )
-            progression_state = verification_pending_transition(
-                eligible_verifier_count,
-                certified_positive_report_count,
-                row_requirement <= len(attempts),
-                config.protocol.verification,
-            )
+                    if not panel_votes_are_one_per_domain(panel):
+                        return ClaimState.DORMANT
+                    reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
+                    if reproduction_row_is_certified(
+                        reports,
+                        panel_size=config.protocol.verification.panel_size,
+                        required_positive_reports=config.protocol.verification.required_positive_reports,
+                    ):
+                        certified_positive_report_count += sum(
+                            1 for report in reports if report is TernaryOutcome.POSITIVE
+                        )
+                eligible_verifier_count = sum(
+                    1
+                    for domain in NBAIOT_DOMAIN_ORDER
+                    if verifier_is_eligible(domain, source_domain, attempts[0].domain)
+                )
+                progression_state = verification_pending_transition(
+                    eligible_verifier_count,
+                    certified_positive_report_count,
+                    row_requirement <= len(attempts),
+                    config.protocol.verification,
+                )
         if progression_state is ClaimState.SYNTHESIS_PENDING:
             state, self._pending_real_report = _final_gate_decision(
                 config,
@@ -1628,19 +1684,6 @@ class ProtocolCellExecutor(CellExecutor):
         elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
             one_independent_retrain_local_epochs()
             candidate_free_full_path_opening_mode()
-            first_eligible_non_source_reproducer(
-                _reproducer_order(cell),
-                frozenset(NBAIOT_DOMAIN_ORDER[1:]),
-            )
-            verifier_domain = single_fresh_verifier_domain(
-                _reproducer_order(cell),
-                frozenset(NBAIOT_DOMAIN_ORDER[:2]),
-                frozenset(NBAIOT_DOMAIN_ORDER[2:]),
-            )
-            single_fresh_verifier_outcome(
-                verifier_domain,
-                TernaryOutcome.POSITIVE,
-            )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
