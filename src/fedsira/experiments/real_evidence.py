@@ -8,6 +8,13 @@ from pathlib import Path
 import pandas
 import torch
 
+from fedsira.baselines.calibration import (
+    cosine_distance_matrix,
+    density_cluster_labels,
+    l2_normalize,
+    select_largest_density_cluster,
+    trimmed_mean_aggregate,
+)
 from fedsira.baselines.references import (
     centralized_reference_local_epochs,
     centralized_reference_pooled_rows,
@@ -17,6 +24,7 @@ from fedsira.baselines.references import (
     local_only_reference_local_epochs,
     local_only_reference_training_role,
 )
+from fedsira.baselines.registry import POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS
 from fedsira.baselines.robust_aggregation import (
     client_sampling_round_order,
     krum_reference_post_reference_rounds,
@@ -101,6 +109,7 @@ FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
 SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
 LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
 CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CENTRALIZED_REFERENCE"
+DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -881,6 +890,95 @@ def train_krum_reference_delta(
         next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
         load_flat_trainable_parameters(next_model, next_flat)
         state_dict = next_model.state_dict()
+    final_flat = _flatten_state_dict(anchor.input_width, anchor.output_width, state_dict)
+    return final_flat - anchor.flat_parameters
+
+
+def train_density_cluster_trimmed_mean_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    source_rows_available = source_domain is not None and (
+        load_prepared_rows(
+            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+        )
+        is not None
+    )
+    participants = fedavg_reference_post_reference_participants(
+        non_source_domains(source_domain), source_domain, source_rows_available
+    )
+    if not participants:
+        return None
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, anchor.flat_parameters)
+    state_dict = model.state_dict()
+    any_round_trained = False
+    for round_index in range(POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS):
+        current_flat = _flatten_state_dict(anchor.input_width, anchor.output_width, state_dict)
+        contributing_domains: list[NBaiotDomain] = []
+        raw_updates: list[torch.Tensor] = []
+        for domain in participants:
+            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
+            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            if combined is None:
+                continue
+            features, labels, sample_ids, _is_supported = combined
+            training_seed = _training_seed(
+                master_seed,
+                anchor.dataset_manifest_hash,
+                _flat_parameters_identity(anchor.flat_parameters),
+                DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
+                domain,
+                round_index,
+            )
+            client_state_dict, _example_count = train_one_client_locally(
+                state_dict,
+                anchor.input_width,
+                anchor.output_width,
+                config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                config.model.optimizer,
+                config.model.training,
+                1,
+                features,
+                labels,
+                sample_ids,
+                training_seed,
+            )
+            client_flat = _flatten_state_dict(
+                anchor.input_width, anchor.output_width, client_state_dict
+            )
+            contributing_domains.append(domain)
+            raw_updates.append(client_flat - current_flat)
+        if not raw_updates:
+            continue
+        normalized = l2_normalize(raw_updates)
+        distance_matrix = cosine_distance_matrix(normalized)
+        cluster_labels = density_cluster_labels(
+            distance_matrix, config.baselines.density_cluster_trimmed_mean
+        )
+        selected_domains = select_largest_density_cluster(
+            tuple(contributing_domains), cluster_labels, distance_matrix
+        )
+        if not selected_domains:
+            continue
+        selected_updates = [
+            raw_updates[contributing_domains.index(domain)] for domain in selected_domains
+        ]
+        aggregated_update = trimmed_mean_aggregate(
+            selected_updates,
+            config.baselines.density_cluster_trimmed_mean.minimum_cluster_size_for_trimming,
+            config.baselines.density_cluster_trimmed_mean.trim_each_tail_count,
+        )
+        next_flat = current_flat + aggregated_update
+        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+        load_flat_trainable_parameters(next_model, next_flat)
+        state_dict = next_model.state_dict()
+        any_round_trained = True
+    if not any_round_trained:
+        return None
     final_flat = _flatten_state_dict(anchor.input_width, anchor.output_width, state_dict)
     return final_flat - anchor.flat_parameters
 

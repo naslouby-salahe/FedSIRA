@@ -24,6 +24,7 @@ from fedsira.experiments.real_evidence import (
     real_evidence_available,
     train_anchor,
     train_centralized_reference_checkpoint,
+    train_density_cluster_trimmed_mean_delta,
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
@@ -380,6 +381,28 @@ def test_train_krum_reference_delta_returns_none_without_prepared_data(
 ) -> None:
     assert (
         train_krum_reference_delta(
+            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        )
+        is None
+    )
+
+
+def test_train_density_cluster_trimmed_mean_delta_is_finite_and_nonzero(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_density_cluster_trimmed_mean_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+    )
+    assert delta is not None
+    assert delta.shape == anchor.flat_parameters.shape
+    assert torch.isfinite(delta).all()
+
+
+def test_train_density_cluster_trimmed_mean_delta_returns_none_without_prepared_data(
+    tmp_path: Path, anchor: RealAnchor
+) -> None:
+    assert (
+        train_density_cluster_trimmed_mean_delta(
             tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
