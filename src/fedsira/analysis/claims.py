@@ -169,8 +169,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
     ClaimDefinition(
         claim_id="Safe Dormancy",
         exact_scoped_claim=(
-            "A permanent singleton may remain unresolved rather than being falsely "
-            "authenticated."
+            "A permanent singleton may remain unresolved rather than being falsely authenticated."
         ),
         evidence_experiments=("Evidence Scarcity and Dormancy",),
         primary_metric="legitimate-admission",

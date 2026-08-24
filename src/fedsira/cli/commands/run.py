@@ -49,8 +49,7 @@ def render_result(result: ExperimentExecutionResult) -> str:
                     else "p=NA"
                 )
                 lines.append(
-                    f"    {comparison.definition.canonical_name:<110} "
-                    f"{result_text:<22} {p_value}"
+                    f"    {comparison.definition.canonical_name:<110} {result_text:<22} {p_value}"
                 )
     return "\n".join(lines)
 
