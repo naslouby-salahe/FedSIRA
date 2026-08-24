@@ -671,6 +671,7 @@ def _final_gate_decision(
     coordinate_median_active: bool = False,
     no_final_synthesis_gate_active: bool = False,
     use_source_delta_for_source_domain: bool = False,
+    force_first_row_to_source_delta: bool = False,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas = (
@@ -686,6 +687,17 @@ def _final_gate_decision(
         )
         if source_delta is not None:
             committee_deltas[source_domain] = source_delta
+    if (
+        force_first_row_to_source_delta
+        and anchor is not None
+        and source_domain is not None
+        and reproducer_order
+    ):
+        source_delta = train_source_candidate_delta(
+            prepared_root, config, master_seed, anchor, source_domain
+        )
+        if source_delta is not None:
+            committee_deltas[reproducer_order[0]] = source_delta
     if coordinate_median_active:
         median_deltas = tuple(
             committee_deltas.get(
@@ -2159,6 +2171,10 @@ class ProtocolCellExecutor(CellExecutor):
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.NO_ORIGIN_EXCLUSION.value
         )
+        byzantine_reproducer_copies_source_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -2189,6 +2205,7 @@ class ProtocolCellExecutor(CellExecutor):
             same_context_verification_active
             or full_path_ablation_active
             or no_origin_exclusion_active
+            or byzantine_reproducer_copies_source_active
         ):
             external_verification_active = True
             single_verifier_active = False
@@ -2281,6 +2298,7 @@ class ProtocolCellExecutor(CellExecutor):
                     or full_path_ablation_active
                     or no_final_synthesis_gate_active
                     or no_origin_exclusion_active
+                    or byzantine_reproducer_copies_source_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
@@ -2289,6 +2307,7 @@ class ProtocolCellExecutor(CellExecutor):
                 coordinate_median_active=coordinate_median_active,
                 no_final_synthesis_gate_active=no_final_synthesis_gate_active,
                 use_source_delta_for_source_domain=no_origin_exclusion_active,
+                force_first_row_to_source_delta=byzantine_reproducer_copies_source_active,
             )
         else:
             state = progression_state

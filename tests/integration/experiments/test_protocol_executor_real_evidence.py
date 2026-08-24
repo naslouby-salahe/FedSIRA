@@ -817,3 +817,19 @@ def test_no_origin_exclusion_ablation_lets_source_occupy_the_first_reproduction_
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_byzantine_reproducer_copies_source_ablation_forces_the_first_row(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE.value,
+        condition="Ablation",
+        master_seed=29,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
