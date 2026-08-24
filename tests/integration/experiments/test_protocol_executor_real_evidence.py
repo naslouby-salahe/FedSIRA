@@ -15,6 +15,7 @@ from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    EFFICIENCY_MEASUREMENT_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
@@ -232,6 +233,23 @@ def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
         method="Resolved FedSIRA Core",
         condition="Permanent Singleton",
         master_seed=11,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["post-evidence-wall-clock-seconds"] is not None
+    assert metrics["post-evidence-wall-clock-seconds"] > 0.0
+
+
+def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    cell = ScientificCell(
+        experiment=EFFICIENCY_MEASUREMENT_NAME,
+        method="Resolved FedSIRA Core",
+        condition="x",
+        master_seed=12,
     )
     outcome = executor.execute_cell(cell, CONFIG)
     assert outcome.terminal_state == "Completed"
