@@ -26,6 +26,7 @@ from fedsira.experiments.real_evidence import (
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
+    train_local_only_reference_checkpoint,
     train_secure_continual_assessment_delta,
 )
 from fedsira.experiments.registry import EpistemicFailureType
@@ -403,5 +404,30 @@ def test_train_secure_continual_assessment_delta_returns_none_without_prepared_d
         train_secure_continual_assessment_delta(
             tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
         )
+        is None
+    )
+
+
+def test_train_local_only_reference_checkpoint_is_finite_and_distinct_per_domain(
+    prepared_root: Path,
+) -> None:
+    first = train_local_only_reference_checkpoint(
+        prepared_root, CONFIG, master_seed=1, domain=DOMAINS[0]
+    )
+    second = train_local_only_reference_checkpoint(
+        prepared_root, CONFIG, master_seed=1, domain=DOMAINS[1]
+    )
+    assert first is not None
+    assert second is not None
+    assert torch.isfinite(first).all()
+    assert torch.isfinite(second).all()
+    assert not torch.equal(first, second)
+
+
+def test_train_local_only_reference_checkpoint_returns_none_without_prepared_data(
+    tmp_path: Path,
+) -> None:
+    assert (
+        train_local_only_reference_checkpoint(tmp_path, CONFIG, master_seed=1, domain=DOMAINS[0])
         is None
     )
