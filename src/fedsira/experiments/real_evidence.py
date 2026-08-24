@@ -18,6 +18,7 @@ from fedsira.baselines.calibration import (
     reconstruction_filter_calibration_error_count,
     reconstruction_filter_reweight,
     reconstruction_rejection_threshold,
+    recovery_alarm_threshold,
     sanitization_clip_bounds,
     select_largest_density_cluster,
     trimmed_mean_aggregate,
@@ -59,6 +60,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_HASH_TOKEN,
     NBAIOT_DOMAIN_ORDER,
+    NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
 )
@@ -119,6 +121,7 @@ CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CENTRALIZED_REFERENCE"
 DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
 CALIBRATION_TRAINING_ALGORITHM_TOKEN = "ANCHOR_ROUND_CALIBRATION"
 UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN = "UPDATE_RECONSTRUCTION_FILTER"
+RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURCE_ADMISSION"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -1006,12 +1009,17 @@ def _train_ordinary_fedavg_delta(
     source_domain: NBaiotDomain | None,
     rounds: int,
     algorithm_token: CanonicalToken,
+    exclude_source_from_participants: bool = False,
 ) -> torch.Tensor | None:
-    source_rows_available = source_domain is not None and (
-        load_prepared_rows(
-            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+    source_rows_available = (
+        not exclude_source_from_participants
+        and source_domain is not None
+        and (
+            load_prepared_rows(
+                prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+            )
+            is not None
         )
-        is not None
     )
     participants = fedavg_reference_post_reference_participants(
         non_source_domains(source_domain), source_domain, source_rows_available
@@ -1095,6 +1103,83 @@ def train_secure_continual_assessment_delta(
         source_domain,
         secure_continual_assessment_post_reference_rounds(config.baselines),
         SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN,
+    )
+
+
+def train_recovery_after_source_admission_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    return _train_ordinary_fedavg_delta(
+        prepared_root,
+        config,
+        master_seed,
+        anchor,
+        source_domain,
+        POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS,
+        RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
+        exclude_source_from_participants=True,
+    )
+
+
+def triggered_to_benign_rate(
+    prepared_root: Path,
+    anchor: RealAnchor,
+    flat_parameters: torch.Tensor,
+    domain: NBaiotDomain,
+    role: Role,
+    trigger_feature_names: tuple[CanonicalToken, ...],
+    trigger_value: float,
+) -> MetricResult:
+    feature_names = prepared_feature_names(prepared_root)
+    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_UDP, role)
+    if feature_names is None or rows is None:
+        return MetricResult(None, 0)
+    trigger_indices = [feature_names.index(name) for name in trigger_feature_names]
+    features = torch.tensor(rows.features, dtype=torch.float32)
+    triggered_features = apply_attacker_induced_common_context(
+        features, trigger_indices, trigger_value
+    )
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, flat_parameters)
+    model.eval()
+    with torch.no_grad():
+        logits = logits_for_samples(model, triggered_features)
+        predictions = torch.argmax(logits, dim=-1)
+    benign_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
+    rate = float((predictions == benign_index).float().mean())
+    return MetricResult(rate, len(rows.sample_ids))
+
+
+def recovery_backdoor_alarm_threshold(
+    prepared_root: Path,
+    config: ScientificConfig,
+    anchor: RealAnchor,
+) -> float | None:
+    trigger_feature_names = NBAIOT_TRIGGER_FEATURES
+    trigger_value = (
+        config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
+    )
+    rates: list[float] = []
+    for domain in NBAIOT_DOMAIN_ORDER:
+        rate = triggered_to_benign_rate(
+            prepared_root,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.ANCHOR_VALIDATION,
+            trigger_feature_names,
+            trigger_value,
+        )
+        if rate.value is not None:
+            rates.append(rate.value)
+    if not rates:
+        return None
+    return recovery_alarm_threshold(
+        rates, config.baselines.recovery_after_source_admission.backdoor_alarm_percentile
     )
 
 

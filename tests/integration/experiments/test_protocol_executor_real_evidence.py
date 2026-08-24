@@ -416,6 +416,22 @@ def test_update_reconstruction_filter_baseline_trains_and_evaluates_a_real_model
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_recovery_after_source_admission_baseline_evaluates_the_rollback_decision(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        method=BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
+        condition="Useful Backdoored Source — 5%",
+        master_seed=35,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
 def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
     prepared_root: Path,
 ) -> None:
