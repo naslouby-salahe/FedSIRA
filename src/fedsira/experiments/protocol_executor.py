@@ -24,11 +24,6 @@ from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     parameter_similarity_certification_row_results,
-    reconstruction_error,
-    reconstruction_filter_accepts,
-    reconstruction_filter_calibration_error_count,
-    reconstruction_filter_reweight,
-    reconstruction_rejection_threshold,
     recovery_alarm_threshold,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
@@ -181,6 +176,7 @@ from fedsira.experiments.real_evidence import (
     train_secure_continual_assessment_delta,
     train_source_candidate_delta,
     train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
 )
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -1040,6 +1036,34 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "density-cluster-trimmed-mean-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _update_reconstruction_filter_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        delta = train_update_reconstruction_filter_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + delta
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "update-reconstruction-filter-claim",
             source_domain,
             (),
             (),
@@ -2065,21 +2089,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value:
-            reconstruction_error(
-                torch.zeros(3),
-                torch.zeros(3),
-                config.baselines.reconstruction_filter.normalization_epsilon,
-            )
-            reconstruction_filter_calibration_error_count(
-                config.model.anchor_fedavg.rounds, len(NBAIOT_DOMAIN_ORDER)
-            )
-            reconstruction_rejection_threshold(
-                (0.0, 1.0, 2.0),
-                config.baselines.reconstruction_filter.calibration_percentile,
-            )
-            reconstruction_filter_accepts(1.0, 2.0)
-            reconstruction_filter_reweight((), ())
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._update_reconstruction_filter_outcome(cell, config, evidence)
         elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
             state = self._density_cluster_trimmed_mean_outcome(cell, config, evidence)
         elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
