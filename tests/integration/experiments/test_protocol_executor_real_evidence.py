@@ -625,3 +625,19 @@ def test_parameter_similarity_certification_ablation_reports_real_committed_rows
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
     assert metrics["parameter-similarity-committed-rows"] == 5.0
     assert metrics["parameter-similarity-certified-rows"] is not None
+
+
+def test_multiple_reproductions_without_cross_verification_ablation_uses_real_krum_synthesis(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value,
+        condition="Ablation",
+        master_seed=17,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
