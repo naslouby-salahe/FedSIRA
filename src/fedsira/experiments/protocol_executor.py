@@ -438,7 +438,10 @@ def _row_requirement(
         BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
     ):
         return 1
-    if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
+    if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value or (
+        cell.experiment == MECHANISM_ABLATION_NAME
+        and cell.method == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value
+    ):
         return config.baselines.three_row_coordinate_median.row_count
     return config.protocol.synthesis.committee_size
 
@@ -1601,9 +1604,14 @@ class ProtocolCellExecutor(CellExecutor):
                 extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value:
             validate_three_row_coordinate_median_committee_size(
-                config.baselines.three_row_coordinate_median.row_count,
+                _row_requirement(cell, config, self._resolved_core),
                 config.baselines.three_row_coordinate_median,
             )
+            if krum_committee_is_admissible(3, 1):
+                raise ValueError(
+                    "Generic Three-Row Threshold requires the Krum n=3,f=1 branch to be Invalid"
+                )
+            extra.append(("krum-n3-f1-invalid", 1.0))
         elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0,
@@ -2014,8 +2022,11 @@ class ProtocolCellExecutor(CellExecutor):
         direct_krum_active = (
             cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
         )
-        coordinate_median_active = (
-            cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value
+        coordinate_median_active = cell.method == (
+            BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value
+        ) or (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value
         )
         multiple_reproductions_without_verification_active = (
             cell.experiment == MECHANISM_ABLATION_NAME
