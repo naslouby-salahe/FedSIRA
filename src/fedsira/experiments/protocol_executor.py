@@ -76,11 +76,12 @@ from fedsira.baselines.robust_aggregation import (
 from fedsira.baselines.source_authority import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+    SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
+    SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
     client_review_direct_admission_production_is_source,
     client_review_then_retrain_local_epochs,
     client_review_then_retrain_should_discard_source_weights,
     independent_local_reference_reviewer_is_positive,
-    secure_continual_assessment_post_reference_rounds,
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
 )
@@ -183,6 +184,7 @@ from fedsira.experiments.real_evidence import (
     train_anchor,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
+    train_secure_continual_assessment_delta,
     train_source_candidate_delta,
 )
 from fedsira.experiments.registry import (
@@ -962,6 +964,47 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "krum-reference-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _secure_continual_assessment_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        positive_report_count = sum(
+            1
+            for _reviewer in range(SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT)
+            if resolve_ternary_outcome(True, True) is TernaryOutcome.POSITIVE
+        )
+        review_state = review_style_baseline_outcome(
+            adequate_reviewer_count=SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
+            positive_report_count=positive_report_count,
+            panel_size=SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
+            required_positive_reports=SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
+        )
+        if review_state is not ClaimState.ADMITTED:
+            return review_state
+        delta = train_secure_continual_assessment_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + delta
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "secure-continual-assessment-claim",
             source_domain,
             (),
             (),
@@ -1798,8 +1841,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
-            secure_continual_assessment_post_reference_rounds(config.baselines)
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._secure_continual_assessment_outcome(cell, config, evidence)
         elif method == BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value:
             recovery_rollback_is_triggered(
                 MetricResult(None, 0),

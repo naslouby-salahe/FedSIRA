@@ -13,6 +13,8 @@ CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.POST_REFERENCE_REPLAY,
 )
 CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT: Final[PositiveInt] = 3
+SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT: Final[PositiveInt] = 3
+SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS: Final[PositiveInt] = 2
 
 
 def client_review_direct_admission_production_is_source(

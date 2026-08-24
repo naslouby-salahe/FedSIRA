@@ -18,6 +18,7 @@ from fedsira.baselines.robust_aggregation import (
     krum_reference_post_reference_rounds,
     krum_reference_round_participants,
 )
+from fedsira.baselines.source_authority import secure_continual_assessment_post_reference_rounds
 from fedsira.boundaries.capability_granularity import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
@@ -93,6 +94,7 @@ ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"
 SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
+SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -567,12 +569,14 @@ def train_source_candidate_delta(
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
 
 
-def train_fedavg_reference_delta(
+def _train_ordinary_fedavg_delta(
     prepared_root: Path,
     config: ScientificConfig,
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
+    rounds: int,
+    algorithm_token: CanonicalToken,
 ) -> torch.Tensor | None:
     source_rows_available = source_domain is not None and (
         load_prepared_rows(
@@ -590,7 +594,7 @@ def train_fedavg_reference_delta(
     state_dict = model.state_dict()
     local_epochs = fedavg_reference_post_reference_local_epochs()
     any_round_trained = False
-    for round_index in range(fedavg_reference_post_reference_rounds(config.baselines)):
+    for round_index in range(rounds):
         round_clients: list[
             tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed]
         ] = []
@@ -604,7 +608,7 @@ def train_fedavg_reference_delta(
                 master_seed,
                 anchor.dataset_manifest_hash,
                 _flat_parameters_identity(anchor.flat_parameters),
-                FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+                algorithm_token,
                 domain,
                 round_index,
             )
@@ -627,6 +631,42 @@ def train_fedavg_reference_delta(
     final_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
     final_model.load_state_dict(state_dict)
     return flatten_trainable_parameters(final_model) - anchor.flat_parameters
+
+
+def train_fedavg_reference_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    return _train_ordinary_fedavg_delta(
+        prepared_root,
+        config,
+        master_seed,
+        anchor,
+        source_domain,
+        fedavg_reference_post_reference_rounds(config.baselines),
+        FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+    )
+
+
+def train_secure_continual_assessment_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    return _train_ordinary_fedavg_delta(
+        prepared_root,
+        config,
+        master_seed,
+        anchor,
+        source_domain,
+        secure_continual_assessment_post_reference_rounds(config.baselines),
+        SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN,
+    )
 
 
 def _flatten_state_dict(
