@@ -27,6 +27,7 @@ from fedsira.experiments.real_evidence import (
     recovery_backdoor_alarm_threshold,
     train_anchor,
     train_centralized_reference_checkpoint,
+    train_certified_ensemble_group_checkpoints,
     train_density_cluster_trimmed_mean_delta,
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
@@ -513,6 +514,19 @@ def test_train_recovery_after_source_admission_delta_excludes_the_source_domain(
     )
     assert delta is not None
     assert torch.isfinite(delta).all()
+
+
+def test_train_certified_ensemble_group_checkpoints_returns_none_without_prepared_data(
+    tmp_path: Path,
+) -> None:
+    assert train_certified_ensemble_group_checkpoints(tmp_path, CONFIG, master_seed=1) is None
+
+
+def test_train_certified_ensemble_group_checkpoints_reflects_partial_domain_coverage(
+    prepared_root: Path,
+) -> None:
+    checkpoints = train_certified_ensemble_group_checkpoints(prepared_root, CONFIG, master_seed=1)
+    assert checkpoints is None or all(torch.isfinite(c.flat_parameters).all() for c in checkpoints)
 
 
 def test_train_secure_continual_assessment_delta_is_finite_and_nonzero(

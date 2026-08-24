@@ -23,6 +23,12 @@ from fedsira.baselines.calibration import (
     select_largest_density_cluster,
     trimmed_mean_aggregate,
 )
+from fedsira.baselines.certified_ensemble import (
+    certified_ensemble_domain_groups,
+    certified_ensemble_post_reference_rounds,
+    ensemble_predicted_label,
+    validate_group_without_target_member_uses_supported_only,
+)
 from fedsira.baselines.references import (
     centralized_reference_local_epochs,
     centralized_reference_pooled_rows,
@@ -122,6 +128,8 @@ DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED
 CALIBRATION_TRAINING_ALGORITHM_TOKEN = "ANCHOR_ROUND_CALIBRATION"
 UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN = "UPDATE_RECONSTRUCTION_FILTER"
 RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURCE_ADMISSION"
+CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_ANCHOR"
+CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_POST_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -1122,6 +1130,266 @@ def train_recovery_after_source_admission_delta(
         POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS,
         RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
         exclude_source_from_participants=True,
+    )
+
+
+@dataclass(frozen=True)
+class GroupCheckpoint:
+    input_width: int
+    output_width: int
+    flat_parameters: torch.Tensor
+
+
+def _group_anchor_checkpoint(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    group_domains: Sequence[NBaiotDomain],
+    group_index: int,
+) -> GroupCheckpoint | None:
+    first_rows = load_prepared_rows(
+        prepared_root, group_domains[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
+    )
+    if first_rows is None:
+        return None
+    input_width = len(first_rows.features[0])
+    output_width = len(NBAIOT_CLASS_ORDER)
+    initialization_seed = derive_uint32(
+        "CERTIFIED_ENSEMBLE_GROUP_INIT",
+        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
+        group_index,
+    )
+    seed_job_local_rng_streams(initialization_seed)
+    initial_state = FedSIRAClassifier(input_width, output_width).state_dict()
+    start_checkpoint_identity = f"certified-ensemble-group-{group_index}-anchor-start"
+    clients_per_round: list[
+        tuple[tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed], ...]
+    ] = []
+    for round_index in range(config.model.anchor_fedavg.rounds):
+        round_clients: list[
+            tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed]
+        ] = []
+        for domain in group_domains:
+            combined_features: list[torch.Tensor] = []
+            combined_labels: list[torch.Tensor] = []
+            combined_sample_ids: list[ArtifactDigest] = []
+            for class_id in NBAIOT_CLASS_ORDER:
+                if class_id is NBaiotClass.GAFGYT_COMBO:
+                    continue
+                tensor_view = _tensor_view(
+                    load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
+                )
+                if tensor_view is None:
+                    continue
+                features, labels, sample_ids = tensor_view
+                combined_features.append(features)
+                combined_labels.append(labels)
+                combined_sample_ids.extend(sample_ids)
+            if not combined_features:
+                continue
+            training_seed = _training_seed(
+                master_seed,
+                dataset_manifest_hash(prepared_root),
+                start_checkpoint_identity,
+                CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN,
+                domain,
+                round_index,
+            )
+            round_clients.append(
+                (
+                    torch.cat(combined_features, dim=0),
+                    torch.cat(combined_labels, dim=0),
+                    tuple(combined_sample_ids),
+                    training_seed,
+                )
+            )
+        if not round_clients:
+            return None
+        clients_per_round.append(tuple(round_clients))
+    final_state, _round_checkpoints = run_anchor_fedavg_training(
+        input_width,
+        output_width,
+        initial_state,
+        config.model.optimizer.anchor_and_standard_fl_learning_rate,
+        config.model.optimizer,
+        config.model.training,
+        config.model.anchor_fedavg,
+        clients_per_round,
+    )
+    model = FedSIRAClassifier(input_width, output_width)
+    model.load_state_dict(final_state)
+    return GroupCheckpoint(
+        input_width=input_width,
+        output_width=output_width,
+        flat_parameters=flatten_trainable_parameters(model),
+    )
+
+
+def _group_post_reference_round_clients(
+    prepared_root: Path,
+    master_seed: MasterSeed,
+    group_domains: Sequence[NBaiotDomain],
+    group_index: int,
+    round_index: int,
+) -> list[tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed]]:
+    manifest_hash = dataset_manifest_hash(prepared_root)
+    start_checkpoint_identity = f"certified-ensemble-group-{group_index}-post-reference-start"
+    has_target_bearing_member = False
+    group_target_row_count = 0
+    clients: list[tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed]] = []
+    for domain in group_domains:
+        target_rows = load_prepared_rows(
+            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION
+        )
+        if target_rows is not None:
+            has_target_bearing_member = True
+            group_target_row_count += target_rows.row_count
+        combined = _combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
+        if combined is not None:
+            features, labels, sample_ids, _is_supported = combined
+        else:
+            supported_features: list[torch.Tensor] = []
+            supported_labels: list[torch.Tensor] = []
+            supported_sample_ids: list[ArtifactDigest] = []
+            for class_id in NBAIOT_CLASS_ORDER:
+                if class_id is NBaiotClass.GAFGYT_COMBO:
+                    continue
+                tensor_view = _tensor_view(
+                    load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+                )
+                if tensor_view is None:
+                    continue
+                sf, sl, sid = tensor_view
+                supported_features.append(sf)
+                supported_labels.append(sl)
+                supported_sample_ids.extend(sid)
+            if not supported_features:
+                continue
+            features = torch.cat(supported_features, dim=0)
+            labels = torch.cat(supported_labels, dim=0)
+            sample_ids = tuple(supported_sample_ids)
+        training_seed = _training_seed(
+            master_seed,
+            manifest_hash,
+            start_checkpoint_identity,
+            CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+            domain,
+            round_index,
+        )
+        clients.append((features, labels, sample_ids, training_seed))
+    validate_group_without_target_member_uses_supported_only(
+        has_target_bearing_member, 0 if has_target_bearing_member else group_target_row_count
+    )
+    return clients
+
+
+def train_certified_ensemble_group_checkpoints(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+) -> tuple[GroupCheckpoint, ...] | None:
+    domain_partition_namespace_seed = namespace_seed(master_seed, SeedNamespace.DOMAIN_PARTITION)
+    groups = certified_ensemble_domain_groups(
+        domain_partition_namespace_seed,
+        config.baselines.multiple_model_certified_ensemble_group_count,
+    )
+    checkpoints: list[GroupCheckpoint] = []
+    for group_index, group_domains in enumerate(groups):
+        group_anchor = _group_anchor_checkpoint(
+            prepared_root, config, master_seed, group_domains, group_index
+        )
+        if group_anchor is None:
+            return None
+        model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
+        load_flat_trainable_parameters(model, group_anchor.flat_parameters)
+        state_dict = model.state_dict()
+        for round_index in range(certified_ensemble_post_reference_rounds(config.baselines)):
+            round_clients = _group_post_reference_round_clients(
+                prepared_root, master_seed, group_domains, group_index, round_index
+            )
+            if not round_clients:
+                continue
+            state_dict = run_fedavg_round(
+                state_dict,
+                group_anchor.input_width,
+                group_anchor.output_width,
+                config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                config.model.optimizer,
+                config.model.training,
+                1,
+                round_clients,
+            )
+        final_model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
+        final_model.load_state_dict(state_dict)
+        checkpoints.append(
+            GroupCheckpoint(
+                input_width=group_anchor.input_width,
+                output_width=group_anchor.output_width,
+                flat_parameters=flatten_trainable_parameters(final_model),
+            )
+        )
+    return tuple(checkpoints)
+
+
+def _ensemble_predictions_for_domain(
+    prepared_root: Path,
+    group_checkpoints: Sequence[GroupCheckpoint],
+    domain: NBaiotDomain,
+    role: Role,
+) -> tuple[list[CanonicalToken], list[CanonicalToken]] | None:
+    true_labels: list[CanonicalToken] = []
+    predicted_labels: list[CanonicalToken] = []
+    models: list[FedSIRAClassifier] = []
+    for checkpoint in group_checkpoints:
+        model = FedSIRAClassifier(checkpoint.input_width, checkpoint.output_width)
+        load_flat_trainable_parameters(model, checkpoint.flat_parameters)
+        model.eval()
+        models.append(model)
+    for class_id in NBAIOT_CLASS_ORDER:
+        rows = load_prepared_rows(prepared_root, domain, class_id, role)
+        if rows is None:
+            continue
+        features = torch.tensor(rows.features, dtype=torch.float32)
+        with torch.no_grad():
+            per_model_logits = [logits_for_samples(model, features) for model in models]
+        for sample_index in range(features.shape[0]):
+            predicted_indices: list[int] = []
+            softmax_probabilities: list[tuple[float, ...]] = []
+            for logits in per_model_logits:
+                sample_logits = logits[sample_index]
+                predicted_indices.append(int(torch.argmax(sample_logits)))
+                probabilities = torch.softmax(sample_logits, dim=-1)
+                softmax_probabilities.append(tuple(float(value) for value in probabilities))
+            ensemble_index = ensemble_predicted_label(predicted_indices, softmax_probabilities)
+            true_labels.append(class_id.value)
+            predicted_labels.append(NBAIOT_CLASS_ORDER[ensemble_index].value)
+    if not true_labels:
+        return None
+    return true_labels, predicted_labels
+
+
+def evaluate_certified_ensemble(
+    prepared_root: Path,
+    group_checkpoints: Sequence[GroupCheckpoint],
+    domain: NBaiotDomain,
+    role: Role,
+) -> DomainTargetMetrics | None:
+    result = _ensemble_predictions_for_domain(prepared_root, group_checkpoints, domain, role)
+    if result is None:
+        return None
+    true_labels, predicted_labels = result
+    class_tokens = tuple(class_id.value for class_id in NBAIOT_CLASS_ORDER)
+    counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
+    f1_by_class = {token: f1_for_class(counts) for token, counts in counts_by_class.items()}
+    supported_f1 = {
+        token: f1_by_class[token]
+        for token in class_tokens
+        if token != NBaiotClass.GAFGYT_COMBO.value
+    }
+    return DomainTargetMetrics(
+        target_f1=f1_by_class.get(NBaiotClass.GAFGYT_COMBO.value, MetricResult(None, 0)),
+        supported_macro_f1=macro_f1(supported_f1),
+        benign_far=benign_false_alarm_rate(true_labels, predicted_labels, NBaiotClass.BENIGN.value),
     )
 
 
