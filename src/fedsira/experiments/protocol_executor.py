@@ -168,6 +168,7 @@ from fedsira.evaluation.records import (
     ProposalOracleLabel,
 )
 from fedsira.evaluation.screen import screen_fold_index
+from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
@@ -385,7 +386,11 @@ def load_prepared_evidence_counts(
     )
 
 
-def _opening_mode_for_cell(cell: ScientificCell) -> ClaimOpeningMode:
+def _opening_mode_for_cell(
+    cell: ScientificCell, resolved_core: ResolvedCore | None = None
+) -> ClaimOpeningMode:
+    if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
+        return resolved_core.opening_mode
     if cell.method == OpeningMode.PROPOSAL_ASSISTED.value:
         return ClaimOpeningMode.PROPOSAL_ASSISTED
     return ClaimOpeningMode.CANDIDATE_FREE
@@ -431,7 +436,11 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
     )
 
 
-def _row_requirement(cell: ScientificCell, config: ScientificConfig) -> int:
+def _row_requirement(
+    cell: ScientificCell, config: ScientificConfig, resolved_core: ResolvedCore | None = None
+) -> int:
+    if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
+        return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
     if cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
         return 1
     return config.protocol.synthesis.committee_size
@@ -731,11 +740,19 @@ def _compromised_verifier_count(condition: CanonicalToken) -> int:
     return 0
 
 
+RESOLVED_FEDSIRA_CORE_METHOD = "Resolved FedSIRA Core"
+
+
 class ProtocolCellExecutor(CellExecutor):
-    def __init__(self, prepared_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        prepared_root: Path | None = None,
+        resolved_core: ResolvedCore | None = None,
+    ) -> None:
         self._prepared_root = prepared_root or prepared_evidence_root(
             DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
         )
+        self._resolved_core = resolved_core
         self._real_anchor_cache: dict[MasterSeed, RealAnchor | None] = {}
         self._pending_real_report: RealReportSummary | None = None
 
@@ -1326,11 +1343,16 @@ class ProtocolCellExecutor(CellExecutor):
         if not training_entries:
             return ClaimState.DORMANT
         source_domain = _source_domain_for_cell(cell)
-        external_verification_active = (
-            cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
-            and cell.method == SourceExclusionMethod.FULL_FEDSIRA.value
-        )
-        row_requirement = _row_requirement(cell, config)
+        if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
+            if self._resolved_core is None:
+                return ClaimState.DORMANT
+            external_verification_active = self._resolved_core.external_verification_survives
+        else:
+            external_verification_active = (
+                cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
+                and cell.method == SourceExclusionMethod.FULL_FEDSIRA.value
+            )
+        row_requirement = _row_requirement(cell, config, self._resolved_core)
         progression_state, attempts, commitment_hashes = _reproduction_progression(
             cell,
             config,
@@ -1378,10 +1400,17 @@ class ProtocolCellExecutor(CellExecutor):
                 tuple(attempt.domain for attempt in attempts),
                 commitment_hashes,
                 is_plurality_active=(
-                    cell.experiment == SINGLE_REPRODUCTION_NECESSITY_NAME
-                    and cell.method == "Full Plurality Path"
+                    (
+                        cell.experiment == SINGLE_REPRODUCTION_NECESSITY_NAME
+                        and cell.method == "Full Plurality Path"
+                    )
+                    or (
+                        cell.method == RESOLVED_FEDSIRA_CORE_METHOD
+                        and self._resolved_core is not None
+                        and self._resolved_core.plurality_survives
+                    )
                 ),
-                opening_mode=_opening_mode_for_cell(cell),
+                opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
                 master_seed=cell.master_seed,
                 anchor=self._real_anchor(config, cell.master_seed),
