@@ -48,7 +48,6 @@ pytestmark = pytest.mark.skip(
     " Re-enable deliberately when verifying fedsira.experiments.protocol_executor."
 )
 
-
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 RESOLVED_CORE = resolve_core_mapping(True, True, True)
 CLASSES = (NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO, NBaiotClass.GAFGYT_JUNK)

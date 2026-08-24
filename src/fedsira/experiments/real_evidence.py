@@ -8,6 +8,11 @@ from pathlib import Path
 import pandas
 import torch
 
+from fedsira.attacks.source_backdoor import (
+    apply_trigger_transform,
+    relabel_triggered_rows_as_benign,
+    select_source_backdoor_poison_rows,
+)
 from fedsira.attacks.transform import balanced_50_50_selection
 from fedsira.baselines.calibration import (
     clip_source_update,
@@ -77,7 +82,13 @@ from fedsira.domain.enums import (
     RootCause,
     SeedNamespace,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed, MasterSeed
+from fedsira.domain.records import (
+    ArtifactDigest,
+    CanonicalToken,
+    DerivedSeed,
+    MasterSeed,
+    Probability,
+)
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
     decile_bin,
@@ -172,6 +183,44 @@ class RootCauseScope:
     root_cause_b_feature_name: CanonicalToken
     shift_value: float
     balanced_selection_seed: DerivedSeed | None = None
+
+
+@dataclass(frozen=True)
+class BackdoorScope:
+    attack_generation_seed: DerivedSeed
+    poison_fraction: Probability
+    trigger_feature_indices: tuple[int, ...]
+    trigger_value: float
+
+
+def _poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
+    poisoned_ids = select_source_backdoor_poison_rows(
+        rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
+    )
+    if not poisoned_ids:
+        return rows
+    poisoned_id_set = frozenset(poisoned_ids)
+    labels_by_row_id = dict(
+        zip(rows.sample_ids, (NBaiotClass(label) for label in rows.labels), strict=True)
+    )
+    relabeled = relabel_triggered_rows_as_benign(labels_by_row_id, poisoned_ids)
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[CanonicalToken] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in poisoned_id_set:
+            kept_features.append(features)
+            kept_labels.append(relabeled[sample_id].value)
+            continue
+        triggered = apply_trigger_transform(
+            torch.tensor(features, dtype=torch.float32),
+            scope.trigger_feature_indices,
+            scope.trigger_value,
+        )
+        kept_features.append(tuple(float(value) for value in triggered))
+        kept_labels.append(relabeled[sample_id].value)
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
+    )
 
 
 def _scope_and_shift_rows(
@@ -886,6 +935,7 @@ def _combined_post_reference_rows(
     target_role: Role,
     root_cause_scope: RootCauseScope | None = None,
     epistemic_failure_scope: EpistemicFailureScope | None = None,
+    backdoor_scope: BackdoorScope | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
     target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
     if target_rows is not None and root_cause_scope is not None:
@@ -920,6 +970,8 @@ def _combined_post_reference_rows(
             and epistemic_failure_scope.failure_type is EpistemicFailureType.SHARED_LABEL_ERROR
         ):
             rows, relabeled_mask = _relabel_shared_label_error_rows(rows, epistemic_failure_scope)
+        if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and backdoor_scope is not None:
+            rows = _poison_backdoor_rows(rows, backdoor_scope)
         replay_tensor = _tensor_view(rows)
         if replay_tensor is None:
             continue
@@ -998,8 +1050,11 @@ def train_source_candidate_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: NBaiotDomain,
+    backdoor_scope: BackdoorScope | None = None,
 ) -> torch.Tensor | None:
-    combined = _combined_post_reference_rows(prepared_root, source_domain, Role.SOURCE_PROPOSAL)
+    combined = _combined_post_reference_rows(
+        prepared_root, source_domain, Role.SOURCE_PROPOSAL, backdoor_scope=backdoor_scope
+    )
     if combined is None:
         return None
     features, labels, sample_ids, is_supported = combined
@@ -1039,6 +1094,35 @@ def train_source_candidate_delta(
         config.model.post_reference.local_epochs,
     )
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
+def compute_source_backdoor_asr(
+    prepared_root: Path,
+    anchor: RealAnchor,
+    production_flat_parameters: torch.Tensor,
+    source_domain: NBaiotDomain,
+    trigger_feature_indices: tuple[int, ...],
+    trigger_value: float,
+) -> MetricResult:
+    rows = load_prepared_rows(
+        prepared_root, source_domain, NBaiotClass.GAFGYT_UDP, Role.REPORT_TEST
+    )
+    tensor_view = _tensor_view(rows)
+    if tensor_view is None:
+        return MetricResult(None, 0)
+    features, _labels, _sample_ids = tensor_view
+    triggered_features = features.clone()
+    for feature_index in trigger_feature_indices:
+        triggered_features[:, feature_index] = trigger_value
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, production_flat_parameters)
+    model.eval()
+    with torch.no_grad():
+        logits = logits_for_samples(model, triggered_features)
+        predictions = torch.argmax(logits, dim=1)
+    benign_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
+    asr = float((predictions == benign_index).float().mean())
+    return MetricResult(asr, triggered_features.shape[0])
 
 
 def train_generic_hard_supported_examples_delta(
