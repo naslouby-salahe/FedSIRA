@@ -15,11 +15,6 @@ from fedsira.attacks.reproduction import (
     source_copy_update,
     verifier_aware_training_step,
 )
-from fedsira.attacks.source_backdoor import (
-    apply_trigger_transform,
-    relabel_triggered_rows_as_benign,
-    select_source_backdoor_poison_rows,
-)
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     parameter_similarity_certification_row_results,
@@ -148,6 +143,7 @@ from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
+    BackdoorScope,
     EpistemicFailureScope,
     RealAnchor,
     RealReportSummary,
@@ -157,6 +153,7 @@ from fedsira.experiments.real_evidence import (
     compute_real_report_summary,
     compute_screen_differential,
     compute_shared_epistemic_failure_summary,
+    compute_source_backdoor_asr,
     compute_unmatched_screen_differential,
     domain_anchor_train_feature_mean,
     evaluate_certified_ensemble,
@@ -1046,13 +1043,39 @@ class ProtocolCellExecutor(CellExecutor):
             benign_far_increase,
         )
 
+    def _backdoor_scope_for_cell(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> BackdoorScope | None:
+        if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
+            return None
+        real_feature_names = prepared_feature_names(self._prepared_root)
+        if real_feature_names is None:
+            return None
+        trigger_indices = tuple(real_feature_names.index(name) for name in NBAIOT_TRIGGER_FEATURES)
+        return BackdoorScope(
+            attack_generation_seed=derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed),
+            poison_fraction=(
+                config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction
+            ),
+            trigger_feature_indices=trigger_indices,
+            trigger_value=(
+                config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
+            ),
+        )
+
     def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
         real_anchor = self._real_anchor(config, cell.master_seed)
         positive_report_count = 0
         if real_anchor is not None and source_domain is not None:
+            backdoor_scope = self._backdoor_scope_for_cell(cell, config)
             source_delta = train_source_candidate_delta(
-                self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+                self._prepared_root,
+                config,
+                cell.master_seed,
+                real_anchor,
+                source_domain,
+                backdoor_scope=backdoor_scope,
             )
             if source_delta is not None and self._candidate_capability_contract_passes(
                 config, real_anchor, source_domain, real_anchor.flat_parameters + source_delta
@@ -2539,24 +2562,35 @@ class ProtocolCellExecutor(CellExecutor):
             )
         else:
             state = self._advance_protocol(cell, config, evidence)
+        extra: list[tuple[CanonicalToken, float | None]] = []
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
-            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-            poison_rows = select_source_backdoor_poison_rows(
-                ("udp-1", "udp-2"),
-                config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction,
-                attack_seed,
-            )
-            relabel_triggered_rows_as_benign({"udp-1": NBaiotClass.GAFGYT_UDP}, poison_rows or ())
-            apply_trigger_transform(
-                torch.zeros(1, 115),
-                (0, 1, 2, 3),
-                config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
-            )
+            real_anchor = self._real_anchor(config, cell.master_seed)
+            source_domain = _source_domain_for_cell(cell)
+            backdoor_scope = self._backdoor_scope_for_cell(cell, config)
+            if real_anchor is not None and source_domain is not None and backdoor_scope is not None:
+                source_delta = train_source_candidate_delta(
+                    self._prepared_root,
+                    config,
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
+                    backdoor_scope=backdoor_scope,
+                )
+                if source_delta is not None:
+                    asr = compute_source_backdoor_asr(
+                        self._prepared_root,
+                        real_anchor,
+                        real_anchor.flat_parameters + source_delta,
+                        source_domain,
+                        backdoor_scope.trigger_feature_indices,
+                        backdoor_scope.trigger_value,
+                    )
+                    extra.append(("source-backdoor-asr", asr.value))
         metrics = _metrics_from_state(state, self._pending_real_report)
         malicious_admission = 0.0
         if method != full_fedsira and state is ClaimState.ADMITTED:
             malicious_admission = 1.0
-        return state, (*metrics, ("malicious-admission", malicious_admission))
+        return state, (*metrics, ("malicious-admission", malicious_admission), *extra)
 
     def _execute_external_verification_cell(
         self,

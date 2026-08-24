@@ -13,6 +13,7 @@ from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass,
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.records import CanonicalToken
 from fedsira.experiments.real_evidence import (
+    BackdoorScope,
     EpistemicFailureScope,
     RealAnchor,
     RootCauseScope,
@@ -20,6 +21,7 @@ from fedsira.experiments.real_evidence import (
     anchor_round_reconstruction_calibration_errors,
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
+    compute_source_backdoor_asr,
     domain_anchor_train_feature_mean,
     evaluate_domain,
     non_source_domains,
@@ -37,6 +39,7 @@ from fedsira.experiments.real_evidence import (
     train_local_only_reference_checkpoint,
     train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,
+    train_source_candidate_delta,
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
     triggered_to_benign_rate,
@@ -49,7 +52,6 @@ pytestmark = pytest.mark.skip(
     " to avoid competing for CPU with other work. Re-enable deliberately when verifying"
     " fedsira.experiments.real_evidence."
 )
-
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 DOMAINS = (
@@ -74,10 +76,10 @@ def _write_csv(path: Path, row_count: int, offset: float) -> None:
     frame.to_csv(path, index=False)
 
 
-def _prepare_real_evidence(root: Path) -> Path:
+def _prepare_real_evidence(root: Path, classes: tuple[NBaiotClass, ...] = CLASSES) -> Path:
     discovered: list[DiscoveredCsvFile] = []
     for domain_index, domain in enumerate(DOMAINS):
-        for class_index, class_id in enumerate(CLASSES):
+        for class_index, class_id in enumerate(classes):
             relative_path = f"{class_id.value}.csv"
             absolute_path = root / "raw" / domain.value / relative_path
             absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,6 +109,19 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
 @pytest.fixture(scope="module")
 def anchor(prepared_root: Path) -> RealAnchor:
     result = train_anchor(prepared_root, CONFIG, master_seed=1)
+    assert result is not None
+    return result
+
+
+@pytest.fixture(scope="module")
+def prepared_root_with_udp(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    classes = (*CLASSES, NBaiotClass.GAFGYT_UDP)
+    return _prepare_real_evidence(tmp_path_factory.mktemp("real-evidence-udp"), classes=classes)
+
+
+@pytest.fixture(scope="module")
+def anchor_with_udp(prepared_root_with_udp: Path) -> RealAnchor:
+    result = train_anchor(prepared_root_with_udp, CONFIG, master_seed=1)
     assert result is not None
     return result
 
@@ -192,6 +207,77 @@ def test_train_generic_hard_supported_examples_delta_returns_none_without_prepar
         tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is None
+
+
+def _backdoor_scope(prepared_root: Path) -> BackdoorScope:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    trigger_indices = tuple(feature_names.index(name) for name in NBAIOT_TRIGGER_FEATURES)
+    return BackdoorScope(
+        attack_generation_seed=7,
+        poison_fraction=0.05,
+        trigger_feature_indices=trigger_indices,
+        trigger_value=6.0,
+    )
+
+
+def test_train_source_candidate_delta_with_backdoor_scope_is_finite_and_differs_from_clean(
+    prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
+) -> None:
+    scope = _backdoor_scope(prepared_root_with_udp)
+    clean_delta = train_source_candidate_delta(
+        prepared_root_with_udp,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor_with_udp,
+        source_domain=DOMAINS[0],
+    )
+    poisoned_delta = train_source_candidate_delta(
+        prepared_root_with_udp,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor_with_udp,
+        source_domain=DOMAINS[0],
+        backdoor_scope=scope,
+    )
+    assert clean_delta is not None
+    assert poisoned_delta is not None
+    assert torch.isfinite(poisoned_delta).all()
+    assert not torch.equal(clean_delta, poisoned_delta)
+
+
+def test_compute_source_backdoor_asr_is_a_defined_rate(
+    prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
+) -> None:
+    scope = _backdoor_scope(prepared_root_with_udp)
+    delta = train_source_candidate_delta(
+        prepared_root_with_udp,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor_with_udp,
+        source_domain=DOMAINS[0],
+        backdoor_scope=scope,
+    )
+    assert delta is not None
+    asr = compute_source_backdoor_asr(
+        prepared_root_with_udp,
+        anchor_with_udp,
+        anchor_with_udp.flat_parameters + delta,
+        DOMAINS[0],
+        scope.trigger_feature_indices,
+        scope.trigger_value,
+    )
+    assert asr.value is not None
+    assert 0.0 <= asr.value <= 1.0
+
+
+def test_compute_source_backdoor_asr_returns_na_without_report_test_rows(
+    anchor: RealAnchor,
+) -> None:
+    asr = compute_source_backdoor_asr(
+        Path("/nonexistent"), anchor, anchor.flat_parameters, DOMAINS[0], (0,), 6.0
+    )
+    assert asr.value is None
 
 
 def test_evaluate_domain_reports_defined_target_metrics_on_report_test(
@@ -551,20 +637,22 @@ def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_
 
 
 def test_recovery_backdoor_alarm_threshold_is_a_finite_rate(
-    prepared_root: Path, anchor: RealAnchor
+    prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
 ) -> None:
-    threshold = recovery_backdoor_alarm_threshold(prepared_root, CONFIG, anchor=anchor)
+    threshold = recovery_backdoor_alarm_threshold(
+        prepared_root_with_udp, CONFIG, anchor=anchor_with_udp
+    )
     assert threshold is not None
     assert 0.0 <= threshold <= 1.0
 
 
 def test_triggered_to_benign_rate_is_defined_for_gafgyt_udp_rows(
-    prepared_root: Path, anchor: RealAnchor
+    prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
 ) -> None:
     rate = triggered_to_benign_rate(
-        prepared_root,
-        anchor,
-        anchor.flat_parameters,
+        prepared_root_with_udp,
+        anchor_with_udp,
+        anchor_with_udp.flat_parameters,
         DOMAINS[0],
         Role.ANCHOR_VALIDATION,
         NBAIOT_TRIGGER_FEATURES,
