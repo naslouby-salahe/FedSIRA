@@ -170,13 +170,14 @@ from fedsira.evaluation.metrics import (
     report_metric_set,
     reproduction_attempt_count,
     supported_macro_f1_harm,
+    target_capability_gain,
 )
 from fedsira.evaluation.records import (
     AdmissionDelayDecomposition,
     MetricResult,
     ProposalOracleLabel,
 )
-from fedsira.evaluation.screen import run_proposal_screen_for_domain, screen_fold_index
+from fedsira.evaluation.screen import screen_fold_index
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
@@ -184,10 +185,12 @@ from fedsira.experiments.real_evidence import (
     RealReportSummary,
     certified_domain_delta_committee,
     compute_real_report_summary,
+    compute_screen_differential,
     evaluate_domain,
     non_source_domains,
     real_evidence_available,
     train_anchor,
+    train_source_candidate_delta,
 )
 from fedsira.experiments.registry import (
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -1031,6 +1034,16 @@ class ProtocolCellExecutor(CellExecutor):
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
         )
         contract_passes = _opening_identity(config).contract_passes
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_source_delta = (
+            train_source_candidate_delta(
+                self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+            )
+            if real_anchor is not None and source_domain is not None
+            else None
+        )
+        real_differential_a: float | None = None
         if not screen_evidence_is_adequate(
             evidence.screen_target_count, config.capability_claim.evidence_minima
         ):
@@ -1044,14 +1057,73 @@ class ProtocolCellExecutor(CellExecutor):
                 screen_domain_count=config.protocol.claim_opening.screen_domains,
             )
             if opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED:
-                screen_decision = screen_domain_decision_is_positive(
-                    None,
-                    MetricResult(None, 0),
-                    MetricResult(None, 0),
-                    MetricResult(None, 0),
-                    config.protocol.proposal_screen,
-                    config.capability_claim,
-                )
+                if (
+                    real_anchor is not None
+                    and real_source_delta is not None
+                    and source_domain is not None
+                ):
+                    differential_a = compute_screen_differential(
+                        self._prepared_root,
+                        config,
+                        cell.master_seed,
+                        real_anchor,
+                        real_source_delta,
+                        source_domain,
+                    )
+                    real_differential_a = differential_a
+                    anchor_screen = evaluate_domain(
+                        self._prepared_root,
+                        real_anchor,
+                        real_anchor.flat_parameters,
+                        source_domain,
+                        role=Role.POST_REFERENCE_REPLAY,
+                        target_role=Role.CANDIDATE_SCREEN,
+                    )
+                    source_screen = evaluate_domain(
+                        self._prepared_root,
+                        real_anchor,
+                        real_anchor.flat_parameters + real_source_delta,
+                        source_domain,
+                        role=Role.POST_REFERENCE_REPLAY,
+                        target_role=Role.CANDIDATE_SCREEN,
+                    )
+                    if anchor_screen is None or source_screen is None:
+                        target_f1_gain = MetricResult(None, 0)
+                        supported_macro_f1_drop = MetricResult(None, 0)
+                        benign_far_increase = MetricResult(None, 0)
+                    else:
+                        target_f1_gain = target_capability_gain(
+                            source_screen.target_f1, anchor_screen.target_f1
+                        )
+                        supported_macro_f1_drop = supported_macro_f1_harm(
+                            anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
+                        )
+                        benign_far_increase = (
+                            MetricResult(
+                                source_screen.benign_far.value - anchor_screen.benign_far.value,
+                                1,
+                            )
+                            if source_screen.benign_far.value is not None
+                            and anchor_screen.benign_far.value is not None
+                            else MetricResult(None, 0)
+                        )
+                    screen_decision = screen_domain_decision_is_positive(
+                        differential_a,
+                        target_f1_gain,
+                        supported_macro_f1_drop,
+                        benign_far_increase,
+                        config.protocol.proposal_screen,
+                        config.capability_claim,
+                    )
+                else:
+                    screen_decision = screen_domain_decision_is_positive(
+                        None,
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
+                        config.protocol.proposal_screen,
+                        config.capability_claim,
+                    )
                 opening_predicate = screen_decision or episode_is_legitimate
             else:
                 opening_predicate = (
@@ -1091,12 +1163,7 @@ class ProtocolCellExecutor(CellExecutor):
         screen_fold_for_target = screen_fold_index(
             "target-sample", screen_fold_seed, config.protocol.proposal_screen.fold_count
         )
-        screen_differential = run_proposal_screen_for_domain(
-            fold_assignment_by_sample_id={},
-            target_observations=(),
-            control_observations=(),
-            fold_count=config.protocol.proposal_screen.fold_count,
-        )
+        screen_differential = real_differential_a
         return state, (
             *metrics,
             ("claim-contract-passes", 1.0 if contract_passes else 0.0),

@@ -36,6 +36,11 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
 )
 from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.screen import (
+    ScreenLossObservation,
+    run_proposal_screen_for_domain,
+    screen_fold_index,
+)
 from fedsira.experiments.registry import ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.post_reference import run_post_reference_training
@@ -47,12 +52,14 @@ from fedsira.models.mlp import (
 )
 from fedsira.runtime.determinism import (
     canonical_bytes,
+    derive_uint32,
     local_training_seed,
     namespace_seed,
     seed_job_local_rng_streams,
 )
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"
+SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
@@ -318,12 +325,62 @@ def train_domain_reproduction_delta(
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
 
 
+def train_source_candidate_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain,
+) -> torch.Tensor | None:
+    combined = _combined_post_reference_rows(prepared_root, source_domain, Role.SOURCE_PROPOSAL)
+    if combined is None:
+        return None
+    features, labels, sample_ids, is_supported = combined
+    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
+    current_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(current_model, anchor.flat_parameters)
+    training_seed = _training_seed(
+        master_seed,
+        anchor.dataset_manifest_hash,
+        _flat_parameters_identity(anchor.flat_parameters),
+        SOURCE_TRAINING_ALGORITHM_TOKEN,
+        source_domain,
+        -1,
+    )
+    seed_job_local_rng_streams(training_seed)
+    optimizer = torch.optim.AdamW(
+        current_model.parameters(),
+        lr=config.model.optimizer.post_reference_learning_rate,
+        betas=config.model.optimizer.betas,
+        eps=config.model.optimizer.epsilon,
+        weight_decay=config.model.optimizer.weight_decay,
+    )
+    loss_function = torch.nn.CrossEntropyLoss()
+    run_post_reference_training(
+        anchor_model,
+        current_model,
+        optimizer,
+        loss_function,
+        config.model.training,
+        config.model.post_reference,
+        features,
+        labels,
+        is_supported,
+        sample_ids,
+        training_seed,
+        config.model.post_reference.local_epochs,
+    )
+    return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
 def evaluate_domain(
     prepared_root: Path,
     anchor: RealAnchor,
     flat_parameters: torch.Tensor,
     domain: NBaiotDomain,
     role: Role,
+    target_role: Role | None = None,
 ) -> DomainTargetMetrics | None:
     true_labels: list[CanonicalToken] = []
     predicted_labels: list[CanonicalToken] = []
@@ -332,7 +389,12 @@ def evaluate_domain(
     model.eval()
     with torch.no_grad():
         for class_id in NBAIOT_CLASS_ORDER:
-            rows = load_prepared_rows(prepared_root, domain, class_id, role)
+            row_role = (
+                target_role
+                if target_role is not None and class_id is NBaiotClass.GAFGYT_COMBO
+                else role
+            )
+            rows = load_prepared_rows(prepared_root, domain, class_id, row_role)
             tensor_view = _tensor_view(rows)
             if tensor_view is None:
                 continue
@@ -439,4 +501,81 @@ def compute_real_report_summary(
         ),
         supported_macro_f1_harm=equal_weight_domain_mean(supported_f1_harms, 1),
         benign_far_increase=equal_weight_domain_mean(benign_far_increases, 1),
+    )
+
+
+def _per_sample_cross_entropy(
+    model: FedSIRAClassifier, features: torch.Tensor, labels: torch.Tensor
+) -> torch.Tensor:
+    model.eval()
+    with torch.no_grad():
+        logits = logits_for_samples(model, features)
+        return torch.nn.functional.cross_entropy(logits, labels, reduction="none")
+
+
+def compute_screen_differential(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_delta: torch.Tensor,
+    domain: NBaiotDomain,
+) -> float | None:
+    target_tensor = _tensor_view(
+        load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN)
+    )
+    if target_tensor is None:
+        return None
+    target_features, target_labels, target_sample_ids = target_tensor
+    control_features_parts: list[torch.Tensor] = []
+    control_labels_parts: list[torch.Tensor] = []
+    control_sample_ids: list[ArtifactDigest] = []
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        replay_tensor = _tensor_view(
+            load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+        )
+        if replay_tensor is None:
+            continue
+        features, labels, sample_ids = replay_tensor
+        control_features_parts.append(features)
+        control_labels_parts.append(labels)
+        control_sample_ids.extend(sample_ids)
+    if not control_features_parts:
+        return None
+    control_features = torch.cat(control_features_parts, dim=0)
+    control_labels = torch.cat(control_labels_parts, dim=0)
+
+    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
+    source_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(source_model, anchor.flat_parameters + source_delta)
+
+    target_anchor_loss = _per_sample_cross_entropy(anchor_model, target_features, target_labels)
+    target_source_loss = _per_sample_cross_entropy(source_model, target_features, target_labels)
+    control_anchor_loss = _per_sample_cross_entropy(anchor_model, control_features, control_labels)
+    control_source_loss = _per_sample_cross_entropy(source_model, control_features, control_labels)
+
+    screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", master_seed)
+    fold_count = config.protocol.proposal_screen.fold_count
+    fold_assignment: dict[CanonicalToken, int] = {}
+    target_observations: list[ScreenLossObservation] = []
+    for index, sample_id in enumerate(target_sample_ids):
+        fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
+        target_observations.append(
+            ScreenLossObservation(
+                sample_id, float(target_anchor_loss[index]), float(target_source_loss[index])
+            )
+        )
+    control_observations: list[ScreenLossObservation] = []
+    for index, sample_id in enumerate(control_sample_ids):
+        fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
+        control_observations.append(
+            ScreenLossObservation(
+                sample_id, float(control_anchor_loss[index]), float(control_source_loss[index])
+            )
+        )
+    return run_proposal_screen_for_domain(
+        fold_assignment, target_observations, control_observations, fold_count
     )
