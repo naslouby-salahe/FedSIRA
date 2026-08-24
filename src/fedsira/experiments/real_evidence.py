@@ -9,9 +9,11 @@ import pandas
 import torch
 
 from fedsira.baselines.calibration import (
+    clip_source_update,
     cosine_distance_matrix,
     density_cluster_labels,
     l2_normalize,
+    sanitization_clip_bounds,
     select_largest_density_cluster,
     trimmed_mean_aggregate,
 )
@@ -110,6 +112,7 @@ SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSM
 LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
 CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CENTRALIZED_REFERENCE"
 DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
+CALIBRATION_TRAINING_ALGORITHM_TOKEN = "ANCHOR_ROUND_CALIBRATION"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -130,6 +133,7 @@ class RealAnchor:
     output_width: int
     flat_parameters: torch.Tensor
     dataset_manifest_hash: ArtifactDigest
+    round_start_flat_parameters: tuple[torch.Tensor, ...]
 
 
 @dataclass(frozen=True)
@@ -403,7 +407,7 @@ def train_anchor(
         if not round_clients:
             return None
         clients_per_round.append(tuple(round_clients))
-    final_state, _round_checkpoints = run_anchor_fedavg_training(
+    final_state, round_checkpoints = run_anchor_fedavg_training(
         input_width,
         output_width,
         initial_state,
@@ -415,12 +419,102 @@ def train_anchor(
     )
     model = FedSIRAClassifier(input_width, output_width)
     model.load_state_dict(final_state)
+    round_start_flat_parameters = tuple(
+        _flatten_state_dict(input_width, output_width, state)
+        for state in (initial_state, *round_checkpoints[:-1])
+    )
     return RealAnchor(
         input_width=input_width,
         output_width=output_width,
         flat_parameters=flatten_trainable_parameters(model),
         dataset_manifest_hash=manifest_hash,
+        round_start_flat_parameters=round_start_flat_parameters,
     )
+
+
+def anchor_round_calibration_updates(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+) -> tuple[torch.Tensor, ...]:
+    updates: list[torch.Tensor] = []
+    for round_index, round_start_flat in enumerate(anchor.round_start_flat_parameters):
+        for domain in NBAIOT_DOMAIN_ORDER:
+            combined_features: list[torch.Tensor] = []
+            combined_labels: list[torch.Tensor] = []
+            combined_sample_ids: list[ArtifactDigest] = []
+            for class_id in NBAIOT_CLASS_ORDER:
+                if class_id is NBaiotClass.GAFGYT_COMBO:
+                    continue
+                tensor_view = _tensor_view(
+                    load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_VALIDATION)
+                )
+                if tensor_view is None:
+                    continue
+                features, labels, sample_ids = tensor_view
+                combined_features.append(features)
+                combined_labels.append(labels)
+                combined_sample_ids.extend(sample_ids)
+            if not combined_features:
+                continue
+            features = torch.cat(combined_features, dim=0)
+            labels = torch.cat(combined_labels, dim=0)
+            sample_ids = tuple(combined_sample_ids)
+            training_seed = _training_seed(
+                master_seed,
+                anchor.dataset_manifest_hash,
+                _flat_parameters_identity(round_start_flat),
+                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
+                domain,
+                round_index,
+            )
+            round_start_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+            load_flat_trainable_parameters(round_start_model, round_start_flat)
+            client_state_dict, _example_count = train_one_client_locally(
+                round_start_model.state_dict(),
+                anchor.input_width,
+                anchor.output_width,
+                config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                config.model.optimizer,
+                config.model.training,
+                1,
+                features,
+                labels,
+                sample_ids,
+                training_seed,
+            )
+            client_flat = _flatten_state_dict(
+                anchor.input_width, anchor.output_width, client_state_dict
+            )
+            updates.append(client_flat - round_start_flat)
+    return tuple(updates)
+
+
+def train_source_update_sanitization_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    if source_domain is None:
+        return None
+    source_delta = train_source_candidate_delta(
+        prepared_root, config, master_seed, anchor, source_domain
+    )
+    if source_delta is None:
+        return None
+    calibration_updates = anchor_round_calibration_updates(
+        prepared_root, config, master_seed, anchor
+    )
+    if not calibration_updates:
+        return None
+    clip_bounds = sanitization_clip_bounds(
+        calibration_updates,
+        config.baselines.source_update_sanitization.coordinate_bound_percentile,
+    )
+    return clip_source_update(source_delta, clip_bounds)
 
 
 def train_local_only_reference_checkpoint(

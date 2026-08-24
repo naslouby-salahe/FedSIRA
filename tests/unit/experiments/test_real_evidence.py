@@ -16,6 +16,7 @@ from fedsira.experiments.real_evidence import (
     EpistemicFailureScope,
     RealAnchor,
     RootCauseScope,
+    anchor_round_calibration_updates,
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
     evaluate_domain,
@@ -30,6 +31,7 @@ from fedsira.experiments.real_evidence import (
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
     train_secure_continual_assessment_delta,
+    train_source_update_sanitization_delta,
 )
 from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -404,6 +406,38 @@ def test_train_density_cluster_trimmed_mean_delta_returns_none_without_prepared_
     assert (
         train_density_cluster_trimmed_mean_delta(
             tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        )
+        is None
+    )
+
+
+def test_anchor_round_calibration_updates_are_finite_and_match_expected_count(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    updates = anchor_round_calibration_updates(prepared_root, CONFIG, master_seed=1, anchor=anchor)
+    assert len(updates) > 0
+    assert len(anchor.round_start_flat_parameters) == CONFIG.model.anchor_fedavg.rounds
+    for update in updates:
+        assert update.shape == anchor.flat_parameters.shape
+        assert torch.isfinite(update).all()
+
+
+def test_train_source_update_sanitization_delta_is_finite_and_clipped(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_source_update_sanitization_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+    )
+    assert delta is not None
+    assert torch.isfinite(delta).all()
+
+
+def test_train_source_update_sanitization_delta_returns_none_without_source_domain(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    assert (
+        train_source_update_sanitization_delta(
+            prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )

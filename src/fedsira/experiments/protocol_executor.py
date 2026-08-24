@@ -23,7 +23,6 @@ from fedsira.attacks.source_backdoor import (
 from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50_selection
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
-    clip_source_update,
     parameter_similarity_certification_row_results,
     reconstruction_error,
     reconstruction_filter_accepts,
@@ -33,7 +32,6 @@ from fedsira.baselines.calibration import (
     recovery_alarm_threshold,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
-    sanitization_clip_bounds,
 )
 from fedsira.baselines.certified_ensemble import (
     certified_ensemble_domain_groups,
@@ -182,6 +180,7 @@ from fedsira.experiments.real_evidence import (
     train_local_only_reference_checkpoint,
     train_secure_continual_assessment_delta,
     train_source_candidate_delta,
+    train_source_update_sanitization_delta,
 )
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -855,6 +854,57 @@ class ProtocolCellExecutor(CellExecutor):
             )
         return self._real_anchor_cache[master_seed]
 
+    def _candidate_capability_contract_passes(
+        self,
+        config: ScientificConfig,
+        real_anchor: RealAnchor,
+        source_domain: NBaiotDomain,
+        candidate_flat_parameters: torch.Tensor,
+    ) -> bool:
+        anchor_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            real_anchor.flat_parameters,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+        )
+        candidate_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            candidate_flat_parameters,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+        )
+        if anchor_screen is None or candidate_screen is None:
+            return False
+        contract = build_capability_claim_contract(
+            real_anchor.dataset_manifest_hash,
+            ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
+            config.datasets.primary.name,
+            len(NBAIOT_DOMAIN_ORDER),
+            real_anchor.dataset_manifest_hash,
+            config.capability_claim,
+        )
+        target_f1_gain = target_capability_gain(candidate_screen.target_f1, anchor_screen.target_f1)
+        supported_macro_f1_drop = supported_macro_f1_harm(
+            anchor_screen.supported_macro_f1, candidate_screen.supported_macro_f1
+        )
+        benign_far_increase = (
+            MetricResult(candidate_screen.benign_far.value - anchor_screen.benign_far.value, 1)
+            if candidate_screen.benign_far.value is not None
+            and anchor_screen.benign_far.value is not None
+            else MetricResult(None, 0)
+        )
+        return capability_claim_contract_passes(
+            contract,
+            candidate_screen.target_f1,
+            target_f1_gain,
+            supported_macro_f1_drop,
+            benign_far_increase,
+        )
+
     def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
         real_anchor = self._real_anchor(config, cell.master_seed)
@@ -863,60 +913,59 @@ class ProtocolCellExecutor(CellExecutor):
             source_delta = train_source_candidate_delta(
                 self._prepared_root, config, cell.master_seed, real_anchor, source_domain
             )
-            if source_delta is not None:
-                anchor_screen = evaluate_domain(
-                    self._prepared_root,
-                    real_anchor,
-                    real_anchor.flat_parameters,
-                    source_domain,
-                    role=Role.POST_REFERENCE_REPLAY,
-                    target_role=Role.CANDIDATE_SCREEN,
-                )
-                source_screen = evaluate_domain(
-                    self._prepared_root,
-                    real_anchor,
-                    real_anchor.flat_parameters + source_delta,
-                    source_domain,
-                    role=Role.POST_REFERENCE_REPLAY,
-                    target_role=Role.CANDIDATE_SCREEN,
-                )
-                if anchor_screen is not None and source_screen is not None:
-                    contract = build_capability_claim_contract(
-                        real_anchor.dataset_manifest_hash,
-                        ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
-                        config.datasets.primary.name,
-                        len(NBAIOT_DOMAIN_ORDER),
-                        real_anchor.dataset_manifest_hash,
-                        config.capability_claim,
-                    )
-                    target_f1_gain = target_capability_gain(
-                        source_screen.target_f1, anchor_screen.target_f1
-                    )
-                    supported_macro_f1_drop = supported_macro_f1_harm(
-                        anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
-                    )
-                    benign_far_increase = (
-                        MetricResult(
-                            source_screen.benign_far.value - anchor_screen.benign_far.value, 1
-                        )
-                        if source_screen.benign_far.value is not None
-                        and anchor_screen.benign_far.value is not None
-                        else MetricResult(None, 0)
-                    )
-                    if capability_claim_contract_passes(
-                        contract,
-                        source_screen.target_f1,
-                        target_f1_gain,
-                        supported_macro_f1_drop,
-                        benign_far_increase,
-                    ):
-                        positive_report_count = CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
+            if source_delta is not None and self._candidate_capability_contract_passes(
+                config, real_anchor, source_domain, real_anchor.flat_parameters + source_delta
+            ):
+                positive_report_count = CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
         return review_style_baseline_outcome(
             adequate_reviewer_count=CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
             positive_report_count=positive_report_count,
             panel_size=config.protocol.claim_opening.screen_domains,
             required_positive_reports=config.protocol.claim_opening.required_positive_screen_domains,
         )
+
+    def _source_update_sanitization_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None or source_domain is None:
+            return ClaimState.DORMANT
+        clipped_delta = train_source_update_sanitization_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if clipped_delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + clipped_delta
+        positive_report_count = (
+            CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
+            if self._candidate_capability_contract_passes(
+                config, real_anchor, source_domain, production_checkpoint
+            )
+            else 0
+        )
+        review_state = review_style_baseline_outcome(
+            adequate_reviewer_count=CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+            positive_report_count=positive_report_count,
+            panel_size=config.protocol.claim_opening.screen_domains,
+            required_positive_reports=config.protocol.claim_opening.required_positive_screen_domains,
+        )
+        if review_state is not ClaimState.ADMITTED:
+            return review_state
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "source-update-sanitization-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
 
     def _fedavg_reference_outcome(
         self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
@@ -2049,12 +2098,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value:
-            sanitization_clip_bounds(
-                (torch.zeros(3),),
-                config.baselines.source_update_sanitization.coordinate_bound_percentile,
-            )
-            clip_source_update(torch.zeros(3), torch.zeros(3))
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._source_update_sanitization_outcome(cell, config, evidence)
         elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:
             state = self._independent_local_reference_outcome(cell, config)
         elif method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value:
