@@ -748,6 +748,69 @@ class ProtocolCellExecutor(CellExecutor):
             )
         return self._real_anchor_cache[master_seed]
 
+    def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        positive_report_count = 0
+        if real_anchor is not None and source_domain is not None:
+            source_delta = train_source_candidate_delta(
+                self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+            )
+            if source_delta is not None:
+                anchor_screen = evaluate_domain(
+                    self._prepared_root,
+                    real_anchor,
+                    real_anchor.flat_parameters,
+                    source_domain,
+                    role=Role.POST_REFERENCE_REPLAY,
+                    target_role=Role.CANDIDATE_SCREEN,
+                )
+                source_screen = evaluate_domain(
+                    self._prepared_root,
+                    real_anchor,
+                    real_anchor.flat_parameters + source_delta,
+                    source_domain,
+                    role=Role.POST_REFERENCE_REPLAY,
+                    target_role=Role.CANDIDATE_SCREEN,
+                )
+                if anchor_screen is not None and source_screen is not None:
+                    contract = build_capability_claim_contract(
+                        real_anchor.dataset_manifest_hash,
+                        ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
+                        config.datasets.primary.name,
+                        len(NBAIOT_DOMAIN_ORDER),
+                        real_anchor.dataset_manifest_hash,
+                        config.capability_claim,
+                    )
+                    target_f1_gain = target_capability_gain(
+                        source_screen.target_f1, anchor_screen.target_f1
+                    )
+                    supported_macro_f1_drop = supported_macro_f1_harm(
+                        anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
+                    )
+                    benign_far_increase = (
+                        MetricResult(
+                            source_screen.benign_far.value - anchor_screen.benign_far.value, 1
+                        )
+                        if source_screen.benign_far.value is not None
+                        and anchor_screen.benign_far.value is not None
+                        else MetricResult(None, 0)
+                    )
+                    if capability_claim_contract_passes(
+                        contract,
+                        source_screen.target_f1,
+                        target_f1_gain,
+                        supported_macro_f1_drop,
+                        benign_far_increase,
+                    ):
+                        positive_report_count = CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
+        return review_style_baseline_outcome(
+            adequate_reviewer_count=CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+            positive_report_count=positive_report_count,
+            panel_size=config.protocol.claim_opening.screen_domains,
+            required_positive_reports=config.protocol.claim_opening.required_positive_screen_domains,
+        )
+
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         self._pending_real_report = None
         evidence = load_prepared_evidence_counts(self._prepared_root, cell)
@@ -1420,20 +1483,12 @@ class ProtocolCellExecutor(CellExecutor):
             client_review_direct_admission_production_is_source(
                 ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
             )
-            review_state = review_style_baseline_outcome(
-                adequate_reviewer_count=3,
-                positive_report_count=3,
-                panel_size=config.protocol.claim_opening.screen_domains,
-                required_positive_reports=(
-                    config.protocol.claim_opening.required_positive_screen_domains
-                ),
-            )
-            state = review_state
+            state = self._client_review_outcome(cell, config)
         elif method == BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             client_review_then_retrain_local_epochs()
             discard_source = client_review_then_retrain_should_discard_source_weights(
-                ClaimState.ADMITTED
+                self._client_review_outcome(cell, config)
             )
             state = (
                 self._advance_protocol(cell, config, evidence)

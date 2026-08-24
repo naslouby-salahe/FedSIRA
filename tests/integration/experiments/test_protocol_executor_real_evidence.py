@@ -16,6 +16,8 @@ from fedsira.experiments.real_evidence import evaluate_domain, non_source_domain
 from fedsira.experiments.registry import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    BaselineIdentity,
     OpeningMode,
     PrimaryScenario,
     ProposalEpisode,
@@ -156,3 +158,33 @@ def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
     )
     metrics = dict(outcome.metrics)
     assert metrics["claim-contract-passes"] in {0.0, 1.0}
+
+
+def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    cell = ScientificCell(
+        experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        method=BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+        condition="Useful Backdoored Source — 5%",
+        master_seed=7,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_client_review_then_retrain_baseline_executes_without_crashing(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    cell = ScientificCell(
+        experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        method=BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+        condition="Useful Backdoored Source — 5%",
+        master_seed=8,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
