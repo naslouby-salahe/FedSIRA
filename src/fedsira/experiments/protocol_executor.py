@@ -1571,8 +1571,6 @@ class ProtocolCellExecutor(CellExecutor):
                 {domain: torch.zeros(115) for domain in NBAIOT_DOMAIN_ORDER},
                 config.protocol.verification.panel_size,
             )
-        elif variant == AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value:
-            coordinate_wise_median_synthesis((torch.zeros(3), torch.zeros(3), torch.zeros(3)))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value:
             validate_three_row_coordinate_median_committee_size(
                 config.baselines.three_row_coordinate_median.row_count,
@@ -1991,6 +1989,11 @@ class ProtocolCellExecutor(CellExecutor):
         coordinate_median_active = (
             cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value
         )
+        multiple_reproductions_without_verification_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method
+            == AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -1998,7 +2001,11 @@ class ProtocolCellExecutor(CellExecutor):
             single_verifier_active = (
                 external_verification_active and not self._resolved_core.plurality_survives
             )
-        elif direct_krum_active or coordinate_median_active:
+        elif (
+            direct_krum_active
+            or coordinate_median_active
+            or multiple_reproductions_without_verification_active
+        ):
             external_verification_active = False
             single_verifier_active = False
         elif cell.method in (
@@ -2079,6 +2086,7 @@ class ProtocolCellExecutor(CellExecutor):
                         and self._resolved_core.plurality_survives
                     )
                     or direct_krum_active
+                    or multiple_reproductions_without_verification_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
