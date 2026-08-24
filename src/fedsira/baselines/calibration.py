@@ -77,7 +77,7 @@ def cosine_distance(first: torch.Tensor, second: torch.Tensor) -> float:
     if first_norm == 0.0 or second_norm == 0.0:
         return 1.0
     cosine_similarity = float(torch.dot(first, second)) / (first_norm * second_norm)
-    return 1.0 - cosine_similarity
+    return 1.0 - max(-1.0, min(1.0, cosine_similarity))
 
 
 def cosine_distance_matrix(update_vectors: Sequence[torch.Tensor]) -> tuple[tuple[float, ...], ...]:
