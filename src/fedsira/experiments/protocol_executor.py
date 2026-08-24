@@ -51,11 +51,7 @@ from fedsira.baselines.independent_retraining import (
     one_independent_retrain_local_epochs,
 )
 from fedsira.baselines.references import (
-    centralized_reference_local_epochs,
-    centralized_reference_pooled_rows,
     local_only_reference_evaluation_is_domain_local,
-    local_only_reference_local_epochs,
-    local_only_reference_training_role,
     standard_fl_anchor_rounds,
 )
 from fedsira.baselines.registry import (
@@ -184,6 +180,7 @@ from fedsira.experiments.real_evidence import (
     real_evidence_available,
     root_cause_partitioned_row_ids,
     train_anchor,
+    train_centralized_reference_checkpoint,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
@@ -1008,6 +1005,94 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "secure-continual-assessment-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _local_only_reference_outcome(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        target_f1_values: list[MetricResult] = []
+        supported_f1_harms: list[MetricResult] = []
+        benign_far_increases: list[MetricResult] = []
+        for domain in non_source_domains(source_domain):
+            if not local_only_reference_evaluation_is_domain_local(domain, domain):
+                continue
+            local_checkpoint = train_local_only_reference_checkpoint(
+                self._prepared_root, config, cell.master_seed, domain
+            )
+            if local_checkpoint is None:
+                continue
+            anchor_metrics = evaluate_domain(
+                self._prepared_root,
+                real_anchor,
+                real_anchor.flat_parameters,
+                domain,
+                Role.FINAL_GATE,
+            )
+            local_metrics = evaluate_domain(
+                self._prepared_root, real_anchor, local_checkpoint, domain, Role.FINAL_GATE
+            )
+            if anchor_metrics is None or local_metrics is None:
+                continue
+            target_f1_values.append(local_metrics.target_f1)
+            supported_f1_harms.append(
+                supported_macro_f1_harm(
+                    anchor_metrics.supported_macro_f1, local_metrics.supported_macro_f1
+                )
+            )
+            if (
+                anchor_metrics.benign_far.value is not None
+                and local_metrics.benign_far.value is not None
+            ):
+                benign_far_increases.append(
+                    MetricResult(
+                        local_metrics.benign_far.value - anchor_metrics.benign_far.value, 1
+                    )
+                )
+            else:
+                benign_far_increases.append(MetricResult(None, 0))
+        predicates_pass = final_gate_predicates_pass(
+            median_domain_target_f1(target_f1_values),
+            worst_domain_target_f1(target_f1_values),
+            equal_weight_domain_mean(supported_f1_harms, 1),
+            equal_weight_domain_mean(benign_far_increases, 1),
+            True,
+            config.protocol.final_gate,
+        )
+        return synthesis_pending_transition(
+            adequate_final_gate_domain_count=len(target_f1_values),
+            final_gate_predicates_pass=predicates_pass,
+            final_gate_config=config.protocol.final_gate,
+        )
+
+    def _centralized_reference_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        production_checkpoint = train_centralized_reference_checkpoint(
+            self._prepared_root, config, cell.master_seed
+        )
+        if production_checkpoint is None:
+            return ClaimState.DORMANT
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "centralized-reference-claim",
             source_domain,
             (),
             (),
@@ -1853,18 +1938,10 @@ class ProtocolCellExecutor(CellExecutor):
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell))
         state: ClaimState
-        if method in (
-            BaselineIdentity.LOCAL_ONLY_REFERENCE.value,
-            BaselineIdentity.CENTRALIZED_REFERENCE.value,
-        ):
-            local_only_reference_local_epochs(config.baselines)
-            local_only_reference_training_role()
-            local_only_reference_evaluation_is_domain_local(
-                NBAIOT_DOMAIN_ORDER[0], NBAIOT_DOMAIN_ORDER[0]
-            )
-            centralized_reference_local_epochs(config.baselines)
-            centralized_reference_pooled_rows({NBAIOT_DOMAIN_ORDER[0]: torch.zeros(3)})
-            state = self._advance_protocol(cell, config, evidence)
+        if method == BaselineIdentity.LOCAL_ONLY_REFERENCE.value:
+            state = self._local_only_reference_outcome(cell, config)
+        elif method == BaselineIdentity.CENTRALIZED_REFERENCE.value:
+            state = self._centralized_reference_outcome(cell, config, evidence)
         elif method == BaselineIdentity.FEDAVG_REFERENCE.value:
             standard_fl_anchor_rounds()
             state = self._fedavg_reference_outcome(cell, config, evidence)

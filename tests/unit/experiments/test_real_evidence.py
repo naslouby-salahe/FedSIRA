@@ -23,6 +23,7 @@ from fedsira.experiments.real_evidence import (
     prepared_feature_names,
     real_evidence_available,
     train_anchor,
+    train_centralized_reference_checkpoint,
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
@@ -431,3 +432,15 @@ def test_train_local_only_reference_checkpoint_returns_none_without_prepared_dat
         train_local_only_reference_checkpoint(tmp_path, CONFIG, master_seed=1, domain=DOMAINS[0])
         is None
     )
+
+
+def test_train_centralized_reference_checkpoint_is_finite(prepared_root: Path) -> None:
+    checkpoint = train_centralized_reference_checkpoint(prepared_root, CONFIG, master_seed=1)
+    assert checkpoint is not None
+    assert torch.isfinite(checkpoint).all()
+
+
+def test_train_centralized_reference_checkpoint_returns_none_without_prepared_data(
+    tmp_path: Path,
+) -> None:
+    assert train_centralized_reference_checkpoint(tmp_path, CONFIG, master_seed=1) is None
