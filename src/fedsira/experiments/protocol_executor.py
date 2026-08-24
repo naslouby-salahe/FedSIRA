@@ -53,9 +53,6 @@ from fedsira.baselines.independent_retraining import (
 from fedsira.baselines.references import (
     centralized_reference_local_epochs,
     centralized_reference_pooled_rows,
-    fedavg_reference_post_reference_local_epochs,
-    fedavg_reference_post_reference_participants,
-    fedavg_reference_post_reference_rounds,
     local_only_reference_evaluation_is_domain_local,
     local_only_reference_local_epochs,
     local_only_reference_training_role,
@@ -187,6 +184,7 @@ from fedsira.experiments.real_evidence import (
     real_evidence_available,
     root_cause_partitioned_row_ids,
     train_anchor,
+    train_fedavg_reference_delta,
     train_source_candidate_delta,
 )
 from fedsira.experiments.registry import (
@@ -920,6 +918,34 @@ class ProtocolCellExecutor(CellExecutor):
             panel_size=config.protocol.claim_opening.screen_domains,
             required_positive_reports=config.protocol.claim_opening.required_positive_screen_domains,
         )
+
+    def _fedavg_reference_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        delta = train_fedavg_reference_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + delta
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "fedavg-reference-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         self._pending_real_report = None
@@ -1672,15 +1698,8 @@ class ProtocolCellExecutor(CellExecutor):
             centralized_reference_pooled_rows({NBAIOT_DOMAIN_ORDER[0]: torch.zeros(3)})
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.FEDAVG_REFERENCE.value:
-            fedavg_reference_post_reference_rounds(config.baselines)
-            fedavg_reference_post_reference_local_epochs()
-            fedavg_reference_post_reference_participants(
-                tuple(NBAIOT_DOMAIN_ORDER[1:]),
-                _source_domain_for_cell(cell),
-                _source_domain_for_cell(cell) is not None,
-            )
             standard_fl_anchor_rounds()
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._fedavg_reference_outcome(cell, config, evidence)
         elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
             one_independent_retrain_local_epochs()
             candidate_free_full_path_opening_mode()

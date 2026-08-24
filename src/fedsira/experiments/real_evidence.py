@@ -8,6 +8,11 @@ from pathlib import Path
 import pandas
 import torch
 
+from fedsira.baselines.references import (
+    fedavg_reference_post_reference_local_epochs,
+    fedavg_reference_post_reference_participants,
+    fedavg_reference_post_reference_rounds,
+)
 from fedsira.boundaries.capability_granularity import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
@@ -62,6 +67,7 @@ from fedsira.evaluation.screen import (
 )
 from fedsira.experiments.registry import EpistemicFailureType, ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
+from fedsira.learning.federated import run_fedavg_round
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.scoring import logits_for_samples
 from fedsira.models.mlp import (
@@ -80,6 +86,7 @@ from fedsira.runtime.determinism import (
 ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"
 SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
+FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -552,6 +559,68 @@ def train_source_candidate_delta(
         config.model.post_reference.local_epochs,
     )
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
+def train_fedavg_reference_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    source_rows_available = source_domain is not None and (
+        load_prepared_rows(
+            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+        )
+        is not None
+    )
+    participants = fedavg_reference_post_reference_participants(
+        non_source_domains(source_domain), source_domain, source_rows_available
+    )
+    if not participants:
+        return None
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, anchor.flat_parameters)
+    state_dict = model.state_dict()
+    local_epochs = fedavg_reference_post_reference_local_epochs()
+    any_round_trained = False
+    for round_index in range(fedavg_reference_post_reference_rounds(config.baselines)):
+        round_clients: list[
+            tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], DerivedSeed]
+        ] = []
+        for domain in participants:
+            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
+            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            if combined is None:
+                continue
+            features, labels, sample_ids, _is_supported = combined
+            training_seed = _training_seed(
+                master_seed,
+                anchor.dataset_manifest_hash,
+                _flat_parameters_identity(anchor.flat_parameters),
+                FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+                domain,
+                round_index,
+            )
+            round_clients.append((features, labels, sample_ids, training_seed))
+        if not round_clients:
+            continue
+        any_round_trained = True
+        state_dict = run_fedavg_round(
+            state_dict,
+            anchor.input_width,
+            anchor.output_width,
+            config.model.optimizer.anchor_and_standard_fl_learning_rate,
+            config.model.optimizer,
+            config.model.training,
+            local_epochs,
+            round_clients,
+        )
+    if not any_round_trained:
+        return None
+    final_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    final_model.load_state_dict(state_dict)
+    return flatten_trainable_parameters(final_model) - anchor.flat_parameters
 
 
 def evaluate_domain(
