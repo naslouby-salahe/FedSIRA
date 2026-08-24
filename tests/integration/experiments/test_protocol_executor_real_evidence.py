@@ -657,3 +657,20 @@ def test_same_context_verification_only_ablation_uses_a_real_feature_mean_panel(
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_generic_three_row_threshold_ablation_uses_real_coordinate_median_synthesis(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value,
+        condition="Ablation",
+        master_seed=19,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+    assert metrics["krum-n3-f1-invalid"] == 1.0
