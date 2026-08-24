@@ -1343,10 +1343,15 @@ class ProtocolCellExecutor(CellExecutor):
         if not training_entries:
             return ClaimState.DORMANT
         source_domain = _source_domain_for_cell(cell)
+        direct_krum_active = (
+            cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
             external_verification_active = self._resolved_core.external_verification_survives
+        elif direct_krum_active:
+            external_verification_active = False
         else:
             external_verification_active = (
                 cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
@@ -1409,6 +1414,7 @@ class ProtocolCellExecutor(CellExecutor):
                         and self._resolved_core is not None
                         and self._resolved_core.plurality_survives
                     )
+                    or direct_krum_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
