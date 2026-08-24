@@ -736,3 +736,20 @@ def test_one_independent_reproduction_ablation_uses_single_verifier_progression(
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_no_final_synthesis_gate_ablation_admits_immediately_after_krum(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.NO_FINAL_SYNTHESIS_GATE.value,
+        condition="Ablation",
+        master_seed=24,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] == 1.0
+    assert metrics["worst-domain-target-f1"] is not None

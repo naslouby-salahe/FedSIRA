@@ -645,6 +645,7 @@ def _final_gate_decision(
     master_seed: MasterSeed,
     anchor: RealAnchor | None,
     coordinate_median_active: bool = False,
+    no_final_synthesis_gate_active: bool = False,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas = (
@@ -714,6 +715,7 @@ def _final_gate_decision(
         prepared_root,
         anchor,
         production_checkpoint,
+        no_final_synthesis_gate_active,
     )
 
 
@@ -729,6 +731,7 @@ def _final_gate_decision_from_production_checkpoint(
     prepared_root: Path,
     anchor: RealAnchor | None,
     production_checkpoint: torch.Tensor,
+    no_final_synthesis_gate_active: bool = False,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     if anchor is not None:
         (
@@ -756,10 +759,14 @@ def _final_gate_decision_from_production_checkpoint(
         True,
         config.protocol.final_gate,
     )
-    final_gate_state = synthesis_pending_transition(
-        adequate_final_gate_domain_count=adequate_final_gate_domain_count,
-        final_gate_predicates_pass=predicates_pass,
-        final_gate_config=config.protocol.final_gate,
+    final_gate_state = (
+        ClaimState.ADMITTED
+        if no_final_synthesis_gate_active and anchor is not None
+        else synthesis_pending_transition(
+            adequate_final_gate_domain_count=adequate_final_gate_domain_count,
+            final_gate_predicates_pass=predicates_pass,
+            final_gate_config=config.protocol.final_gate,
+        )
     )
     real_report_summary = (
         compute_real_report_summary(prepared_root, anchor, source_domain, production_checkpoint)
@@ -2052,6 +2059,10 @@ class ProtocolCellExecutor(CellExecutor):
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value
         )
+        no_final_synthesis_gate_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.NO_FINAL_SYNTHESIS_GATE.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -2064,6 +2075,7 @@ class ProtocolCellExecutor(CellExecutor):
             or coordinate_median_active
             or multiple_reproductions_without_verification_active
             or direct_krum_of_retrains_active
+            or no_final_synthesis_gate_active
         ):
             external_verification_active = False
             single_verifier_active = False
@@ -2160,12 +2172,14 @@ class ProtocolCellExecutor(CellExecutor):
                     or multiple_reproductions_without_verification_active
                     or direct_krum_of_retrains_active
                     or full_path_ablation_active
+                    or no_final_synthesis_gate_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
                 master_seed=cell.master_seed,
                 anchor=self._real_anchor(config, cell.master_seed),
                 coordinate_median_active=coordinate_median_active,
+                no_final_synthesis_gate_active=no_final_synthesis_gate_active,
             )
         else:
             state = progression_state
