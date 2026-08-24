@@ -23,6 +23,7 @@ from fedsira.experiments.registry import (
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
     MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
@@ -32,6 +33,7 @@ from fedsira.experiments.registry import (
     BaselineIdentity,
     BoundCondition,
     EpistemicFailureType,
+    HeterogeneityRegime,
     OpeningMode,
     PrimaryScenario,
     ProposalEpisode,
@@ -45,6 +47,7 @@ pytestmark = pytest.mark.skip(
     " ProtocolCellExecutor; skipped by default to avoid competing for CPU with other work."
     " Re-enable deliberately when verifying fedsira.experiments.protocol_executor."
 )
+
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 RESOLVED_CORE = resolve_core_mapping(True, True, True)
@@ -882,3 +885,19 @@ def test_capability_contract_granularity_ablation_reports_real_certification_rat
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
     assert metrics["capability-contract-granularity-broad-certified-rows"] is not None
+
+
+def test_krum_robust_aggregation_reference_under_heterogeneous_boundary_uses_real_krum_training(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+        method=BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+        condition=HeterogeneityRegime.NATURAL.value,
+        master_seed=36,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
