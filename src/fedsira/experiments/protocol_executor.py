@@ -1863,7 +1863,13 @@ class ProtocolCellExecutor(CellExecutor):
         config: ScientificConfig,
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
-        state = self._advance_protocol(cell, config, evidence)
+        if (
+            cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME
+            and cell.method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value
+        ):
+            state = self._krum_reference_outcome(cell, config, evidence)
+        else:
+            state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         is_scoped_contract = cell.method != CapabilityContractScope.BROAD_TARGET_ONLY.value
         boundary_metrics = boundary_metric_set(
