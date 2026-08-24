@@ -23,10 +23,12 @@ from fedsira.experiments.registry import (
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationVariant,
     BaselineIdentity,
     BoundCondition,
     EpistemicFailureType,
@@ -605,3 +607,21 @@ def test_shared_epistemic_failure_boundary_reports_real_metrics(
         assert metrics["diagnostic-marker-insufficient"] == 1.0
     else:
         assert metrics["diagnostic-marker-value"] is not None
+
+
+def test_parameter_similarity_certification_ablation_reports_real_committed_rows(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value,
+        condition="Ablation",
+        master_seed=16,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+    assert metrics["parameter-similarity-committed-rows"] == 5.0
+    assert metrics["parameter-similarity-certified-rows"] is not None

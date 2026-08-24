@@ -1542,16 +1542,29 @@ class ProtocolCellExecutor(CellExecutor):
         variant = cell.method
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
+        extra: list[tuple[CanonicalToken, float | None]] = []
         if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value:
             domain_without_target_view_may_participate(True)
-            try:
-                parameter_similarity_certification_row_results(
-                    (),
-                    config.baselines.parameter_similarity,
+            real_anchor = self._real_anchor(config, cell.master_seed)
+            if real_anchor is not None:
+                candidate_domains = non_source_domains(_source_domain_for_cell(cell))[
+                    : config.baselines.parameter_similarity.required_committed_rows
+                ]
+                committee_deltas = certified_domain_delta_committee(
+                    self._prepared_root, config, cell.master_seed, real_anchor, candidate_domains
                 )
-            except ValueError:
-                state = ClaimState.DORMANT
-            state = ClaimState.DORMANT
+                committed_rows = tuple(
+                    CertifiedReproductionRow(reproducer_domain=domain, update_vector=delta)
+                    for domain, delta in committee_deltas.items()
+                )
+                try:
+                    row_results = parameter_similarity_certification_row_results(
+                        committed_rows, config.baselines.parameter_similarity
+                    )
+                except ValueError:
+                    row_results = ()
+                extra.append(("parameter-similarity-committed-rows", float(len(committed_rows))))
+                extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
         elif variant == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value:
             same_context_verifier_panel(
                 torch.zeros(115),
@@ -1573,7 +1586,6 @@ class ProtocolCellExecutor(CellExecutor):
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
             balanced_50_50_selection((), (), attack_seed)
             a_dominant_80_20_selection((), (), attack_seed)
-        extra: list[tuple[CanonicalToken, float | None]] = []
         return state, (*metrics, *extra)
 
     def _execute_boundary_cell(
