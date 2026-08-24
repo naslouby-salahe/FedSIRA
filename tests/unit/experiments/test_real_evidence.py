@@ -20,6 +20,7 @@ from fedsira.experiments.real_evidence import (
     anchor_round_reconstruction_calibration_errors,
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
+    domain_anchor_train_feature_mean,
     evaluate_domain,
     non_source_domains,
     prepared_feature_names,
@@ -47,6 +48,7 @@ pytestmark = pytest.mark.skip(
     " to avoid competing for CPU with other work. Re-enable deliberately when verifying"
     " fedsira.experiments.real_evidence."
 )
+
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 DOMAINS = (
@@ -128,6 +130,25 @@ def test_train_anchor_produces_a_flat_parameter_vector_of_the_expected_shape(
 
 def test_train_anchor_returns_none_without_prepared_data(tmp_path: Path) -> None:
     assert train_anchor(tmp_path, CONFIG, master_seed=1) is None
+
+
+def test_domain_anchor_train_feature_mean_is_finite_and_distinct_per_domain(
+    prepared_root: Path,
+) -> None:
+    first_mean = domain_anchor_train_feature_mean(prepared_root, DOMAINS[0])
+    second_mean = domain_anchor_train_feature_mean(prepared_root, DOMAINS[1])
+    assert first_mean is not None
+    assert second_mean is not None
+    for mean in (first_mean, second_mean):
+        assert mean.shape == (NBAIOT_PRIMARY_PREDICTOR_COUNT,)
+        assert torch.isfinite(mean).all()
+    assert not torch.equal(first_mean, second_mean)
+
+
+def test_domain_anchor_train_feature_mean_returns_none_without_prepared_data(
+    tmp_path: Path,
+) -> None:
+    assert domain_anchor_train_feature_mean(tmp_path, DOMAINS[0]) is None
 
 
 def test_train_domain_reproduction_delta_is_nonzero_and_finite(
