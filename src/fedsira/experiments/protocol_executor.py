@@ -467,11 +467,12 @@ def _verifier_panel(
     reproducer_domain: NBaiotDomain,
     master_seed: MasterSeed,
     verification_config: VerificationConfig,
+    allow_source_as_verifier: bool = False,
 ) -> tuple[NBaiotDomain, ...]:
     eligible_verifiers = tuple(
         domain
         for domain in NBAIOT_DOMAIN_ORDER
-        if verifier_is_eligible(domain, source_domain, reproducer_domain)
+        if verifier_is_eligible(domain, source_domain, reproducer_domain, allow_source_as_verifier)
     )
     row_seed = verifier_assignment_seed_for_row(
         derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, master_seed),
@@ -491,6 +492,7 @@ def _reproduction_progression(
     external_verification_active: bool,
     row_requirement: int,
     compromised_reproducers: frozenset[NBaiotDomain],
+    include_source_as_first_reproducer: bool = False,
 ) -> tuple[ClaimState, tuple[ReproductionAttempt, ...], tuple[str, ...]]:
     reproducer_order = _reproducer_order(cell)
     source_domain = _source_domain_for_cell(cell)
@@ -503,6 +505,24 @@ def _reproduction_progression(
     commitment_hashes: list[str] = []
     certified_count = 0
     state = ClaimState.REPRODUCTION_PENDING
+    if include_source_as_first_reproducer and source_domain is not None:
+        commitment_hash = compute_reproduction_commitment_hash(
+            source_domain,
+            "c" * 64,
+            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
+            ANCHOR_FLAT_PARAMETERS,
+        )
+        commitment_hashes.append(commitment_hash)
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        attempts.append(
+            ReproductionAttempt(domain=source_domain, was_trained=True, is_certified=True)
+        )
+        certified_count += 1
+        state = handle_adequate_domain_trained(
+            external_verification_active, certified_count >= row_requirement
+        )
+        if state is ClaimState.SYNTHESIS_PENDING:
+            return state, tuple(attempts), tuple(commitment_hashes)
     for _row_index in range(len(reproducer_order)):
         next_domain = next_reproducer_domain(
             reproducer_order, consumed_domains(attempts), adequate_domains
@@ -650,6 +670,7 @@ def _final_gate_decision(
     anchor: RealAnchor | None,
     coordinate_median_active: bool = False,
     no_final_synthesis_gate_active: bool = False,
+    use_source_delta_for_source_domain: bool = False,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas = (
@@ -659,6 +680,12 @@ def _final_gate_decision(
         if anchor is not None
         else {}
     )
+    if use_source_delta_for_source_domain and anchor is not None and source_domain is not None:
+        source_delta = train_source_candidate_delta(
+            prepared_root, config, master_seed, anchor, source_domain
+        )
+        if source_delta is not None:
+            committee_deltas[source_domain] = source_delta
     if coordinate_median_active:
         median_deltas = tuple(
             committee_deltas.get(
@@ -2128,6 +2155,10 @@ class ProtocolCellExecutor(CellExecutor):
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.NO_FINAL_SYNTHESIS_GATE.value
         )
+        no_origin_exclusion_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.NO_ORIGIN_EXCLUSION.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -2154,7 +2185,11 @@ class ProtocolCellExecutor(CellExecutor):
         ):
             external_verification_active = True
             single_verifier_active = True
-        elif same_context_verification_active or full_path_ablation_active:
+        elif (
+            same_context_verification_active
+            or full_path_ablation_active
+            or no_origin_exclusion_active
+        ):
             external_verification_active = True
             single_verifier_active = False
         else:
@@ -2176,6 +2211,7 @@ class ProtocolCellExecutor(CellExecutor):
                 external_verification_active,
                 row_requirement,
                 frozenset(),
+                include_source_as_first_reproducer=no_origin_exclusion_active,
             )
             if progression_state is ClaimState.VERIFICATION_PENDING:
                 certified_positive_report_count = 0
@@ -2192,6 +2228,7 @@ class ProtocolCellExecutor(CellExecutor):
                             attempt.domain,
                             cell.master_seed,
                             config.protocol.verification,
+                            allow_source_as_verifier=no_origin_exclusion_active,
                         )
                     if not panel_votes_are_one_per_domain(panel):
                         return ClaimState.DORMANT
@@ -2207,7 +2244,12 @@ class ProtocolCellExecutor(CellExecutor):
                 eligible_verifier_count = sum(
                     1
                     for domain in NBAIOT_DOMAIN_ORDER
-                    if verifier_is_eligible(domain, source_domain, attempts[0].domain)
+                    if verifier_is_eligible(
+                        domain,
+                        source_domain,
+                        attempts[0].domain,
+                        allow_source_as_verifier=no_origin_exclusion_active,
+                    )
                 )
                 progression_state = verification_pending_transition(
                     eligible_verifier_count,
@@ -2238,6 +2280,7 @@ class ProtocolCellExecutor(CellExecutor):
                     or direct_krum_of_retrains_active
                     or full_path_ablation_active
                     or no_final_synthesis_gate_active
+                    or no_origin_exclusion_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
@@ -2245,6 +2288,7 @@ class ProtocolCellExecutor(CellExecutor):
                 anchor=self._real_anchor(config, cell.master_seed),
                 coordinate_median_active=coordinate_median_active,
                 no_final_synthesis_gate_active=no_final_synthesis_gate_active,
+                use_source_delta_for_source_domain=no_origin_exclusion_active,
             )
         else:
             state = progression_state
