@@ -87,6 +87,12 @@ def test_cosine_distance_zero_vector_semantics() -> None:
     assert abs(cosine_distance(nonzero, nonzero)) < TOLERANCE
 
 
+def test_cosine_distance_is_never_negative_for_near_parallel_vectors() -> None:
+    base = torch.tensor([1.0, 2.0, 3.0])
+    scaled = base * (1.0 + 1e-8)
+    assert cosine_distance(base, scaled) >= 0.0
+
+
 def test_cosine_distance_matrix_is_symmetric_with_zero_diagonal() -> None:
     vectors = [torch.tensor([1.0, 0.0]), torch.tensor([0.0, 1.0])]
     matrix = cosine_distance_matrix(vectors)
