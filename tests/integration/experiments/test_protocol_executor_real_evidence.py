@@ -674,3 +674,19 @@ def test_generic_three_row_threshold_ablation_uses_real_coordinate_median_synthe
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
     assert metrics["krum-n3-f1-invalid"] == 1.0
+
+
+def test_direct_krum_of_retrains_ablation_uses_real_krum_synthesis_without_verification(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.DIRECT_KRUM_OF_RETRAINS.value,
+        condition="Ablation",
+        master_seed=20,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}

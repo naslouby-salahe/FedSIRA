@@ -2033,6 +2033,10 @@ class ProtocolCellExecutor(CellExecutor):
             and cell.method
             == AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value
         )
+        direct_krum_of_retrains_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.DIRECT_KRUM_OF_RETRAINS.value
+        )
         same_context_verification_active = (
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value
@@ -2048,6 +2052,7 @@ class ProtocolCellExecutor(CellExecutor):
             direct_krum_active
             or coordinate_median_active
             or multiple_reproductions_without_verification_active
+            or direct_krum_of_retrains_active
         ):
             external_verification_active = False
             single_verifier_active = False
@@ -2138,6 +2143,7 @@ class ProtocolCellExecutor(CellExecutor):
                     )
                     or direct_krum_active
                     or multiple_reproductions_without_verification_active
+                    or direct_krum_of_retrains_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
