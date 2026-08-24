@@ -370,6 +370,21 @@ def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_independent_local_reference_baseline_evaluates_real_reviewer_votes(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=28,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:

@@ -76,6 +76,8 @@ from fedsira.baselines.robust_aggregation import (
 from fedsira.baselines.source_authority import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+    INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
+    INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
     SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
     SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
     client_review_direct_admission_production_is_source,
@@ -184,6 +186,7 @@ from fedsira.experiments.real_evidence import (
     train_anchor,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
+    train_local_only_reference_checkpoint,
     train_secure_continual_assessment_delta,
     train_source_candidate_delta,
 )
@@ -1015,6 +1018,102 @@ class ProtocolCellExecutor(CellExecutor):
             production_checkpoint,
         )
         return state
+
+    def _independent_local_reference_outcome(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None or source_domain is None:
+            return ClaimState.DORMANT
+        source_delta = train_source_candidate_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if source_delta is None:
+            return ClaimState.DORMANT
+        source_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            real_anchor.flat_parameters + source_delta,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+        )
+        if source_screen is None:
+            return ClaimState.DORMANT
+        contract = build_capability_claim_contract(
+            real_anchor.dataset_manifest_hash,
+            ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
+            config.datasets.primary.name,
+            len(NBAIOT_DOMAIN_ORDER),
+            real_anchor.dataset_manifest_hash,
+            config.capability_claim,
+        )
+        anchor_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            real_anchor.flat_parameters,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+        )
+        source_satisfies_capability_contract = anchor_screen is not None and (
+            capability_claim_contract_passes(
+                contract,
+                source_screen.target_f1,
+                target_capability_gain(source_screen.target_f1, anchor_screen.target_f1),
+                supported_macro_f1_harm(
+                    anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
+                ),
+                (
+                    MetricResult(source_screen.benign_far.value - anchor_screen.benign_far.value, 1)
+                    if source_screen.benign_far.value is not None
+                    and anchor_screen.benign_far.value is not None
+                    else MetricResult(None, 0)
+                ),
+            )
+        )
+        reviewer_domains = non_source_domains(source_domain)[
+            :INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT
+        ]
+        positive_report_count = 0
+        for reviewer_domain in reviewer_domains:
+            local_checkpoint = train_local_only_reference_checkpoint(
+                self._prepared_root, config, cell.master_seed, reviewer_domain
+            )
+            if local_checkpoint is None:
+                continue
+            local_screen = evaluate_domain(
+                self._prepared_root,
+                real_anchor,
+                local_checkpoint,
+                source_domain,
+                role=Role.POST_REFERENCE_REPLAY,
+                target_role=Role.CANDIDATE_SCREEN,
+            )
+            if (
+                local_screen is None
+                or source_screen.supported_macro_f1.value is None
+                or local_screen.supported_macro_f1.value is None
+                or source_screen.benign_far.value is None
+                or local_screen.benign_far.value is None
+            ):
+                continue
+            if independent_local_reference_reviewer_is_positive(
+                source_satisfies_capability_contract,
+                source_screen.supported_macro_f1.value,
+                local_screen.supported_macro_f1.value,
+                source_screen.benign_far.value,
+                local_screen.benign_far.value,
+                config.metrics_and_statistics.materiality,
+            ):
+                positive_report_count += 1
+        return review_style_baseline_outcome(
+            adequate_reviewer_count=len(reviewer_domains),
+            positive_report_count=positive_report_count,
+            panel_size=INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
+            required_positive_reports=INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
+        )
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         self._pending_real_report = None
@@ -1863,15 +1962,7 @@ class ProtocolCellExecutor(CellExecutor):
             clip_source_update(torch.zeros(3), torch.zeros(3))
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:
-            independent_local_reference_reviewer_is_positive(
-                False,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                config.metrics_and_statistics.materiality,
-            )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._independent_local_reference_outcome(cell, config)
         elif method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value:
             state = self._krum_reference_outcome(cell, config, evidence)
         elif method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:

@@ -12,6 +12,7 @@ from fedsira.baselines.references import (
     fedavg_reference_post_reference_local_epochs,
     fedavg_reference_post_reference_participants,
     fedavg_reference_post_reference_rounds,
+    local_only_reference_local_epochs,
 )
 from fedsira.baselines.robust_aggregation import (
     client_sampling_round_order,
@@ -95,6 +96,7 @@ SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
 SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
+LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 
 
@@ -406,6 +408,67 @@ def train_anchor(
         flat_parameters=flatten_trainable_parameters(model),
         dataset_manifest_hash=manifest_hash,
     )
+
+
+def train_local_only_reference_checkpoint(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    domain: NBaiotDomain,
+) -> torch.Tensor | None:
+    combined_features: list[torch.Tensor] = []
+    combined_labels: list[torch.Tensor] = []
+    combined_sample_ids: list[ArtifactDigest] = []
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        tensor_view = _tensor_view(
+            load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
+        )
+        if tensor_view is None:
+            continue
+        features, labels, sample_ids = tensor_view
+        combined_features.append(features)
+        combined_labels.append(labels)
+        combined_sample_ids.extend(sample_ids)
+    if not combined_features:
+        return None
+    features = torch.cat(combined_features, dim=0)
+    labels = torch.cat(combined_labels, dim=0)
+    sample_ids = tuple(combined_sample_ids)
+    input_width = features.shape[1]
+    output_width = len(NBAIOT_CLASS_ORDER)
+    initialization_seed = derive_uint32(
+        "LOCAL_ONLY_REFERENCE_INIT",
+        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
+        NBAIOT_DOMAIN_HASH_TOKEN[domain],
+    )
+    seed_job_local_rng_streams(initialization_seed)
+    initial_state = FedSIRAClassifier(input_width, output_width).state_dict()
+    training_seed = _training_seed(
+        master_seed,
+        dataset_manifest_hash(prepared_root),
+        "local-only-start",
+        LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+        domain,
+        0,
+    )
+    final_state, _example_count = train_one_client_locally(
+        initial_state,
+        input_width,
+        output_width,
+        config.model.optimizer.anchor_and_standard_fl_learning_rate,
+        config.model.optimizer,
+        config.model.training,
+        local_only_reference_local_epochs(config.baselines),
+        features,
+        labels,
+        sample_ids,
+        training_seed,
+    )
+    final_model = FedSIRAClassifier(input_width, output_width)
+    final_model.load_state_dict(final_state)
+    return flatten_trainable_parameters(final_model)
 
 
 def _combined_post_reference_rows(
