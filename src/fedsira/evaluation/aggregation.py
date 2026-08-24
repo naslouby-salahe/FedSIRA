@@ -51,6 +51,8 @@ def match_nearest_within_decile(
     candidates: Sequence[tuple[CanonicalToken, float]],
     boundary_values: Sequence[float],
 ) -> tuple[tuple[CanonicalToken, CanonicalToken], ...] | None:
+    if not boundary_values:
+        return None
     boundaries = decile_boundaries(boundary_values)
     candidates_by_bin: dict[int, list[tuple[CanonicalToken, float]]] = {}
     for row_id, loss in candidates:

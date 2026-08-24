@@ -151,3 +151,8 @@ def test_match_nearest_within_decile_returns_none_without_replacement_when_bin_i
     assert (
         match_nearest_within_decile(targets, candidates, [float(v) for v in range(1, 11)]) is None
     )
+
+
+def test_match_nearest_within_decile_returns_none_for_empty_boundary_values() -> None:
+    assert match_nearest_within_decile([], [], []) is None
+    assert match_nearest_within_decile([("t1", 1.0)], [("c1", 1.0)], []) is None

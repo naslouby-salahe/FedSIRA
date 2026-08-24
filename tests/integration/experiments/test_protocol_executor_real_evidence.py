@@ -13,7 +13,13 @@ from fedsira.domain.enums import SeedNamespace
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
-from fedsira.experiments.registry import PRIMARY_CONFIRMATORY_EVALUATION_NAME, PrimaryScenario
+from fedsira.experiments.registry import (
+    PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+    PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    OpeningMode,
+    PrimaryScenario,
+    ProposalEpisode,
+)
 from fedsira.protocol.source_selection import select_source_domain, source_selection_order
 from fedsira.runtime.determinism import namespace_seed
 
@@ -120,3 +126,33 @@ def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_ro
         assert metrics.target_f1.value is not None
         assert metrics.supported_macro_f1.value is not None
         assert metrics.benign_far.value is not None
+
+
+def _opening_cell(episode: ProposalEpisode, master_seed: int) -> ScientificCell:
+    return ScientificCell(
+        experiment=PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+        method=OpeningMode.PROPOSAL_ASSISTED.value,
+        condition=episode.value,
+        master_seed=master_seed,
+    )
+
+
+def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    outcome = executor.execute_cell(
+        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 5), CONFIG
+    )
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    outcome = executor.execute_cell(
+        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6), CONFIG
+    )
+    metrics = dict(outcome.metrics)
+    assert metrics["claim-contract-passes"] in {0.0, 1.0}
