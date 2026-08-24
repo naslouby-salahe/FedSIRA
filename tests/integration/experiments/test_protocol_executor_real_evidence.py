@@ -21,6 +21,7 @@ from fedsira.experiments.registry import (
     OpeningMode,
     PrimaryScenario,
     ProposalEpisode,
+    SourceExclusionMethod,
 )
 from fedsira.protocol.source_selection import select_source_domain, source_selection_order
 from fedsira.runtime.determinism import namespace_seed
@@ -188,3 +189,21 @@ def test_client_review_then_retrain_baseline_executes_without_crashing(
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    terminal_states: set[float | None] = set()
+    for method in SourceExclusionMethod:
+        cell = ScientificCell(
+            experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+            method=method.value,
+            condition="Useful Backdoored Source — 5%",
+            master_seed=9,
+        )
+        outcome = executor.execute_cell(cell, CONFIG)
+        assert outcome.terminal_state == "Completed"
+        terminal_states.add(dict(outcome.metrics)["terminal-state"])
+    assert terminal_states != {1.0}

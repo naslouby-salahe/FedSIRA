@@ -1372,8 +1372,19 @@ class ProtocolCellExecutor(CellExecutor):
                 candidate_row_ids=("reproducer-a", "reproducer-b", "reproducer-c"),
                 source_row_id=None,
             )
+        elif method == SourceExclusionMethod.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value:
+            state = self._client_review_outcome(cell, config)
+        elif method == SourceExclusionMethod.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value:
+            discard_source = client_review_then_retrain_should_discard_source_weights(
+                self._client_review_outcome(cell, config)
+            )
+            state = (
+                self._advance_protocol(cell, config, evidence)
+                if discard_source
+                else ClaimState.DORMANT
+            )
         else:
-            state = ClaimState.ADMITTED
+            state = self._advance_protocol(cell, config, evidence)
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
             poison_rows = select_source_backdoor_poison_rows(
