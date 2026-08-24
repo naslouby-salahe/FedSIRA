@@ -24,7 +24,6 @@ from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     parameter_similarity_certification_row_results,
-    recovery_alarm_threshold,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
 )
@@ -166,6 +165,7 @@ from fedsira.experiments.real_evidence import (
     non_source_domains,
     prepared_feature_names,
     real_evidence_available,
+    recovery_backdoor_alarm_threshold,
     root_cause_partitioned_row_ids,
     train_anchor,
     train_centralized_reference_checkpoint,
@@ -173,10 +173,12 @@ from fedsira.experiments.real_evidence import (
     train_fedavg_reference_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
+    train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,
     train_source_candidate_delta,
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
+    triggered_to_benign_rate,
 )
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -952,6 +954,92 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "source-update-sanitization-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _recovery_after_source_admission_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None or source_domain is None:
+            return ClaimState.DORMANT
+        review_state = self._client_review_outcome(cell, config)
+        if review_state is not ClaimState.ADMITTED:
+            return review_state
+        source_delta = train_source_candidate_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if source_delta is None:
+            return ClaimState.DORMANT
+        admitted_checkpoint = real_anchor.flat_parameters + source_delta
+        anchor_verification = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            real_anchor.flat_parameters,
+            source_domain,
+            Role.ROW_VERIFICATION,
+        )
+        admitted_verification = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            admitted_checkpoint,
+            source_domain,
+            Role.ROW_VERIFICATION,
+        )
+        alarm_threshold = recovery_backdoor_alarm_threshold(
+            self._prepared_root, config, real_anchor
+        )
+        if anchor_verification is None or admitted_verification is None or alarm_threshold is None:
+            return ClaimState.DORMANT
+        supported_macro_f1_drop = supported_macro_f1_harm(
+            anchor_verification.supported_macro_f1, admitted_verification.supported_macro_f1
+        )
+        benign_far_increase = (
+            MetricResult(
+                admitted_verification.benign_far.value - anchor_verification.benign_far.value, 1
+            )
+            if admitted_verification.benign_far.value is not None
+            and anchor_verification.benign_far.value is not None
+            else MetricResult(None, 0)
+        )
+        triggered_rate = triggered_to_benign_rate(
+            self._prepared_root,
+            real_anchor,
+            admitted_checkpoint,
+            source_domain,
+            Role.ROW_VERIFICATION,
+            NBAIOT_TRIGGER_FEATURES,
+            config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
+        )
+        rollback = recovery_rollback_is_triggered(
+            supported_macro_f1_drop,
+            benign_far_increase,
+            triggered_rate,
+            config.metrics_and_statistics.materiality,
+            alarm_threshold,
+        )
+        if rollback:
+            recovery_delta = train_recovery_after_source_admission_delta(
+                self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+            )
+            if recovery_delta is None:
+                return ClaimState.DORMANT
+            production_checkpoint = real_anchor.flat_parameters + recovery_delta
+        else:
+            production_checkpoint = admitted_checkpoint
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "recovery-after-source-admission-claim",
             source_domain,
             (),
             (),
@@ -2095,18 +2183,7 @@ class ProtocolCellExecutor(CellExecutor):
         elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
             state = self._secure_continual_assessment_outcome(cell, config, evidence)
         elif method == BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value:
-            recovery_rollback_is_triggered(
-                MetricResult(None, 0),
-                MetricResult(None, 0),
-                MetricResult(None, 0),
-                config.metrics_and_statistics.materiality,
-                config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
-            )
-            recovery_alarm_threshold(
-                (0.0, 1.0, 2.0),
-                config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
-            )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._recovery_after_source_admission_outcome(cell, config, evidence)
         elif method == BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value:
             state = self._source_update_sanitization_outcome(cell, config, evidence)
         elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:

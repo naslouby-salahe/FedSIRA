@@ -24,6 +24,7 @@ from fedsira.experiments.real_evidence import (
     non_source_domains,
     prepared_feature_names,
     real_evidence_available,
+    recovery_backdoor_alarm_threshold,
     train_anchor,
     train_centralized_reference_checkpoint,
     train_density_cluster_trimmed_mean_delta,
@@ -31,9 +32,11 @@ from fedsira.experiments.real_evidence import (
     train_fedavg_reference_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
+    train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
+    triggered_to_benign_rate,
 )
 from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -476,6 +479,40 @@ def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_
         )
         is None
     )
+
+
+def test_recovery_backdoor_alarm_threshold_is_a_finite_rate(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    threshold = recovery_backdoor_alarm_threshold(prepared_root, CONFIG, anchor=anchor)
+    assert threshold is not None
+    assert 0.0 <= threshold <= 1.0
+
+
+def test_triggered_to_benign_rate_is_defined_for_gafgyt_udp_rows(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    rate = triggered_to_benign_rate(
+        prepared_root,
+        anchor,
+        anchor.flat_parameters,
+        DOMAINS[0],
+        Role.ANCHOR_VALIDATION,
+        NBAIOT_TRIGGER_FEATURES,
+        6.0,
+    )
+    assert rate.value is not None
+    assert 0.0 <= rate.value <= 1.0
+
+
+def test_train_recovery_after_source_admission_delta_excludes_the_source_domain(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_recovery_after_source_admission_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+    )
+    assert delta is not None
+    assert torch.isfinite(delta).all()
 
 
 def test_train_secure_continual_assessment_delta_is_finite_and_nonzero(
