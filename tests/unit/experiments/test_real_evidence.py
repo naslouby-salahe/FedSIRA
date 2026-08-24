@@ -24,6 +24,7 @@ from fedsira.experiments.real_evidence import (
     real_evidence_available,
     train_anchor,
     train_domain_reproduction_delta,
+    train_fedavg_reference_delta,
 )
 from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -335,3 +336,26 @@ def test_compute_shared_epistemic_failure_summary_for_common_context_reports_dia
     )
     assert summary.defined_domain_count > 0
     assert summary.diagnostic_marker.value is not None
+
+
+def test_train_fedavg_reference_delta_is_finite_and_nonzero(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_fedavg_reference_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+    )
+    assert delta is not None
+    assert delta.shape == anchor.flat_parameters.shape
+    assert torch.isfinite(delta).all()
+    assert torch.any(delta != 0.0)
+
+
+def test_train_fedavg_reference_delta_returns_none_without_prepared_data(
+    tmp_path: Path, anchor: RealAnchor
+) -> None:
+    assert (
+        train_fedavg_reference_delta(
+            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        )
+        is None
+    )
