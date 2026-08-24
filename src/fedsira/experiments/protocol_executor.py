@@ -69,11 +69,8 @@ from fedsira.baselines.registry import (
     validate_role_not_used_for_tuning,
 )
 from fedsira.baselines.robust_aggregation import (
-    client_sampling_round_order,
     coordinate_wise_median_synthesis,
     direct_krum_committee_rows,
-    krum_reference_post_reference_rounds,
-    krum_reference_round_participants,
     validate_three_row_coordinate_median_committee_size,
 )
 from fedsira.baselines.source_authority import (
@@ -185,6 +182,7 @@ from fedsira.experiments.real_evidence import (
     root_cause_partitioned_row_ids,
     train_anchor,
     train_fedavg_reference_delta,
+    train_krum_reference_delta,
     train_source_candidate_delta,
 )
 from fedsira.experiments.registry import (
@@ -936,6 +934,34 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "fedavg-reference-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _krum_reference_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        delta = train_krum_reference_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + delta
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "krum-reference-claim",
             source_domain,
             (),
             (),
@@ -1805,18 +1831,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value:
-            krum_reference_post_reference_rounds(config.baselines)
-            round_order = client_sampling_round_order(
-                tuple(NBAIOT_DOMAIN_ORDER),
-                cell.master_seed,
-                0,
-            )
-            krum_reference_round_participants(
-                round_order,
-                None,
-                config.protocol.synthesis.committee_size,
-            )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._krum_reference_outcome(cell, config, evidence)
         elif method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
             validate_three_row_coordinate_median_committee_size(
                 config.baselines.three_row_coordinate_median.row_count,

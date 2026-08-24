@@ -25,6 +25,7 @@ from fedsira.experiments.real_evidence import (
     train_anchor,
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
+    train_krum_reference_delta,
 )
 from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -355,6 +356,27 @@ def test_train_fedavg_reference_delta_returns_none_without_prepared_data(
 ) -> None:
     assert (
         train_fedavg_reference_delta(
+            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        )
+        is None
+    )
+
+
+def test_train_krum_reference_delta_returns_none_with_fewer_than_committee_size_participants(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    assert CONFIG.protocol.synthesis.committee_size > len(DOMAINS)
+    delta = train_krum_reference_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+    )
+    assert delta is None
+
+
+def test_train_krum_reference_delta_returns_none_without_prepared_data(
+    tmp_path: Path, anchor: RealAnchor
+) -> None:
+    assert (
+        train_krum_reference_delta(
             tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
