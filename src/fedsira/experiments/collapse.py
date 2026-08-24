@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 from fedsira.analysis.comparisons import ComparisonFamilyResult
+from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts.storage import (
+    canonical_artifact_paths,
+    compute_checksum,
+    is_artifact_complete_and_valid,
+    publish_artifact_to_disk,
+    read_published_manifest,
+    stage_payload,
+)
 from fedsira.config.schema import MaterialityConfig, MultiplicityConfig
-from fedsira.domain.enums import ClaimOpeningMode
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOpeningMode
 from fedsira.domain.records import CanonicalToken, Probability
 from fedsira.experiments.registry import ClaimFamily
 
@@ -365,6 +376,64 @@ def materialize_resolved_core(
         production_update_rule=core.production_update_rule,
         final_gate_required=core.final_gate_required,
         source_excluded=core.source_excluded,
+    )
+
+
+RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
+RESOLVED_CORE_ARTIFACT_IDENTITY: CanonicalToken = compute_checksum(
+    b"RESOLVED_FEDSIRA_CORE_SECTION_18_7"
+)
+
+
+def _resolved_core_payload(core: ResolvedCore) -> bytes:
+    fields = {
+        "proposal_assistance_survives": core.proposal_assistance_survives,
+        "plurality_survives": core.plurality_survives,
+        "direct_source_exclusion_survives": core.direct_source_exclusion_survives,
+        "external_verification_survives": core.external_verification_survives,
+        "opening_mode": core.opening_mode.value,
+        "reproduction_row_requirement": core.reproduction_row_requirement,
+        "row_verification_mode": core.row_verification_mode,
+        "production_update_rule": core.production_update_rule,
+        "final_gate_required": core.final_gate_required,
+        "source_excluded": core.source_excluded,
+    }
+    return json.dumps(fields, sort_keys=True).encode("utf-8")
+
+
+def publish_resolved_core(canonical_directory: Path, core: ResolvedCore) -> ArtifactManifest:
+    payload = _resolved_core_payload(core)
+    staged_manifest = ArtifactManifest(
+        family=RESOLVED_CORE_ARTIFACT_FAMILY,
+        identity=RESOLVED_CORE_ARTIFACT_IDENTITY,
+        checksum=compute_checksum(payload),
+        lifecycle_state=ArtifactLifecycleState.STAGING,
+        upstream_identities=(),
+    )
+    staging_root = canonical_directory / "staging"
+    staged_path = stage_payload(staging_root, payload)
+    return publish_artifact_to_disk(staged_path, canonical_directory, staged_manifest, payload)
+
+
+def read_resolved_core(canonical_directory: Path) -> ResolvedCore | None:
+    if not is_artifact_complete_and_valid(canonical_directory, RESOLVED_CORE_ARTIFACT_IDENTITY):
+        return None
+    manifest = read_published_manifest(canonical_directory, RESOLVED_CORE_ARTIFACT_IDENTITY)
+    if manifest is None:
+        return None
+    payload_path, _manifest_path = canonical_artifact_paths(canonical_directory, manifest.identity)
+    fields = json.loads(payload_path.read_text())
+    return ResolvedCore(
+        proposal_assistance_survives=fields["proposal_assistance_survives"],
+        plurality_survives=fields["plurality_survives"],
+        direct_source_exclusion_survives=fields["direct_source_exclusion_survives"],
+        external_verification_survives=fields["external_verification_survives"],
+        opening_mode=ClaimOpeningMode(fields["opening_mode"]),
+        reproduction_row_requirement=fields["reproduction_row_requirement"],
+        row_verification_mode=fields["row_verification_mode"],
+        production_update_rule=fields["production_update_rule"],
+        final_gate_required=fields["final_gate_required"],
+        source_excluded=fields["source_excluded"],
     )
 
 

@@ -1,11 +1,14 @@
 from pathlib import Path
 
+from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
     materialize_resolved_core,
+    publish_resolved_core,
+    read_resolved_core,
 )
 from fedsira.experiments.execution import (
     CellExecutionOutcome,
@@ -17,6 +20,10 @@ from fedsira.experiments.execution import (
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily
+
+RESOLVED_CORE_CANONICAL_DIRECTORY = workspace_root_for_family(
+    ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
+)
 
 
 def render_result(result: ExperimentExecutionResult) -> str:
@@ -94,15 +101,17 @@ def _materialize_core_if_complete(experiment: str) -> None:
         )
     if len(decisions) == len(COLLAPSE_EXPERIMENT_NAMES):
         core = materialize_resolved_core(tuple(decisions))
+        publish_resolved_core(RESOLVED_CORE_CANONICAL_DIRECTORY, core)
         print(f"Resolved FedSIRA Core materialized: {core.identity_token}")
 
 
 def execute(name: str, overwrite: bool) -> None:
+    resolved_core = read_resolved_core(RESOLVED_CORE_CANONICAL_DIRECTORY)
     result = run_experiment(
         name,
-        ProtocolCellExecutor(),
+        ProtocolCellExecutor(resolved_core=resolved_core),
         overwrite=overwrite,
-        resolved_core_complete=False,
+        resolved_core_complete=resolved_core is not None,
     )
     print(render_result(result))
     if (

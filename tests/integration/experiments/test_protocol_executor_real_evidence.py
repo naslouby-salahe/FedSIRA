@@ -14,6 +14,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
 )
 from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
+from fedsira.experiments.collapse import resolve_core_mapping
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
@@ -44,6 +45,7 @@ pytestmark = pytest.mark.skip(
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+RESOLVED_CORE = resolve_core_mapping(True, True, True)
 CLASSES = (NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO, NBaiotClass.GAFGYT_JUNK)
 CLASS_OFFSETS = {
     NBaiotClass.BENIGN: 0.0,
@@ -101,7 +103,7 @@ def _primary_cell(master_seed: int) -> ScientificCell:
 
 
 def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     outcome = executor.execute_cell(_primary_cell(1), CONFIG)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
@@ -111,7 +113,7 @@ def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root:
 def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     outcome = executor.execute_cell(_primary_cell(4), CONFIG)
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] != 0.0
@@ -119,8 +121,23 @@ def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
     assert metrics["worst-domain-target-f1"] is not None
 
 
-def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) -> None:
+def test_resolved_core_cell_is_dormant_without_a_resolved_core(prepared_root: Path) -> None:
     executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    outcome = executor.execute_cell(_primary_cell(1), CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] == 0.0
+
+
+def test_resolved_core_without_plurality_uses_single_row_requirement(prepared_root: Path) -> None:
+    single_row_core = resolve_core_mapping(True, False, True)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=single_row_core)
+    outcome = executor.execute_cell(_primary_cell(20), CONFIG)
+    assert outcome.terminal_state == "Completed"
+
+
+def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     first = executor.execute_cell(_primary_cell(2), CONFIG)
     second = executor.execute_cell(_primary_cell(2), CONFIG)
     assert first.terminal_state == second.terminal_state
@@ -161,7 +178,7 @@ def _opening_cell(episode: ProposalEpisode, master_seed: int) -> ScientificCell:
 
 
 def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     outcome = executor.execute_cell(
         _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 5), CONFIG
     )
@@ -173,7 +190,7 @@ def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root:
 def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     outcome = executor.execute_cell(
         _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6), CONFIG
     )
@@ -182,7 +199,7 @@ def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
 
 
 def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
@@ -198,7 +215,7 @@ def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -
 def test_client_review_then_retrain_baseline_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
@@ -214,7 +231,7 @@ def test_client_review_then_retrain_baseline_executes_without_crashing(
 def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     terminal_states: set[float | None] = set()
     for method in SourceExclusionMethod:
         cell = ScientificCell(
@@ -230,7 +247,7 @@ def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method
 
 
 def test_every_primary_baseline_method_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     for method in BaselineIdentity:
         cell = ScientificCell(
             experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
@@ -245,7 +262,7 @@ def test_every_primary_baseline_method_executes_without_crashing(prepared_root: 
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=ADMISSION_DELAY_DECOMPOSITION_NAME,
         method="Resolved FedSIRA Core",
@@ -262,7 +279,7 @@ def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
 def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=EFFICIENCY_MEASUREMENT_NAME,
         method="Resolved FedSIRA Core",
@@ -279,7 +296,7 @@ def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
 def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     methods = (
         SourceExclusionMethod.FULL_FEDSIRA.value,
         BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
@@ -299,7 +316,7 @@ def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
 def test_capability_under_specification_boundary_reports_a_real_oracle_label(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
         method=CapabilityContractScope.BROAD_TARGET_ONLY.value,
@@ -323,7 +340,7 @@ def test_capability_under_specification_boundary_reports_a_real_oracle_label(
 def test_shared_epistemic_failure_boundary_reports_real_metrics(
     prepared_root: Path, failure_type: EpistemicFailureType
 ) -> None:
-    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
     cell = ScientificCell(
         experiment=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
         method="x",

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import MaterialityConfig, MultiplicityConfig
 from fedsira.domain.enums import ClaimOpeningMode
@@ -10,6 +12,8 @@ from fedsira.experiments.collapse import (
     evaluate_proposal_survival,
     evaluate_source_exclusion_survival,
     materialize_resolved_core,
+    publish_resolved_core,
+    read_resolved_core,
     resolve_all_eight_cases,
     resolve_core_mapping,
 )
@@ -245,3 +249,27 @@ def test_materialize_resolved_core_uses_decision_states() -> None:
     core = materialize_resolved_core(decisions)
     assert core.identity_token == "P|R|V"
     assert core.direct_source_exclusion_survives
+
+
+def test_publish_and_read_resolved_core_round_trips(tmp_path: Path) -> None:
+    core = resolve_core_mapping(True, False, True)
+    publish_resolved_core(tmp_path, core)
+    reloaded = read_resolved_core(tmp_path)
+    assert reloaded is not None
+    assert reloaded.identity_token == core.identity_token
+    assert reloaded.opening_mode is core.opening_mode
+    assert reloaded.reproduction_row_requirement == core.reproduction_row_requirement
+    assert reloaded.row_verification_mode == core.row_verification_mode
+    assert reloaded.production_update_rule == core.production_update_rule
+
+
+def test_read_resolved_core_returns_none_without_a_published_artifact(tmp_path: Path) -> None:
+    assert read_resolved_core(tmp_path) is None
+
+
+def test_publish_resolved_core_overwrites_a_prior_publish(tmp_path: Path) -> None:
+    publish_resolved_core(tmp_path, resolve_core_mapping(True, True, True))
+    publish_resolved_core(tmp_path, resolve_core_mapping(False, False, False))
+    reloaded = read_resolved_core(tmp_path)
+    assert reloaded is not None
+    assert reloaded.identity_token == "p|r|v"
