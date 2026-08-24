@@ -2,8 +2,6 @@ import hashlib
 import math
 from collections.abc import Mapping, Sequence
 
-import torch
-
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_HASH_TOKEN,
     NBAIOT_DOMAIN_ORDER,
@@ -71,12 +69,3 @@ def feature_shift_sign(
         )
     ).digest()
     return 1.0 if (digest[-1] & 1) == 1 else -1.0
-
-
-def apply_feature_shift(
-    standardized_features: torch.Tensor, feature_indices: Sequence[int], signed_magnitude: float
-) -> torch.Tensor:
-    shifted = standardized_features.clone()
-    for feature_index in feature_indices:
-        shifted[..., feature_index] = shifted[..., feature_index] + signed_magnitude
-    return shifted

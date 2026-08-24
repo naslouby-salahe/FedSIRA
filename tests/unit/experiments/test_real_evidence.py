@@ -15,6 +15,7 @@ from fedsira.domain.records import CanonicalToken
 from fedsira.experiments.real_evidence import (
     BackdoorScope,
     EpistemicFailureScope,
+    HeterogeneityScope,
     RealAnchor,
     RootCauseScope,
     anchor_round_calibration_updates,
@@ -278,6 +279,67 @@ def test_compute_source_backdoor_asr_returns_na_without_report_test_rows(
         Path("/nonexistent"), anchor, anchor.flat_parameters, DOMAINS[0], (0,), 6.0
     )
     assert asr.value is None
+
+
+def _heterogeneity_scope(prepared_root: Path, shift_magnitude: float) -> HeterogeneityScope:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    return HeterogeneityScope(
+        heterogeneity_namespace_seed=11,
+        selected_feature_names=feature_names[:10],
+        feature_names=feature_names,
+        shift_magnitude=shift_magnitude,
+    )
+
+
+def test_evaluate_domain_with_large_heterogeneity_shift_changes_predictions(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    natural_metrics = evaluate_domain(
+        prepared_root, anchor, anchor.flat_parameters, DOMAINS[0], Role.REPORT_TEST
+    )
+    assert natural_metrics is not None
+    shift_differed = False
+    for shift_magnitude in (10.0, 50.0, 200.0):
+        scope = _heterogeneity_scope(prepared_root, shift_magnitude=shift_magnitude)
+        shifted_metrics = evaluate_domain(
+            prepared_root,
+            anchor,
+            anchor.flat_parameters,
+            DOMAINS[0],
+            Role.REPORT_TEST,
+            heterogeneity_scope=scope,
+        )
+        assert shifted_metrics is not None
+        if (
+            natural_metrics.target_f1.value != shifted_metrics.target_f1.value
+            or natural_metrics.supported_macro_f1.value != shifted_metrics.supported_macro_f1.value
+            or natural_metrics.benign_far.value != shifted_metrics.benign_far.value
+        ):
+            shift_differed = True
+            break
+    assert shift_differed
+
+
+def test_train_domain_reproduction_delta_with_heterogeneity_scope_differs_from_natural(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    scope = _heterogeneity_scope(prepared_root, shift_magnitude=1.0)
+    natural_delta = train_domain_reproduction_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, domain=DOMAINS[0]
+    )
+    shifted_delta = train_domain_reproduction_delta(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        domain=DOMAINS[0],
+        heterogeneity_scope=scope,
+    )
+    assert natural_delta is not None
+    assert shifted_delta is not None
+    assert torch.isfinite(shifted_delta).all()
+    assert not torch.equal(natural_delta, shifted_delta)
 
 
 def test_evaluate_domain_reports_defined_target_metrics_on_report_test(

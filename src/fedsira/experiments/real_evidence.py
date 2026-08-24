@@ -65,6 +65,7 @@ from fedsira.boundaries.epistemic_failure import (
     select_shared_label_error_rows,
     select_spurious_feature_rows,
 )
+from fedsira.boundaries.heterogeneity import feature_shift_sign
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.materialization import view_parquet_path
@@ -220,6 +221,35 @@ def _poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedR
         kept_labels.append(relabeled[sample_id].value)
     return PreparedRows(
         sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
+    )
+
+
+@dataclass(frozen=True)
+class HeterogeneityScope:
+    heterogeneity_namespace_seed: DerivedSeed
+    selected_feature_names: tuple[CanonicalToken, ...]
+    feature_names: tuple[CanonicalToken, ...]
+    shift_magnitude: float
+
+
+def _apply_heterogeneity_shift(
+    rows: PreparedRows, domain: NBaiotDomain, scope: HeterogeneityScope
+) -> PreparedRows:
+    feature_indices_and_signs = tuple(
+        (
+            scope.feature_names.index(feature_name),
+            feature_shift_sign(domain, feature_name, scope.heterogeneity_namespace_seed),
+        )
+        for feature_name in scope.selected_feature_names
+    )
+    shifted_features: list[tuple[float, ...]] = []
+    for features in rows.features:
+        tensor = torch.tensor(features, dtype=torch.float32)
+        for feature_index, sign in feature_indices_and_signs:
+            tensor[feature_index] = tensor[feature_index] + sign * scope.shift_magnitude
+        shifted_features.append(tuple(float(value) for value in tensor))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(shifted_features), labels=rows.labels
     )
 
 
@@ -936,6 +966,7 @@ def _combined_post_reference_rows(
     root_cause_scope: RootCauseScope | None = None,
     epistemic_failure_scope: EpistemicFailureScope | None = None,
     backdoor_scope: BackdoorScope | None = None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
     target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
     if target_rows is not None and root_cause_scope is not None:
@@ -950,6 +981,8 @@ def _combined_post_reference_rows(
         )
     ):
         target_rows = _apply_epistemic_target_marker(target_rows, epistemic_failure_scope)
+    if target_rows is not None and heterogeneity_scope is not None:
+        target_rows = _apply_heterogeneity_shift(target_rows, domain, heterogeneity_scope)
     target_tensor = _tensor_view(target_rows)
     if target_tensor is None:
         return None
@@ -972,6 +1005,8 @@ def _combined_post_reference_rows(
             rows, relabeled_mask = _relabel_shared_label_error_rows(rows, epistemic_failure_scope)
         if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and backdoor_scope is not None:
             rows = _poison_backdoor_rows(rows, backdoor_scope)
+        if rows is not None and heterogeneity_scope is not None:
+            rows = _apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
         replay_tensor = _tensor_view(rows)
         if replay_tensor is None:
             continue
@@ -999,9 +1034,15 @@ def train_domain_reproduction_delta(
     domain: NBaiotDomain,
     root_cause_scope: RootCauseScope | None = None,
     epistemic_failure_scope: EpistemicFailureScope | None = None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> torch.Tensor | None:
     combined = _combined_post_reference_rows(
-        prepared_root, domain, Role.REPRODUCTION, root_cause_scope, epistemic_failure_scope
+        prepared_root,
+        domain,
+        Role.REPRODUCTION,
+        root_cause_scope,
+        epistemic_failure_scope,
+        heterogeneity_scope=heterogeneity_scope,
     )
     if combined is None:
         return None
@@ -1658,6 +1699,7 @@ def train_krum_reference_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> torch.Tensor | None:
     eligible_domains = non_source_domains(source_domain)
     model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
@@ -1673,7 +1715,9 @@ def train_krum_reference_delta(
         committee: list[CertifiedReproductionRow] = []
         for domain in participants:
             target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            combined = _combined_post_reference_rows(
+                prepared_root, domain, target_role, heterogeneity_scope=heterogeneity_scope
+            )
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -1816,6 +1860,7 @@ def evaluate_domain(
     role: Role,
     target_role: Role | None = None,
     root_cause_scope: RootCauseScope | None = None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> DomainTargetMetrics | None:
     true_labels: list[CanonicalToken] = []
     predicted_labels: list[CanonicalToken] = []
@@ -1836,6 +1881,8 @@ def evaluate_domain(
                 and rows is not None
             ):
                 rows = _scope_and_shift_rows(rows, root_cause_scope)
+            if rows is not None and heterogeneity_scope is not None:
+                rows = _apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
             tensor_view = _tensor_view(rows)
             if tensor_view is None:
                 continue
@@ -1899,10 +1946,18 @@ def certified_domain_delta_committee(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     domains: Sequence[NBaiotDomain],
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> dict[NBaiotDomain, torch.Tensor]:
     deltas: dict[NBaiotDomain, torch.Tensor] = {}
     for domain in domains:
-        delta = train_domain_reproduction_delta(prepared_root, config, master_seed, anchor, domain)
+        delta = train_domain_reproduction_delta(
+            prepared_root,
+            config,
+            master_seed,
+            anchor,
+            domain,
+            heterogeneity_scope=heterogeneity_scope,
+        )
         if delta is not None:
             deltas[domain] = delta
     return deltas

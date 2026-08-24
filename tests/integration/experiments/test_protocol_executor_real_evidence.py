@@ -900,3 +900,21 @@ def test_krum_robust_aggregation_reference_under_heterogeneous_boundary_uses_rea
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_feature_shift_heterogeneity_boundary_applies_real_shift_to_training_and_evaluation(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+        method="Resolved FedSIRA Core",
+        condition=HeterogeneityRegime.FEATURE_SHIFT_0_5.value,
+        master_seed=37,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+    assert metrics["feature-shift-sign"] in {1.0, -1.0}
+    assert metrics["feature-shift-count"] == 10.0
