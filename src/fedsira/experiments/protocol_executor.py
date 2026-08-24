@@ -184,6 +184,7 @@ from fedsira.experiments.real_evidence import (
     non_source_domains,
     prepared_feature_names,
     real_evidence_available,
+    root_cause_partitioned_row_ids,
     train_anchor,
     train_source_candidate_delta,
 )
@@ -1016,16 +1017,20 @@ class ProtocolCellExecutor(CellExecutor):
                     float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
                 )
             )
-            target_row_ids = target_row_ids_for_contract(
-                scope,
-                frozenset({"sample-a"}),
-                frozenset({"sample-b"}),
-            )
+            empty_row_ids: frozenset[CanonicalToken] = frozenset()
+            if real_anchor is not None:
+                root_cause_a_ids, root_cause_b_ids, supported_ids = root_cause_partitioned_row_ids(
+                    self._prepared_root, non_source_domains(_source_domain_for_cell(cell))
+                )
+            else:
+                root_cause_a_ids, root_cause_b_ids, supported_ids = (
+                    empty_row_ids,
+                    empty_row_ids,
+                    empty_row_ids,
+                )
+            target_row_ids = target_row_ids_for_contract(scope, root_cause_a_ids, root_cause_b_ids)
             validate_excluded_root_cause_not_supported(
-                scope,
-                frozenset(),
-                frozenset({"sample-a"}),
-                frozenset({"sample-b"}),
+                scope, supported_ids, root_cause_a_ids, root_cause_b_ids
             )
             extra.append(("target-row-ids", float(len(target_row_ids))))
         if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:

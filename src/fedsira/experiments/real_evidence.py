@@ -612,6 +612,33 @@ def non_source_domains(source_domain: NBaiotDomain | None) -> tuple[NBaiotDomain
     return tuple(domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain)
 
 
+def root_cause_partitioned_row_ids(
+    prepared_root: Path, domains: Sequence[NBaiotDomain]
+) -> tuple[frozenset[ArtifactDigest], frozenset[ArtifactDigest], frozenset[ArtifactDigest]]:
+    root_cause_a_ids: set[ArtifactDigest] = set()
+    root_cause_b_ids: set[ArtifactDigest] = set()
+    supported_ids: set[ArtifactDigest] = set()
+    for domain in domains:
+        target_rows = load_prepared_rows(
+            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.POST_REFERENCE_REPLAY
+        )
+        if target_rows is not None:
+            for sample_id in target_rows.sample_ids:
+                if root_cause_for_sample(sample_id) is RootCause.A:
+                    root_cause_a_ids.add(sample_id)
+                else:
+                    root_cause_b_ids.add(sample_id)
+        for class_id in NBAIOT_CLASS_ORDER:
+            if class_id is NBaiotClass.GAFGYT_COMBO:
+                continue
+            supported_rows = load_prepared_rows(
+                prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY
+            )
+            if supported_rows is not None:
+                supported_ids.update(supported_rows.sample_ids)
+    return frozenset(root_cause_a_ids), frozenset(root_cause_b_ids), frozenset(supported_ids)
+
+
 def certified_domain_delta_committee(
     prepared_root: Path,
     config: ScientificConfig,
