@@ -17,6 +17,7 @@ from fedsira.experiments.real_evidence import (
     RealAnchor,
     RootCauseScope,
     anchor_round_calibration_updates,
+    anchor_round_reconstruction_calibration_errors,
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
     evaluate_domain,
@@ -32,6 +33,7 @@ from fedsira.experiments.real_evidence import (
     train_local_only_reference_checkpoint,
     train_secure_continual_assessment_delta,
     train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
 )
 from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -438,6 +440,39 @@ def test_train_source_update_sanitization_delta_returns_none_without_source_doma
     assert (
         train_source_update_sanitization_delta(
             prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        )
+        is None
+    )
+
+
+def test_anchor_round_reconstruction_calibration_errors_are_within_expected_count(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    errors = anchor_round_reconstruction_calibration_errors(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor
+    )
+    assert len(errors) > 0
+    assert len(errors) <= len(anchor.round_start_flat_parameters) * len(DOMAINS)
+    for error in errors:
+        assert error >= 0.0
+
+
+def test_train_update_reconstruction_filter_delta_is_finite(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_update_reconstruction_filter_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+    )
+    assert delta is not None
+    assert torch.isfinite(delta).all()
+
+
+def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_data(
+    tmp_path: Path, anchor: RealAnchor
+) -> None:
+    assert (
+        train_update_reconstruction_filter_delta(
+            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )
