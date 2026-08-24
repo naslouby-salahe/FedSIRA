@@ -160,6 +160,7 @@ from fedsira.experiments.real_evidence import (
     compute_shared_epistemic_failure_summary,
     evaluate_certified_ensemble,
     evaluate_domain,
+    flat_parameters_identity,
     non_source_domains,
     prepared_feature_names,
     real_evidence_available,
@@ -1404,9 +1405,20 @@ class ProtocolCellExecutor(CellExecutor):
                 ),
             )
         )
-        reviewer_domains = non_source_domains(source_domain)[
-            :INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT
-        ]
+        eligible_reviewer_domains = tuple(
+            domain
+            for domain in NBAIOT_DOMAIN_ORDER
+            if verifier_is_eligible(domain, source_domain, source_domain)
+        )
+        reviewer_assignment_seed = verifier_assignment_seed_for_row(
+            derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, cell.master_seed),
+            flat_parameters_identity(source_delta),
+        )
+        reviewer_domains = deterministic_verifier_panel(
+            eligible_reviewer_domains,
+            reviewer_assignment_seed,
+            INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
+        )
         positive_report_count = 0
         for reviewer_domain in reviewer_domains:
             local_checkpoint = train_local_only_reference_checkpoint(
