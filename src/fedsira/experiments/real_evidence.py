@@ -366,6 +366,25 @@ def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
     return hashlib.sha256(flat_parameters.detach().cpu().numpy().tobytes()).hexdigest()
 
 
+def domain_anchor_train_feature_mean(
+    prepared_root: Path, domain: NBaiotDomain
+) -> torch.Tensor | None:
+    combined_features: list[torch.Tensor] = []
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        tensor_view = _tensor_view(
+            load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
+        )
+        if tensor_view is None:
+            continue
+        features, _labels, _sample_ids = tensor_view
+        combined_features.append(features)
+    if not combined_features:
+        return None
+    return torch.cat(combined_features, dim=0).mean(dim=0)
+
+
 def train_anchor(
     prepared_root: Path, config: ScientificConfig, master_seed: MasterSeed
 ) -> RealAnchor | None:

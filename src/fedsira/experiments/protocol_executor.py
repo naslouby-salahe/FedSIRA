@@ -158,6 +158,7 @@ from fedsira.experiments.real_evidence import (
     compute_real_report_summary,
     compute_screen_differential,
     compute_shared_epistemic_failure_summary,
+    domain_anchor_train_feature_mean,
     evaluate_certified_ensemble,
     evaluate_domain,
     flat_parameters_identity,
@@ -851,6 +852,39 @@ class ProtocolCellExecutor(CellExecutor):
                 else None
             )
         return self._real_anchor_cache[master_seed]
+
+    def _same_context_verifier_panel(
+        self,
+        source_domain: NBaiotDomain | None,
+        reproducer_domain: NBaiotDomain,
+        config: ScientificConfig,
+    ) -> tuple[NBaiotDomain, ...]:
+        eligible_verifiers = tuple(
+            domain
+            for domain in NBAIOT_DOMAIN_ORDER
+            if verifier_is_eligible(domain, source_domain, reproducer_domain)
+        )
+        reproducer_feature_mean = domain_anchor_train_feature_mean(
+            self._prepared_root, reproducer_domain
+        )
+        if reproducer_feature_mean is None:
+            raise ValueError(
+                f"same-context verification requires real anchor-train features for "
+                f"{reproducer_domain}"
+            )
+        eligible_verifier_feature_means: dict[NBaiotDomain, torch.Tensor] = {}
+        for domain in eligible_verifiers:
+            feature_mean = domain_anchor_train_feature_mean(self._prepared_root, domain)
+            if feature_mean is None:
+                raise ValueError(
+                    f"same-context verification requires real anchor-train features for {domain}"
+                )
+            eligible_verifier_feature_means[domain] = feature_mean
+        return same_context_verifier_panel(
+            reproducer_feature_mean,
+            eligible_verifier_feature_means,
+            config.protocol.verification.panel_size,
+        )
 
     def _candidate_capability_contract_passes(
         self,
@@ -1565,12 +1599,6 @@ class ProtocolCellExecutor(CellExecutor):
                     row_results = ()
                 extra.append(("parameter-similarity-committed-rows", float(len(committed_rows))))
                 extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
-        elif variant == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value:
-            same_context_verifier_panel(
-                torch.zeros(115),
-                {domain: torch.zeros(115) for domain in NBAIOT_DOMAIN_ORDER},
-                config.protocol.verification.panel_size,
-            )
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value:
             validate_three_row_coordinate_median_committee_size(
                 config.baselines.three_row_coordinate_median.row_count,
@@ -1994,6 +2022,10 @@ class ProtocolCellExecutor(CellExecutor):
             and cell.method
             == AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value
         )
+        same_context_verification_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -2014,6 +2046,9 @@ class ProtocolCellExecutor(CellExecutor):
         ):
             external_verification_active = True
             single_verifier_active = True
+        elif same_context_verification_active:
+            external_verification_active = True
+            single_verifier_active = False
         else:
             external_verification_active = (
                 cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
@@ -2039,12 +2074,17 @@ class ProtocolCellExecutor(CellExecutor):
                 for attempt in attempts:
                     if not attempt.is_certified:
                         continue
-                    panel = _verifier_panel(
-                        source_domain,
-                        attempt.domain,
-                        cell.master_seed,
-                        config.protocol.verification,
-                    )
+                    if same_context_verification_active:
+                        panel = self._same_context_verifier_panel(
+                            source_domain, attempt.domain, config
+                        )
+                    else:
+                        panel = _verifier_panel(
+                            source_domain,
+                            attempt.domain,
+                            cell.master_seed,
+                            config.protocol.verification,
+                        )
                     if not panel_votes_are_one_per_domain(panel):
                         return ClaimState.DORMANT
                     reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
