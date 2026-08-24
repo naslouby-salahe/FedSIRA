@@ -43,14 +43,3 @@ def balanced_50_50_selection(
     ordered_a = attack_generation_order(group_a_row_ids, attack_generation_namespace_seed)
     ordered_b = attack_generation_order(group_b_row_ids, attack_generation_namespace_seed)
     return ordered_a[:selected_count], ordered_b[:selected_count]
-
-
-def a_dominant_80_20_selection(
-    group_a_row_ids: Sequence[CanonicalToken],
-    group_b_row_ids: Sequence[CanonicalToken],
-    attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[tuple[CanonicalToken, ...], tuple[CanonicalToken, ...]]:
-    b_matched_count = min(len(group_a_row_ids) // 4, len(group_b_row_ids))
-    ordered_a = attack_generation_order(group_a_row_ids, attack_generation_namespace_seed)
-    ordered_b = attack_generation_order(group_b_row_ids, attack_generation_namespace_seed)
-    return ordered_a[: 4 * b_matched_count], ordered_b[:b_matched_count]

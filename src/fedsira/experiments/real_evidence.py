@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas
 import torch
 
+from fedsira.attacks.transform import balanced_50_50_selection
 from fedsira.baselines.calibration import (
     clip_source_update,
     cosine_distance_matrix,
@@ -170,6 +171,7 @@ class RootCauseScope:
     root_cause_a_feature_name: CanonicalToken
     root_cause_b_feature_name: CanonicalToken
     shift_value: float
+    balanced_selection_seed: DerivedSeed | None = None
 
 
 def _scope_and_shift_rows(
@@ -181,6 +183,14 @@ def _scope_and_shift_rows(
         if root_cause_for_sample(sample_id) is RootCause.A
     )
     root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
+    if root_cause_scope.balanced_selection_seed is not None:
+        selected_a_ids, selected_b_ids = balanced_50_50_selection(
+            sorted(root_cause_a_ids),
+            sorted(root_cause_b_ids),
+            root_cause_scope.balanced_selection_seed,
+        )
+        root_cause_a_ids = frozenset(selected_a_ids)
+        root_cause_b_ids = frozenset(selected_b_ids)
     allowed_ids = target_row_ids_for_contract(
         root_cause_scope.contract_scope, root_cause_a_ids, root_cause_b_ids
     )

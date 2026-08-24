@@ -20,7 +20,6 @@ from fedsira.attacks.source_backdoor import (
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
 )
-from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50_selection
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     parameter_similarity_certification_row_results,
@@ -993,6 +992,60 @@ class ProtocolCellExecutor(CellExecutor):
             benign_far_increase,
         )
 
+    def _scoped_capability_contract_passes(
+        self,
+        config: ScientificConfig,
+        real_anchor: RealAnchor,
+        source_domain: NBaiotDomain,
+        candidate_flat_parameters: torch.Tensor,
+        root_cause_scope: RootCauseScope,
+    ) -> bool:
+        anchor_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            real_anchor.flat_parameters,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+            root_cause_scope=root_cause_scope,
+        )
+        candidate_screen = evaluate_domain(
+            self._prepared_root,
+            real_anchor,
+            candidate_flat_parameters,
+            source_domain,
+            role=Role.POST_REFERENCE_REPLAY,
+            target_role=Role.CANDIDATE_SCREEN,
+            root_cause_scope=root_cause_scope,
+        )
+        if anchor_screen is None or candidate_screen is None:
+            return False
+        contract = build_capability_claim_contract(
+            real_anchor.dataset_manifest_hash,
+            ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY],
+            config.datasets.primary.name,
+            len(NBAIOT_DOMAIN_ORDER),
+            real_anchor.dataset_manifest_hash,
+            config.capability_claim,
+        )
+        target_f1_gain = target_capability_gain(candidate_screen.target_f1, anchor_screen.target_f1)
+        supported_macro_f1_drop = supported_macro_f1_harm(
+            anchor_screen.supported_macro_f1, candidate_screen.supported_macro_f1
+        )
+        benign_far_increase = (
+            MetricResult(candidate_screen.benign_far.value - anchor_screen.benign_far.value, 1)
+            if candidate_screen.benign_far.value is not None
+            and anchor_screen.benign_far.value is not None
+            else MetricResult(None, 0)
+        )
+        return capability_claim_contract_passes(
+            contract,
+            candidate_screen.target_f1,
+            target_f1_gain,
+            supported_macro_f1_drop,
+            benign_far_increase,
+        )
+
     def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
         real_anchor = self._real_anchor(config, cell.master_seed)
@@ -1738,9 +1791,70 @@ class ProtocolCellExecutor(CellExecutor):
                 evidence.reproduction_target_count > 0,
                 evidence.reproduction_target_count,
             )
-            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-            balanced_50_50_selection((), (), attack_seed)
-            a_dominant_80_20_selection((), (), attack_seed)
+            real_anchor = self._real_anchor(config, cell.master_seed)
+            source_domain = _source_domain_for_cell(cell)
+            real_feature_names = (
+                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
+            )
+            if (
+                real_anchor is not None
+                and source_domain is not None
+                and real_feature_names is not None
+            ):
+                candidate_domains = non_source_domains(source_domain)[
+                    : config.protocol.synthesis.committee_size
+                ]
+                committee_deltas = certified_domain_delta_committee(
+                    self._prepared_root, config, cell.master_seed, real_anchor, candidate_domains
+                )
+                balanced_selection_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+                broad_certified_count = 0
+                false_same_count = 0
+                for domain, delta in committee_deltas.items():
+                    candidate_flat = real_anchor.flat_parameters + delta
+                    broad_scope = RootCauseScope(
+                        contract_scope=CapabilityContractScope.BROAD_TARGET_ONLY,
+                        feature_names=real_feature_names,
+                        root_cause_a_feature_name=NBAIOT_TRIGGER_FEATURES[0],
+                        root_cause_b_feature_name=NBAIOT_TRIGGER_FEATURES[3],
+                        shift_value=(
+                            config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization
+                        ),
+                        balanced_selection_seed=balanced_selection_seed,
+                    )
+                    if not self._scoped_capability_contract_passes(
+                        config, real_anchor, domain, candidate_flat, broad_scope
+                    ):
+                        continue
+                    broad_certified_count += 1
+                    a_scope = replace(
+                        broad_scope, contract_scope=CapabilityContractScope.ROOT_CAUSE_A_SCOPED
+                    )
+                    b_scope = replace(
+                        broad_scope, contract_scope=CapabilityContractScope.ROOT_CAUSE_B_SCOPED
+                    )
+                    a_passes = self._scoped_capability_contract_passes(
+                        config, real_anchor, domain, candidate_flat, a_scope
+                    )
+                    b_passes = self._scoped_capability_contract_passes(
+                        config, real_anchor, domain, candidate_flat, b_scope
+                    )
+                    if a_passes != b_passes:
+                        false_same_count += 1
+                extra.append(
+                    (
+                        "capability-contract-granularity-broad-certified-rows",
+                        float(broad_certified_count),
+                    )
+                )
+                extra.append(
+                    (
+                        "capability-contract-granularity-false-same-rate",
+                        false_same_count / broad_certified_count
+                        if broad_certified_count > 0
+                        else None,
+                    )
+                )
         return state, (*metrics, *extra)
 
     def _execute_boundary_cell(
