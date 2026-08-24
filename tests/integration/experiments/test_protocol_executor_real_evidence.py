@@ -15,11 +15,13 @@ from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    BYZANTINE_BOUND_VIOLATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     BaselineIdentity,
+    BoundCondition,
     OpeningMode,
     PrimaryScenario,
     ProposalEpisode,
@@ -256,3 +258,23 @@ def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
     metrics = dict(outcome.metrics)
     assert metrics["post-evidence-wall-clock-seconds"] is not None
     assert metrics["post-evidence-wall-clock-seconds"] > 0.0
+
+
+def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    methods = (
+        SourceExclusionMethod.FULL_FEDSIRA.value,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+    )
+    for method in methods:
+        for condition in BoundCondition:
+            cell = ScientificCell(
+                experiment=BYZANTINE_BOUND_VIOLATION_NAME,
+                method=method,
+                condition=condition.value,
+                master_seed=13,
+            )
+            outcome = executor.execute_cell(cell, CONFIG)
+            assert outcome.terminal_state == "Completed", (method, condition.value, outcome.failure)
