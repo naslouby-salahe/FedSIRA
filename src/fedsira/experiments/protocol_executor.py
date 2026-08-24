@@ -172,6 +172,7 @@ from fedsira.experiments.real_evidence import (
     train_certified_ensemble_group_checkpoints,
     train_density_cluster_trimmed_mean_delta,
     train_fedavg_reference_delta,
+    train_generic_hard_supported_examples_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
     train_recovery_after_source_admission_delta,
@@ -1871,8 +1872,13 @@ class ProtocolCellExecutor(CellExecutor):
         contract_passes = _opening_identity(config).contract_passes
         source_domain = _source_domain_for_cell(cell)
         real_anchor = self._real_anchor(config, cell.master_seed)
+        source_training_function = (
+            train_generic_hard_supported_examples_delta
+            if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value
+            else train_source_candidate_delta
+        )
         real_source_delta = (
-            train_source_candidate_delta(
+            source_training_function(
                 self._prepared_root, config, cell.master_seed, real_anchor, source_domain
             )
             if real_anchor is not None and source_domain is not None

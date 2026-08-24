@@ -79,6 +79,8 @@ from fedsira.domain.enums import (
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed, MasterSeed
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
+    decile_bin,
+    decile_boundaries,
     domain_disparity,
     equal_weight_domain_mean,
     interquartile_range,
@@ -119,6 +121,7 @@ from fedsira.runtime.determinism import (
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"
 SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
+GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN = "GENERIC_HARD_SUPPORTED_EXAMPLES"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
 SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
@@ -1022,6 +1025,83 @@ def train_source_candidate_delta(
         labels,
         is_supported,
         sample_ids,
+        training_seed,
+        config.model.post_reference.local_epochs,
+    )
+    return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
+def train_generic_hard_supported_examples_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain,
+) -> torch.Tensor | None:
+    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
+    selected_features: list[torch.Tensor] = []
+    selected_labels: list[torch.Tensor] = []
+    selected_sample_ids: list[ArtifactDigest] = []
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        tensor_view = _tensor_view(
+            load_prepared_rows(prepared_root, source_domain, class_id, Role.POST_REFERENCE_REPLAY)
+        )
+        if tensor_view is None:
+            continue
+        features, labels, sample_ids = tensor_view
+        losses = [
+            float(value) for value in _per_sample_cross_entropy(anchor_model, features, labels)
+        ]
+        boundaries = decile_boundaries(losses)
+        top_decile_bin = len(boundaries)
+        top_decile_indices = [
+            index
+            for index, loss in enumerate(losses)
+            if decile_bin(loss, boundaries) == top_decile_bin
+        ]
+        if not top_decile_indices:
+            continue
+        selected_features.append(features[top_decile_indices])
+        selected_labels.append(labels[top_decile_indices])
+        selected_sample_ids.extend(sample_ids[index] for index in top_decile_indices)
+    if not selected_features:
+        return None
+    combined_features = torch.cat(selected_features, dim=0)
+    combined_labels = torch.cat(selected_labels, dim=0)
+    is_supported = torch.ones(combined_features.shape[0], dtype=torch.bool)
+    current_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(current_model, anchor.flat_parameters)
+    training_seed = _training_seed(
+        master_seed,
+        anchor.dataset_manifest_hash,
+        flat_parameters_identity(anchor.flat_parameters),
+        GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN,
+        source_domain,
+        -1,
+    )
+    seed_job_local_rng_streams(training_seed)
+    optimizer = torch.optim.AdamW(
+        current_model.parameters(),
+        lr=config.model.optimizer.post_reference_learning_rate,
+        betas=config.model.optimizer.betas,
+        eps=config.model.optimizer.epsilon,
+        weight_decay=config.model.optimizer.weight_decay,
+    )
+    loss_function = torch.nn.CrossEntropyLoss()
+    run_post_reference_training(
+        anchor_model,
+        current_model,
+        optimizer,
+        loss_function,
+        config.model.training,
+        config.model.post_reference,
+        combined_features,
+        combined_labels,
+        is_supported,
+        tuple(selected_sample_ids),
         training_seed,
         config.model.post_reference.local_epochs,
     )

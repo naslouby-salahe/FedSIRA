@@ -32,6 +32,7 @@ from fedsira.experiments.real_evidence import (
     train_density_cluster_trimmed_mean_delta,
     train_domain_reproduction_delta,
     train_fedavg_reference_delta,
+    train_generic_hard_supported_examples_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
     train_recovery_after_source_admission_delta,
@@ -168,6 +169,27 @@ def test_train_domain_reproduction_delta_is_none_without_target_rows(
 ) -> None:
     delta = train_domain_reproduction_delta(
         prepared_root, CONFIG, master_seed=1, anchor=anchor, domain=NBaiotDomain.SAMSUNG_WEBCAM
+    )
+    assert delta is None
+
+
+def test_train_generic_hard_supported_examples_delta_is_nonzero_and_finite(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    delta = train_generic_hard_supported_examples_delta(
+        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+    )
+    assert delta is not None
+    assert delta.shape == anchor.flat_parameters.shape
+    assert torch.isfinite(delta).all()
+    assert torch.any(delta != 0.0)
+
+
+def test_train_generic_hard_supported_examples_delta_returns_none_without_prepared_data(
+    tmp_path: Path, anchor: RealAnchor
+) -> None:
+    delta = train_generic_hard_supported_examples_delta(
+        tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is None
 
