@@ -439,7 +439,10 @@ def _row_requirement(
 ) -> int:
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
         return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
-    if cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
+    if cell.method in (
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+    ):
         return 1
     if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
         return config.baselines.three_row_coordinate_median.row_count
@@ -1731,7 +1734,10 @@ class ProtocolCellExecutor(CellExecutor):
         elif direct_krum_active or coordinate_median_active:
             external_verification_active = False
             single_verifier_active = False
-        elif cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
+        elif cell.method in (
+            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+            BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+        ):
             external_verification_active = True
             single_verifier_active = True
         else:

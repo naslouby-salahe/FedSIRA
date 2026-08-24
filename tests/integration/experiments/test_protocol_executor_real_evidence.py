@@ -228,6 +228,21 @@ def test_client_review_then_retrain_baseline_executes_without_crashing(
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
 
 
+def test_client_review_then_retrain_uses_single_verifier_progression_when_review_passes(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=31,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method(
     prepared_root: Path,
 ) -> None:
