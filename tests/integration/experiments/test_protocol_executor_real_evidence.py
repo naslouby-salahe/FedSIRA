@@ -865,3 +865,20 @@ def test_source_release_after_full_external_check_ablation_uses_a_real_verifier_
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_capability_contract_granularity_ablation_reports_real_certification_rate(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value,
+        condition="Ablation",
+        master_seed=35,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+    assert metrics["capability-contract-granularity-broad-certified-rows"] is not None

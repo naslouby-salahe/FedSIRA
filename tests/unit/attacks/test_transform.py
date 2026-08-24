@@ -1,5 +1,4 @@
 from fedsira.attacks.transform import (
-    a_dominant_80_20_selection,
     attack_generation_order,
     balanced_50_50_selection,
     fraction_to_transform_count,
@@ -46,11 +45,3 @@ def test_balanced_50_50_selection_uses_the_smaller_group_size() -> None:
     selected_a, selected_b = balanced_50_50_selection(group_a, group_b, 42)
     assert len(selected_a) == 4
     assert len(selected_b) == 4
-
-
-def test_a_dominant_80_20_selection_uses_4to1_ratio() -> None:
-    group_a = [f"a-{i}" for i in range(20)]
-    group_b = [f"b-{i}" for i in range(3)]
-    selected_a, selected_b = a_dominant_80_20_selection(group_a, group_b, 42)
-    assert len(selected_b) == 3
-    assert len(selected_a) == 12

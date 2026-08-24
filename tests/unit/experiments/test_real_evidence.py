@@ -250,6 +250,31 @@ def _root_cause_scope(
     )
 
 
+def test_train_domain_reproduction_delta_with_balanced_selection_seed_is_finite(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    scope = RootCauseScope(
+        contract_scope=CapabilityContractScope.BROAD_TARGET_ONLY,
+        feature_names=feature_names,
+        root_cause_a_feature_name=NBAIOT_TRIGGER_FEATURES[0],
+        root_cause_b_feature_name=NBAIOT_TRIGGER_FEATURES[3],
+        shift_value=3.0,
+        balanced_selection_seed=1,
+    )
+    delta = train_domain_reproduction_delta(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        domain=DOMAINS[0],
+        root_cause_scope=scope,
+    )
+    assert delta is not None
+    assert torch.isfinite(delta).all()
+
+
 def test_train_domain_reproduction_delta_with_root_cause_scope_is_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
