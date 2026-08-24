@@ -13,6 +13,15 @@ from fedsira.boundaries.capability_granularity import (
     root_cause_for_sample,
     target_row_ids_for_contract,
 )
+from fedsira.boundaries.epistemic_failure import (
+    apply_attacker_induced_common_context,
+    apply_shared_spurious_feature,
+    diagnostic_marker_metric_or_insufficient,
+    match_diagnostic_benign_report_test_rows,
+    relabel_shared_label_error_rows,
+    select_shared_label_error_rows,
+    select_spurious_feature_rows,
+)
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.materialization import view_parquet_path
@@ -23,7 +32,12 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.enums import CapabilityContractScope, RootCause, SeedNamespace
+from fedsira.domain.enums import (
+    CapabilityContractScope,
+    EvaluationInsufficiencyReason,
+    RootCause,
+    SeedNamespace,
+)
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed, MasterSeed
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
@@ -46,7 +60,7 @@ from fedsira.evaluation.screen import (
     run_proposal_screen_for_domain,
     screen_fold_index,
 )
-from fedsira.experiments.registry import ReproducerCondition
+from fedsira.experiments.registry import EpistemicFailureType, ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.scoring import logits_for_samples
@@ -142,6 +156,81 @@ def _scope_and_shift_rows(
         features=tuple(kept_features),
         labels=tuple(kept_labels),
     )
+
+
+@dataclass(frozen=True)
+class EpistemicFailureScope:
+    failure_type: EpistemicFailureType
+    strength: float
+    attack_generation_seed: DerivedSeed
+    feature_names: tuple[CanonicalToken, ...]
+    spurious_feature_name: CanonicalToken
+    spurious_feature_value: float
+    common_context_feature_names: tuple[CanonicalToken, ...]
+    common_context_trigger_value: float
+
+
+def _relabel_shared_label_error_rows(
+    rows: PreparedRows, scope: EpistemicFailureScope
+) -> tuple[PreparedRows, tuple[bool, ...]]:
+    selected = (
+        select_shared_label_error_rows(
+            rows.sample_ids, scope.strength, scope.attack_generation_seed
+        )
+        or ()
+    )
+    selected_ids = frozenset(selected)
+    labels_by_row_id = {
+        sample_id: NBaiotClass(label)
+        for sample_id, label in zip(rows.sample_ids, rows.labels, strict=True)
+    }
+    relabeled = relabel_shared_label_error_rows(labels_by_row_id, selected)
+    new_labels = tuple(relabeled[sample_id].value for sample_id in rows.sample_ids)
+    is_supported_mask = tuple(sample_id not in selected_ids for sample_id in rows.sample_ids)
+    return (
+        PreparedRows(sample_ids=rows.sample_ids, features=rows.features, labels=new_labels),
+        is_supported_mask,
+    )
+
+
+def _mark_rows(
+    rows: PreparedRows, scope: EpistemicFailureScope, selected_ids: frozenset[ArtifactDigest]
+) -> PreparedRows:
+    if not selected_ids:
+        return rows
+    is_common_context = scope.failure_type is EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT
+    if is_common_context:
+        feature_indices = tuple(
+            scope.feature_names.index(name) for name in scope.common_context_feature_names
+        )
+        trigger_value = scope.common_context_trigger_value
+    else:
+        feature_indices = (scope.feature_names.index(scope.spurious_feature_name),)
+        trigger_value = scope.spurious_feature_value
+    marked_features: list[tuple[float, ...]] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in selected_ids:
+            marked_features.append(features)
+            continue
+        tensor = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+        if is_common_context:
+            shifted = apply_attacker_induced_common_context(tensor, feature_indices, trigger_value)
+        else:
+            shifted = apply_shared_spurious_feature(tensor, feature_indices[0], trigger_value)
+        marked_features.append(tuple(float(value) for value in shifted.squeeze(0)))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(marked_features), labels=rows.labels
+    )
+
+
+def _apply_epistemic_target_marker(
+    rows: PreparedRows, scope: EpistemicFailureScope
+) -> PreparedRows:
+    selected = (
+        select_spurious_feature_rows(rows.sample_ids, scope.strength, scope.attack_generation_seed)
+        or ()
+    )
+    return _mark_rows(rows, scope, frozenset(selected))
 
 
 def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> CanonicalToken:
@@ -309,10 +398,21 @@ def _combined_post_reference_rows(
     domain: NBaiotDomain,
     target_role: Role,
     root_cause_scope: RootCauseScope | None = None,
+    epistemic_failure_scope: EpistemicFailureScope | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
     target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
     if target_rows is not None and root_cause_scope is not None:
         target_rows = _scope_and_shift_rows(target_rows, root_cause_scope)
+    if (
+        target_rows is not None
+        and epistemic_failure_scope is not None
+        and epistemic_failure_scope.failure_type
+        in (
+            EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
+            EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
+        )
+    ):
+        target_rows = _apply_epistemic_target_marker(target_rows, epistemic_failure_scope)
     target_tensor = _tensor_view(target_rows)
     if target_tensor is None:
         return None
@@ -324,16 +424,26 @@ def _combined_post_reference_rows(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        replay_tensor = _tensor_view(
-            load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
-        )
+        rows = load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+        relabeled_mask: tuple[bool, ...] | None = None
+        if (
+            rows is not None
+            and class_id is NBaiotClass.BENIGN
+            and epistemic_failure_scope is not None
+            and epistemic_failure_scope.failure_type is EpistemicFailureType.SHARED_LABEL_ERROR
+        ):
+            rows, relabeled_mask = _relabel_shared_label_error_rows(rows, epistemic_failure_scope)
+        replay_tensor = _tensor_view(rows)
         if replay_tensor is None:
             continue
         features, labels, sample_ids = replay_tensor
         supported_features.append(features)
         supported_labels.append(labels)
         supported_sample_ids.extend(sample_ids)
-        is_supported.append(torch.ones(features.shape[0], dtype=torch.bool))
+        if relabeled_mask is not None:
+            is_supported.append(torch.tensor(relabeled_mask, dtype=torch.bool))
+        else:
+            is_supported.append(torch.ones(features.shape[0], dtype=torch.bool))
     return (
         torch.cat(supported_features, dim=0),
         torch.cat(supported_labels, dim=0),
@@ -349,9 +459,10 @@ def train_domain_reproduction_delta(
     anchor: RealAnchor,
     domain: NBaiotDomain,
     root_cause_scope: RootCauseScope | None = None,
+    epistemic_failure_scope: EpistemicFailureScope | None = None,
 ) -> torch.Tensor | None:
     combined = _combined_post_reference_rows(
-        prepared_root, domain, Role.REPRODUCTION, root_cause_scope
+        prepared_root, domain, Role.REPRODUCTION, root_cause_scope, epistemic_failure_scope
     )
     if combined is None:
         return None
@@ -732,4 +843,166 @@ def compute_capability_under_specification_summary(
         target_f1_gain=target_f1_gain,
         supported_macro_f1_drop=equal_weight_domain_mean(supported_f1_harms, 1),
         benign_far_increase=equal_weight_domain_mean(benign_far_increases, 1),
+    )
+
+
+def _diagnostic_marker_for_domain(
+    prepared_root: Path,
+    anchor: RealAnchor,
+    production_flat: torch.Tensor,
+    domain: NBaiotDomain,
+    scope: EpistemicFailureScope,
+) -> tuple[MetricResult, EvaluationInsufficiencyReason | None]:
+    target_rows = load_prepared_rows(
+        prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.REPORT_TEST
+    )
+    benign_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.BENIGN, Role.REPORT_TEST)
+    if target_rows is None or benign_rows is None:
+        return diagnostic_marker_metric_or_insufficient(None, 0.0)
+    selected_target_ids = (
+        select_spurious_feature_rows(
+            target_rows.sample_ids, scope.strength, scope.attack_generation_seed
+        )
+        or ()
+    )
+    if not selected_target_ids:
+        return diagnostic_marker_metric_or_insufficient(None, 0.0)
+    target_index_by_id = {
+        sample_id: index for index, sample_id in enumerate(target_rows.sample_ids)
+    }
+    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
+    target_class_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.GAFGYT_COMBO)
+    selected_target_features = torch.tensor(
+        [target_rows.features[target_index_by_id[sample_id]] for sample_id in selected_target_ids],
+        dtype=torch.float32,
+    )
+    selected_target_labels = torch.full(
+        (len(selected_target_ids),), target_class_index, dtype=torch.long
+    )
+    target_losses = _per_sample_cross_entropy(
+        anchor_model, selected_target_features, selected_target_labels
+    )
+    target_report_losses = tuple(
+        zip(selected_target_ids, (float(value) for value in target_losses), strict=True)
+    )
+    benign_class_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
+    benign_features = torch.tensor(benign_rows.features, dtype=torch.float32)
+    benign_labels = torch.full((len(benign_rows.sample_ids),), benign_class_index, dtype=torch.long)
+    benign_losses = _per_sample_cross_entropy(anchor_model, benign_features, benign_labels)
+    benign_report_losses = tuple(
+        zip(benign_rows.sample_ids, (float(value) for value in benign_losses), strict=True)
+    )
+    matched_pairs = match_diagnostic_benign_report_test_rows(
+        target_report_losses, benign_report_losses
+    )
+    if matched_pairs is None:
+        return diagnostic_marker_metric_or_insufficient(None, 0.0)
+    matched_benign_ids = tuple(benign_id for _target_id, benign_id in matched_pairs)
+    benign_index_by_id = {
+        sample_id: index for index, sample_id in enumerate(benign_rows.sample_ids)
+    }
+    matched_benign_rows = PreparedRows(
+        sample_ids=matched_benign_ids,
+        features=tuple(
+            benign_rows.features[benign_index_by_id[sample_id]] for sample_id in matched_benign_ids
+        ),
+        labels=tuple(NBaiotClass.BENIGN.value for _ in matched_benign_ids),
+    )
+    marked_rows = _mark_rows(matched_benign_rows, scope, frozenset(matched_benign_ids))
+    production_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(production_model, production_flat)
+    production_model.eval()
+    with torch.no_grad():
+        marked_features = torch.tensor(marked_rows.features, dtype=torch.float32)
+        logits = logits_for_samples(production_model, marked_features)
+        predictions = torch.argmax(logits, dim=-1)
+    marker_rate = float((predictions == target_class_index).float().mean())
+    return diagnostic_marker_metric_or_insufficient(matched_pairs, marker_rate)
+
+
+@dataclass(frozen=True)
+class SharedEpistemicFailureSummary:
+    defined_domain_count: int
+    aggregate_target_f1: MetricResult
+    target_f1_gain: MetricResult
+    supported_macro_f1_drop: MetricResult
+    benign_far_increase: MetricResult
+    diagnostic_marker: MetricResult
+
+
+def compute_shared_epistemic_failure_summary(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+    epistemic_failure_scope: EpistemicFailureScope,
+) -> SharedEpistemicFailureSummary:
+    target_f1_values: list[MetricResult] = []
+    anchor_target_f1_values: list[MetricResult] = []
+    supported_f1_harms: list[MetricResult] = []
+    benign_far_increases: list[MetricResult] = []
+    diagnostic_markers: list[MetricResult] = []
+    has_diagnostic_marker = epistemic_failure_scope.failure_type in (
+        EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
+        EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
+    )
+    for domain in non_source_domains(source_domain):
+        delta = train_domain_reproduction_delta(
+            prepared_root,
+            config,
+            master_seed,
+            anchor,
+            domain,
+            epistemic_failure_scope=epistemic_failure_scope,
+        )
+        if delta is None:
+            continue
+        production_flat = anchor.flat_parameters + delta
+        anchor_metrics = evaluate_domain(
+            prepared_root, anchor, anchor.flat_parameters, domain, Role.REPORT_TEST
+        )
+        production_metrics = evaluate_domain(
+            prepared_root, anchor, production_flat, domain, Role.REPORT_TEST
+        )
+        if anchor_metrics is None or production_metrics is None:
+            continue
+        target_f1_values.append(production_metrics.target_f1)
+        anchor_target_f1_values.append(anchor_metrics.target_f1)
+        supported_f1_harms.append(
+            supported_macro_f1_harm(
+                anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
+            )
+        )
+        if (
+            anchor_metrics.benign_far.value is not None
+            and production_metrics.benign_far.value is not None
+        ):
+            benign_far_increases.append(
+                MetricResult(
+                    production_metrics.benign_far.value - anchor_metrics.benign_far.value, 1
+                )
+            )
+        else:
+            benign_far_increases.append(MetricResult(None, 0))
+        if has_diagnostic_marker:
+            marker_result, _reason = _diagnostic_marker_for_domain(
+                prepared_root, anchor, production_flat, domain, epistemic_failure_scope
+            )
+            diagnostic_markers.append(marker_result)
+    aggregate_target_f1 = equal_weight_domain_mean(target_f1_values, 1)
+    anchor_target_f1 = equal_weight_domain_mean(anchor_target_f1_values, 1)
+    target_f1_gain = (
+        MetricResult(aggregate_target_f1.value - anchor_target_f1.value, 1)
+        if aggregate_target_f1.value is not None and anchor_target_f1.value is not None
+        else MetricResult(None, 0)
+    )
+    return SharedEpistemicFailureSummary(
+        defined_domain_count=len(target_f1_values),
+        aggregate_target_f1=aggregate_target_f1,
+        target_f1_gain=target_f1_gain,
+        supported_macro_f1_drop=equal_weight_domain_mean(supported_f1_harms, 1),
+        benign_far_increase=equal_weight_domain_mean(benign_far_increases, 1),
+        diagnostic_marker=equal_weight_domain_mean(diagnostic_markers, 1),
     )
