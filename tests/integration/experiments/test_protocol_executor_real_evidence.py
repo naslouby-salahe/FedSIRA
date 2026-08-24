@@ -370,6 +370,21 @@ def test_krum_reference_baseline_trains_and_evaluates_a_real_krum_synthesized_mo
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_density_cluster_trimmed_mean_baseline_trains_and_evaluates_a_real_model(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=32,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
     prepared_root: Path,
 ) -> None:

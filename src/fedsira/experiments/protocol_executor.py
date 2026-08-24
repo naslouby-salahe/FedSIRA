@@ -24,9 +24,6 @@ from fedsira.attacks.transform import a_dominant_80_20_selection, balanced_50_50
 from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     clip_source_update,
-    cosine_distance_matrix,
-    density_cluster_labels,
-    l2_normalize,
     parameter_similarity_certification_row_results,
     reconstruction_error,
     reconstruction_filter_accepts,
@@ -37,8 +34,6 @@ from fedsira.baselines.calibration import (
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
     sanitization_clip_bounds,
-    select_largest_density_cluster,
-    trimmed_mean_aggregate,
 )
 from fedsira.baselines.certified_ensemble import (
     certified_ensemble_domain_groups,
@@ -181,6 +176,7 @@ from fedsira.experiments.real_evidence import (
     root_cause_partitioned_row_ids,
     train_anchor,
     train_centralized_reference_checkpoint,
+    train_density_cluster_trimmed_mean_delta,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
@@ -967,6 +963,34 @@ class ProtocolCellExecutor(CellExecutor):
             config,
             evidence,
             "krum-reference-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
+    def _density_cluster_trimmed_mean_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        delta = train_density_cluster_trimmed_mean_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + delta
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "density-cluster-trimmed-mean-claim",
             source_domain,
             (),
             (),
@@ -2008,20 +2032,7 @@ class ProtocolCellExecutor(CellExecutor):
             reconstruction_filter_reweight((), ())
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
-            distance_matrix = cosine_distance_matrix((torch.zeros(3), torch.zeros(3)))
-            density_cluster_labels(distance_matrix, config.baselines.density_cluster_trimmed_mean)
-            l2_normalize((torch.zeros(3),))
-            select_largest_density_cluster(
-                tuple(NBAIOT_DOMAIN_ORDER[:3]),
-                (0, 0, 1),
-                distance_matrix,
-            )
-            trimmed_mean_aggregate(
-                (torch.zeros(3), torch.zeros(3), torch.zeros(3)),
-                config.baselines.density_cluster_trimmed_mean.minimum_cluster_size_for_trimming,
-                config.baselines.density_cluster_trimmed_mean.trim_each_tail_count,
-            )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._density_cluster_trimmed_mean_outcome(cell, config, evidence)
         elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
             state = self._secure_continual_assessment_outcome(cell, config, evidence)
         elif method == BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value:
