@@ -73,7 +73,6 @@ from fedsira.boundaries.evidence_arrival import (
     reproducer_order,
 )
 from fedsira.boundaries.heterogeneity import (
-    apply_feature_shift,
     apply_quantity_skew_to_cap,
     exclude_source_from_quantity_skew,
     feature_shift_sign,
@@ -145,6 +144,7 @@ from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
     BackdoorScope,
     EpistemicFailureScope,
+    HeterogeneityScope,
     RealAnchor,
     RealReportSummary,
     RootCauseScope,
@@ -598,12 +598,20 @@ def _real_final_gate_metrics(
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
     production_checkpoint: torch.Tensor,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[int, MetricResult, MetricResult, MetricResult, MetricResult]:
     candidate_domains = non_source_domains(source_domain)
     adequate_domains = tuple(
         domain
         for domain in candidate_domains
-        if evaluate_domain(prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE)
+        if evaluate_domain(
+            prepared_root,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
+        )
         is not None
     )
     if not adequate_domains:
@@ -619,10 +627,20 @@ def _real_final_gate_metrics(
     benign_far_increases: list[MetricResult] = []
     for domain in adequate_domains:
         anchor_metrics = evaluate_domain(
-            prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE
+            prepared_root,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
         )
         production_metrics = evaluate_domain(
-            prepared_root, anchor, production_checkpoint, domain, Role.FINAL_GATE
+            prepared_root,
+            anchor,
+            production_checkpoint,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
         )
         if anchor_metrics is None or production_metrics is None:
             continue
@@ -668,11 +686,17 @@ def _final_gate_decision(
     no_final_synthesis_gate_active: bool = False,
     use_source_delta_for_source_domain: bool = False,
     force_first_row_to_source_delta: bool = False,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas = (
         certified_domain_delta_committee(
-            prepared_root, config, master_seed, anchor, reproducer_order
+            prepared_root,
+            config,
+            master_seed,
+            anchor,
+            reproducer_order,
+            heterogeneity_scope=heterogeneity_scope,
         )
         if anchor is not None
         else {}
@@ -715,6 +739,7 @@ def _final_gate_decision(
             prepared_root,
             anchor,
             production_checkpoint,
+            heterogeneity_scope=heterogeneity_scope,
         )
     krum_selected_update: torch.Tensor | None = None
     if is_plurality_active:
@@ -755,6 +780,7 @@ def _final_gate_decision(
         anchor,
         production_checkpoint,
         no_final_synthesis_gate_active,
+        heterogeneity_scope=heterogeneity_scope,
     )
 
 
@@ -771,6 +797,7 @@ def _final_gate_decision_from_production_checkpoint(
     anchor: RealAnchor | None,
     production_checkpoint: torch.Tensor,
     no_final_synthesis_gate_active: bool = False,
+    heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     if anchor is not None:
         (
@@ -780,7 +807,12 @@ def _final_gate_decision_from_production_checkpoint(
             pooled_supported_macro_f1_drop,
             pooled_benign_far_increase,
         ) = _real_final_gate_metrics(
-            prepared_root, config, anchor, source_domain, production_checkpoint
+            prepared_root,
+            config,
+            anchor,
+            source_domain,
+            production_checkpoint,
+            heterogeneity_scope=heterogeneity_scope,
         )
     else:
         adequate_final_gate_domain_count = evidence.final_gate_adequate_domain_count
@@ -1061,6 +1093,35 @@ class ProtocolCellExecutor(CellExecutor):
             trigger_value=(
                 config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
             ),
+        )
+
+    def _heterogeneity_scope_for_cell(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> HeterogeneityScope | None:
+        if cell.experiment != HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
+            return None
+        regime = HeterogeneityRegime(cell.condition)
+        magnitudes = config.attacks_and_boundaries.heterogeneity.feature_shift_magnitudes
+        if regime is HeterogeneityRegime.FEATURE_SHIFT_0_5:
+            shift_magnitude = magnitudes[0]
+        elif regime is HeterogeneityRegime.FEATURE_SHIFT_1_0:
+            shift_magnitude = magnitudes[1]
+        else:
+            return None
+        real_feature_names = prepared_feature_names(self._prepared_root)
+        if real_feature_names is None:
+            return None
+        heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
+        selected_feature_names = select_heterogeneity_shift_features(
+            real_feature_names,
+            heterogeneity_seed,
+            config.attacks_and_boundaries.heterogeneity.feature_shift_selected_feature_count,
+        )
+        return HeterogeneityScope(
+            heterogeneity_namespace_seed=heterogeneity_seed,
+            selected_feature_names=selected_feature_names,
+            feature_names=real_feature_names,
+            shift_magnitude=shift_magnitude,
         )
 
     def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
@@ -2083,21 +2144,23 @@ class ProtocolCellExecutor(CellExecutor):
                 )
                 extra.append(("quantity-skew-cap", float(applied_cap)))
             else:
-                selected_features = select_heterogeneity_shift_features(
-                    ("feature-0", "feature-1"),
-                    heterogeneity_seed,
-                    config.attacks_and_boundaries.heterogeneity.feature_shift_selected_feature_count,
-                )
-                feature_sign = feature_shift_sign(
-                    NBAIOT_DOMAIN_ORDER[0], "feature-0", heterogeneity_seed
-                )
-                apply_feature_shift(
-                    torch.zeros(1, 115),
-                    (0,),
-                    feature_sign,
-                )
-                extra.append(("feature-shift-sign", float(feature_sign)))
-                extra.append(("feature-shift-count", float(len(selected_features))))
+                heterogeneity_scope = self._heterogeneity_scope_for_cell(cell, config)
+                if heterogeneity_scope is not None:
+                    feature_sign = feature_shift_sign(
+                        NBAIOT_DOMAIN_ORDER[0],
+                        heterogeneity_scope.selected_feature_names[0],
+                        heterogeneity_seed,
+                    )
+                    extra.append(("feature-shift-sign", float(feature_sign)))
+                    extra.append(
+                        (
+                            "feature-shift-count",
+                            float(len(heterogeneity_scope.selected_feature_names)),
+                        )
+                    )
+                else:
+                    extra.append(("feature-shift-sign", None))
+                    extra.append(("feature-shift-count", 0.0))
         return state, (*metrics, *extra)
 
     def _execute_opening_cell(
@@ -2500,6 +2563,7 @@ class ProtocolCellExecutor(CellExecutor):
                 no_final_synthesis_gate_active=no_final_synthesis_gate_active,
                 use_source_delta_for_source_domain=no_origin_exclusion_active,
                 force_first_row_to_source_delta=byzantine_reproducer_copies_source_active,
+                heterogeneity_scope=self._heterogeneity_scope_for_cell(cell, config),
             )
         else:
             state = progression_state

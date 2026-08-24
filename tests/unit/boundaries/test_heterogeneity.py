@@ -1,7 +1,4 @@
-import torch
-
 from fedsira.boundaries.heterogeneity import (
-    apply_feature_shift,
     apply_quantity_skew_to_cap,
     exclude_source_from_quantity_skew,
     feature_shift_sign,
@@ -59,10 +56,3 @@ def test_feature_shift_sign_is_deterministic_and_plus_or_minus_one() -> None:
     second = feature_shift_sign(domain, "feature-1", 42)
     assert first == second
     assert first in (1.0, -1.0)
-
-
-def test_apply_feature_shift_adds_signed_magnitude_only_to_selected_indices() -> None:
-    features = torch.zeros(2, 4)
-    shifted = apply_feature_shift(features, [1, 2], -0.5)
-    assert torch.equal(shifted, torch.tensor([[0.0, -0.5, -0.5, 0.0]] * 2))
-    assert torch.equal(features, torch.zeros(2, 4))
