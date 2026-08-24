@@ -690,3 +690,49 @@ def test_direct_krum_of_retrains_ablation_uses_real_krum_synthesis_without_verif
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_no_proposal_screen_ablation_uses_the_full_downstream_path(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.NO_PROPOSAL_SCREEN.value,
+        condition="Ablation",
+        master_seed=21,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_candidate_free_reproduction_ablation_uses_the_full_downstream_path(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.CANDIDATE_FREE_REPRODUCTION.value,
+        condition="Ablation",
+        master_seed=22,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_one_independent_reproduction_ablation_uses_single_verifier_progression(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value,
+        condition="Ablation",
+        master_seed=23,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}

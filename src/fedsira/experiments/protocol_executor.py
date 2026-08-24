@@ -436,6 +436,9 @@ def _row_requirement(
     if cell.method in (
         BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
         BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+    ) or (
+        cell.experiment == MECHANISM_ABLATION_NAME
+        and cell.method == AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value
     ):
         return 1
     if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value or (
@@ -2041,6 +2044,14 @@ class ProtocolCellExecutor(CellExecutor):
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value
         )
+        full_path_ablation_active = cell.experiment == MECHANISM_ABLATION_NAME and cell.method in (
+            AblationVariant.NO_PROPOSAL_SCREEN.value,
+            AblationVariant.CANDIDATE_FREE_REPRODUCTION.value,
+        )
+        one_independent_reproduction_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
@@ -2056,13 +2067,17 @@ class ProtocolCellExecutor(CellExecutor):
         ):
             external_verification_active = False
             single_verifier_active = False
-        elif cell.method in (
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+        elif (
+            cell.method
+            in (
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+            )
+            or one_independent_reproduction_active
         ):
             external_verification_active = True
             single_verifier_active = True
-        elif same_context_verification_active:
+        elif same_context_verification_active or full_path_ablation_active:
             external_verification_active = True
             single_verifier_active = False
         else:
@@ -2144,6 +2159,7 @@ class ProtocolCellExecutor(CellExecutor):
                     or direct_krum_active
                     or multiple_reproductions_without_verification_active
                     or direct_krum_of_retrains_active
+                    or full_path_ablation_active
                 ),
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
