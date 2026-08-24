@@ -443,6 +443,8 @@ def _row_requirement(
         return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
     if cell.method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
         return 1
+    if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
+        return config.baselines.three_row_coordinate_median.row_count
     return config.protocol.synthesis.committee_size
 
 
@@ -601,6 +603,7 @@ def _final_gate_decision(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor | None,
+    coordinate_median_active: bool = False,
 ) -> tuple[ClaimState, RealReportSummary | None]:
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas = (
@@ -610,6 +613,28 @@ def _final_gate_decision(
         if anchor is not None
         else {}
     )
+    if coordinate_median_active:
+        median_deltas = tuple(
+            committee_deltas.get(
+                domain, reproduction_update_vector(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS)
+            )
+            for domain in reproducer_order
+        )
+        production_update = coordinate_wise_median_synthesis(median_deltas)
+        production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+        return _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            claim_identity,
+            source_domain,
+            reproducer_order,
+            commitment_hashes,
+            opening_mode,
+            False,
+            prepared_root,
+            anchor,
+            production_checkpoint,
+        )
     krum_selected_update: torch.Tensor | None = None
     if is_plurality_active:
         committee = tuple(
@@ -636,6 +661,34 @@ def _final_gate_decision(
         single_reproduction_update,
     )
     production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+    return _final_gate_decision_from_production_checkpoint(
+        config,
+        evidence,
+        claim_identity,
+        source_domain,
+        reproducer_order,
+        commitment_hashes,
+        opening_mode,
+        is_plurality_active,
+        prepared_root,
+        anchor,
+        production_checkpoint,
+    )
+
+
+def _final_gate_decision_from_production_checkpoint(
+    config: ScientificConfig,
+    evidence: PreparedEvidenceCounts,
+    claim_identity: str,
+    source_domain: NBaiotDomain | None,
+    reproducer_order: Sequence[NBaiotDomain],
+    commitment_hashes: Sequence[str],
+    opening_mode: ClaimOpeningMode,
+    is_plurality_active: bool,
+    prepared_root: Path,
+    anchor: RealAnchor | None,
+    production_checkpoint: torch.Tensor,
+) -> tuple[ClaimState, RealReportSummary | None]:
     if anchor is not None:
         (
             adequate_final_gate_domain_count,
@@ -1346,11 +1399,14 @@ class ProtocolCellExecutor(CellExecutor):
         direct_krum_active = (
             cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
         )
+        coordinate_median_active = (
+            cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value
+        )
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if self._resolved_core is None:
                 return ClaimState.DORMANT
             external_verification_active = self._resolved_core.external_verification_survives
-        elif direct_krum_active:
+        elif direct_krum_active or coordinate_median_active:
             external_verification_active = False
         else:
             external_verification_active = (
@@ -1420,6 +1476,7 @@ class ProtocolCellExecutor(CellExecutor):
                 prepared_root=self._prepared_root,
                 master_seed=cell.master_seed,
                 anchor=self._real_anchor(config, cell.master_seed),
+                coordinate_median_active=coordinate_median_active,
             )
         else:
             state = progression_state
@@ -1604,10 +1661,6 @@ class ProtocolCellExecutor(CellExecutor):
                 else ClaimState.DORMANT
             )
         elif method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value:
-            validate_three_row_coordinate_median_committee_size(
-                config.baselines.three_row_coordinate_median.row_count,
-                config.baselines.three_row_coordinate_median,
-            )
             direct_krum_committee_rows(
                 (),
                 (),
@@ -1700,6 +1753,12 @@ class ProtocolCellExecutor(CellExecutor):
                 round_order,
                 None,
                 config.protocol.synthesis.committee_size,
+            )
+            state = self._advance_protocol(cell, config, evidence)
+        elif method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
+            validate_three_row_coordinate_median_committee_size(
+                config.baselines.three_row_coordinate_median.row_count,
+                config.baselines.three_row_coordinate_median,
             )
             state = self._advance_protocol(cell, config, evidence)
         else:

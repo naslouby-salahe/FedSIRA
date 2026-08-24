@@ -285,6 +285,21 @@ def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
     assert dict(direct_krum_outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_three_row_coordinate_median_baseline_is_routed_and_uses_median_synthesis(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=22,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
