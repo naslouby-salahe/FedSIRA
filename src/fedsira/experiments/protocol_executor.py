@@ -193,6 +193,7 @@ from fedsira.experiments.real_evidence import (
     train_source_candidate_delta,
 )
 from fedsira.experiments.registry import (
+    ADMISSION_DELAY_DECOMPOSITION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
@@ -872,6 +873,8 @@ class ProtocolCellExecutor(CellExecutor):
             return self._execute_secondary_cell(cell, config, evidence)
         if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
             return self._execute_evidence_scarcity_cell(cell, config, evidence)
+        if cell.experiment == ADMISSION_DELAY_DECOMPOSITION_NAME:
+            return self._execute_admission_delay_cell(cell, config, evidence)
         if cell.experiment in (
             SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
             CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -1446,7 +1449,7 @@ class ProtocolCellExecutor(CellExecutor):
         evidence: PreparedEvidenceCounts,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         method = cell.method
-        validate_role_not_used_for_tuning(Role.REPORT_TEST)
+        validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell))
         state: ClaimState
         if method in (
@@ -1538,7 +1541,7 @@ class ProtocolCellExecutor(CellExecutor):
                 config.model.anchor_fedavg.rounds, len(NBAIOT_DOMAIN_ORDER)
             )
             reconstruction_rejection_threshold(
-                (),
+                (0.0, 1.0, 2.0),
                 config.baselines.reconstruction_filter.calibration_percentile,
             )
             reconstruction_filter_accepts(1.0, 2.0)
@@ -1571,7 +1574,7 @@ class ProtocolCellExecutor(CellExecutor):
                 config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
             )
             recovery_alarm_threshold(
-                (),
+                (0.0, 1.0, 2.0),
                 config.baselines.recovery_after_source_admission.backdoor_alarm_percentile,
             )
             state = self._advance_protocol(cell, config, evidence)
@@ -1870,6 +1873,46 @@ class ProtocolCellExecutor(CellExecutor):
                 float(first_holder) if first_holder is not None else None,
             ),
             ("post-evidence-wall-clock-seconds", None),
+        )
+
+    def _execute_admission_delay_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        schedule = EvidenceArrivalSchedule(cell.condition)
+        horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
+        candidate_cycles = tuple(range(horizon))
+        holder_counts = tuple(
+            holder_count_at_cycle(schedule, cycle, len(NBAIOT_DOMAIN_ORDER) - 1)
+            for cycle in candidate_cycles
+        )
+        tau_k = first_cycle_with_minimum_eligible_evidence_holders(
+            holder_counts,
+            config.protocol.final_gate.minimum_adequate_non_source_domains,
+        )
+        target_capable_order = tuple(NBAIOT_DOMAIN_ORDER[1:])
+        t_evidence = compute_t_evidence(
+            schedule,
+            target_capable_order,
+            candidate_cycles,
+            config.protocol.synthesis.committee_size,
+            config.protocol.final_gate.minimum_adequate_non_source_domains,
+        )
+        timer = ElapsedTimer()
+        if cell.method == "Resolved FedSIRA Core":
+            state = self._advance_protocol(cell, config, evidence)
+            post_evidence_wall_clock_seconds = timer.elapsed_seconds()
+            metrics = _metrics_from_state(state, self._pending_real_report)
+        else:
+            state, metrics = self._execute_baseline_cell(cell, config, evidence)
+            post_evidence_wall_clock_seconds = timer.elapsed_seconds()
+        return state, (
+            *metrics,
+            ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
+            ("t-evidence", float(t_evidence) if t_evidence is not None else None),
+            ("post-evidence-wall-clock-seconds", post_evidence_wall_clock_seconds),
         )
 
     def _execute_efficiency_cell(
