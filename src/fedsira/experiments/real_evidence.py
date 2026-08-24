@@ -362,7 +362,7 @@ def _training_seed(
     )
 
 
-def _flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
+def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
     return hashlib.sha256(flat_parameters.detach().cpu().numpy().tobytes()).hexdigest()
 
 
@@ -482,7 +482,7 @@ def _client_delta_from_role(
     training_seed = _training_seed(
         master_seed,
         anchor.dataset_manifest_hash,
-        _flat_parameters_identity(round_start_flat),
+        flat_parameters_identity(round_start_flat),
         algorithm_token,
         domain,
         round_index,
@@ -630,7 +630,7 @@ def train_update_reconstruction_filter_delta(
             training_seed = _training_seed(
                 master_seed,
                 anchor.dataset_manifest_hash,
-                _flat_parameters_identity(anchor.flat_parameters),
+                flat_parameters_identity(anchor.flat_parameters),
                 UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN,
                 domain,
                 round_index,
@@ -929,7 +929,7 @@ def train_domain_reproduction_delta(
     training_seed = _training_seed(
         master_seed,
         anchor.dataset_manifest_hash,
-        _flat_parameters_identity(anchor.flat_parameters),
+        flat_parameters_identity(anchor.flat_parameters),
         REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
         domain,
         -1,
@@ -978,7 +978,7 @@ def train_source_candidate_delta(
     training_seed = _training_seed(
         master_seed,
         anchor.dataset_manifest_hash,
-        _flat_parameters_identity(anchor.flat_parameters),
+        flat_parameters_identity(anchor.flat_parameters),
         SOURCE_TRAINING_ALGORITHM_TOKEN,
         source_domain,
         -1,
@@ -1052,7 +1052,7 @@ def _train_ordinary_fedavg_delta(
             training_seed = _training_seed(
                 master_seed,
                 anchor.dataset_manifest_hash,
-                _flat_parameters_identity(anchor.flat_parameters),
+                flat_parameters_identity(anchor.flat_parameters),
                 algorithm_token,
                 domain,
                 round_index,
@@ -1487,7 +1487,7 @@ def train_krum_reference_delta(
             training_seed = _training_seed(
                 master_seed,
                 anchor.dataset_manifest_hash,
-                _flat_parameters_identity(anchor.flat_parameters),
+                flat_parameters_identity(anchor.flat_parameters),
                 "KRUM_REFERENCE",
                 domain,
                 round_index,
@@ -1561,7 +1561,7 @@ def train_density_cluster_trimmed_mean_delta(
             training_seed = _training_seed(
                 master_seed,
                 anchor.dataset_manifest_hash,
-                _flat_parameters_identity(anchor.flat_parameters),
+                flat_parameters_identity(anchor.flat_parameters),
                 DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
                 domain,
                 round_index,
