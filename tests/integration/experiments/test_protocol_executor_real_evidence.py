@@ -259,6 +259,32 @@ def test_every_primary_baseline_method_executes_without_crashing(prepared_root: 
         assert outcome.terminal_state == "Completed", (method.value, outcome.failure)
 
 
+def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
+    prepared_root: Path,
+) -> None:
+    verification_required_core = resolve_core_mapping(True, True, True)
+    executor = ProtocolCellExecutor(
+        prepared_root=prepared_root, resolved_core=verification_required_core
+    )
+    core_cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method="Resolved FedSIRA Core",
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=21,
+    )
+    core_outcome = executor.execute_cell(core_cell, CONFIG)
+    assert core_outcome.terminal_state == "Completed"
+    direct_krum_cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=21,
+    )
+    direct_krum_outcome = executor.execute_cell(direct_krum_cell, CONFIG)
+    assert direct_krum_outcome.terminal_state == "Completed"
+    assert dict(direct_krum_outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
