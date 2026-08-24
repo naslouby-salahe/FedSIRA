@@ -13,6 +13,11 @@ from fedsira.baselines.references import (
     fedavg_reference_post_reference_participants,
     fedavg_reference_post_reference_rounds,
 )
+from fedsira.baselines.robust_aggregation import (
+    client_sampling_round_order,
+    krum_reference_post_reference_rounds,
+    krum_reference_round_participants,
+)
 from fedsira.boundaries.capability_granularity import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
@@ -67,7 +72,7 @@ from fedsira.evaluation.screen import (
 )
 from fedsira.experiments.registry import EpistemicFailureType, ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
-from fedsira.learning.federated import run_fedavg_round
+from fedsira.learning.federated import run_fedavg_round, train_one_client_locally
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.scoring import logits_for_samples
 from fedsira.models.mlp import (
@@ -75,6 +80,7 @@ from fedsira.models.mlp import (
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
+from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime.determinism import (
     canonical_bytes,
     derive_uint32,
@@ -621,6 +627,81 @@ def train_fedavg_reference_delta(
     final_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
     final_model.load_state_dict(state_dict)
     return flatten_trainable_parameters(final_model) - anchor.flat_parameters
+
+
+def _flatten_state_dict(
+    input_width: int, output_width: int, state_dict: dict[str, torch.Tensor]
+) -> torch.Tensor:
+    model = FedSIRAClassifier(input_width, output_width)
+    model.load_state_dict(state_dict)
+    return flatten_trainable_parameters(model)
+
+
+def train_krum_reference_delta(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    eligible_domains = non_source_domains(source_domain)
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, anchor.flat_parameters)
+    state_dict = model.state_dict()
+    participant_count = config.protocol.synthesis.committee_size
+    for round_index in range(krum_reference_post_reference_rounds(config.baselines)):
+        round_order = client_sampling_round_order(eligible_domains, master_seed, round_index)
+        participants = krum_reference_round_participants(round_order, None, participant_count)
+        if participants is None:
+            return None
+        current_flat = _flatten_state_dict(anchor.input_width, anchor.output_width, state_dict)
+        committee: list[CertifiedReproductionRow] = []
+        for domain in participants:
+            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
+            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            if combined is None:
+                continue
+            features, labels, sample_ids, _is_supported = combined
+            training_seed = _training_seed(
+                master_seed,
+                anchor.dataset_manifest_hash,
+                _flat_parameters_identity(anchor.flat_parameters),
+                "KRUM_REFERENCE",
+                domain,
+                round_index,
+            )
+            client_state_dict, _example_count = train_one_client_locally(
+                state_dict,
+                anchor.input_width,
+                anchor.output_width,
+                config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                config.model.optimizer,
+                config.model.training,
+                1,
+                features,
+                labels,
+                sample_ids,
+                training_seed,
+            )
+            client_flat = _flatten_state_dict(
+                anchor.input_width, anchor.output_width, client_state_dict
+            )
+            committee.append(
+                CertifiedReproductionRow(
+                    reproducer_domain=domain, update_vector=client_flat - current_flat
+                )
+            )
+        if len(committee) < participant_count:
+            return None
+        krum_delta = select_krum_update(
+            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ).update_vector
+        next_flat = current_flat + krum_delta
+        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+        load_flat_trainable_parameters(next_model, next_flat)
+        state_dict = next_model.state_dict()
+    final_flat = _flatten_state_dict(anchor.input_width, anchor.output_width, state_dict)
+    return final_flat - anchor.flat_parameters
 
 
 def evaluate_domain(

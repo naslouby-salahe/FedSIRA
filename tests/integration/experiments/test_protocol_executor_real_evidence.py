@@ -340,6 +340,21 @@ def test_fedavg_reference_baseline_trains_and_evaluates_a_real_fedavg_model(
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_krum_reference_baseline_trains_and_evaluates_a_real_krum_synthesized_model(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=26,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
