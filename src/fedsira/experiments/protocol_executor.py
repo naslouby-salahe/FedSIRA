@@ -94,15 +94,6 @@ from fedsira.boundaries.capability_granularity import (
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
 )
-from fedsira.boundaries.epistemic_failure import (
-    apply_attacker_induced_common_context,
-    apply_shared_spurious_feature,
-    diagnostic_marker_metric_or_insufficient,
-    match_diagnostic_benign_report_test_rows,
-    relabel_shared_label_error_rows,
-    select_shared_label_error_rows,
-    select_spurious_feature_rows,
-)
 from fedsira.boundaries.evidence_arrival import (
     EvidenceArrivalSchedule,
     compute_t_evidence,
@@ -180,6 +171,7 @@ from fedsira.evaluation.screen import screen_fold_index
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
+    EpistemicFailureScope,
     RealAnchor,
     RealReportSummary,
     RootCauseScope,
@@ -187,6 +179,7 @@ from fedsira.experiments.real_evidence import (
     compute_capability_under_specification_summary,
     compute_real_report_summary,
     compute_screen_differential,
+    compute_shared_epistemic_failure_summary,
     evaluate_domain,
     non_source_domains,
     prepared_feature_names,
@@ -213,6 +206,7 @@ from fedsira.experiments.registry import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     AblationVariant,
     BoundCondition,
+    EpistemicFailureType,
     ExternalVerificationCondition,
     HeterogeneityRegime,
     OpeningMode,
@@ -1035,51 +1029,78 @@ class ProtocolCellExecutor(CellExecutor):
             )
             extra.append(("target-row-ids", float(len(target_row_ids))))
         if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
-            _failure_type_token, strength_token = cell.condition.split("|")
+            failure_type_token, strength_token = cell.condition.split("|")
+            failure_type = EpistemicFailureType(failure_type_token)
             strength = float(strength_token)
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-            selected_label_rows = select_shared_label_error_rows(
-                ("benign-1", "benign-2"), strength, attack_seed
+            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_feature_names = (
+                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
-            relabel_shared_label_error_rows(
-                {"benign-1": NBaiotClass.BENIGN}, selected_label_rows or ()
-            )
-            selected_spurious_rows = select_spurious_feature_rows(
-                ("target-1", "target-2"), strength, attack_seed
-            )
-            apply_shared_spurious_feature(
-                torch.zeros(1, 115),
-                0,
-                config.attacks_and_boundaries.shared_spurious_feature.value_after_standardization,
-            )
-            apply_attacker_induced_common_context(
-                torch.zeros(1, 115),
-                (0, 1, 2, 3),
-                config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
-            )
-            matched_benign = match_diagnostic_benign_report_test_rows(
-                (("target-1", 1.0), ("target-2", 2.0)),
-                (("benign-1", 1.1), ("benign-2", 1.9)),
-            )
-            marker_result, marker_reason = diagnostic_marker_metric_or_insufficient(
-                matched_benign,
-                0.0,
-            )
-            extra.append(("selected-spurious-rows", float(len(selected_spurious_rows or ()))))
-            extra.append(("selected-label-rows", float(len(selected_label_rows or ()))))
-            extra.append(
-                (
-                    "matched-benign-controls",
-                    float(len(matched_benign)) if matched_benign is not None else 0.0,
+            if real_anchor is not None and real_feature_names is not None:
+                epistemic_failure_scope = EpistemicFailureScope(
+                    failure_type=failure_type,
+                    strength=strength,
+                    attack_generation_seed=attack_seed,
+                    feature_names=real_feature_names,
+                    spurious_feature_name=NBAIOT_TRIGGER_FEATURES[0],
+                    spurious_feature_value=(
+                        config.attacks_and_boundaries.shared_spurious_feature.value_after_standardization
+                    ),
+                    common_context_feature_names=NBAIOT_TRIGGER_FEATURES,
+                    common_context_trigger_value=(
+                        config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
+                    ),
                 )
-            )
-            extra.append(("diagnostic-marker-value", marker_result.value))
-            extra.append(
-                (
-                    "diagnostic-marker-insufficient",
-                    1.0 if marker_reason is not None else 0.0,
+                epistemic_summary = compute_shared_epistemic_failure_summary(
+                    self._prepared_root,
+                    config,
+                    cell.master_seed,
+                    real_anchor,
+                    _source_domain_for_cell(cell),
+                    epistemic_failure_scope,
                 )
-            )
+                oracle_label = clean_proposal_oracle_label(
+                    aggregate_target_f1=epistemic_summary.aggregate_target_f1,
+                    target_f1_gain=epistemic_summary.target_f1_gain,
+                    supported_macro_f1_drop=epistemic_summary.supported_macro_f1_drop,
+                    benign_far_increase=epistemic_summary.benign_far_increase,
+                    defined_domain_count=epistemic_summary.defined_domain_count,
+                    expected_domain_count=8,
+                    generic_defined_domain_fraction_minimum=(
+                        config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum
+                    ),
+                    capability_claim_config=config.capability_claim,
+                )
+                extra.append(
+                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))
+                )
+                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))
+                extra.append(
+                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)
+                )
+                extra.append(("benign-far-increase", epistemic_summary.benign_far_increase.value))
+                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))
+                extra.append(
+                    (
+                        "diagnostic-marker-insufficient",
+                        1.0 if epistemic_summary.diagnostic_marker.value is None else 0.0,
+                    )
+                )
+                extra.append(
+                    (
+                        "proposal-oracle-label",
+                        float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
+                    )
+                )
+            else:
+                extra.append(("defined-domain-count", 0.0))
+                extra.append(("target-f1-gain", None))
+                extra.append(("supported-macro-f1-drop", None))
+                extra.append(("benign-far-increase", None))
+                extra.append(("diagnostic-marker-value", None))
+                extra.append(("diagnostic-marker-insufficient", 1.0))
+                extra.append(("proposal-oracle-label", 0.0))
         if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             regime = cell.condition
             heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)

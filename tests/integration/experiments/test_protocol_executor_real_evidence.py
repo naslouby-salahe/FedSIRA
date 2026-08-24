@@ -8,7 +8,11 @@ from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
 from fedsira.datasets.nbaiot.preprocessing import NBAIOT_PRIMARY_PREDICTOR_COUNT
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotClass
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_DOMAIN_ORDER,
+    NBAIOT_TRIGGER_FEATURES,
+    NBaiotClass,
+)
 from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
@@ -20,9 +24,11 @@ from fedsira.experiments.registry import (
     EFFICIENCY_MEASUREMENT_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     BaselineIdentity,
     BoundCondition,
+    EpistemicFailureType,
     OpeningMode,
     PrimaryScenario,
     ProposalEpisode,
@@ -47,7 +53,10 @@ CLASS_OFFSETS = {
 
 
 def _feature_names() -> list[str]:
-    return [f"feature_{index:03d}" for index in range(NBAIOT_PRIMARY_PREDICTOR_COUNT)]
+    names = [f"feature_{index:03d}" for index in range(NBAIOT_PRIMARY_PREDICTOR_COUNT)]
+    for index, trigger in enumerate(NBAIOT_TRIGGER_FEATURES):
+        names[index] = trigger
+    return names
 
 
 def _write_csv(path: Path, row_count: int, offset: float) -> None:
@@ -301,3 +310,33 @@ def test_capability_under_specification_boundary_reports_a_real_oracle_label(
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["proposal-oracle-label"] is not None
+
+
+@pytest.mark.parametrize(
+    "failure_type",
+    [
+        EpistemicFailureType.SHARED_LABEL_ERROR,
+        EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
+        EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
+    ],
+)
+def test_shared_epistemic_failure_boundary_reports_real_metrics(
+    prepared_root: Path, failure_type: EpistemicFailureType
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    cell = ScientificCell(
+        experiment=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+        method="x",
+        condition=f"{failure_type.value}|0.5",
+        master_seed=15,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["defined-domain-count"] is not None
+    assert metrics["defined-domain-count"] > 0
+    assert metrics["proposal-oracle-label"] is not None
+    if failure_type is EpistemicFailureType.SHARED_LABEL_ERROR:
+        assert metrics["diagnostic-marker-insufficient"] == 1.0
+    else:
+        assert metrics["diagnostic-marker-value"] is not None

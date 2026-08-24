@@ -13,9 +13,11 @@ from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass,
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.records import CanonicalToken
 from fedsira.experiments.real_evidence import (
+    EpistemicFailureScope,
     RealAnchor,
     RootCauseScope,
     compute_capability_under_specification_summary,
+    compute_shared_epistemic_failure_summary,
     evaluate_domain,
     non_source_domains,
     prepared_feature_names,
@@ -23,6 +25,7 @@ from fedsira.experiments.real_evidence import (
     train_anchor,
     train_domain_reproduction_delta,
 )
+from fedsira.experiments.registry import EpistemicFailureType
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
 
 pytestmark = pytest.mark.skip(
@@ -242,3 +245,93 @@ def test_compute_capability_under_specification_summary_is_genuinely_computed(
     )
     assert summary.defined_domain_count > 0
     assert summary.aggregate_target_f1.value is not None
+
+
+def _epistemic_failure_scope(
+    feature_names: tuple[CanonicalToken, ...], failure_type: EpistemicFailureType
+) -> EpistemicFailureScope:
+    return EpistemicFailureScope(
+        failure_type=failure_type,
+        strength=0.5,
+        attack_generation_seed=1,
+        feature_names=feature_names,
+        spurious_feature_name=NBAIOT_TRIGGER_FEATURES[0],
+        spurious_feature_value=6.0,
+        common_context_feature_names=NBAIOT_TRIGGER_FEATURES,
+        common_context_trigger_value=6.0,
+    )
+
+
+def test_train_domain_reproduction_delta_with_shared_label_error_scope_is_finite(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
+    delta = train_domain_reproduction_delta(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        domain=DOMAINS[0],
+        epistemic_failure_scope=scope,
+    )
+    assert delta is not None
+    assert torch.isfinite(delta).all()
+
+
+def test_compute_shared_epistemic_failure_summary_for_label_error_is_genuinely_computed(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
+    summary = compute_shared_epistemic_failure_summary(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        source_domain=None,
+        epistemic_failure_scope=scope,
+    )
+    assert summary.defined_domain_count > 0
+    assert summary.aggregate_target_f1.value is not None
+    assert summary.diagnostic_marker.value is None
+
+
+def test_compute_shared_epistemic_failure_summary_for_spurious_feature_reports_diagnostic_marker(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_SPURIOUS_FEATURE)
+    summary = compute_shared_epistemic_failure_summary(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        source_domain=None,
+        epistemic_failure_scope=scope,
+    )
+    assert summary.defined_domain_count > 0
+    assert summary.diagnostic_marker.value is not None
+
+
+def test_compute_shared_epistemic_failure_summary_for_common_context_reports_diagnostic_marker(
+    prepared_root: Path, anchor: RealAnchor
+) -> None:
+    feature_names = prepared_feature_names(prepared_root)
+    assert feature_names is not None
+    scope = _epistemic_failure_scope(
+        feature_names, EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT
+    )
+    summary = compute_shared_epistemic_failure_summary(
+        prepared_root,
+        CONFIG,
+        master_seed=1,
+        anchor=anchor,
+        source_domain=None,
+        epistemic_failure_scope=scope,
+    )
+    assert summary.defined_domain_count > 0
+    assert summary.diagnostic_marker.value is not None
