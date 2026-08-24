@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import torch
@@ -194,6 +194,7 @@ from fedsira.experiments.real_evidence import (
 )
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
@@ -209,6 +210,7 @@ from fedsira.experiments.registry import (
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     AblationVariant,
+    BoundCondition,
     ExternalVerificationCondition,
     HeterogeneityRegime,
     OpeningMode,
@@ -867,6 +869,8 @@ class ProtocolCellExecutor(CellExecutor):
             return self._execute_reproducer_robustness_cell(cell, config, evidence)
         if cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
             return self._execute_verifier_robustness_cell(cell, config, evidence)
+        if cell.experiment == BYZANTINE_BOUND_VIOLATION_NAME:
+            return self._execute_byzantine_bound_cell(cell, config, evidence)
         if cell.experiment == EFFICIENCY_MEASUREMENT_NAME:
             return self._execute_efficiency_cell(cell, config, evidence)
         if cell.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
@@ -1802,6 +1806,37 @@ class ProtocolCellExecutor(CellExecutor):
                 )
         metrics = _metrics_from_state(state, self._pending_real_report)
         return state, metrics
+
+    def _execute_byzantine_bound_cell(
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
+        evidence: PreparedEvidenceCounts,
+    ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
+        condition = BoundCondition(cell.condition)
+        if condition is BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND:
+            reproducer_cell = replace(
+                cell, condition=ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value
+            )
+            return self._execute_reproducer_robustness_cell(reproducer_cell, config, evidence)
+        if condition is BoundCondition.TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND:
+            reproducer_cell = replace(
+                cell, condition=ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS.value
+            )
+            return self._execute_reproducer_robustness_cell(reproducer_cell, config, evidence)
+        if condition is BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND:
+            verifier_cell = replace(
+                cell,
+                method=VerifierProfile.DETERMINISTIC_BOUND.value,
+                condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
+            )
+            return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+        verifier_cell = replace(
+            cell,
+            method=VerifierProfile.DETERMINISTIC_BOUND.value,
+            condition=VerifierCondition.TWO_FALSE_POSITIVES.value,
+        )
+        return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
 
     def _execute_secondary_cell(
         self,
