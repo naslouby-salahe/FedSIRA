@@ -14,6 +14,7 @@ from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
 from fedsira.experiments.registry import (
+    ADMISSION_DELAY_DECOMPOSITION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
@@ -207,3 +208,33 @@ def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method
         assert outcome.terminal_state == "Completed"
         terminal_states.add(dict(outcome.metrics)["terminal-state"])
     assert terminal_states != {1.0}
+
+
+def test_every_primary_baseline_method_executes_without_crashing(prepared_root: Path) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    for method in BaselineIdentity:
+        cell = ScientificCell(
+            experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+            method=method.value,
+            condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+            master_seed=10,
+        )
+        outcome = executor.execute_cell(cell, CONFIG)
+        assert outcome.terminal_state == "Completed", (method.value, outcome.failure)
+
+
+def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root)
+    cell = ScientificCell(
+        experiment=ADMISSION_DELAY_DECOMPOSITION_NAME,
+        method="Resolved FedSIRA Core",
+        condition="Permanent Singleton",
+        master_seed=11,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["post-evidence-wall-clock-seconds"] is not None
+    assert metrics["post-evidence-wall-clock-seconds"] > 0.0
