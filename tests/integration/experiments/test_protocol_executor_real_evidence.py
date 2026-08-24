@@ -769,3 +769,35 @@ def test_random_committee_profile_ablation_delegates_to_verifier_robustness_mech
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_raw_target_f1_screen_only_ablation_ignores_the_matched_differential(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
+        condition="Ablation",
+        master_seed=26,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_no_matched_control_ablation_uses_the_unmatched_differential(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.NO_MATCHED_CONTROL.value,
+        condition="Ablation",
+        master_seed=27,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}

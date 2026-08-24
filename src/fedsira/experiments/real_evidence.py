@@ -1887,6 +1887,27 @@ def _per_sample_cross_entropy(
         return torch.nn.functional.cross_entropy(logits, labels, reduction="none")
 
 
+def compute_unmatched_screen_differential(
+    prepared_root: Path,
+    anchor: RealAnchor,
+    source_delta: torch.Tensor,
+    domain: NBaiotDomain,
+) -> float | None:
+    target_tensor = _tensor_view(
+        load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN)
+    )
+    if target_tensor is None:
+        return None
+    target_features, target_labels, _target_sample_ids = target_tensor
+    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
+    source_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(source_model, anchor.flat_parameters + source_delta)
+    target_anchor_loss = _per_sample_cross_entropy(anchor_model, target_features, target_labels)
+    target_source_loss = _per_sample_cross_entropy(source_model, target_features, target_labels)
+    return float(torch.mean(target_anchor_loss - target_source_loss))
+
+
 def compute_screen_differential(
     prepared_root: Path,
     config: ScientificConfig,

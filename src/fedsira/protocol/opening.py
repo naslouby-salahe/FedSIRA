@@ -70,6 +70,51 @@ def screen_domain_decision_is_positive(
     )
 
 
+def raw_target_f1_screen_domain_decision_is_positive(
+    target_f1_gain: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+    capability_claim_config: CapabilityClaimConfig,
+) -> bool:
+    if (
+        target_f1_gain.value is None
+        or supported_macro_f1_drop.value is None
+        or benign_far_increase.value is None
+    ):
+        return False
+    return (
+        target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        and benign_far_increase.value
+        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+    )
+
+
+def unmatched_control_screen_domain_decision_is_positive(
+    unmatched_differential: float | None,
+    target_f1_gain: MetricResult,
+    supported_macro_f1_drop: MetricResult,
+    benign_far_increase: MetricResult,
+    proposal_screen_config: ProposalScreenConfig,
+    capability_claim_config: CapabilityClaimConfig,
+) -> bool:
+    if unmatched_differential is None:
+        return False
+    if (
+        target_f1_gain.value is None
+        or supported_macro_f1_drop.value is None
+        or benign_far_increase.value is None
+    ):
+        return False
+    return (
+        unmatched_differential >= proposal_screen_config.differential_minimum_nats_per_example
+        and target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        and benign_far_increase.value
+        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+    )
+
+
 def candidate_free_screen_domain_predicate(
     anchor_target_f1: MetricResult, capability_claim_config: CapabilityClaimConfig
 ) -> bool:

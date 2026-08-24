@@ -158,6 +158,7 @@ from fedsira.experiments.real_evidence import (
     compute_real_report_summary,
     compute_screen_differential,
     compute_shared_epistemic_failure_summary,
+    compute_unmatched_screen_differential,
     domain_anchor_train_feature_mean,
     evaluate_certified_ensemble,
     evaluate_domain,
@@ -238,9 +239,11 @@ from fedsira.protocol.opening import (
     ScreenDomainResult,
     candidate_free_screen_domain_predicate,
     candidate_screen_transition,
+    raw_target_f1_screen_domain_decision_is_positive,
     screen_domain_decision_is_positive,
     screen_domain_order,
     start_claim,
+    unmatched_control_screen_domain_decision_is_positive,
 )
 from fedsira.protocol.reproduction import (
     ReproductionAttempt,
@@ -1595,6 +1598,18 @@ class ProtocolCellExecutor(CellExecutor):
                 condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
             )
             return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+        if variant in (
+            AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
+            AblationVariant.NO_MATCHED_CONTROL.value,
+        ):
+            opening_cell = replace(
+                cell,
+                method=OpeningMode.PROPOSAL_ASSISTED.value,
+                condition=ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
+            )
+            return self._execute_opening_cell(
+                opening_cell, config, evidence, screen_predicate_variant=AblationVariant(variant)
+            )
         state = self._advance_protocol(cell, config, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         extra: list[tuple[CanonicalToken, float | None]] = []
@@ -1859,6 +1874,7 @@ class ProtocolCellExecutor(CellExecutor):
         cell: ScientificCell,
         config: ScientificConfig,
         evidence: PreparedEvidenceCounts,
+        screen_predicate_variant: AblationVariant | None = None,
     ) -> tuple[ClaimState, tuple[tuple[CanonicalToken, float | None], ...]]:
         opening_mode = _opening_mode_for_cell(cell)
         entry = start_claim(opening_mode)
@@ -1948,11 +1964,47 @@ class ProtocolCellExecutor(CellExecutor):
                             and anchor_screen.benign_far.value is not None
                             else MetricResult(None, 0)
                         )
-                    screen_decision = screen_domain_decision_is_positive(
-                        differential_a,
-                        target_f1_gain,
-                        supported_macro_f1_drop,
-                        benign_far_increase,
+                    if screen_predicate_variant == AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
+                        screen_decision = raw_target_f1_screen_domain_decision_is_positive(
+                            target_f1_gain,
+                            supported_macro_f1_drop,
+                            benign_far_increase,
+                            config.capability_claim,
+                        )
+                    elif screen_predicate_variant == AblationVariant.NO_MATCHED_CONTROL:
+                        unmatched_differential = compute_unmatched_screen_differential(
+                            self._prepared_root, real_anchor, real_source_delta, source_domain
+                        )
+                        screen_decision = unmatched_control_screen_domain_decision_is_positive(
+                            unmatched_differential,
+                            target_f1_gain,
+                            supported_macro_f1_drop,
+                            benign_far_increase,
+                            config.protocol.proposal_screen,
+                            config.capability_claim,
+                        )
+                    else:
+                        screen_decision = screen_domain_decision_is_positive(
+                            differential_a,
+                            target_f1_gain,
+                            supported_macro_f1_drop,
+                            benign_far_increase,
+                            config.protocol.proposal_screen,
+                            config.capability_claim,
+                        )
+                elif screen_predicate_variant == AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
+                    screen_decision = raw_target_f1_screen_domain_decision_is_positive(
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
+                        config.capability_claim,
+                    )
+                elif screen_predicate_variant == AblationVariant.NO_MATCHED_CONTROL:
+                    screen_decision = unmatched_control_screen_domain_decision_is_positive(
+                        None,
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
+                        MetricResult(None, 0),
                         config.protocol.proposal_screen,
                         config.capability_claim,
                     )
