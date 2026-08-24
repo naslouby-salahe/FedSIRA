@@ -22,9 +22,12 @@ def verifier_is_eligible(
     verifier_domain: NBaiotDomain,
     source_domain: NBaiotDomain | None,
     reproducer_domain: NBaiotDomain,
+    allow_source_as_verifier: bool = False,
 ) -> bool:
     if verifier_domain == reproducer_domain:
         return False
+    if allow_source_as_verifier:
+        return True
     return source_domain is None or verifier_domain != source_domain
 
 

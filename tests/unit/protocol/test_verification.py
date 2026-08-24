@@ -26,6 +26,15 @@ def test_verifier_is_eligible_excludes_reproducer_and_source() -> None:
     assert verifier_is_eligible(DOMAIN_C, DOMAIN_B, reproducer_domain=DOMAIN_A)
 
 
+def test_verifier_is_eligible_allows_source_as_verifier_when_flagged() -> None:
+    assert verifier_is_eligible(
+        DOMAIN_A, source_domain=DOMAIN_A, reproducer_domain=DOMAIN_B, allow_source_as_verifier=True
+    )
+    assert not verifier_is_eligible(
+        DOMAIN_A, source_domain=DOMAIN_A, reproducer_domain=DOMAIN_A, allow_source_as_verifier=True
+    )
+
+
 def test_verifier_assignment_timestamp_must_be_strictly_later() -> None:
     assert verifier_assignment_timestamp_is_valid(2.0, 1.0)
     assert not verifier_assignment_timestamp_is_valid(1.0, 1.0)
