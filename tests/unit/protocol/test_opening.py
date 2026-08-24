@@ -6,9 +6,11 @@ from fedsira.protocol.opening import (
     ScreenDomainResult,
     candidate_free_screen_domain_predicate,
     candidate_screen_transition,
+    raw_target_f1_screen_domain_decision_is_positive,
     screen_domain_decision_is_positive,
     screen_domain_order,
     start_claim,
+    unmatched_control_screen_domain_decision_is_positive,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -112,6 +114,50 @@ def test_screen_domain_decision_is_positive_fails_when_differential_too_small() 
 
 def test_screen_domain_decision_is_positive_na_differential_is_not_positive() -> None:
     result = screen_domain_decision_is_positive(
+        None,
+        MetricResult(1.0, 10),
+        MetricResult(0.0, 10),
+        MetricResult(0.0, 10),
+        PROPOSAL_SCREEN_CONFIG,
+        CAPABILITY_CLAIM_CONFIG,
+    )
+    assert not result
+
+
+def test_raw_target_f1_screen_domain_decision_ignores_the_differential() -> None:
+    passing = raw_target_f1_screen_domain_decision_is_positive(
+        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, 10),
+        MetricResult(CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, 10),
+        MetricResult(CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, 10),
+        CAPABILITY_CLAIM_CONFIG,
+    )
+    assert passing
+
+
+def test_raw_target_f1_screen_domain_decision_fails_when_target_gain_too_small() -> None:
+    result = raw_target_f1_screen_domain_decision_is_positive(
+        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum - 0.001, 10),
+        MetricResult(0.0, 10),
+        MetricResult(0.0, 10),
+        CAPABILITY_CLAIM_CONFIG,
+    )
+    assert not result
+
+
+def test_unmatched_control_screen_domain_decision_is_positive_requires_all_predicates() -> None:
+    passing = unmatched_control_screen_domain_decision_is_positive(
+        PROPOSAL_SCREEN_CONFIG.differential_minimum_nats_per_example,
+        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, 10),
+        MetricResult(CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, 10),
+        MetricResult(CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, 10),
+        PROPOSAL_SCREEN_CONFIG,
+        CAPABILITY_CLAIM_CONFIG,
+    )
+    assert passing
+
+
+def test_unmatched_control_screen_domain_decision_na_differential_is_not_positive() -> None:
+    result = unmatched_control_screen_domain_decision_is_positive(
         None,
         MetricResult(1.0, 10),
         MetricResult(0.0, 10),
