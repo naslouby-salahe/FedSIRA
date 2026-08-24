@@ -300,6 +300,31 @@ def test_three_row_coordinate_median_baseline_is_routed_and_uses_median_synthesi
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
 
+def test_one_independent_retrain_baseline_uses_single_verifier_progression(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=23,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
+def test_resolved_core_single_row_path_admits_via_single_verifier_progression(
+    prepared_root: Path,
+) -> None:
+    single_row_core = resolve_core_mapping(True, False, True)
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=single_row_core)
+    outcome = executor.execute_cell(_primary_cell(24), CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
