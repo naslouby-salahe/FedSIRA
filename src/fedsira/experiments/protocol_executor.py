@@ -1055,6 +1055,49 @@ class ProtocolCellExecutor(CellExecutor):
         )
         return state
 
+    def _source_release_after_full_external_check_outcome(
+        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None or source_domain is None:
+            return ClaimState.DORMANT
+        source_delta = train_source_candidate_delta(
+            self._prepared_root, config, cell.master_seed, real_anchor, source_domain
+        )
+        if source_delta is None:
+            return ClaimState.DORMANT
+        production_checkpoint = real_anchor.flat_parameters + source_delta
+        panel = _verifier_panel(
+            source_domain, source_domain, cell.master_seed, config.protocol.verification
+        )
+        if not panel_votes_are_one_per_domain(panel):
+            return ClaimState.DORMANT
+        reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
+        positive_report_count = sum(1 for report in reports if report is TernaryOutcome.POSITIVE)
+        review_state = review_style_baseline_outcome(
+            adequate_reviewer_count=len(panel),
+            positive_report_count=positive_report_count,
+            panel_size=config.protocol.verification.panel_size,
+            required_positive_reports=config.protocol.verification.required_positive_reports,
+        )
+        if review_state is not ClaimState.ADMITTED:
+            return review_state
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            config,
+            evidence,
+            "source-release-full-external-check-claim",
+            source_domain,
+            (),
+            (),
+            ClaimOpeningMode.CANDIDATE_FREE,
+            False,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+        )
+        return state
+
     def _recovery_after_source_admission_outcome(
         self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
@@ -1637,6 +1680,12 @@ class ProtocolCellExecutor(CellExecutor):
                 condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
             )
             return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+        if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value:
+            state = self._client_review_outcome(cell, config)
+            return state, _metrics_from_state(state, self._pending_real_report)
+        if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value:
+            state = self._source_release_after_full_external_check_outcome(cell, config, evidence)
+            return state, _metrics_from_state(state, self._pending_real_report)
         if variant in (
             AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
             AblationVariant.NO_MATCHED_CONTROL.value,

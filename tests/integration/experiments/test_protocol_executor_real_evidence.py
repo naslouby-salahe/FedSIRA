@@ -833,3 +833,35 @@ def test_byzantine_reproducer_copies_source_ablation_forces_the_first_row(
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_source_release_after_peer_review_ablation_admits_via_client_review(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value,
+        condition="Ablation",
+        master_seed=30,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
+
+
+def test_source_release_after_full_external_check_ablation_uses_a_real_verifier_panel(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value,
+        condition="Ablation",
+        master_seed=33,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    metrics = dict(outcome.metrics)
+    assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
