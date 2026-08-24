@@ -432,6 +432,21 @@ def test_recovery_after_source_admission_baseline_evaluates_the_rollback_decisio
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
 
 
+def test_multiple_model_certified_ensemble_baseline_trains_three_group_models(
+    prepared_root: Path,
+) -> None:
+    executor = ProtocolCellExecutor(prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    cell = ScientificCell(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        method=BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
+        condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
+        master_seed=36,
+    )
+    outcome = executor.execute_cell(cell, CONFIG)
+    assert outcome.terminal_state == "Completed"
+    assert dict(outcome.metrics)["terminal-state"] != 0.0
+
+
 def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
     prepared_root: Path,
 ) -> None:

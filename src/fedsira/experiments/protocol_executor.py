@@ -28,9 +28,6 @@ from fedsira.baselines.calibration import (
     same_context_verifier_panel,
 )
 from fedsira.baselines.certified_ensemble import (
-    certified_ensemble_domain_groups,
-    certified_ensemble_post_reference_rounds,
-    ensemble_predicted_label,
     validate_group_without_target_member_uses_supported_only,
 )
 from fedsira.baselines.independent_retraining import (
@@ -161,6 +158,7 @@ from fedsira.experiments.real_evidence import (
     compute_real_report_summary,
     compute_screen_differential,
     compute_shared_epistemic_failure_summary,
+    evaluate_certified_ensemble,
     evaluate_domain,
     non_source_domains,
     prepared_feature_names,
@@ -169,6 +167,7 @@ from fedsira.experiments.real_evidence import (
     root_cause_partitioned_row_ids,
     train_anchor,
     train_centralized_reference_checkpoint,
+    train_certified_ensemble_group_checkpoints,
     train_density_cluster_trimmed_mean_delta,
     train_fedavg_reference_delta,
     train_krum_reference_delta,
@@ -1265,6 +1264,65 @@ class ProtocolCellExecutor(CellExecutor):
             final_gate_config=config.protocol.final_gate,
         )
 
+    def _multiple_model_certified_ensemble_outcome(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> ClaimState:
+        source_domain = _source_domain_for_cell(cell)
+        real_anchor = self._real_anchor(config, cell.master_seed)
+        if real_anchor is None:
+            return ClaimState.DORMANT
+        group_checkpoints = train_certified_ensemble_group_checkpoints(
+            self._prepared_root, config, cell.master_seed
+        )
+        if group_checkpoints is None:
+            return ClaimState.DORMANT
+        target_f1_values: list[MetricResult] = []
+        supported_f1_harms: list[MetricResult] = []
+        benign_far_increases: list[MetricResult] = []
+        for domain in non_source_domains(source_domain):
+            anchor_metrics = evaluate_domain(
+                self._prepared_root,
+                real_anchor,
+                real_anchor.flat_parameters,
+                domain,
+                Role.FINAL_GATE,
+            )
+            ensemble_metrics = evaluate_certified_ensemble(
+                self._prepared_root, group_checkpoints, domain, Role.FINAL_GATE
+            )
+            if anchor_metrics is None or ensemble_metrics is None:
+                continue
+            target_f1_values.append(ensemble_metrics.target_f1)
+            supported_f1_harms.append(
+                supported_macro_f1_harm(
+                    anchor_metrics.supported_macro_f1, ensemble_metrics.supported_macro_f1
+                )
+            )
+            if (
+                anchor_metrics.benign_far.value is not None
+                and ensemble_metrics.benign_far.value is not None
+            ):
+                benign_far_increases.append(
+                    MetricResult(
+                        ensemble_metrics.benign_far.value - anchor_metrics.benign_far.value, 1
+                    )
+                )
+            else:
+                benign_far_increases.append(MetricResult(None, 0))
+        predicates_pass = final_gate_predicates_pass(
+            median_domain_target_f1(target_f1_values),
+            worst_domain_target_f1(target_f1_values),
+            equal_weight_domain_mean(supported_f1_harms, 1),
+            equal_weight_domain_mean(benign_far_increases, 1),
+            True,
+            config.protocol.final_gate,
+        )
+        return synthesis_pending_transition(
+            adequate_final_gate_domain_count=len(target_f1_values),
+            final_gate_predicates_pass=predicates_pass,
+            final_gate_config=config.protocol.final_gate,
+        )
+
     def _centralized_reference_outcome(
         self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
@@ -2166,16 +2224,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
             state = self._advance_protocol(cell, config, evidence)
         elif method == BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value:
-            certified_ensemble_post_reference_rounds(config.baselines)
-            certified_ensemble_domain_groups(
-                derive_uint32("DOMAIN_PARTITION_SEED", cell.master_seed),
-                config.baselines.multiple_model_certified_ensemble_group_count,
-            )
-            ensemble_predicted_label(
-                (0, 1, 0),
-                ((0.5, 0.5), (0.5, 0.5), (0.5, 0.5)),
-            )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._multiple_model_certified_ensemble_outcome(cell, config)
         elif method == BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value:
             state = self._update_reconstruction_filter_outcome(cell, config, evidence)
         elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
