@@ -8,6 +8,11 @@ from pathlib import Path
 import pandas
 import torch
 
+from fedsira.boundaries.capability_granularity import (
+    apply_root_cause_feature_shift,
+    root_cause_for_sample,
+    target_row_ids_for_contract,
+)
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.materialization import view_parquet_path
@@ -18,7 +23,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.enums import SeedNamespace
+from fedsira.domain.enums import CapabilityContractScope, RootCause, SeedNamespace
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, DerivedSeed, MasterSeed
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
@@ -90,6 +95,55 @@ class DomainTargetMetrics:
     benign_far: MetricResult
 
 
+@dataclass(frozen=True)
+class RootCauseScope:
+    contract_scope: CapabilityContractScope
+    feature_names: tuple[CanonicalToken, ...]
+    root_cause_a_feature_name: CanonicalToken
+    root_cause_b_feature_name: CanonicalToken
+    shift_value: float
+
+
+def _scope_and_shift_rows(
+    rows: PreparedRows, root_cause_scope: RootCauseScope
+) -> PreparedRows | None:
+    root_cause_a_ids = frozenset(
+        sample_id
+        for sample_id in rows.sample_ids
+        if root_cause_for_sample(sample_id) is RootCause.A
+    )
+    root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
+    allowed_ids = target_row_ids_for_contract(
+        root_cause_scope.contract_scope, root_cause_a_ids, root_cause_b_ids
+    )
+    a_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_a_feature_name)
+    b_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_b_feature_name)
+    kept_sample_ids: list[ArtifactDigest] = []
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[CanonicalToken] = []
+    for sample_id, features, label in zip(rows.sample_ids, rows.features, rows.labels, strict=True):
+        if sample_id not in allowed_ids:
+            continue
+        row_root_cause = root_cause_for_sample(sample_id)
+        shifted = apply_root_cause_feature_shift(
+            torch.tensor(features, dtype=torch.float32),
+            row_root_cause,
+            a_index,
+            b_index,
+            root_cause_scope.shift_value,
+        )
+        kept_sample_ids.append(sample_id)
+        kept_features.append(tuple(float(value) for value in shifted))
+        kept_labels.append(label)
+    if not kept_sample_ids:
+        return None
+    return PreparedRows(
+        sample_ids=tuple(kept_sample_ids),
+        features=tuple(kept_features),
+        labels=tuple(kept_labels),
+    )
+
+
 def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> CanonicalToken:
     return f"{NBAIOT_DOMAIN_HASH_TOKEN[domain]}_{class_id.value}_{ROLE_HASH_TOKEN[role]}"
 
@@ -117,6 +171,14 @@ def load_prepared_rows(
     )
     labels = tuple(str(value) for value in frame["label"])
     return PreparedRows(sample_ids=sample_ids, features=features, labels=labels)
+
+
+def prepared_feature_names(prepared_root: Path) -> tuple[CanonicalToken, ...] | None:
+    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
+    if not parquet_files:
+        return None
+    frame: pandas.DataFrame = pandas.read_parquet(parquet_files[0])
+    return tuple(column for column in frame.columns if column not in ("sample_id", "label"))
 
 
 def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
@@ -243,11 +305,15 @@ def train_anchor(
 
 
 def _combined_post_reference_rows(
-    prepared_root: Path, domain: NBaiotDomain, target_role: Role
+    prepared_root: Path,
+    domain: NBaiotDomain,
+    target_role: Role,
+    root_cause_scope: RootCauseScope | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
-    target_tensor = _tensor_view(
-        load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
-    )
+    target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
+    if target_rows is not None and root_cause_scope is not None:
+        target_rows = _scope_and_shift_rows(target_rows, root_cause_scope)
+    target_tensor = _tensor_view(target_rows)
     if target_tensor is None:
         return None
     target_features, target_labels, target_sample_ids = target_tensor
@@ -282,8 +348,11 @@ def train_domain_reproduction_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     domain: NBaiotDomain,
+    root_cause_scope: RootCauseScope | None = None,
 ) -> torch.Tensor | None:
-    combined = _combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
+    combined = _combined_post_reference_rows(
+        prepared_root, domain, Role.REPRODUCTION, root_cause_scope
+    )
     if combined is None:
         return None
     features, labels, sample_ids, is_supported = combined
@@ -381,6 +450,7 @@ def evaluate_domain(
     domain: NBaiotDomain,
     role: Role,
     target_role: Role | None = None,
+    root_cause_scope: RootCauseScope | None = None,
 ) -> DomainTargetMetrics | None:
     true_labels: list[CanonicalToken] = []
     predicted_labels: list[CanonicalToken] = []
@@ -395,6 +465,12 @@ def evaluate_domain(
                 else role
             )
             rows = load_prepared_rows(prepared_root, domain, class_id, row_role)
+            if (
+                class_id is NBaiotClass.GAFGYT_COMBO
+                and root_cause_scope is not None
+                and rows is not None
+            ):
+                rows = _scope_and_shift_rows(rows, root_cause_scope)
             tensor_view = _tensor_view(rows)
             if tensor_view is None:
                 continue
@@ -578,4 +654,82 @@ def compute_screen_differential(
         )
     return run_proposal_screen_for_domain(
         fold_assignment, target_observations, control_observations, fold_count
+    )
+
+
+@dataclass(frozen=True)
+class CapabilityUnderSpecificationSummary:
+    defined_domain_count: int
+    aggregate_target_f1: MetricResult
+    target_f1_gain: MetricResult
+    supported_macro_f1_drop: MetricResult
+    benign_far_increase: MetricResult
+
+
+def compute_capability_under_specification_summary(
+    prepared_root: Path,
+    config: ScientificConfig,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+    root_cause_scope: RootCauseScope,
+) -> CapabilityUnderSpecificationSummary:
+    target_f1_values: list[MetricResult] = []
+    anchor_target_f1_values: list[MetricResult] = []
+    supported_f1_harms: list[MetricResult] = []
+    benign_far_increases: list[MetricResult] = []
+    for domain in non_source_domains(source_domain):
+        delta = train_domain_reproduction_delta(
+            prepared_root, config, master_seed, anchor, domain, root_cause_scope
+        )
+        if delta is None:
+            continue
+        production_flat = anchor.flat_parameters + delta
+        anchor_metrics = evaluate_domain(
+            prepared_root,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.REPORT_TEST,
+            root_cause_scope=root_cause_scope,
+        )
+        scoped_metrics = evaluate_domain(
+            prepared_root,
+            anchor,
+            production_flat,
+            domain,
+            Role.REPORT_TEST,
+            root_cause_scope=root_cause_scope,
+        )
+        if anchor_metrics is None or scoped_metrics is None:
+            continue
+        target_f1_values.append(scoped_metrics.target_f1)
+        anchor_target_f1_values.append(anchor_metrics.target_f1)
+        supported_f1_harms.append(
+            supported_macro_f1_harm(
+                anchor_metrics.supported_macro_f1, scoped_metrics.supported_macro_f1
+            )
+        )
+        if (
+            anchor_metrics.benign_far.value is not None
+            and scoped_metrics.benign_far.value is not None
+        ):
+            benign_far_increases.append(
+                MetricResult(scoped_metrics.benign_far.value - anchor_metrics.benign_far.value, 1)
+            )
+        else:
+            benign_far_increases.append(MetricResult(None, 0))
+    aggregate_target_f1 = equal_weight_domain_mean(target_f1_values, 1)
+    anchor_target_f1 = equal_weight_domain_mean(anchor_target_f1_values, 1)
+    target_f1_gain = (
+        MetricResult(aggregate_target_f1.value - anchor_target_f1.value, 1)
+        if aggregate_target_f1.value is not None and anchor_target_f1.value is not None
+        else MetricResult(None, 0)
+    )
+    return CapabilityUnderSpecificationSummary(
+        defined_domain_count=len(target_f1_values),
+        aggregate_target_f1=aggregate_target_f1,
+        target_f1_gain=target_f1_gain,
+        supported_macro_f1_drop=equal_weight_domain_mean(supported_f1_harms, 1),
+        benign_far_increase=equal_weight_domain_mean(benign_far_increases, 1),
     )

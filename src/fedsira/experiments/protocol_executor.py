@@ -91,8 +91,6 @@ from fedsira.baselines.source_authority import (
     validate_client_review_reviewer_count,
 )
 from fedsira.boundaries.capability_granularity import (
-    apply_root_cause_feature_shift,
-    root_cause_for_sample,
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
 )
@@ -124,6 +122,7 @@ from fedsira.config.schema import ScientificConfig, VerificationConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
+    NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
 )
@@ -183,11 +182,14 @@ from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.real_evidence import (
     RealAnchor,
     RealReportSummary,
+    RootCauseScope,
     certified_domain_delta_committee,
+    compute_capability_under_specification_summary,
     compute_real_report_summary,
     compute_screen_differential,
     evaluate_domain,
     non_source_domains,
+    prepared_feature_names,
     real_evidence_available,
     train_anchor,
     train_source_candidate_delta,
@@ -966,33 +968,60 @@ class ProtocolCellExecutor(CellExecutor):
             ("false-same-capability-rate", false_same_rate.value),
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
-            oracle_label = clean_proposal_oracle_label(
-                aggregate_target_f1=MetricResult(None, 0),
-                target_f1_gain=MetricResult(None, 0),
-                supported_macro_f1_drop=MetricResult(None, 0),
-                benign_far_increase=MetricResult(None, 0),
-                defined_domain_count=0,
-                expected_domain_count=8,
-                generic_defined_domain_fraction_minimum=(
-                    config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum
-                ),
-                capability_claim_config=config.capability_claim,
+            scope = CapabilityContractScope(cell.method)
+            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_feature_names = (
+                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
+            if real_anchor is not None and real_feature_names is not None:
+                root_cause_scope = RootCauseScope(
+                    contract_scope=scope,
+                    feature_names=real_feature_names,
+                    root_cause_a_feature_name=NBAIOT_TRIGGER_FEATURES[0],
+                    root_cause_b_feature_name=NBAIOT_TRIGGER_FEATURES[3],
+                    shift_value=(
+                        config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization
+                    ),
+                )
+                capability_summary = compute_capability_under_specification_summary(
+                    self._prepared_root,
+                    config,
+                    cell.master_seed,
+                    real_anchor,
+                    _source_domain_for_cell(cell),
+                    root_cause_scope,
+                )
+                oracle_label = clean_proposal_oracle_label(
+                    aggregate_target_f1=capability_summary.aggregate_target_f1,
+                    target_f1_gain=capability_summary.target_f1_gain,
+                    supported_macro_f1_drop=capability_summary.supported_macro_f1_drop,
+                    benign_far_increase=capability_summary.benign_far_increase,
+                    defined_domain_count=capability_summary.defined_domain_count,
+                    expected_domain_count=8,
+                    generic_defined_domain_fraction_minimum=(
+                        config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum
+                    ),
+                    capability_claim_config=config.capability_claim,
+                )
+            else:
+                oracle_label = clean_proposal_oracle_label(
+                    aggregate_target_f1=MetricResult(None, 0),
+                    target_f1_gain=MetricResult(None, 0),
+                    supported_macro_f1_drop=MetricResult(None, 0),
+                    benign_far_increase=MetricResult(None, 0),
+                    defined_domain_count=0,
+                    expected_domain_count=8,
+                    generic_defined_domain_fraction_minimum=(
+                        config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum
+                    ),
+                    capability_claim_config=config.capability_claim,
+                )
             extra.append(
                 (
                     "proposal-oracle-label",
                     float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
                 )
             )
-            sample_root_cause = root_cause_for_sample("sample-id")
-            apply_root_cause_feature_shift(
-                torch.zeros(1, 115),
-                sample_root_cause,
-                0,
-                1,
-                config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization,
-            )
-            scope = CapabilityContractScope(cell.method)
             target_row_ids = target_row_ids_for_contract(
                 scope,
                 frozenset({"sample-a"}),
