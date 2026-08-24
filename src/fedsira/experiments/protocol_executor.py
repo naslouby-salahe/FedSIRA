@@ -1957,17 +1957,23 @@ class ProtocolCellExecutor(CellExecutor):
         encode_elapsed_seconds = timer.elapsed_seconds()
         bytes_total = communication_bytes(envelopes)
         transmissions = model_transmission_count(metadata_records)
+        reset_peak_gpu_memory_counter()
+        protocol_timer = ElapsedTimer()
+        if cell.method == "Resolved FedSIRA Core":
+            state = self._advance_protocol(cell, config, evidence)
+        else:
+            state, _baseline_metrics = self._execute_baseline_cell(cell, config, evidence)
+        post_evidence_seconds = protocol_timer.elapsed_seconds()
         delay_decomposition = AdmissionDelayDecomposition(
             logical_information_arrival_cycles=0,
             assignment_seconds=0.0,
             reproduce_seconds=0.0,
             verify_seconds=encode_elapsed_seconds,
-            synthesize_seconds=0.0,
+            synthesize_seconds=post_evidence_seconds,
         )
-        reset_peak_gpu_memory_counter()
         gpu_memory_bytes = peak_gpu_memory_bytes()
         host_rss_bytes = peak_host_resident_set_bytes()
-        return ClaimState.DORMANT, (
+        return state, (
             ("post-evidence-overhead", delay_decomposition.post_evidence_wall_clock_seconds),
             ("communication-bytes", float(bytes_total)),
             ("model-transmissions", float(transmissions)),
