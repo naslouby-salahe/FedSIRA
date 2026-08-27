@@ -1,8 +1,6 @@
-import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
-
-import pandas
 
 from fedsira.artifacts.fingerprints import (
     DATASET_PACKAGE_NAME,
@@ -15,6 +13,7 @@ from fedsira.artifacts.fingerprints import (
 from fedsira.artifacts.paths import (
     prepared_evidence_root,
     prepared_feature_root,
+    preprocessing_metadata_root,
     workspace_root_for_family,
 )
 from fedsira.artifacts.records import ArtifactManifest
@@ -28,25 +27,8 @@ from fedsira.artifacts.storage import (
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
-from fedsira.datasets.ciciot2023.acquisition import (
-    compute_file_checksum,
-    discover_secondary_csv_files,
-    read_csv_header,
-    resolve_label_column,
-    validate_consistent_header,
-)
-from fedsira.datasets.ciciot2023.preprocessing import (
-    assign_group_local_roles,
-    assign_pseudo_domains,
-    compute_stable_row_id,
-    order_group_by_stable_row_id,
-    resolve_predictor_columns,
-)
-from fedsira.datasets.ciciot2023.schema import canonical_class_registry, canonicalize_label
-from fedsira.datasets.ciciot2023.validation import (
-    validate_label_collisions,
-    validate_target_label_present,
-)
+from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
+from fedsira.datasets.ciciot2023.materialization import materialize_ciciot2023_prepared_views
 from fedsira.datasets.nbaiot.acquisition import (
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
@@ -67,15 +49,14 @@ from fedsira.domain.enums import (
     DatasetId,
     ProducerFingerprintFamily,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.domain.records import ArtifactDigest, CanonicalToken
 
 
 def _publish_or_reuse_canonical_dataset_manifest(
     dataset: DatasetId,
     config: ScientificConfig,
     dataset_split_view_identities: CanonicalToken,
-    payload_fields: dict[str, CanonicalToken | list[CanonicalToken]],
+    payload_fields: Mapping[str, object],
 ) -> tuple[ArtifactManifest, bool]:
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
     producer_fingerprint = compute_producer_component_fingerprint(entry_modules, schema_version="1")
@@ -119,77 +100,6 @@ def _publish_or_reuse_canonical_dataset_manifest(
     return published, False
 
 
-def _validate_ciciot2023_raw_data() -> (
-    tuple[
-        NonNegativeInt, tuple[CanonicalToken, ...], NonNegativeInt, NonNegativeInt, NonNegativeInt
-    ]
-):
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    csv_root = (
-        REPOSITORY_ROOT
-        / config.runtime.repository_layout.raw_data
-        / "CIC_IOT_Dataset2023"
-        / "CSV"
-        / "MERGED_CSV"
-    )
-    discovered = discover_secondary_csv_files(csv_root)
-    reference_header = read_csv_header(discovered[0])
-    label_column = resolve_label_column(reference_header)
-
-    observed_raw_labels: set[str] = set()
-    for path in discovered:
-        observed_header = read_csv_header(path)
-        validate_consistent_header(reference_header, observed_header)
-        label_frame: pandas.DataFrame = pandas.read_csv(path, usecols=[label_column])
-        labels: pandas.Series[str] = label_frame[label_column]
-        observed_raw_labels.update(str(label) for label in labels.unique())
-
-    validate_label_collisions(frozenset(observed_raw_labels))
-    canonical_labels = frozenset(canonicalize_label(label) for label in observed_raw_labels)
-    validate_target_label_present(canonical_labels)
-    registry = canonical_class_registry(canonical_labels)
-
-    reference_path = discovered[0]
-    reference_file_sha256 = compute_file_checksum(reference_path)
-    reference_sample: pandas.DataFrame = pandas.read_csv(reference_path, nrows=1500)
-    predictor_columns = resolve_predictor_columns(reference_header, label_column, reference_sample)
-    dataset_manifest_hash = hashlib.sha256(
-        canonical_bytes(reference_path.name, reference_file_sha256)
-    ).hexdigest()
-    reference_relative_path = reference_path.relative_to(csv_root).as_posix()
-
-    rows_by_group: dict[tuple[CanonicalToken, NonNegativeInt], list[ArtifactDigest]] = {}
-    for row_index in range(len(reference_sample)):
-        stable_row_id = compute_stable_row_id(
-            reference_relative_path, reference_file_sha256, row_index
-        )
-        label_column_series: pandas.Series[str] = reference_sample[label_column]
-        canonical_label = canonicalize_label(str(label_column_series.iloc[row_index]))
-        pseudo_domain = assign_pseudo_domains(
-            dataset_manifest_hash,
-            canonical_label,
-            (stable_row_id,),
-            config.datasets.secondary.pseudo_domain_partition_salt,
-        )[0]
-        rows_by_group.setdefault((canonical_label, pseudo_domain), []).append(stable_row_id)
-
-    total_group_local_role_assignments = 0
-    for (canonical_label, _pseudo_domain), stable_row_ids in rows_by_group.items():
-        ordered = order_group_by_stable_row_id(tuple(stable_row_ids))
-        roles = assign_group_local_roles(
-            canonical_label, ordered, config.datasets.primary.role_intervals
-        )
-        total_group_local_role_assignments += sum(1 for role in roles if role is not None)
-
-    return (
-        len(discovered),
-        registry,
-        len(predictor_columns),
-        len(rows_by_group),
-        total_group_local_role_assignments,
-    )
-
-
 def _preprocess_nbaiot(overwrite: bool) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
@@ -205,7 +115,9 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
         minimum_target_holding_domains=config.datasets.primary.minimum_target_holding_domains,
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
-    unavailable_classes = tuple(class_id.value for class_id in classes_structurally_unavailable(discovered))
+    unavailable_classes = tuple(
+        class_id.value for class_id in classes_structurally_unavailable(discovered)
+    )
     reference_file = discovered[0]
     reference_header = read_predictor_header(reference_file.absolute_path)
     validate_predictor_schema(reference_header)
@@ -245,21 +157,67 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
     print(f"role row totals: {role_counts}")
 
 
-def _preprocess_ciciot2023() -> None:
-    (
-        file_count,
-        class_registry,
-        predictor_count,
-        group_count,
-        group_local_role_assignments,
-    ) = _validate_ciciot2023_raw_data()
+def _preprocess_ciciot2023(overwrite: bool) -> None:
+    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    csv_root = (
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.raw_data
+        / "CIC_IOT_Dataset2023"
+        / "CSV"
+    )
+    discovered = discover_secondary_csv_files(csv_root)
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
+        DATASET_PACKAGE_NAME[DatasetId.CICIOT2023]
+    )
+    scaler_root = REPOSITORY_ROOT / prepared_feature_root()
+    metadata_root = REPOSITORY_ROOT / preprocessing_metadata_root()
+    cache_root = (
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.execution_workspace
+        / "cache"
+        / "preprocessing"
+    )
+    summary = materialize_ciciot2023_prepared_views(
+        discovered,
+        config,
+        prepared_root,
+        scaler_root,
+        metadata_root,
+        cache_root,
+        overwrite,
+    )
+    _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
+        DatasetId.CICIOT2023,
+        config,
+        summary.dataset_manifest_hash,
+        {
+            "dataset_file_manifest_hash": summary.dataset_manifest_hash,
+            "file_count": len(discovered),
+            "raw_row_count": summary.raw_row_count,
+            "retained_row_count": summary.retained_row_count,
+            "excluded_row_count": summary.excluded_row_count,
+            "predictor_count": len(summary.predictor_columns),
+            "class_registry": list(summary.class_registry),
+            "pseudo_domain_count": 9,
+        },
+    )
+    exclusion_rate = (
+        summary.excluded_row_count / summary.raw_row_count if summary.raw_row_count else 0.0
+    )
+    role_counts: dict[str, int] = {}
+    for view in summary.views:
+        role_counts[view.role.value] = role_counts.get(view.role.value, 0) + view.row_count
     print(
         "CICIoT2023 preprocessing complete: "
-        f"files={file_count}, class_registry={list(class_registry)}, "
-        f"predictor_count={predictor_count}, "
-        f"reference_label_pseudo_domain_groups={group_count}, "
-        f"reference_group_local_role_assignments={group_local_role_assignments}"
+        f"dataset_file_manifest_hash={summary.dataset_manifest_hash}, "
+        f"files={len(discovered)}, raw_rows={summary.raw_row_count}, "
+        f"retained_rows={summary.retained_row_count}, excluded_rows={summary.excluded_row_count}, "
+        f"exclusion_rate={exclusion_rate:.8f}, predictor_count={len(summary.predictor_columns)}, "
+        f"class_count={len(summary.class_registry)}, prepared_views={len(summary.views)}, "
+        f"scaler_training_rows={summary.scaler.training_row_count}, "
+        f"canonical_dataset_manifest_reused={reused}"
     )
+    print(f"role row totals: {role_counts}")
 
 
 def execute(dataset: DatasetId | None, overwrite: bool) -> None:
@@ -268,6 +226,6 @@ def execute(dataset: DatasetId | None, overwrite: bool) -> None:
         if selected_dataset is DatasetId.N_BAIOT:
             _preprocess_nbaiot(overwrite)
         elif selected_dataset is DatasetId.CICIOT2023:
-            _preprocess_ciciot2023()
+            _preprocess_ciciot2023(overwrite)
         else:
             raise ValueError(f"unsupported dataset identity: {selected_dataset}")
