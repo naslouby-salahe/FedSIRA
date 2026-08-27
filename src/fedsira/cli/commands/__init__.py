@@ -1,7 +1,3 @@
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
-
-
-class ScientificPipelineNotImplementedError(Exception):
-    pass
