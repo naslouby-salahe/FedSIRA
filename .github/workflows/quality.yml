@@ -24,18 +24,27 @@ jobs:
       - name: Install locked environment
         run: uv sync --all-groups --frozen
       - name: Ruff format diff
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         run: uv run ruff format --diff .
       - name: Ruff format
+        if: ${{ !cancelled() }}
         run: uv run ruff format --check .
       - name: Ruff lint
+        if: ${{ !cancelled() }}
         run: uv run ruff check .
       - name: Pyright
+        if: ${{ !cancelled() }}
         run: uv run pyright
       - name: Import boundaries
+        if: ${{ !cancelled() }}
         run: uv run lint-imports
       - name: Architecture tests
+        if: ${{ !cancelled() }}
         run: uv run pytest tests/architecture -x
       - name: Dependency hygiene
+        if: ${{ !cancelled() }}
         run: uv run deptry src
       - name: Full test suite
+        if: ${{ !cancelled() }}
         run: uv run pytest tests -x
