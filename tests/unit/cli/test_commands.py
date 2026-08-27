@@ -35,6 +35,25 @@ def test_preprocess_accepts_only_roadmap_dataset_identities() -> None:
     assert result.exit_code != 0
 
 
+def test_preprocess_without_dataset_runs_all_roadmap_datasets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    def record_nbaiot(overwrite: bool) -> None:
+        calls.append(("N-BaIoT", overwrite))
+
+    def record_ciciot2023() -> None:
+        calls.append(("CICIoT2023", None))
+
+    monkeypatch.setattr(preprocess, "_preprocess_nbaiot", record_nbaiot)
+    monkeypatch.setattr(preprocess, "_preprocess_ciciot2023", record_ciciot2023)
+
+    preprocess.execute(None, True)
+
+    assert calls == [("N-BaIoT", True), ("CICIoT2023", None)]
+
+
 def test_plan_prints_section_31_counts() -> None:
     result = runner.invoke(app, ["plan"])
     assert result.exit_code == 0
