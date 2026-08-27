@@ -25,7 +25,7 @@ from fedsira.artifacts.storage import (
     read_published_manifest,
     stage_payload,
 )
-from fedsira.cli.commands import REPOSITORY_ROOT, ScientificPipelineNotImplementedError
+from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import (
@@ -190,83 +190,84 @@ def _validate_ciciot2023_raw_data() -> (
     )
 
 
-def execute(dataset: DatasetId | None, overwrite: bool) -> None:
-    if dataset is DatasetId.N_BAIOT:
-        config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-        raw_root = (
-            REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
-        )
-        extraction_cache_root = (
-            REPOSITORY_ROOT
-            / config.runtime.repository_layout.execution_workspace
-            / "cache"
-            / "preprocessing"
-        )
-        discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
-        validate_target_holder_feasibility(
-            discovered,
-            minimum_target_holding_domains=config.datasets.primary.minimum_target_holding_domains,
-        )
-        manifest_hash = compute_dataset_manifest_hash(discovered)
-        unavailable_classes = tuple(
-            class_id.value for class_id in classes_structurally_unavailable(discovered)
-        )
-        reference_file = discovered[0]
-        reference_header = read_predictor_header(reference_file.absolute_path)
-        validate_predictor_schema(reference_header)
-        validate_all_predictors_finite(reference_file.absolute_path, reference_header)
-        for item in discovered:
-            observed_header = read_predictor_header(item.absolute_path)
-            validate_consistent_predictor_schema(reference_header, observed_header)
-
-        _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
-            DatasetId.N_BAIOT,
-            config,
-            manifest_hash,
-            {
-                "dataset_file_manifest_hash": manifest_hash,
-                "structurally_unavailable_classes": list(unavailable_classes),
-            },
-        )
-
-        prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
-            DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
-        )
-        scaler_root = REPOSITORY_ROOT / prepared_feature_root()
-        from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
-
-        views, moments = materialize_nbaiot_prepared_views(
-            discovered, config, prepared_root, scaler_root, overwrite
-        )
-        role_counts: dict[str, int] = {}
-        for view in views:
-            role_counts[view.role.value] = role_counts.get(view.role.value, 0) + view.row_count
-        print(
-            "N-BaIoT preprocessing complete: "
-            f"dataset_file_manifest_hash={manifest_hash}, "
-            f"structurally_unavailable_classes={list(unavailable_classes)}, "
-            f"prepared_views={len(views)}, "
-            f"scaler_training_rows={moments.training_row_count}, "
-            f"canonical_dataset_manifest_reused={reused}"
-        )
-        print(f"role row totals: {role_counts}")
-        return
-    if dataset is DatasetId.CICIOT2023:
-        (
-            file_count,
-            class_registry,
-            predictor_count,
-            group_count,
-            group_local_role_assignments,
-        ) = _validate_ciciot2023_raw_data()
-        print(
-            "CICIoT2023 preprocessing complete: "
-            f"files={file_count}, class_registry={list(class_registry)}, "
-            f"predictor_count={predictor_count}, "
-            f"reference_label_pseudo_domain_groups={group_count}, "
-            f"reference_group_local_role_assignments={group_local_role_assignments}"
-        )
-        return
-    raise ScientificPipelineNotImplementedError(
-        f"fedsira preprocess is not implemented for dataset {dataset}"
+def _preprocess_nbaiot(overwrite: bool) -> None:
+    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
+    extraction_cache_root = (
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.execution_workspace
+        / "cache"
+        / "preprocessing"
     )
+    discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
+    validate_target_holder_feasibility(
+        discovered,
+        minimum_target_holding_domains=config.datasets.primary.minimum_target_holding_domains,
+    )
+    manifest_hash = compute_dataset_manifest_hash(discovered)
+    unavailable_classes = tuple(class_id.value for class_id in classes_structurally_unavailable(discovered))
+    reference_file = discovered[0]
+    reference_header = read_predictor_header(reference_file.absolute_path)
+    validate_predictor_schema(reference_header)
+    validate_all_predictors_finite(reference_file.absolute_path, reference_header)
+    for item in discovered:
+        observed_header = read_predictor_header(item.absolute_path)
+        validate_consistent_predictor_schema(reference_header, observed_header)
+
+    _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
+        DatasetId.N_BAIOT,
+        config,
+        manifest_hash,
+        {
+            "dataset_file_manifest_hash": manifest_hash,
+            "structurally_unavailable_classes": list(unavailable_classes),
+        },
+    )
+
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DATASET_PACKAGE_NAME[DatasetId.N_BAIOT])
+    scaler_root = REPOSITORY_ROOT / prepared_feature_root()
+    from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
+
+    views, moments = materialize_nbaiot_prepared_views(
+        discovered, config, prepared_root, scaler_root, overwrite
+    )
+    role_counts: dict[str, int] = {}
+    for view in views:
+        role_counts[view.role.value] = role_counts.get(view.role.value, 0) + view.row_count
+    print(
+        "N-BaIoT preprocessing complete: "
+        f"dataset_file_manifest_hash={manifest_hash}, "
+        f"structurally_unavailable_classes={list(unavailable_classes)}, "
+        f"prepared_views={len(views)}, "
+        f"scaler_training_rows={moments.training_row_count}, "
+        f"canonical_dataset_manifest_reused={reused}"
+    )
+    print(f"role row totals: {role_counts}")
+
+
+def _preprocess_ciciot2023() -> None:
+    (
+        file_count,
+        class_registry,
+        predictor_count,
+        group_count,
+        group_local_role_assignments,
+    ) = _validate_ciciot2023_raw_data()
+    print(
+        "CICIoT2023 preprocessing complete: "
+        f"files={file_count}, class_registry={list(class_registry)}, "
+        f"predictor_count={predictor_count}, "
+        f"reference_label_pseudo_domain_groups={group_count}, "
+        f"reference_group_local_role_assignments={group_local_role_assignments}"
+    )
+
+
+def execute(dataset: DatasetId | None, overwrite: bool) -> None:
+    selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
+    for selected_dataset in selected_datasets:
+        if selected_dataset is DatasetId.N_BAIOT:
+            _preprocess_nbaiot(overwrite)
+        elif selected_dataset is DatasetId.CICIOT2023:
+            _preprocess_ciciot2023()
+        else:
+            raise ValueError(f"unsupported dataset identity: {selected_dataset}")
