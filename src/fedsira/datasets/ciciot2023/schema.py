@@ -9,6 +9,7 @@ from fedsira.runtime.determinism import canonical_bytes
 TARGET_LABEL = "BACKDOOR_MALWARE"
 BENIGN_LABEL = "BENIGN"
 BENIGN_CANONICAL_ALIASES: frozenset[CanonicalToken] = frozenset({"BENIGNTRAFFIC", "BENIGN_TRAFFIC"})
+OFFICIAL_EXPECTED_PREDICTOR_COUNT = 46
 
 ROW_IDENTIFIER_CANONICAL_TOKENS: frozenset[CanonicalToken] = frozenset(
     {"INDEX", "ROW_ID", "ROWID", "UNNAMED_0"}
