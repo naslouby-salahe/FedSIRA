@@ -29,6 +29,8 @@ jobs:
         run: uv run ruff check .
       - name: Pyright
         run: uv run pyright
+      - name: Import boundaries
+        run: uv run lint-imports
       - name: Architecture tests
         run: uv run pytest tests/architecture -x
       - name: Dependency hygiene
