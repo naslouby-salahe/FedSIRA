@@ -29,6 +29,10 @@ from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_confi
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.materialization import materialize_ciciot2023_prepared_views
+from fedsira.datasets.ciciot2023.schema import (
+    OFFICIAL_EXPECTED_PREDICTOR_COUNT,
+    PSEUDO_DOMAIN_COUNT,
+)
 from fedsira.datasets.nbaiot.acquisition import (
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
@@ -197,8 +201,10 @@ def _preprocess_ciciot2023(overwrite: bool) -> None:
             "retained_row_count": summary.retained_row_count,
             "excluded_row_count": summary.excluded_row_count,
             "predictor_count": len(summary.predictor_columns),
+            "official_expected_predictor_count": OFFICIAL_EXPECTED_PREDICTOR_COUNT,
+            "predictor_count_matches_official": summary.predictor_count_matches_official,
             "class_registry": list(summary.class_registry),
-            "pseudo_domain_count": 9,
+            "pseudo_domain_count": PSEUDO_DOMAIN_COUNT,
         },
     )
     exclusion_rate = (
@@ -213,6 +219,7 @@ def _preprocess_ciciot2023(overwrite: bool) -> None:
         f"files={len(discovered)}, raw_rows={summary.raw_row_count}, "
         f"retained_rows={summary.retained_row_count}, excluded_rows={summary.excluded_row_count}, "
         f"exclusion_rate={exclusion_rate:.8f}, predictor_count={len(summary.predictor_columns)}, "
+        f"predictor_count_matches_official={summary.predictor_count_matches_official}, "
         f"class_count={len(summary.class_registry)}, prepared_views={len(summary.views)}, "
         f"scaler_training_rows={summary.scaler.training_row_count}, "
         f"canonical_dataset_manifest_reused={reused}"
