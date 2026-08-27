@@ -1,15 +1,21 @@
+import math
+
 import pandas
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.ciciot2023.preprocessing import (
+    SecondaryRetainedRow,
+    apply_secondary_sampling_cap,
     assign_group_local_roles,
     assign_pseudo_domains,
+    assign_secondary_roles,
     compute_stable_row_id,
     order_group_by_stable_row_id,
+    parse_complete_case_rows,
     resolve_predictor_columns,
 )
-from fedsira.datasets.ciciot2023.schema import PSEUDO_DOMAIN_COUNT, TARGET_LABEL
-from fedsira.datasets.common import Role
+from fedsira.datasets.ciciot2023.schema import BENIGN_LABEL, PSEUDO_DOMAIN_COUNT, TARGET_LABEL
+from fedsira.datasets.common import DatasetExclusionReason, Role
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 ROLE_INTERVALS = CONFIG.datasets.primary.role_intervals
@@ -39,6 +45,35 @@ def test_resolve_predictor_columns_keeps_a_non_sequential_index_like_column() ->
     sample = pandas.DataFrame({"index": [5, 1, 9]})
     predictors = resolve_predictor_columns(header, "Label", sample)
     assert "index" in predictors
+
+
+def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
+    frame = pandas.DataFrame(
+        {
+            "feature_a": [1.0, "bad", math.inf],
+            "feature_b": [2.0, 3.0, 4.0],
+            "Label": ["BenignTraffic", "Backdoor_Malware", "Backdoor_Malware"],
+        }
+    )
+
+    retained, exclusions = parse_complete_case_rows(
+        frame,
+        relative_path="part.csv",
+        file_sha256="a" * 64,
+        label_column="Label",
+        predictor_columns=("feature_a", "feature_b"),
+        dataset_manifest_hash="b" * 64,
+        pseudo_domain_partition_salt=CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+    )
+
+    assert len(retained) == 1
+    assert retained[0].canonical_label == BENIGN_LABEL
+    assert retained[0].original_row_index == 0
+    assert [row.original_row_index for row in exclusions] == [1, 2]
+    assert [row.reason for row in exclusions] == [
+        DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
+        DatasetExclusionReason.NON_FINITE_PREDICTOR,
+    ]
 
 
 def test_assign_pseudo_domains_returns_values_within_the_pseudo_domain_count() -> None:
@@ -91,7 +126,7 @@ def test_assign_group_local_roles_uses_supported_windows_for_other_labels() -> N
     assert Role.SOURCE_PROPOSAL not in roles_seen
 
 
-def test_assign_group_local_roles_has_no_guard_gap_at_boundary() -> None:
+def test_assign_group_local_roles_has_guard_gap_at_boundary() -> None:
     ids = tuple(f"{i:064d}" for i in range(1000))
     roles = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     assert roles[145] is None
@@ -104,3 +139,49 @@ def test_assign_group_local_roles_is_deterministic() -> None:
     first = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     second = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     assert first == second
+
+
+def test_secondary_sampling_cap_is_deterministic_and_exact() -> None:
+    stable_row_ids = tuple(f"{index:064x}" for index in range(2000))
+    first = apply_secondary_sampling_cap(
+        "a" * 64,
+        TARGET_LABEL,
+        0,
+        Role.CANDIDATE_SCREEN,
+        stable_row_ids,
+        1000,
+    )
+    second = apply_secondary_sampling_cap(
+        "a" * 64,
+        TARGET_LABEL,
+        0,
+        Role.CANDIDATE_SCREEN,
+        stable_row_ids,
+        1000,
+    )
+    assert len(first) == 1000
+    assert first == second
+    assert len(set(first)) == len(first)
+
+
+def test_secondary_role_assignment_never_assigns_one_row_to_multiple_roles() -> None:
+    rows = tuple(
+        SecondaryRetainedRow(
+            stable_row_id=f"{index:064x}",
+            file_sha256="a" * 64,
+            relative_path="part.csv",
+            original_row_index=index,
+            canonical_label=TARGET_LABEL,
+            pseudo_domain=0,
+            features=(float(index),),
+        )
+        for index in range(1000)
+    )
+    assignments = assign_secondary_roles(
+        rows,
+        ROLE_INTERVALS,
+        CONFIG.datasets.primary.sampling_caps_per_domain,
+        "b" * 64,
+    )
+    assigned_ids = [assignment.stable_row_id for assignment in assignments]
+    assert len(assigned_ids) == len(set(assigned_ids))
