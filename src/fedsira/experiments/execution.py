@@ -4,6 +4,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import pydantic
 
@@ -99,9 +100,8 @@ class ExperimentExecutionResult:
         return sum(1 for outcome in self.outcomes if outcome.completed)
 
 
-class CellExecutor:
-    def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
-        raise NotImplementedError
+class CellExecutor(Protocol):
+    def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome: ...
 
 
 class ExecutionRecordStore:
