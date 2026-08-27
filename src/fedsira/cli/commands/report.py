@@ -25,6 +25,7 @@ from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
     EXPERIMENT_REGISTRY,
     ClaimFamily,
+    experiment_by_name,
 )
 from fedsira.reporting.export import (
     derive_claim_states_for_export,
@@ -108,6 +109,7 @@ def execute(name: str | None, overwrite: bool) -> None:
 
 def _load_experiment_result(name: str, store: ExecutionRecordStore) -> ExperimentExecutionResult:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    definition = experiment_by_name(name)
     outcomes_records = store.read_all_outcomes(name)
     outcomes: list[CellExecutionOutcome] = []
     for record in outcomes_records:
@@ -125,7 +127,12 @@ def _load_experiment_result(name: str, store: ExecutionRecordStore) -> Experimen
                 metrics=record.metrics,
             )
         )
-    comparison_results = comparison_results_for_experiment(name, outcomes, config)
+    comparison_results = comparison_results_for_experiment(
+        name,
+        definition.dataset,
+        outcomes,
+        config,
+    )
     if not outcomes:
         lifecycle = ExperimentLifecycleState.NOT_STARTED
     else:
@@ -176,7 +183,13 @@ def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecis
             )
             for record in records
         )
-        comparison_results = comparison_results_for_experiment(experiment, outcomes, config)
+        definition = experiment_by_name(experiment)
+        comparison_results = comparison_results_for_experiment(
+            experiment,
+            definition.dataset,
+            outcomes,
+            config,
+        )
         family_names = {family.family.value for family in comparison_results}
         matched_family = next(
             (family for family in family_names if family in collapse_family_names),
