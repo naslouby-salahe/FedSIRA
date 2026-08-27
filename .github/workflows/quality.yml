@@ -23,6 +23,8 @@ jobs:
           enable-cache: true
       - name: Install locked environment
         run: uv sync --all-groups --frozen
+      - name: Ruff format diff
+        run: uv run ruff format --diff .
       - name: Ruff format
         run: uv run ruff format --check .
       - name: Ruff lint
