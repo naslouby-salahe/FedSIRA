@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import heapq
 import json
 import sqlite3
 import struct
 from collections.abc import Iterator, Mapping, Sequence
-from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,7 +28,6 @@ from fedsira.datasets.ciciot2023.preprocessing import (
     sampling_cap_for_secondary_role,
 )
 from fedsira.datasets.ciciot2023.schema import (
-    PSEUDO_DOMAIN_COUNT,
     ROW_IDENTIFIER_CANONICAL_TOKENS,
     TARGET_LABEL,
     canonical_class_registry,
@@ -328,22 +325,23 @@ def materialize_ciciot2023_prepared_views(
     raw_row_count = 0
     try:
         for item in discovered:
+            file_row_offset = 0
             for chunk in pandas.read_csv(item.absolute_path, chunksize=READ_CHUNK_ROWS):
                 chunk = chunk.reset_index(drop=True)
-                chunk_start = raw_row_count_for_file = raw_row_count
                 raw_row_count += len(chunk)
                 raw_labels.update(str(value) for value in chunk[label_column].unique())
                 retained, exclusions = _parse_chunk_with_physical_indices(
                     chunk,
                     relative_path=item.relative_path,
                     file_sha256=item.file_sha256,
-                    file_row_offset=_file_row_offset(item, chunk_start, raw_row_count_for_file),
+                    file_row_offset=file_row_offset,
                     label_column=label_column,
                     predictor_columns=predictor_columns,
                     dataset_manifest_hash=dataset_manifest_hash,
                     pseudo_domain_partition_salt=config.datasets.secondary.pseudo_domain_partition_salt,
                 )
                 store.add_rows(retained, exclusions)
+                file_row_offset += len(chunk)
 
         validate_label_collisions(frozenset(raw_labels))
         canonical_labels = frozenset(canonicalize_label(label) for label in raw_labels)
@@ -441,15 +439,6 @@ def _parse_chunk_with_physical_indices(
         dataset_manifest_hash=dataset_manifest_hash,
         pseudo_domain_partition_salt=pseudo_domain_partition_salt,
     )
-
-
-def _file_row_offset(
-    item: SecondaryCsvFile,
-    global_chunk_start: NonNegativeInt,
-    _global_rows_before_chunk: NonNegativeInt,
-) -> NonNegativeInt:
-    del item, global_chunk_start, _global_rows_before_chunk
-    return 0
 
 
 def _assign_roles(
