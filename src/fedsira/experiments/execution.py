@@ -158,6 +158,7 @@ class ExecutionRecordStore:
 
 def comparison_results_for_experiment(
     experiment: CanonicalToken,
+    dataset: DatasetId,
     outcomes: Sequence[CellExecutionOutcome],
     config: ScientificConfig,
 ) -> tuple[ComparisonFamilyResult, ...]:
@@ -172,11 +173,10 @@ def comparison_results_for_experiment(
     )
     if not definitions:
         return ()
-    dataset_id = DatasetId.N_BAIOT.value
     seed_metrics: dict[tuple[PairingKey, CanonicalToken], dict[CanonicalToken, float | None]] = {}
     for outcome in outcomes:
         pairing = PairingKey(
-            dataset=dataset_id,
+            dataset=dataset.value,
             experiment=experiment,
             scientific_scenario=outcome.cell.condition,
             master_seed=outcome.cell.master_seed,
@@ -324,7 +324,12 @@ def run_experiment(
         store.write_outcome(outcome)
         outcomes.append(outcome)
 
-    comparison_results = comparison_results_for_experiment(experiment, outcomes, config)
+    comparison_results = comparison_results_for_experiment(
+        experiment,
+        planned.definition.dataset,
+        outcomes,
+        config,
+    )
     lifecycle_state = derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
     completed_digest = execution_record_digest(outcomes)
     return ExperimentExecutionResult(
