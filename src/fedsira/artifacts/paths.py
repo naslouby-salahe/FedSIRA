@@ -32,16 +32,24 @@ OUTPUTS_ROOT = Path("outputs")
 RESULTS_ROOT = Path("results")
 
 
+def preprocessing_root() -> Path:
+    return OUTPUTS_ROOT / "preprocessing"
+
+
+def preprocessing_metadata_root() -> Path:
+    return preprocessing_root() / "metadata"
+
+
 def prepared_evidence_root(dataset: CanonicalToken) -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "prepared" / dataset
+    return preprocessing_root() / "prepared" / dataset
 
 
 def prepared_feature_root() -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "features"
+    return preprocessing_root() / "features"
 
 
 def smoke_record_path() -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "validation" / "smoke_record.json"
+    return preprocessing_root() / "validation" / "smoke_record.json"
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
@@ -53,7 +61,7 @@ def workspace_root_for_family(
 ) -> Path:
     scope = path_scope_for_family(family)
     if scope is ArtifactPathScope.PREPROCESSING:
-        return OUTPUTS_ROOT / "preprocessing"
+        return preprocessing_root()
     if scope is ArtifactPathScope.PROJECT_ARTIFACT:
         return OUTPUTS_ROOT / "artifacts"
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:
