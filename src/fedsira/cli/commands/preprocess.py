@@ -125,10 +125,10 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
     reference_file = discovered[0]
     reference_header = read_predictor_header(reference_file.absolute_path)
     validate_predictor_schema(reference_header)
-    validate_all_predictors_finite(reference_file.absolute_path, reference_header)
     for item in discovered:
         observed_header = read_predictor_header(item.absolute_path)
         validate_consistent_predictor_schema(reference_header, observed_header)
+        validate_all_predictors_finite(item.absolute_path, reference_header)
 
     _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
         DatasetId.N_BAIOT,
