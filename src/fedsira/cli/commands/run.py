@@ -19,7 +19,11 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily
+from fedsira.experiments.registry import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    ClaimFamily,
+    experiment_by_name,
+)
 
 RESOLVED_CORE_CANONICAL_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
@@ -85,8 +89,12 @@ def _materialize_core_if_complete(experiment: str) -> None:
             )
             for record in records
         )
+        definition = experiment_by_name(collapse_experiment)
         comparison_results = comparison_results_for_experiment(
-            collapse_experiment, outcomes, config
+            collapse_experiment,
+            definition.dataset,
+            outcomes,
+            config,
         )
         family_names = {family.family.value for family in comparison_results}
         matched_family = next(
