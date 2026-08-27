@@ -5,26 +5,31 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-import pandas
-
 from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.ciciot2023.schema import (
     BENIGN_LABEL,
-    ROW_IDENTIFIER_CANONICAL_TOKENS,
     TARGET_LABEL,
-    canonicalize_label,
-    canonicalize_token,
+    CICIoT2023PseudoDomain,
     hash_to_pseudo_domain,
-    is_row_identifier_column,
 )
-from fedsira.datasets.common import ROLE_HASH_TOKEN, DatasetExclusionReason, Role, role_for_normalized_position
+from fedsira.datasets.common import (
+    ROLE_HASH_TOKEN,
+    DatasetExclusionReason,
+    Role,
+    role_for_normalized_position,
+)
 from fedsira.datasets.roles import supported_role_windows, target_role_windows
 from fedsira.datasets.sampling import PREPROCESSING_SAMPLE_ORDER_SEED
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt, PositiveInt
 from fedsira.runtime.determinism import canonical_bytes
 
 STABLE_ROW_ID_PREFIX = "CICIOT2023_SAMPLE_ID_V1"
-PSEUDO_DOMAIN_TOKEN_PREFIX = "CICIOT2023_PSEUDO_DOMAIN"
+
+
+@dataclass(frozen=True)
+class SecondaryRawRow:
+    original_row_index: NonNegativeInt
+    values: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -34,7 +39,7 @@ class SecondaryRetainedRow:
     relative_path: CanonicalToken
     original_row_index: NonNegativeInt
     canonical_label: CanonicalToken
-    pseudo_domain: NonNegativeInt
+    pseudo_domain: CICIoT2023PseudoDomain
     features: tuple[float, ...]
 
 
@@ -51,7 +56,7 @@ class SecondaryExcludedRow:
 class SecondaryRoleAssignment:
     stable_row_id: ArtifactDigest
     canonical_label: CanonicalToken
-    pseudo_domain: NonNegativeInt
+    pseudo_domain: CICIoT2023PseudoDomain
     role: Role
 
 
@@ -71,63 +76,26 @@ def compute_stable_row_id(
 
 
 def resolve_predictor_columns(
-    header: tuple[CanonicalToken, ...], label_column: CanonicalToken, sample: pandas.DataFrame
+    header: tuple[CanonicalToken, ...],
+    label_column: CanonicalToken,
+    row_identifier_columns: frozenset[CanonicalToken] = frozenset(),
 ) -> tuple[CanonicalToken, ...]:
-    predictors: list[CanonicalToken] = []
-    for column in header:
-        if column == label_column:
-            continue
-        canonical = canonicalize_token(column)
-        if canonical in ROW_IDENTIFIER_CANONICAL_TOKENS and column in sample.columns:
-            numeric = pandas.to_numeric(sample[column], errors="coerce")
-            if numeric.notna().all():
-                values = tuple(int(value) for value in numeric)
-                if all(float(value).is_integer() for value in numeric) and is_row_identifier_column(
-                    canonical, values
-                ):
-                    continue
-        predictors.append(column)
+    predictors = tuple(
+        column
+        for column in header
+        if column != label_column and column not in row_identifier_columns
+    )
     if not predictors:
         raise ValueError("CICIoT2023 resolved no predictor columns")
     if len(set(predictors)) != len(predictors):
         raise ValueError("CICIoT2023 predictor schema contains duplicate names")
-    return tuple(predictors)
-
-
-def validate_predictor_columns_across_shards(
-    header: tuple[CanonicalToken, ...],
-    label_column: CanonicalToken,
-    shard_frames: Sequence[pandas.DataFrame],
-) -> tuple[CanonicalToken, ...]:
-    if not shard_frames:
-        raise ValueError("CICIoT2023 predictor validation requires at least one shard")
-    candidate_predictors = tuple(column for column in header if column != label_column)
-    excluded_identifiers: set[CanonicalToken] = set()
-    for column in candidate_predictors:
-        canonical = canonicalize_token(column)
-        if canonical not in ROW_IDENTIFIER_CANONICAL_TOKENS:
-            continue
-        identifier_in_every_shard = True
-        for frame in shard_frames:
-            numeric = pandas.to_numeric(frame[column], errors="coerce")
-            if not numeric.notna().all() or not all(float(value).is_integer() for value in numeric):
-                identifier_in_every_shard = False
-                break
-            values = tuple(int(value) for value in numeric)
-            if not is_row_identifier_column(canonical, values):
-                identifier_in_every_shard = False
-                break
-        if identifier_in_every_shard:
-            excluded_identifiers.add(column)
-    predictors = tuple(column for column in candidate_predictors if column not in excluded_identifiers)
-    if not predictors:
-        raise ValueError("CICIoT2023 resolved no predictor columns")
     return predictors
 
 
 def parse_complete_case_rows(
-    frame: pandas.DataFrame,
+    raw_rows: Sequence[SecondaryRawRow],
     *,
+    header: tuple[CanonicalToken, ...],
     relative_path: CanonicalToken,
     file_sha256: ArtifactDigest,
     label_column: CanonicalToken,
@@ -135,36 +103,56 @@ def parse_complete_case_rows(
     dataset_manifest_hash: ArtifactDigest,
     pseudo_domain_partition_salt: PositiveInt,
 ) -> tuple[tuple[SecondaryRetainedRow, ...], tuple[SecondaryExcludedRow, ...]]:
+    column_index = {column: index for index, column in enumerate(header)}
+    if len(column_index) != len(header):
+        raise ValueError("CICIoT2023 header contains duplicate column names")
+    try:
+        label_index = column_index[label_column]
+        predictor_indices = tuple(column_index[column] for column in predictor_columns)
+    except KeyError as error:
+        raise ValueError(f"CICIoT2023 column missing from validated header: {error.args[0]}") from error
+
     retained: list[SecondaryRetainedRow] = []
     excluded: list[SecondaryExcludedRow] = []
-    for original_row_index, row in frame.iterrows():
-        row_index = int(original_row_index)
-        stable_row_id = compute_stable_row_id(relative_path, file_sha256, row_index)
-        numeric = pandas.to_numeric(row[list(predictor_columns)], errors="coerce")
-        if numeric.isna().any():
+    for raw_row in raw_rows:
+        if len(raw_row.values) != len(header):
+            raise ValueError(
+                "CICIoT2023 row width does not match the validated header: "
+                f"row={raw_row.original_row_index}, expected={len(header)}, "
+                f"observed={len(raw_row.values)}"
+            )
+        stable_row_id = compute_stable_row_id(
+            relative_path,
+            file_sha256,
+            raw_row.original_row_index,
+        )
+        try:
+            features = tuple(float(raw_row.values[index]) for index in predictor_indices)
+        except ValueError:
             excluded.append(
                 SecondaryExcludedRow(
                     stable_row_id=stable_row_id,
                     file_sha256=file_sha256,
                     relative_path=relative_path,
-                    original_row_index=row_index,
+                    original_row_index=raw_row.original_row_index,
                     reason=DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
                 )
             )
             continue
-        values = tuple(float(value) for value in numeric)
-        if any(not math.isfinite(value) for value in values):
+        if any(not math.isfinite(value) for value in features):
             excluded.append(
                 SecondaryExcludedRow(
                     stable_row_id=stable_row_id,
                     file_sha256=file_sha256,
                     relative_path=relative_path,
-                    original_row_index=row_index,
+                    original_row_index=raw_row.original_row_index,
                     reason=DatasetExclusionReason.NON_FINITE_PREDICTOR,
                 )
             )
             continue
-        canonical_label = canonicalize_label(str(row[label_column]))
+        from fedsira.datasets.ciciot2023.schema import canonicalize_label
+
+        canonical_label = canonicalize_label(raw_row.values[label_index])
         pseudo_domain = hash_to_pseudo_domain(
             dataset_manifest_hash,
             canonical_label,
@@ -176,10 +164,10 @@ def parse_complete_case_rows(
                 stable_row_id=stable_row_id,
                 file_sha256=file_sha256,
                 relative_path=relative_path,
-                original_row_index=row_index,
+                original_row_index=raw_row.original_row_index,
                 canonical_label=canonical_label,
                 pseudo_domain=pseudo_domain,
-                features=values,
+                features=features,
             )
         )
     return tuple(retained), tuple(excluded)
@@ -190,10 +178,13 @@ def assign_pseudo_domains(
     canonical_label: CanonicalToken,
     stable_row_ids: tuple[ArtifactDigest, ...],
     pseudo_domain_partition_salt: PositiveInt,
-) -> tuple[NonNegativeInt, ...]:
+) -> tuple[CICIoT2023PseudoDomain, ...]:
     return tuple(
         hash_to_pseudo_domain(
-            dataset_manifest_hash, canonical_label, stable_row_id, pseudo_domain_partition_salt
+            dataset_manifest_hash,
+            canonical_label,
+            stable_row_id,
+            pseudo_domain_partition_salt,
         )
         for stable_row_id in stable_row_ids
     )
@@ -211,7 +202,9 @@ def assign_group_local_roles(
     role_intervals: RoleIntervals,
 ) -> tuple[Role | None, ...]:
     if tuple(stable_row_ids_ascending) != order_group_by_stable_row_id(stable_row_ids_ascending):
-        raise ValueError("CICIoT2023 group rows must be ordered by stable_row_id before role assignment")
+        raise ValueError(
+            "CICIoT2023 group rows must be ordered by stable_row_id before role assignment"
+        )
     windows = (
         target_role_windows(role_intervals)
         if canonical_label == TARGET_LABEL
@@ -260,20 +253,19 @@ def sampling_cap_for_secondary_role(
 def apply_secondary_sampling_cap(
     dataset_manifest_hash: ArtifactDigest,
     canonical_label: CanonicalToken,
-    pseudo_domain: NonNegativeInt,
+    pseudo_domain: CICIoT2023PseudoDomain,
     role: Role,
     stable_row_ids: tuple[ArtifactDigest, ...],
     cap: NonNegativeInt | None,
 ) -> tuple[ArtifactDigest, ...]:
     if cap is None or len(stable_row_ids) <= cap:
         return stable_row_ids
-    domain_token = f"{PSEUDO_DOMAIN_TOKEN_PREFIX}_{pseudo_domain + 1}"
 
     def selection_key(stable_row_id: ArtifactDigest) -> tuple[bytes, ArtifactDigest]:
         digest = hashlib.sha256(
             canonical_bytes(
                 dataset_manifest_hash,
-                domain_token,
+                pseudo_domain.display_token,
                 canonical_label,
                 ROLE_HASH_TOKEN[role],
                 stable_row_id,
@@ -291,12 +283,17 @@ def assign_secondary_roles(
     sampling_caps: SamplingCapsPerDomain,
     dataset_manifest_hash: ArtifactDigest,
 ) -> tuple[SecondaryRoleAssignment, ...]:
-    rows_by_group: dict[tuple[CanonicalToken, NonNegativeInt], list[SecondaryRetainedRow]] = {}
+    rows_by_group: dict[
+        tuple[CanonicalToken, CICIoT2023PseudoDomain], list[SecondaryRetainedRow]
+    ] = {}
     for row in rows:
         rows_by_group.setdefault((row.canonical_label, row.pseudo_domain), []).append(row)
 
     assignments: list[SecondaryRoleAssignment] = []
-    for (canonical_label, pseudo_domain), group_rows in sorted(rows_by_group.items()):
+    for (canonical_label, pseudo_domain), group_rows in sorted(
+        rows_by_group.items(),
+        key=lambda item: (item[0][0], int(item[0][1])),
+    ):
         ordered_rows = sorted(group_rows, key=lambda row: bytes.fromhex(row.stable_row_id))
         stable_row_ids = tuple(row.stable_row_id for row in ordered_rows)
         roles = assign_group_local_roles(canonical_label, stable_row_ids, role_intervals)
