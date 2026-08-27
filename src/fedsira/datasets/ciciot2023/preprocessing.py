@@ -1,21 +1,58 @@
+from __future__ import annotations
+
 import hashlib
+import math
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 import pandas
 
-from fedsira.config.schema import RoleIntervals
+from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.ciciot2023.schema import (
+    BENIGN_LABEL,
     ROW_IDENTIFIER_CANONICAL_TOKENS,
     TARGET_LABEL,
+    canonicalize_label,
     canonicalize_token,
     hash_to_pseudo_domain,
     is_row_identifier_column,
 )
-from fedsira.datasets.common import Role, role_for_normalized_position
+from fedsira.datasets.common import ROLE_HASH_TOKEN, DatasetExclusionReason, Role, role_for_normalized_position
 from fedsira.datasets.roles import supported_role_windows, target_role_windows
+from fedsira.datasets.sampling import PREPROCESSING_SAMPLE_ORDER_SEED
 from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt, PositiveInt
 from fedsira.runtime.determinism import canonical_bytes
 
 STABLE_ROW_ID_PREFIX = "CICIOT2023_SAMPLE_ID_V1"
+PSEUDO_DOMAIN_TOKEN_PREFIX = "CICIOT2023_PSEUDO_DOMAIN"
+
+
+@dataclass(frozen=True)
+class SecondaryRetainedRow:
+    stable_row_id: ArtifactDigest
+    file_sha256: ArtifactDigest
+    relative_path: CanonicalToken
+    original_row_index: NonNegativeInt
+    canonical_label: CanonicalToken
+    pseudo_domain: NonNegativeInt
+    features: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class SecondaryExcludedRow:
+    stable_row_id: ArtifactDigest
+    file_sha256: ArtifactDigest
+    relative_path: CanonicalToken
+    original_row_index: NonNegativeInt
+    reason: DatasetExclusionReason
+
+
+@dataclass(frozen=True)
+class SecondaryRoleAssignment:
+    stable_row_id: ArtifactDigest
+    canonical_label: CanonicalToken
+    pseudo_domain: NonNegativeInt
+    role: Role
 
 
 def compute_stable_row_id(
@@ -41,13 +78,111 @@ def resolve_predictor_columns(
         if column == label_column:
             continue
         canonical = canonicalize_token(column)
-        if canonical in ROW_IDENTIFIER_CANONICAL_TOKENS:
-            column_series: pandas.Series[int] = sample[column]
-            values = tuple(int(value) for value in column_series)
-            if is_row_identifier_column(canonical, values):
-                continue
+        if canonical in ROW_IDENTIFIER_CANONICAL_TOKENS and column in sample.columns:
+            numeric = pandas.to_numeric(sample[column], errors="coerce")
+            if numeric.notna().all():
+                values = tuple(int(value) for value in numeric)
+                if all(float(value).is_integer() for value in numeric) and is_row_identifier_column(
+                    canonical, values
+                ):
+                    continue
         predictors.append(column)
+    if not predictors:
+        raise ValueError("CICIoT2023 resolved no predictor columns")
+    if len(set(predictors)) != len(predictors):
+        raise ValueError("CICIoT2023 predictor schema contains duplicate names")
     return tuple(predictors)
+
+
+def validate_predictor_columns_across_shards(
+    header: tuple[CanonicalToken, ...],
+    label_column: CanonicalToken,
+    shard_frames: Sequence[pandas.DataFrame],
+) -> tuple[CanonicalToken, ...]:
+    if not shard_frames:
+        raise ValueError("CICIoT2023 predictor validation requires at least one shard")
+    candidate_predictors = tuple(column for column in header if column != label_column)
+    excluded_identifiers: set[CanonicalToken] = set()
+    for column in candidate_predictors:
+        canonical = canonicalize_token(column)
+        if canonical not in ROW_IDENTIFIER_CANONICAL_TOKENS:
+            continue
+        identifier_in_every_shard = True
+        for frame in shard_frames:
+            numeric = pandas.to_numeric(frame[column], errors="coerce")
+            if not numeric.notna().all() or not all(float(value).is_integer() for value in numeric):
+                identifier_in_every_shard = False
+                break
+            values = tuple(int(value) for value in numeric)
+            if not is_row_identifier_column(canonical, values):
+                identifier_in_every_shard = False
+                break
+        if identifier_in_every_shard:
+            excluded_identifiers.add(column)
+    predictors = tuple(column for column in candidate_predictors if column not in excluded_identifiers)
+    if not predictors:
+        raise ValueError("CICIoT2023 resolved no predictor columns")
+    return predictors
+
+
+def parse_complete_case_rows(
+    frame: pandas.DataFrame,
+    *,
+    relative_path: CanonicalToken,
+    file_sha256: ArtifactDigest,
+    label_column: CanonicalToken,
+    predictor_columns: tuple[CanonicalToken, ...],
+    dataset_manifest_hash: ArtifactDigest,
+    pseudo_domain_partition_salt: PositiveInt,
+) -> tuple[tuple[SecondaryRetainedRow, ...], tuple[SecondaryExcludedRow, ...]]:
+    retained: list[SecondaryRetainedRow] = []
+    excluded: list[SecondaryExcludedRow] = []
+    for original_row_index, row in frame.iterrows():
+        row_index = int(original_row_index)
+        stable_row_id = compute_stable_row_id(relative_path, file_sha256, row_index)
+        numeric = pandas.to_numeric(row[list(predictor_columns)], errors="coerce")
+        if numeric.isna().any():
+            excluded.append(
+                SecondaryExcludedRow(
+                    stable_row_id=stable_row_id,
+                    file_sha256=file_sha256,
+                    relative_path=relative_path,
+                    original_row_index=row_index,
+                    reason=DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
+                )
+            )
+            continue
+        values = tuple(float(value) for value in numeric)
+        if any(not math.isfinite(value) for value in values):
+            excluded.append(
+                SecondaryExcludedRow(
+                    stable_row_id=stable_row_id,
+                    file_sha256=file_sha256,
+                    relative_path=relative_path,
+                    original_row_index=row_index,
+                    reason=DatasetExclusionReason.NON_FINITE_PREDICTOR,
+                )
+            )
+            continue
+        canonical_label = canonicalize_label(str(row[label_column]))
+        pseudo_domain = hash_to_pseudo_domain(
+            dataset_manifest_hash,
+            canonical_label,
+            stable_row_id,
+            pseudo_domain_partition_salt,
+        )
+        retained.append(
+            SecondaryRetainedRow(
+                stable_row_id=stable_row_id,
+                file_sha256=file_sha256,
+                relative_path=relative_path,
+                original_row_index=row_index,
+                canonical_label=canonical_label,
+                pseudo_domain=pseudo_domain,
+                features=values,
+            )
+        )
+    return tuple(retained), tuple(excluded)
 
 
 def assign_pseudo_domains(
@@ -67,7 +202,7 @@ def assign_pseudo_domains(
 def order_group_by_stable_row_id(
     stable_row_ids: tuple[ArtifactDigest, ...],
 ) -> tuple[ArtifactDigest, ...]:
-    return tuple(sorted(stable_row_ids))
+    return tuple(sorted(stable_row_ids, key=bytes.fromhex))
 
 
 def assign_group_local_roles(
@@ -75,12 +210,116 @@ def assign_group_local_roles(
     stable_row_ids_ascending: tuple[ArtifactDigest, ...],
     role_intervals: RoleIntervals,
 ) -> tuple[Role | None, ...]:
-    is_target = canonical_label == TARGET_LABEL
+    if tuple(stable_row_ids_ascending) != order_group_by_stable_row_id(stable_row_ids_ascending):
+        raise ValueError("CICIoT2023 group rows must be ordered by stable_row_id before role assignment")
     windows = (
-        target_role_windows(role_intervals) if is_target else supported_role_windows(role_intervals)
+        target_role_windows(role_intervals)
+        if canonical_label == TARGET_LABEL
+        else supported_role_windows(role_intervals)
     )
     group_size = len(stable_row_ids_ascending)
+    if group_size == 0:
+        return ()
     return tuple(
         role_for_normalized_position(group_local_index / group_size, windows)
         for group_local_index in range(group_size)
     )
+
+
+def sampling_cap_for_secondary_role(
+    caps: SamplingCapsPerDomain,
+    canonical_label: CanonicalToken,
+    role: Role,
+) -> NonNegativeInt | None:
+    if canonical_label == TARGET_LABEL:
+        target_caps: dict[Role, NonNegativeInt | None] = {
+            Role.SOURCE_PROPOSAL: caps.source_proposal_target,
+            Role.CANDIDATE_SCREEN: caps.candidate_screen_target,
+            Role.REPRODUCTION: caps.reproduction_target,
+            Role.ROW_VERIFICATION: caps.row_verification_target,
+            Role.FINAL_GATE: caps.final_gate_target,
+            Role.REPORT_TEST: caps.report_test_target,
+        }
+        return target_caps.get(role)
+    report_cap = (
+        caps.report_test_benign
+        if canonical_label == BENIGN_LABEL
+        else caps.report_test_other_supported_per_class
+    )
+    supported_caps: dict[Role, NonNegativeInt | None] = {
+        Role.ANCHOR_TRAIN: caps.anchor_train_per_supported_class,
+        Role.ANCHOR_VALIDATION: caps.anchor_validation_per_supported_class,
+        Role.POST_REFERENCE_REPLAY: None,
+        Role.ROW_VERIFICATION: caps.row_verification_supported_per_supported_class,
+        Role.FINAL_GATE: caps.final_gate_supported_per_supported_class,
+        Role.REPORT_TEST: report_cap,
+    }
+    return supported_caps.get(role)
+
+
+def apply_secondary_sampling_cap(
+    dataset_manifest_hash: ArtifactDigest,
+    canonical_label: CanonicalToken,
+    pseudo_domain: NonNegativeInt,
+    role: Role,
+    stable_row_ids: tuple[ArtifactDigest, ...],
+    cap: NonNegativeInt | None,
+) -> tuple[ArtifactDigest, ...]:
+    if cap is None or len(stable_row_ids) <= cap:
+        return stable_row_ids
+    domain_token = f"{PSEUDO_DOMAIN_TOKEN_PREFIX}_{pseudo_domain + 1}"
+
+    def selection_key(stable_row_id: ArtifactDigest) -> tuple[bytes, ArtifactDigest]:
+        digest = hashlib.sha256(
+            canonical_bytes(
+                dataset_manifest_hash,
+                domain_token,
+                canonical_label,
+                ROLE_HASH_TOKEN[role],
+                stable_row_id,
+                PREPROCESSING_SAMPLE_ORDER_SEED,
+            )
+        ).digest()
+        return digest, stable_row_id
+
+    return tuple(sorted(stable_row_ids, key=selection_key)[:cap])
+
+
+def assign_secondary_roles(
+    rows: Sequence[SecondaryRetainedRow],
+    role_intervals: RoleIntervals,
+    sampling_caps: SamplingCapsPerDomain,
+    dataset_manifest_hash: ArtifactDigest,
+) -> tuple[SecondaryRoleAssignment, ...]:
+    rows_by_group: dict[tuple[CanonicalToken, NonNegativeInt], list[SecondaryRetainedRow]] = {}
+    for row in rows:
+        rows_by_group.setdefault((row.canonical_label, row.pseudo_domain), []).append(row)
+
+    assignments: list[SecondaryRoleAssignment] = []
+    for (canonical_label, pseudo_domain), group_rows in sorted(rows_by_group.items()):
+        ordered_rows = sorted(group_rows, key=lambda row: bytes.fromhex(row.stable_row_id))
+        stable_row_ids = tuple(row.stable_row_id for row in ordered_rows)
+        roles = assign_group_local_roles(canonical_label, stable_row_ids, role_intervals)
+        ids_by_role: dict[Role, list[ArtifactDigest]] = {}
+        for stable_row_id, role in zip(stable_row_ids, roles, strict=True):
+            if role is not None:
+                ids_by_role.setdefault(role, []).append(stable_row_id)
+        for role, role_ids in ids_by_role.items():
+            selected_ids = apply_secondary_sampling_cap(
+                dataset_manifest_hash,
+                canonical_label,
+                pseudo_domain,
+                role,
+                tuple(role_ids),
+                sampling_cap_for_secondary_role(sampling_caps, canonical_label, role),
+            )
+            assignments.extend(
+                SecondaryRoleAssignment(
+                    stable_row_id=stable_row_id,
+                    canonical_label=canonical_label,
+                    pseudo_domain=pseudo_domain,
+                    role=role,
+                )
+                for stable_row_id in selected_ids
+            )
+    return tuple(assignments)
