@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from fedsira.datasets.ciciot2023.acquisition import (
+    compute_dataset_manifest_hash,
     compute_file_checksum,
     discover_secondary_csv_files,
     read_csv_header,
@@ -11,22 +12,40 @@ from fedsira.datasets.ciciot2023.acquisition import (
 )
 
 
-def test_discover_secondary_csv_files_finds_nested_shards(tmp_path: Path) -> None:
+def test_discover_secondary_csv_files_models_nested_shards(tmp_path: Path) -> None:
     (tmp_path / "DDoS-SYN_Flood").mkdir()
     (tmp_path / "DDoS-SYN_Flood" / "part1.csv").write_text("a,Label\n1,BENIGN\n")
     (tmp_path / "Backdoor_Malware").mkdir()
     (tmp_path / "Backdoor_Malware" / "part1.csv").write_text("a,Label\n1,Backdoor_Malware\n")
+
     discovered = discover_secondary_csv_files(tmp_path)
-    assert len(discovered) == 2
+
+    assert [item.relative_path for item in discovered] == [
+        "Backdoor_Malware/part1.csv",
+        "DDoS-SYN_Flood/part1.csv",
+    ]
+    assert all(item.absolute_path.is_file() for item in discovered)
+    assert all(len(item.file_sha256) == 64 for item in discovered)
 
 
-def test_discover_secondary_csv_files_is_ordered_by_relative_path(tmp_path: Path) -> None:
-    (tmp_path / "b").mkdir()
+def test_discover_secondary_csv_files_rejects_empty_root(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="no CICIoT2023 CSV shards"):
+        discover_secondary_csv_files(tmp_path)
+
+
+def test_dataset_manifest_hash_depends_on_all_ordered_file_identities(tmp_path: Path) -> None:
     (tmp_path / "a").mkdir()
-    (tmp_path / "b" / "x.csv").write_text("a\n1\n")
-    (tmp_path / "a" / "x.csv").write_text("a\n1\n")
-    discovered = discover_secondary_csv_files(tmp_path)
-    assert [path.relative_to(tmp_path).as_posix() for path in discovered] == ["a/x.csv", "b/x.csv"]
+    (tmp_path / "b").mkdir()
+    first = tmp_path / "a" / "x.csv"
+    second = tmp_path / "b" / "x.csv"
+    first.write_text("a\n1\n")
+    second.write_text("a\n2\n")
+    before = compute_dataset_manifest_hash(discover_secondary_csv_files(tmp_path))
+
+    second.write_text("a\n3\n")
+    after = compute_dataset_manifest_hash(discover_secondary_csv_files(tmp_path))
+
+    assert before != after
 
 
 def test_compute_file_checksum_is_a_sha256_hex_digest(tmp_path: Path) -> None:
@@ -71,10 +90,9 @@ REAL_CICIOT2023_ROOT = Path(
 )
 def test_discover_and_read_headers_against_real_raw_data() -> None:
     discovered = discover_secondary_csv_files(REAL_CICIOT2023_ROOT)
-    assert len(discovered) > 0
-    reference_header = read_csv_header(discovered[0])
+    reference_header = read_csv_header(discovered[0].absolute_path)
     label_column = resolve_label_column(reference_header)
     assert label_column
-    for path in discovered[:5]:
-        header = read_csv_header(path)
+    for item in discovered[:5]:
+        header = read_csv_header(item.absolute_path)
         validate_consistent_header(reference_header, header)
