@@ -45,12 +45,11 @@ def discover_secondary_csv_files(csv_root: Path) -> tuple[SecondaryCsvFile, ...]
 def compute_dataset_manifest_hash(discovered: Sequence[SecondaryCsvFile]) -> ArtifactDigest:
     if not discovered:
         raise ValueError("secondary dataset manifest requires at least one CSV shard")
-    canonical_manifest = tuple(
-        (item.relative_path, item.file_sha256)
-        for item in sorted(discovered, key=lambda item: item.relative_path)
-    )
+    manifest_fields: list[CanonicalToken] = []
+    for item in sorted(discovered, key=lambda discovered_file: discovered_file.relative_path):
+        manifest_fields.extend((item.relative_path, item.file_sha256))
     return hashlib.sha256(
-        canonical_bytes("CICIOT2023_DATASET_MANIFEST_V1", canonical_manifest)
+        canonical_bytes("CICIOT2023_DATASET_MANIFEST_V1", *manifest_fields)
     ).hexdigest()
 
 
