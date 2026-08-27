@@ -10,6 +10,7 @@ from fedsira.datasets.ciciot2023.schema import (
     BENIGN_LABEL,
     TARGET_LABEL,
     CICIoT2023PseudoDomain,
+    canonicalize_label,
     hash_to_pseudo_domain,
 )
 from fedsira.datasets.common import (
@@ -150,8 +151,6 @@ def parse_complete_case_rows(
                 )
             )
             continue
-        from fedsira.datasets.ciciot2023.schema import canonicalize_label
-
         canonical_label = canonicalize_label(raw_row.values[label_index])
         pseudo_domain = hash_to_pseudo_domain(
             dataset_manifest_hash,
@@ -250,6 +249,26 @@ def sampling_cap_for_secondary_role(
     return supported_caps.get(role)
 
 
+def secondary_sampling_selection_key(
+    dataset_manifest_hash: ArtifactDigest,
+    canonical_label: CanonicalToken,
+    pseudo_domain: CICIoT2023PseudoDomain,
+    role: Role,
+    stable_row_id: ArtifactDigest,
+) -> tuple[bytes, ArtifactDigest]:
+    digest = hashlib.sha256(
+        canonical_bytes(
+            dataset_manifest_hash,
+            pseudo_domain.display_token,
+            canonical_label,
+            ROLE_HASH_TOKEN[role],
+            stable_row_id,
+            PREPROCESSING_SAMPLE_ORDER_SEED,
+        )
+    ).digest()
+    return digest, stable_row_id
+
+
 def apply_secondary_sampling_cap(
     dataset_manifest_hash: ArtifactDigest,
     canonical_label: CanonicalToken,
@@ -260,21 +279,18 @@ def apply_secondary_sampling_cap(
 ) -> tuple[ArtifactDigest, ...]:
     if cap is None or len(stable_row_ids) <= cap:
         return stable_row_ids
-
-    def selection_key(stable_row_id: ArtifactDigest) -> tuple[bytes, ArtifactDigest]:
-        digest = hashlib.sha256(
-            canonical_bytes(
+    return tuple(
+        sorted(
+            stable_row_ids,
+            key=lambda stable_row_id: secondary_sampling_selection_key(
                 dataset_manifest_hash,
-                pseudo_domain.display_token,
                 canonical_label,
-                ROLE_HASH_TOKEN[role],
+                pseudo_domain,
+                role,
                 stable_row_id,
-                PREPROCESSING_SAMPLE_ORDER_SEED,
-            )
-        ).digest()
-        return digest, stable_row_id
-
-    return tuple(sorted(stable_row_ids, key=selection_key)[:cap])
+            ),
+        )[:cap]
+    )
 
 
 def assign_secondary_roles(
