@@ -1,9 +1,6 @@
-import math
-
-import pandas
-
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.ciciot2023.preprocessing import (
+    SecondaryRawRow,
     SecondaryRetainedRow,
     apply_secondary_sampling_cap,
     assign_group_local_roles,
@@ -14,7 +11,12 @@ from fedsira.datasets.ciciot2023.preprocessing import (
     parse_complete_case_rows,
     resolve_predictor_columns,
 )
-from fedsira.datasets.ciciot2023.schema import BENIGN_LABEL, PSEUDO_DOMAIN_COUNT, TARGET_LABEL
+from fedsira.datasets.ciciot2023.schema import (
+    BENIGN_LABEL,
+    PSEUDO_DOMAIN_COUNT,
+    TARGET_LABEL,
+    CICIoT2023PseudoDomain,
+)
 from fedsira.datasets.common import DatasetExclusionReason, Role
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -33,31 +35,28 @@ def test_compute_stable_row_id_changes_with_row_index() -> None:
     assert first != second
 
 
-def test_resolve_predictor_columns_excludes_label_and_true_row_index() -> None:
+def test_resolve_predictor_columns_excludes_validated_row_identifier() -> None:
     header = ("index", "feature_a", "feature_b", "Label")
-    sample = pandas.DataFrame({"index": [0, 1, 2], "feature_a": [1.0, 2.0, 3.0]})
-    predictors = resolve_predictor_columns(header, "Label", sample)
+    predictors = resolve_predictor_columns(header, "Label", frozenset({"index"}))
     assert predictors == ("feature_a", "feature_b")
 
 
-def test_resolve_predictor_columns_keeps_a_non_sequential_index_like_column() -> None:
+def test_resolve_predictor_columns_keeps_identifier_like_predictor_when_not_validated() -> None:
     header = ("index", "feature_a", "Label")
-    sample = pandas.DataFrame({"index": [5, 1, 9]})
-    predictors = resolve_predictor_columns(header, "Label", sample)
-    assert "index" in predictors
+    predictors = resolve_predictor_columns(header, "Label")
+    assert predictors == ("index", "feature_a")
 
 
 def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
-    frame = pandas.DataFrame(
-        {
-            "feature_a": [1.0, "bad", math.inf],
-            "feature_b": [2.0, 3.0, 4.0],
-            "Label": ["BenignTraffic", "Backdoor_Malware", "Backdoor_Malware"],
-        }
+    raw_rows = (
+        SecondaryRawRow(0, ("1.0", "2.0", "BenignTraffic")),
+        SecondaryRawRow(1, ("bad", "3.0", "Backdoor_Malware")),
+        SecondaryRawRow(2, ("inf", "4.0", "Backdoor_Malware")),
     )
 
     retained, exclusions = parse_complete_case_rows(
-        frame,
+        raw_rows,
+        header=("feature_a", "feature_b", "Label"),
         relative_path="part.csv",
         file_sha256="a" * 64,
         label_column="Label",
@@ -76,14 +75,44 @@ def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
     ]
 
 
-def test_assign_pseudo_domains_returns_values_within_the_pseudo_domain_count() -> None:
-    domains = assign_pseudo_domains("a" * 64, "BACKDOOR_MALWARE", ("b" * 64, "c" * 64), 730201)
+def test_complete_case_parsing_rejects_mismatched_row_width() -> None:
+    raw_rows = (SecondaryRawRow(7, ("1.0", "BenignTraffic")),)
+    try:
+        parse_complete_case_rows(
+            raw_rows,
+            header=("feature_a", "feature_b", "Label"),
+            relative_path="part.csv",
+            file_sha256="a" * 64,
+            label_column="Label",
+            predictor_columns=("feature_a", "feature_b"),
+            dataset_manifest_hash="b" * 64,
+            pseudo_domain_partition_salt=CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+        )
+    except ValueError as error:
+        assert "row width" in str(error)
+    else:
+        raise AssertionError("mismatched CIC row width was accepted")
+
+
+def test_assign_pseudo_domains_returns_closed_domain_values() -> None:
+    domains = assign_pseudo_domains(
+        "a" * 64,
+        TARGET_LABEL,
+        ("b" * 64, "c" * 64),
+        CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+    )
     assert len(domains) == 2
-    assert all(0 <= domain < PSEUDO_DOMAIN_COUNT for domain in domains)
+    assert all(isinstance(domain, CICIoT2023PseudoDomain) for domain in domains)
+    assert all(0 <= int(domain) < PSEUDO_DOMAIN_COUNT for domain in domains)
 
 
 def test_assign_pseudo_domains_is_deterministic() -> None:
-    args = ("a" * 64, "BACKDOOR_MALWARE", ("b" * 64,), 730201)
+    args = (
+        "a" * 64,
+        TARGET_LABEL,
+        ("b" * 64,),
+        CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+    )
     assert assign_pseudo_domains(*args) == assign_pseudo_domains(*args)
 
 
@@ -146,7 +175,7 @@ def test_secondary_sampling_cap_is_deterministic_and_exact() -> None:
     first = apply_secondary_sampling_cap(
         "a" * 64,
         TARGET_LABEL,
-        0,
+        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
         Role.CANDIDATE_SCREEN,
         stable_row_ids,
         1000,
@@ -154,7 +183,7 @@ def test_secondary_sampling_cap_is_deterministic_and_exact() -> None:
     second = apply_secondary_sampling_cap(
         "a" * 64,
         TARGET_LABEL,
-        0,
+        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
         Role.CANDIDATE_SCREEN,
         stable_row_ids,
         1000,
@@ -172,7 +201,7 @@ def test_secondary_role_assignment_never_assigns_one_row_to_multiple_roles() -> 
             relative_path="part.csv",
             original_row_index=index,
             canonical_label=TARGET_LABEL,
-            pseudo_domain=0,
+            pseudo_domain=CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
             features=(float(index),),
         )
         for index in range(1000)
