@@ -2,7 +2,16 @@ import re
 from collections.abc import Sequence
 from enum import StrEnum
 
-from fedsira.domain.records import CanonicalToken, NamespaceSeed
+from fedsira.domain.records import (
+    AttackBasename,
+    AttackFamilyName,
+    DomainId,
+    FeatureName,
+    NamespaceSeed,
+    PathToken,
+    RelativePathText,
+    SeedDerivationLabel,
+)
 from fedsira.runtime.determinism import deterministic_order
 
 
@@ -30,7 +39,7 @@ NBAIOT_DOMAIN_ORDER: tuple[NBaiotDomain, ...] = (
     NBaiotDomain.SAMSUNG_WEBCAM,
 )
 
-NBAIOT_DOMAIN_HASH_TOKEN: dict[NBaiotDomain, CanonicalToken] = {
+NBAIOT_DOMAIN_HASH_TOKEN: dict[NBaiotDomain, DomainId] = {
     NBaiotDomain.DANMINI_DOORBELL: "DANMINI_DOORBELL",
     NBaiotDomain.ENNIO_DOORBELL: "ENNIO_DOORBELL",
     NBaiotDomain.ECOBEE_THERMOSTAT: "ECOBEE_THERMOSTAT",
@@ -42,7 +51,7 @@ NBAIOT_DOMAIN_HASH_TOKEN: dict[NBaiotDomain, CanonicalToken] = {
     NBaiotDomain.SAMSUNG_WEBCAM: "SAMSUNG_WEBCAM",
 }
 
-NBAIOT_DIRECTORY_TO_DOMAIN: dict[CanonicalToken, NBaiotDomain] = {
+NBAIOT_DIRECTORY_TO_DOMAIN: dict[RelativePathText, NBaiotDomain] = {
     "Danmini_Doorbell": NBaiotDomain.DANMINI_DOORBELL,
     "Ennio_Doorbell": NBaiotDomain.ENNIO_DOORBELL,
     "Ecobee_Thermostat": NBaiotDomain.ECOBEE_THERMOSTAT,
@@ -85,14 +94,14 @@ NBAIOT_CLASS_ORDER: tuple[NBaiotClass, ...] = (
 
 NBAIOT_TARGET_CLASS = NBaiotClass.GAFGYT_COMBO
 
-NBAIOT_TRIGGER_FEATURES: tuple[CanonicalToken, ...] = (
+NBAIOT_TRIGGER_FEATURES: tuple[FeatureName, ...] = (
     "MI_dir_L0.1_weight",
     "H_L0.1_weight",
     "HH_L0.1_magnitude",
     "HpHp_L0.1_mean",
 )
 
-NBAIOT_GAFGYT_BASENAME_CLASS: dict[CanonicalToken, NBaiotClass] = {
+NBAIOT_GAFGYT_BASENAME_CLASS: dict[AttackBasename, NBaiotClass] = {
     "combo": NBaiotClass.GAFGYT_COMBO,
     "junk": NBaiotClass.GAFGYT_JUNK,
     "scan": NBaiotClass.GAFGYT_SCAN,
@@ -100,7 +109,7 @@ NBAIOT_GAFGYT_BASENAME_CLASS: dict[CanonicalToken, NBaiotClass] = {
     "udp": NBaiotClass.GAFGYT_UDP,
 }
 
-NBAIOT_MIRAI_BASENAME_CLASS: dict[CanonicalToken, NBaiotClass] = {
+NBAIOT_MIRAI_BASENAME_CLASS: dict[AttackBasename, NBaiotClass] = {
     "ack": NBaiotClass.MIRAI_ACK,
     "scan": NBaiotClass.MIRAI_SCAN,
     "syn": NBaiotClass.MIRAI_SYN,
@@ -111,16 +120,17 @@ NBAIOT_MIRAI_BASENAME_CLASS: dict[CanonicalToken, NBaiotClass] = {
 _NON_ALPHANUMERIC = re.compile(r"[^0-9a-zA-Z]+")
 
 
-def normalize_path_token(raw_token: CanonicalToken) -> CanonicalToken:
+def normalize_path_token(raw_token: RelativePathText) -> PathToken:
     return _NON_ALPHANUMERIC.sub("_", raw_token).strip("_").upper()
 
 
-def resolve_domain(directory_name: CanonicalToken) -> NBaiotDomain | None:
+def resolve_domain(directory_name: RelativePathText) -> NBaiotDomain | None:
     return NBAIOT_DIRECTORY_TO_DOMAIN.get(directory_name)
 
 
 def resolve_attack_class(
-    attack_family_token: CanonicalToken, basename_token: CanonicalToken
+    attack_family_token: AttackFamilyName,
+    basename_token: AttackBasename,
 ) -> NBaiotClass | None:
     family = attack_family_token.strip().lower()
     basename = basename_token.strip().lower()
@@ -131,14 +141,14 @@ def resolve_attack_class(
     return None
 
 
-_DOMAIN_BY_HASH_TOKEN: dict[CanonicalToken, NBaiotDomain] = {
+_DOMAIN_BY_HASH_TOKEN: dict[DomainId, NBaiotDomain] = {
     token: domain for domain, token in NBAIOT_DOMAIN_HASH_TOKEN.items()
 }
 
 
 def deterministic_domain_order(
     domains: Sequence[NBaiotDomain],
-    domain_separator: CanonicalToken,
+    domain_separator: SeedDerivationLabel,
     order_namespace_seed: NamespaceSeed,
 ) -> tuple[NBaiotDomain, ...]:
     tokens = tuple(NBAIOT_DOMAIN_HASH_TOKEN[domain] for domain in domains)
