@@ -315,9 +315,7 @@ def materialize_nbaiot_prepared_views(
         "standard_deviations": list(moments.standard_deviations),
         "training_row_count": moments.training_row_count,
     }
-    (scaler_root / "nbaiot_scaler.json").write_text(
-        _stable_json(scaler_payload), encoding="utf-8"
-    )
+    (scaler_root / "nbaiot_scaler.json").write_text(_stable_json(scaler_payload), encoding="utf-8")
     return tuple(views), moments
 
 
