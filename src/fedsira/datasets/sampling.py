@@ -4,8 +4,9 @@ from collections.abc import Sequence
 from fedsira.domain.records import (
     UINT32_MODULUS,
     ArtifactDigest,
-    CanonicalToken,
+    ClassLabel,
     DerivedSeed,
+    NonEmptyString,
     NonNegativeInt,
 )
 from fedsira.runtime.determinism import canonical_bytes
@@ -20,9 +21,9 @@ PREPROCESSING_SAMPLE_ORDER_SEED: DerivedSeed = (
 
 def sampling_cap_selection_digest(
     dataset_file_sha256: ArtifactDigest,
-    domain_hash_token: CanonicalToken,
-    class_id: CanonicalToken,
-    role_hash_token: CanonicalToken,
+    domain_hash_token: NonEmptyString,
+    class_id: ClassLabel,
+    role_hash_token: NonEmptyString,
     original_row_index: NonNegativeInt,
 ) -> bytes:
     return hashlib.sha256(
@@ -39,9 +40,9 @@ def sampling_cap_selection_digest(
 
 def apply_sampling_cap(
     dataset_file_sha256: ArtifactDigest,
-    domain_hash_token: CanonicalToken,
-    class_id: CanonicalToken,
-    role_hash_token: CanonicalToken,
+    domain_hash_token: NonEmptyString,
+    class_id: ClassLabel,
+    role_hash_token: NonEmptyString,
     original_row_indices: Sequence[NonNegativeInt],
     cap: NonNegativeInt,
 ) -> tuple[NonNegativeInt, ...]:

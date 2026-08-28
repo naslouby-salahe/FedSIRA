@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Iterator
-from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Self
+
+from pydantic import model_validator
 
 from fedsira.config.schema import ScalingConfig
-from fedsira.domain.records import CanonicalToken, NonNegativeInt
+from fedsira.domain.records import FeatureName, FiniteFloat, FrozenDomainModel, NonNegativeInt
 
 
 class NumericRow(Protocol):
@@ -16,20 +17,23 @@ class NumericRow(Protocol):
 FeatureStatisticRow = tuple[float, float, float]
 
 
-@dataclass(frozen=True)
-class FeatureMoments:
-    feature_names: tuple[CanonicalToken, ...]
-    means: tuple[float, ...]
-    standard_deviations: tuple[float, ...]
+class FeatureMoments(FrozenDomainModel):
+    feature_names: tuple[FeatureName, ...]
+    means: tuple[FiniteFloat, ...]
+    standard_deviations: tuple[FiniteFloat, ...]
     training_row_count: NonNegativeInt
 
-    def validate_consistency(self) -> None:
+    @model_validator(mode="after")
+    def _validate_consistency(self) -> Self:
         if not (len(self.feature_names) == len(self.means) == len(self.standard_deviations)):
             raise ValueError("feature moments must have matching lengths")
+        if any(standard_deviation <= 0.0 for standard_deviation in self.standard_deviations):
+            raise ValueError("feature standard deviations must be positive")
+        return self
 
 
 def accumulate_feature_statistics(
-    feature_names: tuple[CanonicalToken, ...],
+    feature_names: tuple[FeatureName, ...],
     feature_matrix: Iterable[NumericRow],
     existing: tuple[FeatureStatisticRow, ...] | None = None,
 ) -> tuple[FeatureStatisticRow, ...]:
@@ -57,14 +61,14 @@ def accumulate_feature_statistics(
 
 
 def fit_feature_moments(
-    feature_names: tuple[CanonicalToken, ...],
+    feature_names: tuple[FeatureName, ...],
     statistics: tuple[FeatureStatisticRow, ...],
     scaling_config: ScalingConfig,
 ) -> FeatureMoments:
     if len(feature_names) != len(statistics):
         raise ValueError("feature name count must match statistics count")
-    means: list[float] = []
-    standard_deviations: list[float] = []
+    means: list[FiniteFloat] = []
+    standard_deviations: list[FiniteFloat] = []
     row_count = 0
     for feature_index, feature_name in enumerate(feature_names):
         count, total, total_squared = statistics[feature_index]
@@ -72,29 +76,26 @@ def fit_feature_moments(
             raise ValueError(f"feature {feature_name} has no supported anchor-train rows")
         row_count = int(count)
         mean = total / count
-        variance = total_squared / count - mean * mean
-        variance = max(variance, 0.0)
+        variance = max(total_squared / count - mean * mean, 0.0)
         standard_deviation = math.sqrt(variance)
         if standard_deviation == 0.0:
             standard_deviation = scaling_config.zero_standard_deviation_scale
         means.append(mean)
         standard_deviations.append(standard_deviation)
-    moments = FeatureMoments(
+    return FeatureMoments(
         feature_names=feature_names,
         means=tuple(means),
         standard_deviations=tuple(standard_deviations),
         training_row_count=row_count,
     )
-    moments.validate_consistency()
-    return moments
 
 
 def standardize_row(
     row: NumericRow,
     moments: FeatureMoments,
     scaling_config: ScalingConfig,
-) -> tuple[float, ...]:
-    standardized: list[float] = []
+) -> tuple[FiniteFloat, ...]:
+    standardized: list[FiniteFloat] = []
     for column_index, value in enumerate(row):
         mean = moments.means[column_index]
         standard_deviation = moments.standard_deviations[column_index]

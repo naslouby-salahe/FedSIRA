@@ -25,9 +25,11 @@ MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 CanonicalToken = NonEmptyString
-ExperimentName = CanonicalToken
-DomainId = CanonicalToken
-DatasetClassToken = CanonicalToken
+ExperimentName = NonEmptyString
+DomainId = NonEmptyString
+ClassLabel = NonEmptyString
+FeatureName = NonEmptyString
+DatasetClassToken = ClassLabel
 RepositoryPath = NonEmptyString
 Doi = NonEmptyString
 RoundIndex = Annotated[int, Field(ge=-1)]
