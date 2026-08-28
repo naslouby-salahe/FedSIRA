@@ -58,7 +58,7 @@ PRODUCER_ENTRY_MODULES: dict[ProducerFingerprintFamily, tuple[CanonicalToken, ..
         "fedsira.evaluation.validation",
     ),
     ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT: (
-        "fedsira.evaluation.statistics",
+        "fedsira.analysis.statistics",
         "fedsira.analysis.comparisons",
     ),
     ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT: (

@@ -14,7 +14,7 @@ from fedsira.config.schema import ScientificConfig, TestFixtureConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.evaluation.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
+from fedsira.analysis.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
 from fedsira.protocol.reproduction import validate_commitment_exists_before_verifier_assignment
 from fedsira.protocol.synthesis import krum_committee_is_admissible
 from fedsira.protocol.theory import (
