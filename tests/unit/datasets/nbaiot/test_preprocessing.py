@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+from typing import cast
 
 import pandas
 import pytest
@@ -11,8 +12,8 @@ from fedsira.datasets.nbaiot.preprocessing import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     PreparedView,
     assign_stream_roles_and_sample_ids,
-    materialize_nbaiot_prepared_views,
     classify_row_finiteness,
+    materialize_nbaiot_prepared_views,
     supported_class_sampling_caps,
     target_class_sampling_caps,
     validate_all_predictors_finite,
@@ -331,8 +332,10 @@ def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) ->
     assert parquet_path.exists()
     frame: pandas.DataFrame = pandas.read_parquet(parquet_path)
     assert len(frame) == view.row_count
-    assert tuple(str(value) for value in frame["sample_id"]) == view.sample_ids
-    assert tuple(str(value) for value in frame["label"]) == view.labels
+    sample_ids = cast(pandas.Series[str], frame["sample_id"])
+    labels = cast(pandas.Series[str], frame["label"])
+    assert tuple(sample_ids) == view.sample_ids
+    assert tuple(labels) == view.labels
     for feature_name in moments.feature_names:
         assert feature_name in frame.columns
 

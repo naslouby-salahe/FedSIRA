@@ -57,5 +57,8 @@ def test_violation_detected_for_todo_marker() -> None:
 
 
 def test_violation_detected_for_unfinished_statements() -> None:
-    source = "def unfinished() -> None:\n    pass\n\ndef unsupported() -> None:\n    raise NotImplementedError\n"
+    source = (
+        "def unfinished() -> None:\n    pass\n\n"
+        "def unsupported() -> None:\n    raise NotImplementedError\n"
+    )
     assert unfinished_statement_violations(source) == ["pass@2", "NotImplementedError@5"]
