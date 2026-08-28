@@ -1,10 +1,39 @@
+import math
 from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.attacks.transform import select_transform_rows
 from fedsira.datasets.nbaiot.schema import NBaiotClass
-from fedsira.domain.records import CanonicalToken, NamespaceSeed, Probability
+from fedsira.domain.enums import SeedNamespace
+from fedsira.domain.records import ArtifactDigest, NamespaceSeed, NonNegativeInt, Probability
+from fedsira.runtime.determinism import deterministic_order
+
+ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
+
+
+def fraction_to_attack_count(
+    fraction: Probability, eligible_population_size: NonNegativeInt
+) -> NonNegativeInt:
+    return math.floor(fraction * eligible_population_size)
+
+
+def attack_row_order(
+    eligible_row_ids: Sequence[ArtifactDigest], attack_generation_namespace_seed: NamespaceSeed
+) -> tuple[ArtifactDigest, ...]:
+    return deterministic_order(
+        eligible_row_ids, ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
+    )
+
+
+def select_fractional_attack_rows(
+    eligible_row_ids: Sequence[ArtifactDigest],
+    fraction: Probability,
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[ArtifactDigest, ...] | None:
+    count = fraction_to_attack_count(fraction, len(eligible_row_ids))
+    if fraction > 0.0 and count == 0:
+        return None
+    return attack_row_order(eligible_row_ids, attack_generation_namespace_seed)[:count]
 
 
 def apply_trigger_transform(
@@ -19,19 +48,19 @@ def apply_trigger_transform(
 
 
 def select_source_backdoor_poison_rows(
-    eligible_gafgyt_udp_row_ids: Sequence[CanonicalToken],
+    eligible_gafgyt_udp_row_ids: Sequence[ArtifactDigest],
     poison_fraction: Probability,
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[CanonicalToken, ...] | None:
-    return select_transform_rows(
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
         eligible_gafgyt_udp_row_ids, poison_fraction, attack_generation_namespace_seed
     )
 
 
 def relabel_triggered_rows_as_benign(
-    labels_by_row_id: Mapping[CanonicalToken, NBaiotClass],
-    poisoned_row_ids: Sequence[CanonicalToken],
-) -> dict[CanonicalToken, NBaiotClass]:
+    labels_by_row_id: Mapping[ArtifactDigest, NBaiotClass],
+    poisoned_row_ids: Sequence[ArtifactDigest],
+) -> dict[ArtifactDigest, NBaiotClass]:
     relabeled = dict(labels_by_row_id)
     for row_id in poisoned_row_ids:
         relabeled[row_id] = NBaiotClass.BENIGN
