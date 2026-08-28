@@ -127,17 +127,6 @@ from fedsira.evaluation.aggregation import (
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
 )
-from fedsira.evaluation.communication import (
-    SERVER_TOKEN,
-    CommunicationMessageMetadata,
-    CommunicationMessageType,
-    TensorParameterKind,
-    TensorPayloadMetadata,
-    canonical_parameter_tensor_name,
-    communication_bytes,
-    encode_message_envelope,
-    model_transmission_count,
-)
 from fedsira.evaluation.metrics import (
     boundary_metric_set,
     clean_proposal_oracle_label,
@@ -151,9 +140,18 @@ from fedsira.evaluation.metrics import (
     target_capability_gain,
 )
 from fedsira.evaluation.records import (
+    SERVER_ID,
     AdmissionDelayDecomposition,
+    CommunicationMessageMetadata,
+    CommunicationMessageType,
     MetricResult,
     ProposalOracleLabel,
+    TensorParameterKind,
+    TensorPayloadMetadata,
+    communication_bytes,
+    encode_message_envelope,
+    model_transmission_count,
+    parameter_tensor_name,
 )
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
@@ -3137,7 +3135,7 @@ class ProtocolCellExecutor(CellExecutor):
         model_size_bytes = 115 * 256 * 4
         envelopes: list[bytes] = []
         metadata_records: list[CommunicationMessageMetadata] = []
-        tensor_name = canonical_parameter_tensor_name(TensorParameterKind.MODEL, "linear")
+        tensor_name = parameter_tensor_name(TensorParameterKind.MODEL, "linear")
         timer = ElapsedTimer()
         for message_type, count in _efficiency_message_counts():
             for _index in range(count):
@@ -3147,7 +3145,7 @@ class ProtocolCellExecutor(CellExecutor):
                     semantic_cell_key_hash="b" * 64,
                     master_seed=cell.master_seed,
                     round_index=None,
-                    sender=SERVER_TOKEN,
+                    sender=SERVER_ID,
                     receiver="CLIENT",
                     claim_contract_hash="c" * 64,
                     payload_tensor_count=1,
