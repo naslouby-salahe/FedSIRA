@@ -105,7 +105,9 @@ class TensorPayloadMetadata(FrozenDomainModel):
     dtype: NonEmptyString = TENSOR_DTYPE
 
 
-def parameter_tensor_name(kind: TensorParameterKind, parameter_name: NonEmptyString) -> NonEmptyString:
+def parameter_tensor_name(
+    kind: TensorParameterKind, parameter_name: NonEmptyString
+) -> NonEmptyString:
     return f"{kind.value}.{parameter_name}"
 
 

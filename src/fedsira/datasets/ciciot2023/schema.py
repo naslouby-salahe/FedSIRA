@@ -20,9 +20,7 @@ TARGET_LABEL: ClassLabel = "BACKDOOR_MALWARE"
 BENIGN_LABEL: ClassLabel = "BENIGN"
 BENIGN_LABEL_ALIASES: frozenset[ClassLabel] = frozenset({"BENIGNTRAFFIC", "BENIGN_TRAFFIC"})
 OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
-ROW_IDENTIFIER_TOKENS: frozenset[ClassLabel] = frozenset(
-    {"INDEX", "ROW_ID", "ROWID", "UNNAMED_0"}
-)
+ROW_IDENTIFIER_TOKENS: frozenset[ClassLabel] = frozenset({"INDEX", "ROW_ID", "ROWID", "UNNAMED_0"})
 
 
 class CICIoT2023PseudoDomain(IntEnum):

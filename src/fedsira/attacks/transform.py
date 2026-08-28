@@ -2,7 +2,7 @@ import math
 from collections.abc import Sequence
 
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import CanonicalToken, NamespaceSeed, NonNegativeInt, Probability
+from fedsira.domain.records import SampleId, NamespaceSeed, NonNegativeInt, Probability
 from fedsira.runtime.determinism import deterministic_order
 
 ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
@@ -15,18 +15,18 @@ def fraction_to_transform_count(
 
 
 def attack_generation_order(
-    eligible_row_ids: Sequence[CanonicalToken], attack_generation_namespace_seed: NamespaceSeed
-) -> tuple[CanonicalToken, ...]:
+    eligible_row_ids: Sequence[SampleId], attack_generation_namespace_seed: NamespaceSeed
+) -> tuple[SampleId, ...]:
     return deterministic_order(
         eligible_row_ids, ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
     )
 
 
 def select_transform_rows(
-    eligible_row_ids: Sequence[CanonicalToken],
+    eligible_row_ids: Sequence[SampleId],
     fraction: Probability,
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[CanonicalToken, ...] | None:
+) -> tuple[SampleId, ...] | None:
     count = fraction_to_transform_count(fraction, len(eligible_row_ids))
     if fraction > 0.0 and count == 0:
         return None
@@ -35,10 +35,10 @@ def select_transform_rows(
 
 
 def balanced_50_50_selection(
-    group_a_row_ids: Sequence[CanonicalToken],
-    group_b_row_ids: Sequence[CanonicalToken],
+    group_a_row_ids: Sequence[SampleId],
+    group_b_row_ids: Sequence[SampleId],
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[tuple[CanonicalToken, ...], tuple[CanonicalToken, ...]]:
+) -> tuple[tuple[SampleId, ...], tuple[SampleId, ...]]:
     selected_count = min(len(group_a_row_ids), len(group_b_row_ids))
     ordered_a = attack_generation_order(group_a_row_ids, attack_generation_namespace_seed)
     ordered_b = attack_generation_order(group_b_row_ids, attack_generation_namespace_seed)

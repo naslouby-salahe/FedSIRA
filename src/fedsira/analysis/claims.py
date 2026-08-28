@@ -431,9 +431,7 @@ def _derive_claim_state(
             return FinalClaimState.PARTIALLY_SUPPORTED
         return FinalClaimState.NULL_RESULT
     if definition.claim_id == "Byzantine Operating Region":
-        maximum = (
-            claim_support_thresholds.byzantine_operating_region.maximum_malicious_admissions_within_bound
-        )
+        maximum = claim_support_thresholds.byzantine_operating_region.maximum_malicious_admissions_within_bound
         if sum(evidence.malicious_admissions) <= maximum:
             return FinalClaimState.CONDITIONAL
         return FinalClaimState.NOT_SUPPORTED
@@ -456,9 +454,7 @@ def _derive_claim_state(
         mean_rate = sum(evidence.false_same_capability_rates) / len(
             evidence.false_same_capability_rates
         )
-        minimum = (
-            claim_support_thresholds.capability_granularity_boundary.false_same_capability_certification_rate_minimum
-        )
+        minimum = claim_support_thresholds.capability_granularity_boundary.false_same_capability_certification_rate_minimum
         return FinalClaimState.SUPPORTED if mean_rate >= minimum else FinalClaimState.NULL_RESULT
     if definition.claim_id == "Heterogeneity Boundary":
         if evidence.heterogeneity_boundary_passes is None:

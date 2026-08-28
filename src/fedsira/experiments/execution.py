@@ -39,7 +39,7 @@ from fedsira.experiments.validation import (
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
 )
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.runtime.determinism import framed_bytes
 from fedsira.runtime.state import FailureDetail
 
 EXECUTION_RECORD_SCHEMA_VERSION = "fedsira|execution_record|1"
@@ -136,13 +136,13 @@ class ExecutionRecordStore:
             metrics=outcome.metrics,
             failure=failure,
         )
-        digest = hashlib.sha256(canonical_bytes(outcome.cell.semantic_key)).hexdigest()
+        digest = hashlib.sha256(framed_bytes(outcome.cell.semantic_key)).hexdigest()
         (directory / f"{digest}.json").write_text(record.model_dump_json(indent=2))
 
     def read_outcome(
         self, experiment: CanonicalToken, semantic_key: CanonicalToken
     ) -> PersistedExecutionRecord | None:
-        digest = hashlib.sha256(canonical_bytes(semantic_key)).hexdigest()
+        digest = hashlib.sha256(framed_bytes(semantic_key)).hexdigest()
         path = self._record_directory(experiment) / f"{digest}.json"
         if not path.exists():
             return None
@@ -378,5 +378,5 @@ def _to_failure_detail(failure: PersistedFailureDetail | None) -> FailureDetail 
 def execution_record_digest(outcomes: Sequence[CellExecutionOutcome]) -> ArtifactDigest:
     hasher = hashlib.sha256()
     for outcome in outcomes:
-        hasher.update(canonical_bytes(outcome.cell.semantic_key, outcome.terminal_state))
+        hasher.update(framed_bytes(outcome.cell.semantic_key, outcome.terminal_state))
     return hasher.hexdigest()

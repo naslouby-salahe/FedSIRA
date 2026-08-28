@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
-from fedsira.domain.records import CanonicalToken, ExperimentName
+from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
+from fedsira.domain.records import ExperimentName
 
 ARTIFACT_FAMILY_PATH_SCOPE: dict[ArtifactFamily, ArtifactPathScope] = {
     ArtifactFamily.RAW_DATASET_IDENTITY: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.CANONICAL_DATASET_MANIFEST: ArtifactPathScope.PREPROCESSING,
+    ArtifactFamily.DATASET_MANIFEST: ArtifactPathScope.PREPROCESSING,
     ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST: ArtifactPathScope.PREPROCESSING,
     ArtifactFamily.SCALER: ArtifactPathScope.PREPROCESSING,
     ArtifactFamily.PREPARED_ROLE_VIEW: ArtifactPathScope.PREPROCESSING,
@@ -40,7 +40,7 @@ def preprocessing_metadata_root() -> Path:
     return preprocessing_root() / "metadata"
 
 
-def prepared_evidence_root(dataset: CanonicalToken) -> Path:
+def prepared_evidence_root(dataset: DatasetId) -> Path:
     return preprocessing_root() / "prepared" / dataset
 
 

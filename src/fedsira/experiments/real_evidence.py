@@ -125,7 +125,7 @@ from fedsira.models.mlp import (
 )
 from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime.determinism import (
-    canonical_bytes,
+    framed_bytes,
     derive_uint32,
     local_training_seed,
     namespace_seed,
@@ -419,7 +419,7 @@ def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
         return "0" * 64
     hasher = hashlib.sha256()
     for path in parquet_files:
-        hasher.update(canonical_bytes(path.name, path.stat().st_size))
+        hasher.update(framed_bytes(path.name, path.stat().st_size))
     return hasher.hexdigest()
 
 

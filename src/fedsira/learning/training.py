@@ -6,7 +6,7 @@ from torch import nn, optim
 
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
 from fedsira.domain.records import (
-    CanonicalToken,
+    SampleId,
     DerivedSeed,
     EpochIndex,
     NonNegativeFloat,
@@ -53,9 +53,9 @@ def clip_gradients(model: FedSIRAClassifier, training_config: TrainingConfig) ->
 def ordered_minibatches(
     training_seed: DerivedSeed,
     epoch: EpochIndex,
-    sample_ids: Sequence[CanonicalToken],
+    sample_ids: Sequence[SampleId],
     batch_size: int,
-) -> tuple[tuple[CanonicalToken, ...], ...]:
+) -> tuple[tuple[SampleId, ...], ...]:
     ordered = minibatch_order(training_seed, epoch, sample_ids)
     return tuple(
         ordered[start : start + batch_size] for start in range(0, len(ordered), batch_size)
@@ -83,7 +83,7 @@ def train_one_epoch(
 
 
 def ordered_batch_indices(
-    sample_ids: Sequence[CanonicalToken],
+    sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
     epoch: EpochIndex,
     batch_size: int,
@@ -99,7 +99,7 @@ def ordered_batch_indices(
 def build_epoch_batches(
     features: torch.Tensor,
     labels: torch.Tensor,
-    sample_ids: Sequence[CanonicalToken],
+    sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
     epoch: EpochIndex,
     batch_size: int,
@@ -117,7 +117,7 @@ def train_epochs_with_deterministic_batch_order(
     training_config: TrainingConfig,
     features: torch.Tensor,
     labels: torch.Tensor,
-    sample_ids: Sequence[CanonicalToken],
+    sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
     local_epochs: int,
 ) -> tuple[NonNegativeFloat, ...]:

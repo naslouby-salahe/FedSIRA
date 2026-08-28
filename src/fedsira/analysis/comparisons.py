@@ -230,9 +230,7 @@ def evaluate_comparison(
             raise ValueError(
                 f"non-inferiority comparison {definition.canonical_name} requires a margin"
             )
-        raw_p_value = exact_sign_flip_non_inferiority_p_value(
-            difference_vector, definition.margin
-        )
+        raw_p_value = exact_sign_flip_non_inferiority_p_value(difference_vector, definition.margin)
     return ComparisonResult(
         definition=definition,
         paired_differences=difference_vector,

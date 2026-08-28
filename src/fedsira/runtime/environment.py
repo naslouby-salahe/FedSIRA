@@ -8,7 +8,7 @@ from pathlib import Path
 
 import torch
 
-from fedsira.domain.records import CanonicalToken, MasterSeed
+from fedsira.domain.records import EnvironmentText, MasterSeed
 
 REFERENCE_OS_NAME = "Ubuntu"
 REFERENCE_OS_VERSION_ID = "24.04"
@@ -42,9 +42,9 @@ PREPROCESSING_OR_REPORT_ONLY_HASHSEED = "0"
 
 @dataclass(frozen=True)
 class EnvironmentMismatch:
-    component: CanonicalToken
-    expected: CanonicalToken
-    actual: CanonicalToken
+    component: EnvironmentText
+    expected: EnvironmentText
+    actual: EnvironmentText
 
 
 def pythonhashseed_for_master_seed_subprocess(master_seed: MasterSeed) -> str:

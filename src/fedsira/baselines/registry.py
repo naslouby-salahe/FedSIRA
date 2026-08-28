@@ -5,7 +5,7 @@ from typing import Final
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState, TernaryOutcome
 from fedsira.domain.records import (
-    BooleanFlag,
+    BaselineFullParticipationAllowed,
     DomainId,
     FrozenDomainModel,
     NonNegativeInt,
@@ -130,8 +130,8 @@ def validate_role_not_used_for_tuning(role: Role) -> None:
 
 
 def domain_without_target_view_may_participate(
-    baseline_allows_full_participation: BooleanFlag,
-) -> BooleanFlag:
+    baseline_allows_full_participation: BaselineFullParticipationAllowed,
+) -> BaselineFullParticipationAllowed:
     return baseline_allows_full_participation
 
 

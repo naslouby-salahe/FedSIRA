@@ -208,7 +208,9 @@ def _has_dynamic_import(tree: ast.Module) -> bool:
     return False
 
 
-def resolve_producer_import_closure(entry_modules: tuple[ModuleName, ...]) -> dict[ModuleName, Path]:
+def resolve_producer_import_closure(
+    entry_modules: tuple[ModuleName, ...],
+) -> dict[ModuleName, Path]:
     resolved: dict[ModuleName, Path] = {}
     frontier = list(entry_modules)
     while frontier:

@@ -4,8 +4,10 @@ from collections.abc import Mapping, Sequence
 from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
 from fedsira.domain.records import (
-    BooleanFlag,
-    CanonicalToken,
+    AttackCarrierRequired,
+    CandidateFreeOpeningPredicate,
+    SampleId,
+    ScreenDomainDecision,
     DerivedSeed,
     DomainId,
     EvidenceAdequate,
@@ -22,7 +24,7 @@ from fedsira.domain.records import (
 )
 from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.evaluation.records import MetricResult
-from fedsira.runtime.determinism import canonical_bytes, deterministic_order
+from fedsira.runtime.determinism import framed_bytes, deterministic_order
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
@@ -50,7 +52,7 @@ class ScreenDomainResult(FrozenDomainModel):
 
 
 class ScreenLossObservation(FrozenDomainModel):
-    sample_id: CanonicalToken
+    sample_id: SampleId
     anchor_loss: ScreenLoss
     source_loss: ScreenLoss
 
@@ -69,7 +71,7 @@ def source_selection_order(
 def select_source_domain(
     source_order: Sequence[DomainId],
     domains_with_target_stream: frozenset[DomainId],
-    requires_attack_carrier: BooleanFlag,
+    requires_attack_carrier: AttackCarrierRequired,
     domains_with_attack_carrier: frozenset[DomainId],
 ) -> DomainId | None:
     for domain in source_order:
@@ -95,12 +97,12 @@ def screen_domain_order(
 
 
 def screen_fold_index(
-    sample_id: CanonicalToken,
+    sample_id: SampleId,
     screen_fold_seed: DerivedSeed,
     fold_count: FoldCount,
 ) -> FoldIndex:
     digest = hashlib.sha256(
-        canonical_bytes(SCREEN_FOLD_SEPARATOR, screen_fold_seed, sample_id)
+        framed_bytes(SCREEN_FOLD_SEPARATOR, screen_fold_seed, sample_id)
     ).digest()
     return int.from_bytes(digest[0:8], byteorder="big", signed=False) % fold_count
 
@@ -138,7 +140,7 @@ def proposal_screen_differential(
 
 
 def run_proposal_screen_for_domain(
-    fold_assignment_by_sample_id: Mapping[CanonicalToken, FoldIndex],
+    fold_assignment_by_sample_id: Mapping[SampleId, FoldIndex],
     target_observations: Sequence[ScreenLossObservation],
     control_observations: Sequence[ScreenLossObservation],
     fold_count: FoldCount,
@@ -174,7 +176,7 @@ def screen_domain_decision_is_positive(
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
     capability_claim_config: CapabilityClaimConfig,
-) -> BooleanFlag:
+) -> ScreenDomainDecision:
     if differential_a is None:
         return False
     if (
@@ -197,7 +199,7 @@ def raw_target_f1_screen_domain_decision_is_positive(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     capability_claim_config: CapabilityClaimConfig,
-) -> BooleanFlag:
+) -> ScreenDomainDecision:
     if (
         target_f1_gain.value is None
         or supported_macro_f1_drop.value is None
@@ -219,7 +221,7 @@ def unmatched_control_screen_domain_decision_is_positive(
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
     capability_claim_config: CapabilityClaimConfig,
-) -> BooleanFlag:
+) -> ScreenDomainDecision:
     if unmatched_differential is None:
         return False
     if (
@@ -239,7 +241,7 @@ def unmatched_control_screen_domain_decision_is_positive(
 
 def candidate_free_screen_domain_predicate(
     anchor_target_f1: MetricResult, capability_claim_config: CapabilityClaimConfig
-) -> BooleanFlag:
+) -> ScreenDomainDecision:
     if anchor_target_f1.value is None:
         return False
     return anchor_target_f1.value < capability_claim_config.candidate_free_anchor_target_f1_maximum

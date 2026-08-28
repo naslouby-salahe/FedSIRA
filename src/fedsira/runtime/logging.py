@@ -2,7 +2,7 @@ import json
 import logging
 from typing import ClassVar
 
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import RuntimeComponentName
 
 LOGGER_NAME_PREFIX = "fedsira"
 
@@ -25,7 +25,7 @@ class StructuredJsonFormatter(logging.Formatter):
         return json.dumps(payload, sort_keys=True, default=str)
 
 
-def get_structured_logger(component: CanonicalToken) -> logging.Logger:
+def get_structured_logger(component: RuntimeComponentName) -> logging.Logger:
     logger = logging.getLogger(f"{LOGGER_NAME_PREFIX}.{component}")
     if not logger.handlers:
         handler = logging.StreamHandler()
