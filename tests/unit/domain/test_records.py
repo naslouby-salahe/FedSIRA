@@ -27,4 +27,4 @@ def test_seed_bundle_rejects_out_of_range_seed() -> None:
 def test_seed_bundle_is_frozen() -> None:
     bundle = SeedBundle(master_seeds=(1,), analysis_seed=2, smoke_seed=3)
     with pytest.raises(ValidationError):
-        bundle.analysis_seed = 5
+        setattr(bundle, "analysis_seed", 5)
