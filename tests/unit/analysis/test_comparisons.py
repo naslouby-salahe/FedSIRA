@@ -1,4 +1,7 @@
 from fedsira.analysis.comparisons import (
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonState,
     ComparisonTestKind,
     apply_holm_adjustment,
     build_comparison_registry,
@@ -33,7 +36,7 @@ def test_canonical_name_follows_section_18_9_pattern() -> None:
         "One Byzantine Source-Copy Reproducer",
         "Full Plurality Path",
         "One Independent Retrain",
-        "malicious-admission",
+        ComparisonMetric.MALICIOUS_ADMISSION,
         ComparisonTestKind.SUPERIORITY,
     )
     assert name == (
@@ -54,7 +57,7 @@ def test_evaluate_comparison_zero_pairs_is_undefined() -> None:
         config.metrics_and_statistics.bootstrap,
         config.seeds_and_determinism.analysis_seed,
     )
-    assert result.comparison_state == "Undefined"
+    assert result.comparison_state is ComparisonState.UNDEFINED
     assert result.mean_paired_difference is None
     assert result.raw_p_value is None
 
@@ -91,12 +94,14 @@ def test_holm_adjustment_marks_passed_and_failed() -> None:
         config.metrics_and_statistics.bootstrap,
         config.seeds_and_determinism.analysis_seed,
     )
-    from fedsira.analysis.comparisons import ComparisonFamilyResult
-
     family_result = ComparisonFamilyResult(
-        ClaimFamily.PROPOSAL_SCREEN_NECESSITY, (passing, failing)
+        family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+        comparisons=(passing, failing),
     )
-    adjusted = apply_holm_adjustment(family_result, config.metrics_and_statistics.multiplicity)
+    adjusted = apply_holm_adjustment(
+        family_result,
+        config.metrics_and_statistics.multiplicity,
+    )
     by_name = {result.definition.canonical_name: result for result in adjusted.comparisons}
-    assert by_name[passing.definition.canonical_name].comparison_state == "Passed"
-    assert by_name[failing.definition.canonical_name].comparison_state == "Failed"
+    assert by_name[passing.definition.canonical_name].comparison_state is ComparisonState.PASSED
+    assert by_name[failing.definition.canonical_name].comparison_state is ComparisonState.FAILED
