@@ -45,6 +45,7 @@ ScreenDomainCount = PositiveInt
 VerifierCount = PositiveInt
 CommitteeSize = PositiveInt
 ReproductionRowCount = NonNegativeInt
+CompromisedReproducerCount = PositiveInt
 ScientificCellCount = NonNegativeInt
 LogicalEvidenceCycleCount = PositiveInt
 EvidenceCycleIndex = NonNegativeInt
@@ -113,6 +114,8 @@ OpeningPredicateSatisfied = BooleanFlag
 FinalGatePredicatesPass = BooleanFlag
 ReproductionWasTrained = BooleanFlag
 ReproductionCertified = BooleanFlag
+ExternalVerificationActive = BooleanFlag
+ResolvedRowRequirementReached = BooleanFlag
 
 
 class FrozenDomainModel(BaseModel):
