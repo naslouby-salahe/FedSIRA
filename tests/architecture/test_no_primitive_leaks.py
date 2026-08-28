@@ -51,7 +51,9 @@ def model_field_primitive_violations(tree: ast.Module) -> list[str]:
         if not _is_model_or_record(class_node):
             continue
         for statement in class_node.body:
-            if not isinstance(statement, ast.AnnAssign) or not isinstance(statement.target, ast.Name):
+            if not isinstance(statement, ast.AnnAssign) or not isinstance(
+                statement.target, ast.Name
+            ):
                 continue
             for primitive in _annotation_primitive_names(statement.annotation):
                 found.append(f"{class_node.name}.{statement.target.id}: {primitive}")
