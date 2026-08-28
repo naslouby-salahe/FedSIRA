@@ -1,6 +1,5 @@
 import hashlib
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 
 from fedsira.datasets.nbaiot.schema import (
@@ -11,29 +10,35 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.domain.records import (
+    AttackFamilyDirectoryToken,
+    AttackFamilyName,
+    DatasetFileDigest,
+    DatasetManifestDigest,
+    FrozenDomainModel,
+    RelativePathText,
+)
+from fedsira.runtime.determinism import framed_bytes
 
-GAFGYT_DIRECTORY_TOKEN = "GAFGYT_ATTACKS"
-MIRAI_DIRECTORY_TOKEN = "MIRAI_ATTACKS"
+GAFGYT_DIRECTORY_TOKEN: AttackFamilyDirectoryToken = "GAFGYT_ATTACKS"
+MIRAI_DIRECTORY_TOKEN: AttackFamilyDirectoryToken = "MIRAI_ATTACKS"
 BENIGN_FILENAME = "benign_traffic.csv"
 
-_ATTACK_FAMILY_BY_DIRECTORY_TOKEN: dict[CanonicalToken, CanonicalToken] = {
+_ATTACK_FAMILY_BY_DIRECTORY_TOKEN: dict[AttackFamilyDirectoryToken, AttackFamilyName] = {
     GAFGYT_DIRECTORY_TOKEN: "gafgyt",
     MIRAI_DIRECTORY_TOKEN: "mirai",
 }
 
 
-@dataclass(frozen=True)
-class DiscoveredCsvFile:
+class DiscoveredCsvFile(FrozenDomainModel):
     domain: NBaiotDomain
     class_id: NBaiotClass
-    relative_path: CanonicalToken
-    file_sha256: ArtifactDigest
+    relative_path: RelativePathText
+    file_sha256: DatasetFileDigest
     absolute_path: Path
 
 
-def compute_file_checksum(path: Path) -> ArtifactDigest:
+def compute_file_checksum(path: Path) -> DatasetFileDigest:
     hasher = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1_048_576), b""):
@@ -58,7 +63,7 @@ def extract_rar_archive(archive_path: Path, destination_directory: Path) -> None
 def _discover_attack_csv_files(
     device_directory: Path,
     domain: NBaiotDomain,
-    directory_token: CanonicalToken,
+    directory_token: AttackFamilyDirectoryToken,
     extraction_cache_root: Path,
 ) -> tuple[DiscoveredCsvFile, ...]:
     family = _ATTACK_FAMILY_BY_DIRECTORY_TOKEN[directory_token]
@@ -127,12 +132,14 @@ def discover_primary_csv_files(
     )
 
 
-def compute_dataset_manifest_hash(discovered: tuple[DiscoveredCsvFile, ...]) -> ArtifactDigest:
+def compute_dataset_manifest_hash(
+    discovered: tuple[DiscoveredCsvFile, ...],
+) -> DatasetManifestDigest:
     ordered = sorted(discovered, key=lambda item: (item.domain.value, item.relative_path))
     hasher = hashlib.sha256()
     for item in ordered:
         hasher.update(
-            canonical_bytes(
+            framed_bytes(
                 NBAIOT_DOMAIN_HASH_TOKEN[item.domain], item.relative_path, item.file_sha256
             )
         )
