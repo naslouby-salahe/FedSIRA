@@ -80,6 +80,9 @@ from fedsira.boundaries.heterogeneity import (
     select_heterogeneity_shift_features,
 )
 from fedsira.config.schema import ScientificConfig, VerificationConfig
+from fedsira.datasets.ciciot2023.schema import (
+    TARGET_LABEL as CICIOT2023_TARGET_LABEL,
+)
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
@@ -209,6 +212,7 @@ from fedsira.experiments.registry import (
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
+    experiment_by_name,
 )
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.post_reference import run_post_reference_training
@@ -341,16 +345,15 @@ class OpeningIdentity:
 
 
 def load_prepared_evidence_counts(
-    prepared_root: Path, cell: ScientificCell
+    prepared_root: Path, target_class_token: CanonicalToken
 ) -> PreparedEvidenceCounts | None:
-    metadata_directory = prepared_root
-    if not metadata_directory.exists():
+    if not prepared_root.exists():
         return None
     screen_target_count = 0
     reproduction_target_count = 0
     reproduction_supported_count = 0
-    final_gate_target_files = 0
-    for metadata_path in sorted(metadata_directory.glob("*.json")):
+    final_gate_target_domains: set[CanonicalToken] = set()
+    for metadata_path in sorted(prepared_root.glob("*.json")):
         try:
             payload = json.loads(metadata_path.read_text())
         except (json.JSONDecodeError, OSError):
@@ -358,23 +361,26 @@ def load_prepared_evidence_counts(
         role = payload.get("role")
         row_count = int(payload.get("row_count", 0))
         class_id = payload.get("class_id")
-        if role == Role.CANDIDATE_SCREEN.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
+        domain = payload.get("domain")
+        if role == Role.CANDIDATE_SCREEN.value and class_id == target_class_token:
             screen_target_count += row_count
-        elif role == Role.REPRODUCTION.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
+        elif role == Role.REPRODUCTION.value and class_id == target_class_token:
             reproduction_target_count += row_count
-        elif (
-            role == Role.POST_REFERENCE_REPLAY.value and class_id != NBaiotClass.GAFGYT_COMBO.value
-        ):
+        elif role == Role.POST_REFERENCE_REPLAY.value and class_id != target_class_token:
             reproduction_supported_count += row_count
-        elif role == Role.FINAL_GATE.value:
-            final_gate_target_files += 1
+        elif (
+            role == Role.FINAL_GATE.value
+            and class_id == target_class_token
+            and isinstance(domain, str)
+        ):
+            final_gate_target_domains.add(domain)
     if screen_target_count == 0 and reproduction_target_count == 0:
         return None
     return PreparedEvidenceCounts(
         screen_target_count=screen_target_count,
         reproduction_target_count=reproduction_target_count,
         reproduction_supported_count=reproduction_supported_count,
-        final_gate_adequate_domain_count=final_gate_target_files,
+        final_gate_adequate_domain_count=len(final_gate_target_domains),
     )
 
 
@@ -918,11 +924,15 @@ RESOLVED_FEDSIRA_CORE_METHOD = "Resolved FedSIRA Core"
 class ProtocolCellExecutor(CellExecutor):
     def __init__(
         self,
-        prepared_root: Path | None = None,
+        primary_prepared_root: Path | None = None,
+        secondary_prepared_root: Path | None = None,
         resolved_core: ResolvedCore | None = None,
     ) -> None:
-        self._prepared_root = prepared_root or prepared_evidence_root(
+        self._prepared_root = primary_prepared_root or prepared_evidence_root(
             DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
+        )
+        self._secondary_prepared_root = secondary_prepared_root or prepared_evidence_root(
+            DATASET_PACKAGE_NAME[DatasetId.CICIOT2023]
         )
         self._resolved_core = resolved_core
         self._real_anchor_cache: dict[MasterSeed, RealAnchor | None] = {}
@@ -1730,7 +1740,14 @@ class ProtocolCellExecutor(CellExecutor):
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         self._pending_real_report = None
-        evidence = load_prepared_evidence_counts(self._prepared_root, cell)
+        dataset = experiment_by_name(cell.experiment).dataset
+        if dataset is DatasetId.CICIOT2023:
+            prepared_root = self._secondary_prepared_root
+            target_class_token = CICIOT2023_TARGET_LABEL
+        else:
+            prepared_root = self._prepared_root
+            target_class_token = NBaiotClass.GAFGYT_COMBO.value
+        evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
         if evidence is None:
             return CellExecutionOutcome(
                 cell=cell,
