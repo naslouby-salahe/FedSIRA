@@ -26,6 +26,7 @@ NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 CanonicalToken = NonEmptyString
 ExperimentName = CanonicalToken
+DomainId = CanonicalToken
 DatasetClassToken = CanonicalToken
 RepositoryPath = NonEmptyString
 Doi = NonEmptyString
@@ -88,6 +89,8 @@ DeltaScale = PositiveFloat
 MetricTolerance = PositiveFloat
 PValueDisplayFloor = PositiveFloat
 DbscanEpsilon = PositiveFloat
+ProductionWeight = NonNegativeFloat
+KrumScore = NonNegativeFloat
 
 PoisonFraction = Probability
 ClientDropout = Probability
@@ -104,10 +107,25 @@ HeterogeneityMultiplier = Probability
 PinMemoryEnabled = BooleanFlag
 PersistentWorkersEnabled = BooleanFlag
 PredictorCountMatchesOfficial = BooleanFlag
+SourceCommitted = BooleanFlag
+EvidenceAdequate = BooleanFlag
+OpeningPredicateSatisfied = BooleanFlag
+FinalGatePredicatesPass = BooleanFlag
+ReproductionWasTrained = BooleanFlag
+ReproductionCertified = BooleanFlag
 
 
 class FrozenDomainModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", protected_namespaces=())
+
+
+class TensorDomainModel(FrozenDomainModel):
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+        protected_namespaces=(),
+        arbitrary_types_allowed=True,
+    )
 
 
 class SeedBundle(FrozenDomainModel):
