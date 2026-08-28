@@ -3,10 +3,10 @@ from collections.abc import Sequence
 import torch
 from torch import nn, optim
 
-from fedsira.attacks.transform import select_transform_rows
+from fedsira.attacks.source_backdoor import select_fractional_attack_rows
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
 from fedsira.domain.records import (
-    CanonicalToken,
+    ArtifactDigest,
     NamespaceSeed,
     NonNegativeFloat,
     PositiveFloat,
@@ -25,11 +25,11 @@ def source_copy_update(
 
 
 def select_model_replacement_carrier_rows(
-    capped_replay_gafgyt_udp_row_ids: Sequence[CanonicalToken],
+    capped_replay_gafgyt_udp_row_ids: Sequence[ArtifactDigest],
     poison_fraction: Probability,
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[CanonicalToken, ...] | None:
-    return select_transform_rows(
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
         capped_replay_gafgyt_udp_row_ids, poison_fraction, attack_generation_namespace_seed
     )
 
