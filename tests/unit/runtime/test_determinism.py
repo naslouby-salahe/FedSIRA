@@ -5,9 +5,9 @@ import torch
 
 from fedsira.domain.enums import SeedNamespace
 from fedsira.runtime.determinism import (
-    framed_bytes,
     derive_uint32,
     deterministic_order,
+    framed_bytes,
     local_training_seed,
     minibatch_order,
     namespace_seed,

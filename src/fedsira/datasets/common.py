@@ -17,7 +17,6 @@ from fedsira.domain.records import (
 )
 from fedsira.runtime.determinism import framed_bytes
 
-
 ROLE_HASH_TOKEN: dict[Role, RoleToken] = {
     Role.ANCHOR_TRAIN: "ANCHOR_TRAIN",
     Role.ANCHOR_VALIDATION: "ANCHOR_VALIDATION",

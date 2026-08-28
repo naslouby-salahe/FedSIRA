@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.schema import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
-from fedsira.domain.records import SampleId, DerivedSeed, PositiveFloat, PositiveInt
+from fedsira.domain.records import DerivedSeed, PositiveFloat, PositiveInt, SampleId
 from fedsira.learning.federated import run_fedavg_round
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
 

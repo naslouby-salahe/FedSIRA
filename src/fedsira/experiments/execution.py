@@ -44,9 +44,9 @@ from fedsira.domain.records import (
     OverwriteExisting,
     PairedDifference,
     ResolvedCoreComplete,
+    ScenarioName,
     ScientificCellCount,
     ScientificCellSemanticKey,
-    ScenarioName,
     TerminalExperimentState,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import SampleId, MasterSeed, PositiveInt, Probability
+from fedsira.domain.records import MasterSeed, PositiveInt, Probability, SampleId
 from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 

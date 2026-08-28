@@ -108,11 +108,6 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
 )
 from fedsira.evaluation.records import MetricResult
-from fedsira.protocol.opening import (
-    ScreenLossObservation,
-    run_proposal_screen_for_domain,
-    screen_fold_index,
-)
 from fedsira.experiments.registry import EpistemicFailureType, ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.federated import run_fedavg_round, train_one_client_locally
@@ -123,10 +118,15 @@ from fedsira.models.mlp import (
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
+from fedsira.protocol.opening import (
+    ScreenLossObservation,
+    run_proposal_screen_for_domain,
+    screen_fold_index,
+)
 from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime.determinism import (
-    framed_bytes,
     derive_uint32,
+    framed_bytes,
     local_training_seed,
     namespace_seed,
     seed_job_local_rng_streams,

@@ -22,12 +22,12 @@ from fedsira.domain.records import (
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
-    MaterialThreshold,
     MaterialityDecision,
+    MaterialThreshold,
     MethodName,
     MetricDifference,
-    PValue,
     PairedDifference,
+    PValue,
     ScenarioName,
 )
 from fedsira.evaluation.aggregation import bootstrap_percentile_confidence_interval

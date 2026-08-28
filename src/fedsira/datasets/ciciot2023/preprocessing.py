@@ -29,9 +29,9 @@ from fedsira.datasets.ciciot2023.schema import (
     TARGET_LABEL,
     CICIoT2023PseudoDomain,
     build_class_registry,
+    hash_to_pseudo_domain,
     normalize_label,
     normalize_label_token,
-    hash_to_pseudo_domain,
 )
 from fedsira.datasets.ciciot2023.validation import (
     validate_label_collisions,

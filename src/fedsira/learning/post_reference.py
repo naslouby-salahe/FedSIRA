@@ -5,7 +5,7 @@ from torch import nn, optim
 from torch.nn import functional as torch_functional
 
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
-from fedsira.domain.records import SampleId, DerivedSeed, NonNegativeFloat, PositiveInt
+from fedsira.domain.records import DerivedSeed, NonNegativeFloat, PositiveInt, SampleId
 from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
 from fedsira.models.mlp import (

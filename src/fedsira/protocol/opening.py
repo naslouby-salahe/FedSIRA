@@ -5,9 +5,6 @@ from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, Pro
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
 from fedsira.domain.records import (
     AttackCarrierRequired,
-    CandidateFreeOpeningPredicate,
-    SampleId,
-    ScreenDomainDecision,
     DerivedSeed,
     DomainId,
     EvidenceAdequate,
@@ -17,14 +14,16 @@ from fedsira.domain.records import (
     NamespaceSeed,
     OpeningPredicateSatisfied,
     ProductionWeight,
+    SampleId,
     ScreenDifferential,
     ScreenDomainCount,
+    ScreenDomainDecision,
     ScreenLoss,
     SourceCommitted,
 )
 from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.evaluation.records import MetricResult
-from fedsira.runtime.determinism import framed_bytes, deterministic_order
+from fedsira.runtime.determinism import deterministic_order, framed_bytes
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
