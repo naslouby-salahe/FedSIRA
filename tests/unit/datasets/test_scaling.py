@@ -86,13 +86,21 @@ def test_standardize_row_clips_high_values() -> None:
     assert standardized[1] >= SCALING.clip_min
 
 
-def test_feature_moments_validate_consistency() -> None:
-    inconsistent = FeatureMoments(
-        feature_names=("f0",),
-        means=(0.0,),
-        standard_deviations=(1.0, 2.0),
-        training_row_count=2,
-    )
-    with pytest.raises(ValueError):
-        inconsistent.validate_consistency()
-    MOMENTS.validate_consistency()
+def test_feature_moments_reject_inconsistent_lengths() -> None:
+    with pytest.raises(ValueError, match="matching lengths"):
+        FeatureMoments(
+            feature_names=("f0",),
+            means=(0.0,),
+            standard_deviations=(1.0, 2.0),
+            training_row_count=2,
+        )
+
+
+def test_feature_moments_reject_nonpositive_scale() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        FeatureMoments(
+            feature_names=("f0",),
+            means=(0.0,),
+            standard_deviations=(0.0,),
+            training_row_count=2,
+        )
