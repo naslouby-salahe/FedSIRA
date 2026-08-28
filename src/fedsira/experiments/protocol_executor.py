@@ -295,7 +295,7 @@ from fedsira.protocol.verification import (
 )
 from fedsira.runtime.determinism import derive_uint32
 from fedsira.runtime.state import FailureDetail
-from fedsira.runtime.telemetry import (
+from fedsira.runtime.timing import (
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,

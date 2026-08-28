@@ -19,3 +19,10 @@ def test_elapsed_timer_fresh_instance_restarts() -> None:
     time.sleep(0.02)
     second = ElapsedTimer()
     assert second.elapsed_seconds() < timer.elapsed_seconds()
+
+
+from fedsira.runtime.timing import peak_host_resident_set_bytes
+
+
+def test_peak_host_resident_set_bytes_is_positive() -> None:
+    assert peak_host_resident_set_bytes() > 0
