@@ -158,6 +158,15 @@ ModelTransmissionCount = NonNegativeInt
 AdequateFinalGateDomainCount = NonNegativeInt
 MaximumByzantineReproductionRows = NonNegativeInt
 KrumNeighborCount = PositiveInt
+ObservedPositiveReportCount = NonNegativeInt
+MaximumByzantineReportCount = NonNegativeInt
+MinimumHonestPositiveReportCount = NonNegativeInt
+EligibleEvidenceHolderCount = NonNegativeInt
+MinimumEligibleEvidenceHolderCount = PositiveInt
+EvidenceArrivalCycleIndex = NonNegativeInt
+ClaimedCompletionCycleIndex = NonNegativeInt
+EligiblePoolSize = PositiveInt
+ByzantineDomainCount = NonNegativeInt
 
 StandardizedValue = FiniteFloat
 MetricDifference = FiniteFloat
@@ -210,6 +219,7 @@ RateWorsening = Probability
 CapabilityCertificationRate = Probability
 AdmissionRateChange = Probability
 TargetF1Change = Probability
+AtLeastTwoByzantineProbability = Probability
 Percentile = Percentage
 RoleBoundary = Probability
 RolePosition = Probability
@@ -229,6 +239,7 @@ MaterialityDecision = BooleanValue
 ClaimGateDecision = BooleanValue
 CapabilityContractSatisfied = BooleanValue
 SourceExcludedFromKrum = BooleanValue
+KrumCommitteeAdmissible = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
