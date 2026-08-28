@@ -112,9 +112,7 @@ ROADMAP_MODULES = frozenset(
 
 def _relative_python_modules() -> frozenset[str]:
     return frozenset(
-        path.relative_to(SRC_ROOT).as_posix()
-        for path in SRC_ROOT.rglob("*.py")
-        if path.is_file()
+        path.relative_to(SRC_ROOT).as_posix() for path in SRC_ROOT.rglob("*.py") if path.is_file()
     )
 
 
@@ -122,9 +120,9 @@ def test_source_tree_matches_authoritative_roadmap() -> None:
     observed = _relative_python_modules()
     missing = sorted(ROADMAP_MODULES - observed)
     unexpected = sorted(observed - ROADMAP_MODULES)
-    assert not missing and not unexpected, (
-        f"Roadmap source tree drift; missing={missing}, unexpected={unexpected}"
-    )
+    assert (
+        not missing and not unexpected
+    ), f"Roadmap source tree drift; missing={missing}, unexpected={unexpected}"
 
 
 def test_roadmap_module_paths_are_normalized() -> None:
