@@ -5,20 +5,22 @@ import torch
 from fedsira.config.schema import FinalGateConfig
 from fedsira.domain.enums import ClaimState
 from fedsira.domain.records import (
-    BooleanFlag,
-    CanonicalToken,
+    AdequateFinalGateDomainCount,
+    CommitteeSize,
     DomainId,
     FinalGatePredicatesPass,
+    KrumNeighborCount,
     KrumScore,
-    NonNegativeInt,
-    PositiveInt,
+    MaximumByzantineReproductionRows,
+    ReproductionRowId,
+    SourceExcludedFromKrum,
     TensorDomainModel,
 )
 from fedsira.protocol.theory import krum_committee_is_admissible
 
 
 def synthesis_pending_transition(
-    adequate_final_gate_domain_count: NonNegativeInt,
+    adequate_final_gate_domain_count: AdequateFinalGateDomainCount,
     final_gate_predicates_pass: FinalGatePredicatesPass,
     final_gate_config: FinalGateConfig,
 ) -> ClaimState:
@@ -30,8 +32,9 @@ def synthesis_pending_transition(
 
 
 def krum_input_excludes_source(
-    candidate_row_ids: Sequence[CanonicalToken], source_row_id: CanonicalToken | None
-) -> BooleanFlag:
+    candidate_row_ids: Sequence[ReproductionRowId],
+    source_row_id: ReproductionRowId | None,
+) -> SourceExcludedFromKrum:
     if source_row_id is None:
         return True
     return source_row_id not in candidate_row_ids
@@ -43,15 +46,16 @@ class CertifiedReproductionRow(TensorDomainModel):
 
 
 def krum_neighbor_count(
-    committee_size: PositiveInt, maximum_byzantine_rows: NonNegativeInt
-) -> PositiveInt:
+    committee_size: CommitteeSize,
+    maximum_byzantine_rows: MaximumByzantineReproductionRows,
+) -> KrumNeighborCount:
     return committee_size - maximum_byzantine_rows - 2
 
 
 def krum_score(
     row: CertifiedReproductionRow,
     committee: Sequence[CertifiedReproductionRow],
-    neighbor_count: PositiveInt,
+    neighbor_count: KrumNeighborCount,
 ) -> KrumScore:
     distances = sorted(
         (
@@ -65,14 +69,16 @@ def krum_score(
 
 
 def select_krum_update(
-    committee: Sequence[CertifiedReproductionRow], maximum_byzantine_rows: NonNegativeInt
+    committee: Sequence[CertifiedReproductionRow],
+    maximum_byzantine_rows: MaximumByzantineReproductionRows,
 ) -> CertifiedReproductionRow:
-    if not krum_committee_is_admissible(len(committee), maximum_byzantine_rows):
+    committee_size = len(committee)
+    if not krum_committee_is_admissible(committee_size, maximum_byzantine_rows):
         raise ValueError(
-            f"Krum committee of size {len(committee)} is not admissible for "
+            f"Krum committee of size {committee_size} is not admissible for "
             f"maximum_byzantine_rows={maximum_byzantine_rows}"
         )
-    neighbor_count = krum_neighbor_count(len(committee), maximum_byzantine_rows)
+    neighbor_count = krum_neighbor_count(committee_size, maximum_byzantine_rows)
     ranked = sorted(
         (
             krum_score(row, committee, neighbor_count),
