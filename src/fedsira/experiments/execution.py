@@ -101,7 +101,9 @@ class ExperimentExecutionResult:
 
 
 class CellExecutor(Protocol):
-    def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome: ...
+    def execute_cell(
+        self, cell: ScientificCell, config: ScientificConfig
+    ) -> CellExecutionOutcome: ...
 
 
 class ExecutionRecordStore:
