@@ -66,6 +66,7 @@ MetricName = TextValue
 DomainId = TextValue
 ClassLabel = TextValue
 DatasetClassToken = ClassLabel
+DatasetColumnName = TextValue
 FeatureName = TextValue
 RoleName = TextValue
 RoleToken = TextValue
