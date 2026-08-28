@@ -41,7 +41,7 @@ from fedsira.experiments.registry import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.protocol.source_selection import select_source_domain, source_selection_order
+from fedsira.protocol.opening import select_source_domain, source_selection_order
 from fedsira.runtime.determinism import namespace_seed
 
 pytestmark = pytest.mark.skip(
@@ -163,12 +163,12 @@ def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_ro
     anchor = train_anchor(prepared_root, CONFIG, master_seed)
     assert anchor is not None
     source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
-    source_order = source_selection_order(source_selection_namespace_seed)
+    source_order = source_selection_order(NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed)
     source_domain = select_source_domain(
         source_order,
         frozenset(NBAIOT_DOMAIN_ORDER),
-        requires_gafgyt_udp_carrier=False,
-        domains_with_gafgyt_udp=frozenset(),
+        requires_attack_carrier=False,
+        domains_with_attack_carrier=frozenset(),
     )
     adequate_domains = non_source_domains(source_domain)
     assert len(adequate_domains) == 8
