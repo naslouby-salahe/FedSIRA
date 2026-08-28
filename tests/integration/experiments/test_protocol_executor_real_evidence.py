@@ -163,7 +163,9 @@ def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_ro
     anchor = train_anchor(prepared_root, CONFIG, master_seed)
     assert anchor is not None
     source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
-    source_order = source_selection_order(NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed)
+    source_order = source_selection_order(
+        NBAIOT_DOMAIN_ORDER, NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed
+    )
     source_domain = select_source_domain(
         source_order,
         frozenset(NBAIOT_DOMAIN_ORDER),
