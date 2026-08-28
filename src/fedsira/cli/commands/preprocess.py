@@ -3,7 +3,6 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from fedsira.artifacts.fingerprints import (
-    DATASET_PACKAGE_NAME,
     PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES,
     compute_artifact_dependency_fingerprint,
     compute_external_dependency_fingerprint,
@@ -54,15 +53,20 @@ from fedsira.domain.enums import (
     DatasetId,
     ProducerFingerprintFamily,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken
+from fedsira.domain.records import (
+    ArtifactDigest,
+    ArtifactReuseDecision,
+    DatasetManifestDigest,
+    OverwriteExisting,
+)
 
 
 def _publish_or_reuse_canonical_dataset_manifest(
     dataset: DatasetId,
     config: ScientificConfig,
-    dataset_split_view_identities: CanonicalToken,
+    dataset_split_view_identities: DatasetManifestDigest,
     payload_fields: Mapping[str, object],
-) -> tuple[ArtifactManifest, bool]:
+) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
     producer_fingerprint = compute_producer_component_fingerprint(entry_modules, schema_version="1")
     external_fingerprint = compute_external_dependency_fingerprint(
@@ -105,7 +109,7 @@ def _publish_or_reuse_canonical_dataset_manifest(
     return published, False
 
 
-def _preprocess_nbaiot(overwrite: bool) -> None:
+def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
     extraction_cache_root = (
@@ -141,9 +145,7 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
         },
     )
 
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
-        DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
-    )
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
     scaler_root = REPOSITORY_ROOT / prepared_feature_root()
     views, moments = materialize_nbaiot_prepared_views(
         discovered, config, prepared_root, scaler_root, overwrite
@@ -162,15 +164,13 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
     print(f"role row totals: {role_counts}")
 
 
-def _preprocess_ciciot2023(overwrite: bool) -> None:
+def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_root = (
         REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
-        DATASET_PACKAGE_NAME[DatasetId.CICIOT2023]
-    )
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023)
     scaler_root = REPOSITORY_ROOT / prepared_feature_root()
     metadata_root = REPOSITORY_ROOT / preprocessing_metadata_root()
     cache_root = (
@@ -225,7 +225,7 @@ def _preprocess_ciciot2023(overwrite: bool) -> None:
     print(f"role row totals: {role_counts}")
 
 
-def execute(dataset: DatasetId | None, overwrite: bool) -> None:
+def execute(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
     selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
     for selected_dataset in selected_datasets:
         if selected_dataset is DatasetId.N_BAIOT:
