@@ -18,6 +18,7 @@ from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import deterministic_order
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
+SOURCE_SELECTION_SEPARATOR = SeedNamespace.SOURCE_SELECTION.value
 
 
 class ClaimOpeningEntry(FrozenDomainModel):
@@ -38,6 +39,32 @@ class ScreenDomainResult(FrozenDomainModel):
     domain: DomainId
     is_evidence_adequate: EvidenceAdequate
     meets_opening_predicate: OpeningPredicateSatisfied
+
+
+def source_selection_order(
+    eligible_domains: Sequence[DomainId],
+    source_selection_namespace_seed: NamespaceSeed,
+) -> tuple[DomainId, ...]:
+    return deterministic_order(
+        eligible_domains,
+        SOURCE_SELECTION_SEPARATOR,
+        source_selection_namespace_seed,
+    )
+
+
+def select_source_domain(
+    source_order: Sequence[DomainId],
+    domains_with_target_stream: frozenset[DomainId],
+    requires_attack_carrier: BooleanFlag,
+    domains_with_attack_carrier: frozenset[DomainId],
+) -> DomainId | None:
+    for domain in source_order:
+        if domain not in domains_with_target_stream:
+            continue
+        if requires_attack_carrier and domain not in domains_with_attack_carrier:
+            continue
+        return domain
+    return None
 
 
 def screen_domain_order(
