@@ -4,15 +4,23 @@ import unicodedata
 from enum import IntEnum
 
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, PositiveInt
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.domain.records import (
+    ClassLabel,
+    DatasetManifestDigest,
+    DomainCount,
+    DomainId,
+    PartitionSalt,
+    PredictorCount,
+    SampleId,
+    SeedDerivationLabel,
+)
+from fedsira.runtime.determinism import framed_bytes
 
-TARGET_LABEL = "BACKDOOR_MALWARE"
-BENIGN_LABEL = "BENIGN"
-BENIGN_CANONICAL_ALIASES: frozenset[CanonicalToken] = frozenset({"BENIGNTRAFFIC", "BENIGN_TRAFFIC"})
-OFFICIAL_EXPECTED_PREDICTOR_COUNT = 46
-
-ROW_IDENTIFIER_CANONICAL_TOKENS: frozenset[CanonicalToken] = frozenset(
+TARGET_LABEL: ClassLabel = "BACKDOOR_MALWARE"
+BENIGN_LABEL: ClassLabel = "BENIGN"
+BENIGN_LABEL_ALIASES: frozenset[ClassLabel] = frozenset({"BENIGNTRAFFIC", "BENIGN_TRAFFIC"})
+OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
+ROW_IDENTIFIER_TOKENS: frozenset[ClassLabel] = frozenset(
     {"INDEX", "ROW_ID", "ROWID", "UNNAMED_0"}
 )
 
@@ -29,12 +37,12 @@ class CICIoT2023PseudoDomain(IntEnum):
     PSEUDO_DOMAIN_9 = 8
 
     @property
-    def display_token(self) -> CanonicalToken:
+    def display_token(self) -> DomainId:
         return f"PSEUDO_DOMAIN_{int(self) + 1}"
 
 
-PSEUDO_DOMAIN_COUNT = len(CICIoT2023PseudoDomain)
-PSEUDO_DOMAIN_HASH_SEPARATOR = "CIC_IOT_2023_PSEUDO_DOMAIN"
+PSEUDO_DOMAIN_COUNT: DomainCount = len(CICIoT2023PseudoDomain)
+PSEUDO_DOMAIN_HASH_SEPARATOR: SeedDerivationLabel = "CIC_IOT_2023_PSEUDO_DOMAIN"
 
 if len(NBAIOT_DOMAIN_ORDER) != PSEUDO_DOMAIN_COUNT:
     raise RuntimeError("CICIoT2023 pseudo-domain count must equal the primary device-proxy count")
@@ -42,30 +50,26 @@ if len(NBAIOT_DOMAIN_ORDER) != PSEUDO_DOMAIN_COUNT:
 _NON_ALPHANUMERIC_RUN = re.compile(r"[^0-9A-Za-z]+")
 
 
-def canonicalize_token(raw: str) -> CanonicalToken:
+def normalize_label_token(raw: str) -> ClassLabel:
     normalized = unicodedata.normalize("NFC", raw).strip().upper()
     normalized = _NON_ALPHANUMERIC_RUN.sub("_", normalized)
     return normalized.strip("_")
 
 
-def canonicalize_label(raw: str) -> CanonicalToken:
-    canonical = canonicalize_token(raw)
-    if canonical in BENIGN_CANONICAL_ALIASES:
+def normalize_label(raw: str) -> ClassLabel:
+    normalized = normalize_label_token(raw)
+    if normalized in BENIGN_LABEL_ALIASES:
         return BENIGN_LABEL
-    return canonical
+    return normalized
 
 
-def canonical_class_registry(
-    observed_labels: frozenset[CanonicalToken],
-) -> tuple[CanonicalToken, ...]:
+def build_class_registry(observed_labels: frozenset[ClassLabel]) -> tuple[ClassLabel, ...]:
     remaining = sorted(observed_labels - {BENIGN_LABEL, TARGET_LABEL})
     return (BENIGN_LABEL, TARGET_LABEL, *remaining)
 
 
-def is_row_identifier_column(
-    canonical_column_token: CanonicalToken, values: tuple[int, ...]
-) -> bool:
-    if canonical_column_token not in ROW_IDENTIFIER_CANONICAL_TOKENS:
+def is_row_identifier_column(column_token: ClassLabel, values: tuple[int, ...]) -> bool:
+    if column_token not in ROW_IDENTIFIER_TOKENS:
         return False
     if len(set(values)) != len(values):
         return False
@@ -75,16 +79,16 @@ def is_row_identifier_column(
 
 
 def hash_to_pseudo_domain(
-    dataset_manifest_hash: ArtifactDigest,
-    canonical_label: CanonicalToken,
-    stable_row_id: ArtifactDigest,
-    pseudo_domain_partition_salt: PositiveInt,
+    dataset_manifest_hash: DatasetManifestDigest,
+    label: ClassLabel,
+    stable_row_id: SampleId,
+    pseudo_domain_partition_salt: PartitionSalt,
 ) -> CICIoT2023PseudoDomain:
     digest = hashlib.sha256(
-        canonical_bytes(
+        framed_bytes(
             PSEUDO_DOMAIN_HASH_SEPARATOR,
             dataset_manifest_hash,
-            canonical_label,
+            label,
             stable_row_id,
             pseudo_domain_partition_salt,
         )
