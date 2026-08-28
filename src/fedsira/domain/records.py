@@ -110,6 +110,7 @@ TableName = TextValue
 ClaimEvidenceName = TextValue
 ReportVerificationFailure = TextValue
 PreparedViewKey = TextValue
+ProgramBlockName = TextValue
 RoleHashToken = TextValue
 
 MasterSeed = Uint32Bound

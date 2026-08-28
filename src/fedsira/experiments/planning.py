@@ -4,7 +4,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import CanonicalToken, MasterSeed, PositiveInt
+from fedsira.domain.records import (
+    CollapseDecisionPassed,
+    ConditionName,
+    ExperimentName,
+    MasterSeed,
+    MethodName,
+    ProgramBlockName,
+    ResolvedCoreComplete,
+    ResolvedCoreDependent,
+    ScientificCellCount,
+    ScientificCellSemanticKey,
+)
 from fedsira.experiments.collapse import CollapseDecisionKind
 from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
@@ -17,7 +28,7 @@ from fedsira.experiments.registry import (
 
 
 def collapse_decision_kind_for_experiment(
-    experiment: CanonicalToken,
+    experiment: ExperimentName,
 ) -> CollapseDecisionKind | None:
     return {
         "Proposal-Assisted Opening Necessity": CollapseDecisionKind.PROPOSAL_ASSISTANCE,
@@ -29,17 +40,17 @@ def collapse_decision_kind_for_experiment(
 
 @dataclass(frozen=True)
 class ScientificCell:
-    experiment: CanonicalToken
-    method: CanonicalToken
-    condition: CanonicalToken
+    experiment: ExperimentName
+    method: MethodName
+    condition: ConditionName
     master_seed: MasterSeed
 
     @property
-    def semantic_key(self) -> CanonicalToken:
+    def semantic_key(self) -> ScientificCellSemanticKey:
         return "|".join((self.experiment, self.method, self.condition, str(self.master_seed)))
 
 
-PRE_CORE_EXPERIMENT_NAMES: frozenset[CanonicalToken] = frozenset(
+PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
     {
         "Data and Domain Evidence Validation",
         "Protocol Invariant Validation",
@@ -53,27 +64,27 @@ PRE_CORE_EXPERIMENT_NAMES: frozenset[CanonicalToken] = frozenset(
 class PlannedExperiment:
     definition: ExperimentDefinition
     cells: tuple[ScientificCell, ...]
-    prerequisites: tuple[CanonicalToken, ...]
+    prerequisites: tuple[ExperimentName, ...]
     lifecycle_state: ExperimentLifecycleState
-    resolved_core_dependent: bool
+    resolved_core_dependent: ResolvedCoreDependent
 
 
 @dataclass(frozen=True)
 class ExperimentPlan:
     experiments: tuple[PlannedExperiment, ...]
 
-    def experiment(self, name: CanonicalToken) -> PlannedExperiment:
+    def experiment(self, name: ExperimentName) -> PlannedExperiment:
         for planned in self.experiments:
             if planned.definition.name == name:
                 return planned
         raise KeyError(f"unknown planned experiment {name!r}")
 
     @property
-    def total_cell_count(self) -> PositiveInt:
+    def total_cell_count(self) -> ScientificCellCount:
         return sum(len(planned.cells) for planned in self.experiments)
 
     @property
-    def pre_core_cell_count(self) -> PositiveInt:
+    def pre_core_cell_count(self) -> ScientificCellCount:
         return sum(
             len(planned.cells)
             for planned in self.experiments
@@ -81,7 +92,7 @@ class ExperimentPlan:
         )
 
     @property
-    def post_core_cell_count(self) -> PositiveInt:
+    def post_core_cell_count(self) -> ScientificCellCount:
         return sum(
             len(planned.cells)
             for planned in self.experiments
@@ -150,8 +161,8 @@ def _planned_experiment(
 
 
 def build_plan(
-    resolved_core_complete: bool = False,
-    collapse_decision_states: Sequence[tuple[CanonicalToken, bool]] | None = None,
+    resolved_core_complete: ResolvedCoreComplete = False,
+    collapse_decision_states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]] | None = None,
     master_seeds: tuple[MasterSeed, ...] | None = None,
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:
@@ -207,7 +218,7 @@ def build_plan(
     return ExperimentPlan(experiments=tuple(planned))
 
 
-def plan_cell_count_by_program_block() -> dict[CanonicalToken, PositiveInt]:
+def plan_cell_count_by_program_block() -> dict[ProgramBlockName, ScientificCellCount]:
     return {
         "data_and_domain_evidence_validation": 1,
         "protocol_invariant_validation": 1,

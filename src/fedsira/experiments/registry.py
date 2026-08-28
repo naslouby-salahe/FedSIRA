@@ -11,7 +11,6 @@ from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.domain.enums import DatasetId, RootCauseMixture
 from fedsira.domain.records import (
     ExperimentName,
-    ExperimentName,
     FrozenDomainModel,
     ScientificCellCount,
     SeedCount,
