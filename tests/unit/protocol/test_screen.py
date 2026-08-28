@@ -1,4 +1,4 @@
-from fedsira.evaluation.screen import (
+from fedsira.protocol.opening import (
     ScreenLossObservation,
     match_held_out_fold,
     proposal_screen_differential,
@@ -21,13 +21,13 @@ def test_screen_fold_index_is_reproducible_across_calls_with_the_same_seed() -> 
 
 
 def test_match_held_out_fold_matches_closest_anchor_loss_within_decile() -> None:
-    targets = [ScreenLossObservation("t1", anchor_loss=1.0, source_loss=0.5)]
+    targets = [ScreenLossObservation(sample_id="t1", anchor_loss=1.0, source_loss=0.5)]
     controls = [
-        ScreenLossObservation("c1", anchor_loss=0.9, source_loss=0.9),
-        ScreenLossObservation("c2", anchor_loss=1.1, source_loss=1.1),
+        ScreenLossObservation(sample_id="c1", anchor_loss=0.9, source_loss=0.9),
+        ScreenLossObservation(sample_id="c2", anchor_loss=1.1, source_loss=1.1),
     ]
     other_fold_controls = [
-        ScreenLossObservation(f"o{i}", anchor_loss=float(i), source_loss=float(i))
+        ScreenLossObservation(sample_id=f"o{i}", anchor_loss=float(i), source_loss=float(i))
         for i in range(1, 10)
     ]
     matches = match_held_out_fold(targets, controls, other_fold_controls)
@@ -37,10 +37,10 @@ def test_match_held_out_fold_matches_closest_anchor_loss_within_decile() -> None
 
 
 def test_match_held_out_fold_returns_none_when_bin_has_no_candidate() -> None:
-    targets = [ScreenLossObservation("t1", anchor_loss=100.0, source_loss=50.0)]
-    controls = [ScreenLossObservation("c1", anchor_loss=0.1, source_loss=0.1)]
+    targets = [ScreenLossObservation(sample_id="t1", anchor_loss=100.0, source_loss=50.0)]
+    controls = [ScreenLossObservation(sample_id="c1", anchor_loss=0.1, source_loss=0.1)]
     other_fold_controls = [
-        ScreenLossObservation(f"o{i}", anchor_loss=float(i), source_loss=float(i))
+        ScreenLossObservation(sample_id=f"o{i}", anchor_loss=float(i), source_loss=float(i))
         for i in range(1, 10)
     ]
     assert match_held_out_fold(targets, controls, other_fold_controls) is None
@@ -51,8 +51,8 @@ def test_proposal_screen_differential_empty_is_none() -> None:
 
 
 def test_proposal_screen_differential_matches_hand_computation() -> None:
-    target = ScreenLossObservation("t1", anchor_loss=1.0, source_loss=0.4)
-    control = ScreenLossObservation("c1", anchor_loss=1.0, source_loss=0.9)
+    target = ScreenLossObservation(sample_id="t1", anchor_loss=1.0, source_loss=0.4)
+    control = ScreenLossObservation(sample_id="c1", anchor_loss=1.0, source_loss=0.9)
     differential = proposal_screen_differential([(target, control)])
     assert differential is not None
     assert abs(differential - 0.5) < 1e-9
@@ -61,11 +61,11 @@ def test_proposal_screen_differential_matches_hand_computation() -> None:
 def test_run_proposal_screen_for_domain_end_to_end() -> None:
     fold_count = 5
     targets = [
-        ScreenLossObservation(f"target-{i}", anchor_loss=float(i % 5), source_loss=0.1)
+        ScreenLossObservation(sample_id=f"target-{i}", anchor_loss=float(i % 5), source_loss=0.1)
         for i in range(10)
     ]
     controls = [
-        ScreenLossObservation(f"control-{i}", anchor_loss=float(i % 5), source_loss=0.2)
+        ScreenLossObservation(sample_id=f"control-{i}", anchor_loss=float(i % 5), source_loss=0.2)
         for i in range(50)
     ]
     fold_assignment = {

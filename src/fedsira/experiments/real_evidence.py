@@ -108,7 +108,7 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
 )
 from fedsira.evaluation.records import MetricResult
-from fedsira.evaluation.screen import (
+from fedsira.protocol.opening import (
     ScreenLossObservation,
     run_proposal_screen_for_domain,
     screen_fold_index,
@@ -2109,7 +2109,9 @@ def compute_screen_differential(
         fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
         target_observations.append(
             ScreenLossObservation(
-                sample_id, float(target_anchor_loss[index]), float(target_source_loss[index])
+                sample_id=sample_id,
+                anchor_loss=float(target_anchor_loss[index]),
+                source_loss=float(target_source_loss[index]),
             )
         )
     control_observations: list[ScreenLossObservation] = []
@@ -2117,7 +2119,9 @@ def compute_screen_differential(
         fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
         control_observations.append(
             ScreenLossObservation(
-                sample_id, float(control_anchor_loss[index]), float(control_source_loss[index])
+                sample_id=sample_id,
+                anchor_loss=float(control_anchor_loss[index]),
+                source_loss=float(control_source_loss[index]),
             )
         )
     return run_proposal_screen_for_domain(
