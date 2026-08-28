@@ -84,6 +84,7 @@ CheckpointIdentity = TextValue
 TrainingConditionId = TextValue
 SeedDerivationLabel = TextValue
 SampleId = TextValue
+SampleIdPrefix = TextValue
 RelativePathText = TextValue
 
 # Deterministic identities and seeds.
@@ -195,6 +196,7 @@ AdmissionRateChange = Probability
 TargetF1Change = Probability
 Percentile = Percentage
 RoleBoundary = Probability
+RolePosition = Probability
 
 # Boolean semantics. Each public field uses a meaning-specific alias.
 PinMemoryEnabled = BooleanValue
