@@ -1,11 +1,26 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from enum import StrEnum
 
 from fedsira.config.schema import ClaimSupportThresholdsConfig, MaterialityConfig
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, Probability
+from fedsira.domain.records import (
+    AdmissionCount,
+    CapabilityCertificationRate,
+    ClaimGateDecision,
+    ClaimId,
+    ClaimReason,
+    ClaimScopeText,
+    ComparisonName,
+    ComparisonState,
+    ExperimentName,
+    FamilyWiseAlpha,
+    FrozenDomainModel,
+    MaterialityDecision,
+    MetricName,
+    MinimumCompletePairCount,
+    PValue,
+)
 from fedsira.experiments.registry import ClaimFamily
 
 
@@ -19,21 +34,19 @@ class FinalClaimState(StrEnum):
     NOT_TESTED = "Not Tested"
 
 
-@dataclass(frozen=True)
-class ClaimDefinition:
-    claim_id: CanonicalToken
-    exact_scoped_claim: CanonicalToken
-    evidence_experiments: tuple[CanonicalToken, ...]
-    primary_metric: CanonicalToken | None
-    required_comparison: CanonicalToken | None
+class ClaimDefinition(FrozenDomainModel):
+    claim_id: ClaimId
+    exact_scoped_claim: ClaimScopeText
+    evidence_experiments: tuple[ExperimentName, ...]
+    primary_metric: MetricName | None
+    required_comparison: ComparisonName | None
 
 
-@dataclass(frozen=True)
-class ClaimStateResult:
-    claim_id: CanonicalToken
+class ClaimStateResult(FrozenDomainModel):
+    claim_id: ClaimId
     state: FinalClaimState
-    scope: CanonicalToken
-    reason: CanonicalToken
+    scope: ClaimScopeText
+    reason: ClaimReason
 
 
 CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
@@ -254,35 +267,38 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
 )
 
 
-def claim_by_id(claim_id: CanonicalToken) -> ClaimDefinition:
+def claim_by_id(claim_id: ClaimId) -> ClaimDefinition:
     for definition in CLAIM_REGISTRY:
         if definition.claim_id == claim_id:
             return definition
     raise KeyError(f"unknown claim {claim_id!r}")
 
 
-@dataclass(frozen=True)
-class ClaimEvidence:
-    comparison_states: Mapping[CanonicalToken, CanonicalToken]
-    comparison_p_values: Mapping[CanonicalToken, Probability | None]
-    malicious_admissions: tuple[NonNegativeInt, ...]
-    legitimate_admissions: tuple[NonNegativeInt, ...]
-    permanent_singleton_admissions: NonNegativeInt
-    false_same_capability_rates: tuple[float, ...]
-    clean_oracle_material_degradations: tuple[bool, ...]
-    source_exclusion_gate_passed: bool | None
-    heterogeneity_boundary_passes: bool | None
-    secondary_generalization_passes: bool | None
+class ClaimEvidence(FrozenDomainModel):
+    comparison_states: Mapping[ComparisonName, ComparisonState]
+    comparison_p_values: Mapping[ComparisonName, PValue | None]
+    malicious_admissions: tuple[AdmissionCount, ...]
+    legitimate_admissions: tuple[AdmissionCount, ...]
+    permanent_singleton_admissions: AdmissionCount
+    false_same_capability_rates: tuple[CapabilityCertificationRate, ...]
+    clean_oracle_material_degradations: tuple[MaterialityDecision, ...]
+    source_exclusion_gate_passed: ClaimGateDecision | None
+    heterogeneity_boundary_passes: ClaimGateDecision | None
+    secondary_generalization_passes: ClaimGateDecision | None
 
 
-def _comparison_passed(evidence: ClaimEvidence, comparison: CanonicalToken) -> bool | None:
+def _comparison_passed(
+    evidence: ClaimEvidence, comparison: ComparisonName
+) -> ClaimGateDecision | None:
     state = evidence.comparison_states.get(comparison)
     if state is None:
         return None
     return state == "Passed"
 
 
-def _required_experiments_complete(definition: ClaimDefinition, evidence: ClaimEvidence) -> bool:
+def _required_experiments_complete(
+    definition: ClaimDefinition, evidence: ClaimEvidence
+) -> ClaimGateDecision:
     if definition.required_comparison is None:
         return True
     if definition.required_comparison not in evidence.comparison_states:
@@ -295,11 +311,11 @@ def _required_experiments_complete(definition: ClaimDefinition, evidence: ClaimE
 
 
 def derive_claim_states(
-    evidence: Mapping[CanonicalToken, ClaimEvidence],
+    evidence: Mapping[ClaimId, ClaimEvidence],
     materiality_config: MaterialityConfig,
     claim_support_thresholds: ClaimSupportThresholdsConfig,
-    minimum_complete_pairs_for_claim_support: NonNegativeInt,
-    family_wise_alpha: Probability,
+    minimum_complete_pairs_for_claim_support: MinimumCompletePairCount,
+    family_wise_alpha: FamilyWiseAlpha,
 ) -> tuple[ClaimStateResult, ...]:
     states: list[ClaimStateResult] = []
 
@@ -356,10 +372,11 @@ def _derive_claim_state(
     evidence: ClaimEvidence,
     materiality_config: MaterialityConfig,
     claim_support_thresholds: ClaimSupportThresholdsConfig,
-    minimum_complete_pairs_for_claim_support: NonNegativeInt,
-    required_comparison_state: bool | None,
-    family_wise_alpha: Probability,
+    minimum_complete_pairs_for_claim_support: MinimumCompletePairCount,
+    required_comparison_state: ClaimGateDecision | None,
+    family_wise_alpha: FamilyWiseAlpha,
 ) -> FinalClaimState:
+    del materiality_config
     if definition.primary_metric is not None and required_comparison_state is False:
         return FinalClaimState.NOT_SUPPORTED
     if definition.claim_id == "Unsupported Capability Problem":
@@ -384,30 +401,25 @@ def _derive_claim_state(
         proposal_state = _comparison_passed(evidence, "proposal survival")
         if proposal_state is None:
             return FinalClaimState.NOT_TESTED
-        if proposal_state:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NULL_RESULT
+        return FinalClaimState.SUPPORTED if proposal_state else FinalClaimState.NULL_RESULT
     if definition.claim_id == "Plurality Necessity":
         plurality_state = _comparison_passed(evidence, "plurality survival")
         if plurality_state is None:
             return FinalClaimState.NOT_TESTED
-        if plurality_state:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
+        return FinalClaimState.SUPPORTED if plurality_state else FinalClaimState.NOT_SUPPORTED
     if definition.claim_id == "External Verification Necessity":
         external_state = _comparison_passed(evidence, "external-verification survival")
         if external_state is None:
             return FinalClaimState.NOT_TESTED
-        if external_state:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
+        return FinalClaimState.SUPPORTED if external_state else FinalClaimState.NOT_SUPPORTED
     if definition.claim_id == "Mechanism Necessity":
-        proposal_state = _comparison_passed(evidence, "proposal survival")
-        plurality_state = _comparison_passed(evidence, "plurality survival")
-        external_state = _comparison_passed(evidence, "external-verification survival")
         known = [
             state
-            for state in (proposal_state, plurality_state, external_state)
+            for state in (
+                _comparison_passed(evidence, "proposal survival"),
+                _comparison_passed(evidence, "plurality survival"),
+                _comparison_passed(evidence, "external-verification survival"),
+            )
             if state is not None
         ]
         if len(known) < 3:
@@ -419,10 +431,10 @@ def _derive_claim_state(
             return FinalClaimState.PARTIALLY_SUPPORTED
         return FinalClaimState.NULL_RESULT
     if definition.claim_id == "Byzantine Operating Region":
-        within_bound_malicious = sum(evidence.malicious_admissions)
-        operating_region = claim_support_thresholds.byzantine_operating_region
-        maximum = operating_region.maximum_malicious_admissions_within_bound
-        if within_bound_malicious <= maximum:
+        maximum = (
+            claim_support_thresholds.byzantine_operating_region.maximum_malicious_admissions_within_bound
+        )
+        if sum(evidence.malicious_admissions) <= maximum:
             return FinalClaimState.CONDITIONAL
         return FinalClaimState.NOT_SUPPORTED
     if definition.claim_id == "Safe Dormancy":
@@ -433,43 +445,46 @@ def _derive_claim_state(
             return FinalClaimState.SUPPORTED
         return FinalClaimState.NOT_SUPPORTED
     if definition.claim_id == "Reproducibility Is Not Truth":
-        if any(evidence.clean_oracle_material_degradations):
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
+        return (
+            FinalClaimState.SUPPORTED
+            if any(evidence.clean_oracle_material_degradations)
+            else FinalClaimState.NOT_SUPPORTED
+        )
     if definition.claim_id == "Capability-Granularity Boundary":
         if not evidence.false_same_capability_rates:
             return FinalClaimState.NULL_RESULT
         mean_rate = sum(evidence.false_same_capability_rates) / len(
             evidence.false_same_capability_rates
         )
-        granularity = claim_support_thresholds.capability_granularity_boundary
-        minimum = granularity.false_same_capability_certification_rate_minimum
-        if mean_rate >= minimum:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NULL_RESULT
+        minimum = (
+            claim_support_thresholds.capability_granularity_boundary.false_same_capability_certification_rate_minimum
+        )
+        return FinalClaimState.SUPPORTED if mean_rate >= minimum else FinalClaimState.NULL_RESULT
     if definition.claim_id == "Heterogeneity Boundary":
         if evidence.heterogeneity_boundary_passes is None:
             return FinalClaimState.NOT_TESTED
-        if evidence.heterogeneity_boundary_passes:
-            return FinalClaimState.CONDITIONAL
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Information-Arrival Delay":
-        return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Post-Evidence Efficiency":
+        return (
+            FinalClaimState.CONDITIONAL
+            if evidence.heterogeneity_boundary_passes
+            else FinalClaimState.NOT_SUPPORTED
+        )
+    if definition.claim_id in ("Information-Arrival Delay", "Post-Evidence Efficiency"):
         return FinalClaimState.SUPPORTED
     if definition.claim_id == "Secondary Generalization":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.NOT_TESTED
-        applicable_p_values = [
+        applicable_p_values = tuple(
             p_value for p_value in evidence.comparison_p_values.values() if p_value is not None
-        ]
+        )
         if applicable_p_values and any(
             p_value >= family_wise_alpha for p_value in applicable_p_values
         ):
             return FinalClaimState.NOT_SUPPORTED
-        if evidence.secondary_generalization_passes:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
+        return (
+            FinalClaimState.SUPPORTED
+            if evidence.secondary_generalization_passes
+            else FinalClaimState.NOT_SUPPORTED
+        )
     if definition.claim_id == "IoT IDS Application":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.PARTIALLY_SUPPORTED
