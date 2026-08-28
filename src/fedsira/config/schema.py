@@ -9,6 +9,7 @@ from fedsira.domain.enums import (
     ByzantineVerifierBehavior,
     CapabilityContractScope,
     DatasetId,
+    Role,
     RootCauseMixture,
 )
 from fedsira.domain.records import (
@@ -75,7 +76,6 @@ from fedsira.domain.records import (
     ReproductionRowCount,
     RetryCount,
     RoleBoundary,
-    RoleName,
     ScaleFactor,
     ScreenDomainCount,
     SeedCount,
@@ -95,24 +95,24 @@ from fedsira.domain.records import (
     WorkerCount,
 )
 
-SUPPORTED_ROLE_NAMES: frozenset[RoleName] = frozenset(
+SUPPORTED_ROLES: frozenset[Role] = frozenset(
     {
-        "Anchor Train",
-        "Anchor Validation",
-        "Post-Reference Replay",
-        "Row Verification",
-        "Final Gate",
-        "Report Test",
+        Role.ANCHOR_TRAIN,
+        Role.ANCHOR_VALIDATION,
+        Role.POST_REFERENCE_REPLAY,
+        Role.ROW_VERIFICATION,
+        Role.FINAL_GATE,
+        Role.REPORT_TEST,
     }
 )
-TARGET_ROLE_NAMES: frozenset[RoleName] = frozenset(
+TARGET_ROLES: frozenset[Role] = frozenset(
     {
-        "Source Proposal",
-        "Candidate Screen",
-        "Reproduction",
-        "Row Verification",
-        "Final Gate",
-        "Report Test",
+        Role.SOURCE_PROPOSAL,
+        Role.CANDIDATE_SCREEN,
+        Role.REPRODUCTION,
+        Role.ROW_VERIFICATION,
+        Role.FINAL_GATE,
+        Role.REPORT_TEST,
     }
 )
 
@@ -136,20 +136,20 @@ RoleInterval = Annotated[
 
 
 class RoleIntervals(FrozenConfigModel):
-    supported: dict[RoleName, RoleInterval]
-    target: dict[RoleName, RoleInterval]
+    supported: dict[Role, RoleInterval]
+    target: dict[Role, RoleInterval]
 
     @model_validator(mode="after")
     def _require_exact_role_sets(self) -> Self:
         supported = frozenset(self.supported)
         target = frozenset(self.target)
-        if supported != SUPPORTED_ROLE_NAMES:
-            missing = sorted(SUPPORTED_ROLE_NAMES - supported)
-            extra = sorted(supported - SUPPORTED_ROLE_NAMES)
+        if supported != SUPPORTED_ROLES:
+            missing = sorted(role.value for role in SUPPORTED_ROLES - supported)
+            extra = sorted(role.value for role in supported - SUPPORTED_ROLES)
             raise ValueError(f"supported role intervals mismatch: missing={missing}, extra={extra}")
-        if target != TARGET_ROLE_NAMES:
-            missing = sorted(TARGET_ROLE_NAMES - target)
-            extra = sorted(target - TARGET_ROLE_NAMES)
+        if target != TARGET_ROLES:
+            missing = sorted(role.value for role in TARGET_ROLES - target)
+            extra = sorted(role.value for role in target - TARGET_ROLES)
             raise ValueError(f"target role intervals mismatch: missing={missing}, extra={extra}")
         return self
 
