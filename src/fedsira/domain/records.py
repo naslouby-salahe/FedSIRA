@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 UINT32_MODULUS = 4294967296
 
@@ -13,7 +12,9 @@ NonNegativeInt = Annotated[int, Field(ge=0)]
 PositiveInt = Annotated[int, Field(gt=0)]
 NonNegativeFloat = Annotated[float, Field(ge=0.0)]
 PositiveFloat = Annotated[float, Field(gt=0.0)]
-NonEmptyString = Annotated[str, StringConstraints(min_length=1)]
+FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
+BooleanFlag = Annotated[bool, Field()]
+NonEmptyString = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS)]
 
 ExperimentId = Annotated[str, StringConstraints(min_length=1, pattern=r"^[a-z][a-z0-9-]*$")]
@@ -24,27 +25,93 @@ MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 CanonicalToken = NonEmptyString
+DatasetClassToken = CanonicalToken
+RepositoryPath = NonEmptyString
+Doi = NonEmptyString
 RoundIndex = Annotated[int, Field(ge=-1)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
 FailureMessage = NonEmptyString
 
+RowCount = NonNegativeInt
+ExampleCount = NonNegativeInt
+MinimumExampleCount = PositiveInt
+DomainCount = PositiveInt
+ClassCount = PositiveInt
+FeatureCount = PositiveInt
+ScreenDomainCount = PositiveInt
+VerifierCount = PositiveInt
+CommitteeSize = PositiveInt
+ReproductionRowCount = NonNegativeInt
+LogicalEvidenceCycleCount = PositiveInt
+EvidenceCycleIndex = NonNegativeInt
+FoldCount = PositiveInt
+MatchedControlCount = PositiveInt
+LocalEpochCount = PositiveInt
+FederatedRoundCount = PositiveInt
+BatchSize = PositiveInt
+CadenceRounds = PositiveInt
+GroupCount = PositiveInt
+BootstrapResampleCount = PositiveInt
+DecimalPlaces = NonNegativeInt
+SignificantDigits = PositiveInt
+WorkerCount = NonNegativeInt
+TimeoutSeconds = PositiveInt
+WarmupPassCount = NonNegativeInt
+AdmissionCount = NonNegativeInt
+HashModulus = PositiveInt
+UciDatasetId = PositiveInt
+SeedCount = PositiveInt
+PredictorCount = PositiveInt
 
-@dataclass(frozen=True)
-class SeedBundle:
+StandardizedValue = FiniteFloat
+MetricDifference = FiniteFloat
+LearningRate = PositiveFloat
+OptimizerEpsilon = PositiveFloat
+WeightDecay = NonNegativeFloat
+GradientL2Clip = PositiveFloat
+Temperature = PositiveFloat
+LossWeight = NonNegativeFloat
+RegularizationWeight = NonNegativeFloat
+DifferentialNatsPerExample = NonNegativeFloat
+ScaleFactor = PositiveFloat
+DeltaScale = PositiveFloat
+MetricTolerance = PositiveFloat
+PValueDisplayFloor = PositiveFloat
+DbscanEpsilon = PositiveFloat
+
+PoisonFraction = Probability
+ClientDropout = Probability
+TargetF1 = Probability
+TargetF1Gain = Probability
+SupportedMacroF1Drop = Probability
+BenignFalseAlarmRateIncrease = Probability
+ContaminationRisk = Probability
+ConfidenceLevel = Probability
+FamilyWiseAlpha = Probability
+CosineSimilarity = Probability
+HeterogeneityMultiplier = Probability
+
+PinMemoryEnabled = BooleanFlag
+PersistentWorkersEnabled = BooleanFlag
+PredictorCountMatchesOfficial = BooleanFlag
+
+
+class SeedBundle(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     master_seeds: tuple[MasterSeed, ...]
     analysis_seed: MasterSeed
     smoke_seed: MasterSeed
 
-    def __post_init__(self) -> None:
-        if len(self.master_seeds) == 0:
+    @model_validator(mode="after")
+    def _validate_seed_authorities(self) -> Self:
+        if not self.master_seeds:
             raise ValueError("master_seeds must not be empty")
         if len(set(self.master_seeds)) != len(self.master_seeds):
             raise ValueError("master_seeds must not contain duplicates")
-        for seed in (*self.master_seeds, self.analysis_seed, self.smoke_seed):
-            if not (0 <= seed < UINT32_MODULUS):
-                raise ValueError(f"seed {seed} outside uint32 range")
+        return self
 
     @property
-    def confirmatory_seed_count(self) -> int:
+    def confirmatory_seed_count(self) -> SeedCount:
         return len(self.master_seeds)
