@@ -46,7 +46,8 @@ def test_krum_input_excludes_source() -> None:
 
 def _row(index: int, value: float) -> CertifiedReproductionRow:
     return CertifiedReproductionRow(
-        NBAIOT_DOMAIN_ORDER[index], torch.tensor([value], dtype=torch.float64)
+        reproducer_domain=NBAIOT_DOMAIN_ORDER[index],
+        update_vector=torch.tensor([value], dtype=torch.float64),
     )
 
 
