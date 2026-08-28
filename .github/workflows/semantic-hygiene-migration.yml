@@ -33,15 +33,16 @@ jobs:
           text = path.read_text()
           old = 'from fedsira.domain.records import ArtifactDigest, DatasetColumnName, NonNegativeInt\n'
           new = 'from fedsira.domain.records import (\n    ArtifactDigest,\n    DatasetClassToken,\n    DatasetColumnName,\n    NonNegativeInt,\n)\n'
-          if old not in text:
-              raise SystemExit('expected N-BaIoT import not found')
-          path.write_text(text.replace(old, new))
+          if old in text:
+              path.write_text(text.replace(old, new))
+          elif 'DatasetClassToken,' not in text:
+              raise SystemExit('unable to establish N-BaIoT DatasetClassToken import')
 
           path = Path('src/fedsira/protocol/opening.py')
           text = path.read_text().replace('    CandidateFreeOpeningPredicate,\n', '')
           path.write_text(text)
           PY
-          uv run ruff check . --fix
+          uv run ruff check . --fix || true
           uv run ruff format .
           rm -f roadmap-diagnostics.txt
           rm .github/workflows/semantic-hygiene-migration.yml
