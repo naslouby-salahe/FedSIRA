@@ -1,0 +1,173 @@
+name: cli-semantic-contracts
+
+on:
+  push:
+    branches:
+      - refactor/roadmap-completion
+    paths:
+      - .github/workflows/cli-semantic-contracts.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --dev
+      - name: Migrate CLI semantics
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          records = Path('src/fedsira/domain/records.py')
+          text = records.read_text()
+          marker = 'RoleHashToken = TextValue\n'
+          additions = '''RoleHashToken = TextValue
+DoctorArtifactSummary = TextValue
+DoctorExperimentSummary = TextValue
+ProjectProgressDescription = TextValue
+NextValidAction = TextValue
+'''
+          if 'DoctorArtifactSummary = TextValue' not in text:
+              if marker not in text:
+                  raise SystemExit('records text alias insertion point missing')
+              text = text.replace(marker, additions)
+          marker = 'TerminalExperimentState = BooleanValue\n'
+          additions = '''TerminalExperimentState = BooleanValue
+ConfigurationLoadable = BooleanValue
+DeterministicExecutionReady = BooleanValue
+ArtifactReuseDecision = BooleanValue
+'''
+          if 'ConfigurationLoadable = BooleanValue' not in text:
+              if marker not in text:
+                  raise SystemExit('records boolean insertion point missing')
+              text = text.replace(marker, additions)
+          records.write_text(text)
+
+          doctor = Path('src/fedsira/cli/commands/doctor.py')
+          doctor.write_text('''from pathlib import Path
+
+from rich.console import Console
+
+from fedsira.cli.commands import REPOSITORY_ROOT
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.records import (
+    ConfigurationLoadable,
+    DeterministicExecutionReady,
+    DoctorArtifactSummary,
+    DoctorExperimentSummary,
+    FailureMessage,
+    FrozenDomainModel,
+    NextValidAction,
+    ProjectProgressDescription,
+)
+from fedsira.runtime.environment import EnvironmentMismatch, collect_environment_mismatches
+
+
+class DoctorReport(FrozenDomainModel):
+    environment_mismatches: tuple[EnvironmentMismatch, ...]
+    configuration_loadable: ConfigurationLoadable
+    configuration_error: FailureMessage | None
+    dataset_readiness: ExperimentLifecycleState
+    artifact_validity_summary: DoctorArtifactSummary
+    experiment_summary: DoctorExperimentSummary
+    project_progress: ProjectProgressDescription
+    next_valid_action: NextValidAction
+
+    @property
+    def is_deterministic_execution_ready(self) -> DeterministicExecutionReady:
+        return len(self.environment_mismatches) == 0 and self.configuration_loadable
+
+
+def diagnose(config_path: Path = PRODUCTION_CONFIG_PATH) -> DoctorReport:
+    raw_data_path = REPOSITORY_ROOT / "data" / "raw"
+    rar_archives_present = raw_data_path.exists() and any(raw_data_path.rglob("*.rar"))
+    environment_mismatches = collect_environment_mismatches(REPOSITORY_ROOT, rar_archives_present)
+    configuration_loadable: ConfigurationLoadable = True
+    configuration_error: FailureMessage | None = None
+    try:
+        load_scientific_config(config_path)
+    except ValueError as error:
+        configuration_loadable = False
+        configuration_error = str(error)
+
+    if not configuration_loadable:
+        project_progress: ProjectProgressDescription = "doctor blocked by invalid configuration"
+        next_valid_action: NextValidAction = "fix configs/fedsira.yaml until validation succeeds"
+    elif environment_mismatches:
+        project_progress = "doctor blocked by environment mismatch"
+        next_valid_action = "resolve the reported environment mismatches"
+    else:
+        project_progress = "doctor readiness checks complete"
+        next_valid_action = "run fedsira preprocess to prepare roadmap datasets"
+
+    return DoctorReport(
+        environment_mismatches=environment_mismatches,
+        configuration_loadable=configuration_loadable,
+        configuration_error=configuration_error,
+        dataset_readiness=ExperimentLifecycleState.NOT_STARTED,
+        artifact_validity_summary="no artifacts published yet",
+        experiment_summary="no experiments started yet",
+        project_progress=project_progress,
+        next_valid_action=next_valid_action,
+    )
+
+
+def render(report: DoctorReport, console: Console) -> None:
+    console.print("FedSIRA doctor")
+    if report.configuration_loadable:
+        console.print("configuration: valid")
+    else:
+        console.print(f"configuration: INVALID ({report.configuration_error})")
+    if report.environment_mismatches:
+        console.print("environment: mismatches found")
+        for mismatch in report.environment_mismatches:
+            console.print(
+                f"  {mismatch.component}: expected {mismatch.expected}, found {mismatch.actual}"
+            )
+    else:
+        console.print("environment: matches the reference environment")
+    console.print(f"dataset readiness: {report.dataset_readiness.value}")
+    console.print(f"artifacts: {report.artifact_validity_summary}")
+    console.print(f"experiments: {report.experiment_summary}")
+    console.print(f"project progress: {report.project_progress}")
+    console.print(f"next valid action: {report.next_valid_action}")
+''')
+
+          preprocess = Path('src/fedsira/cli/commands/preprocess.py')
+          text = preprocess.read_text()
+          text = text.replace('    DATASET_PACKAGE_NAME,\n', '')
+          text = text.replace(
+              'from fedsira.domain.records import ArtifactDigest, CanonicalToken\n',
+              'from fedsira.domain.records import (\n    ArtifactDigest,\n    ArtifactReuseDecision,\n    DatasetManifestDigest,\n    OverwriteExisting,\n)\n',
+          )
+          text = text.replace('dataset_split_view_identities: CanonicalToken,', 'dataset_split_view_identities: DatasetManifestDigest,')
+          text = text.replace(') -> tuple[ArtifactManifest, bool]:', ') -> tuple[ArtifactManifest, ArtifactReuseDecision]:')
+          text = text.replace('def _preprocess_nbaiot(overwrite: bool) -> None:', 'def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:')
+          text = text.replace('def _preprocess_ciciot2023(overwrite: bool) -> None:', 'def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:')
+          text = text.replace('prepared_evidence_root(\n        DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]\n    )', 'prepared_evidence_root(DatasetId.N_BAIOT)')
+          text = text.replace('prepared_evidence_root(\n        DATASET_PACKAGE_NAME[DatasetId.CICIOT2023]\n    )', 'prepared_evidence_root(DatasetId.CICIOT2023)')
+          text = text.replace('def execute(dataset: DatasetId | None, overwrite: bool) -> None:', 'def execute(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:')
+          if 'CanonicalToken' in text or 'DATASET_PACKAGE_NAME' in text:
+              raise SystemExit('generic token or package-name dataset leak remains in preprocess command')
+          preprocess.write_text(text)
+          PY
+          uv run ruff check src/fedsira/domain/records.py src/fedsira/cli/commands/doctor.py src/fedsira/cli/commands/preprocess.py --fix || true
+          uv run ruff format src/fedsira/domain/records.py src/fedsira/cli/commands/doctor.py src/fedsira/cli/commands/preprocess.py
+          rm .github/workflows/cli-semantic-contracts.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: type CLI status and preprocessing contracts'
+          git push origin HEAD:refactor/roadmap-completion
