@@ -1,23 +1,31 @@
-from collections.abc import Sequence
+import hashlib
+from collections.abc import Mapping, Sequence
 
 from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
 from fedsira.domain.records import (
     BooleanFlag,
-    DifferentialNatsPerExample,
+    CanonicalToken,
+    DerivedSeed,
     DomainId,
     EvidenceAdequate,
+    FoldCount,
+    FoldIndex,
     FrozenDomainModel,
     NamespaceSeed,
     OpeningPredicateSatisfied,
     ProductionWeight,
+    ScreenDifferential,
     ScreenDomainCount,
+    ScreenLoss,
     SourceCommitted,
 )
+from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.evaluation.records import MetricResult
-from fedsira.runtime.determinism import deterministic_order
+from fedsira.runtime.determinism import canonical_bytes, deterministic_order
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
+SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
 SOURCE_SELECTION_SEPARATOR = SeedNamespace.SOURCE_SELECTION.value
 
 
@@ -39,6 +47,12 @@ class ScreenDomainResult(FrozenDomainModel):
     domain: DomainId
     is_evidence_adequate: EvidenceAdequate
     meets_opening_predicate: OpeningPredicateSatisfied
+
+
+class ScreenLossObservation(FrozenDomainModel):
+    sample_id: CanonicalToken
+    anchor_loss: ScreenLoss
+    source_loss: ScreenLoss
 
 
 def source_selection_order(
@@ -80,8 +94,81 @@ def screen_domain_order(
     return ordered[:screen_domain_count]
 
 
+def screen_fold_index(
+    sample_id: CanonicalToken,
+    screen_fold_seed: DerivedSeed,
+    fold_count: FoldCount,
+) -> FoldIndex:
+    digest = hashlib.sha256(
+        canonical_bytes(SCREEN_FOLD_SEPARATOR, screen_fold_seed, sample_id)
+    ).digest()
+    return int.from_bytes(digest[0:8], byteorder="big", signed=False) % fold_count
+
+
+def match_held_out_fold(
+    held_out_targets: Sequence[ScreenLossObservation],
+    held_out_controls: Sequence[ScreenLossObservation],
+    other_fold_controls: Sequence[ScreenLossObservation],
+) -> tuple[tuple[ScreenLossObservation, ScreenLossObservation], ...] | None:
+    targets_by_id = {observation.sample_id: observation for observation in held_out_targets}
+    controls_by_id = {observation.sample_id: observation for observation in held_out_controls}
+    matched_ids = match_nearest_within_decile(
+        [(observation.sample_id, observation.anchor_loss) for observation in held_out_targets],
+        [(observation.sample_id, observation.anchor_loss) for observation in held_out_controls],
+        [observation.anchor_loss for observation in other_fold_controls],
+    )
+    if matched_ids is None:
+        return None
+    return tuple(
+        (targets_by_id[target_id], controls_by_id[control_id])
+        for target_id, control_id in matched_ids
+    )
+
+
+def proposal_screen_differential(
+    matched_pairs: Sequence[tuple[ScreenLossObservation, ScreenLossObservation]],
+) -> ScreenDifferential | None:
+    if len(matched_pairs) == 0:
+        return None
+    target_deltas = [target.anchor_loss - target.source_loss for target, _ in matched_pairs]
+    control_deltas = [control.anchor_loss - control.source_loss for _, control in matched_pairs]
+    differential_target = sum(target_deltas) / len(target_deltas)
+    differential_control = sum(control_deltas) / len(control_deltas)
+    return differential_target - differential_control
+
+
+def run_proposal_screen_for_domain(
+    fold_assignment_by_sample_id: Mapping[CanonicalToken, FoldIndex],
+    target_observations: Sequence[ScreenLossObservation],
+    control_observations: Sequence[ScreenLossObservation],
+    fold_count: FoldCount,
+) -> ScreenDifferential | None:
+    all_matches: list[tuple[ScreenLossObservation, ScreenLossObservation]] = []
+    for held_out_fold in range(fold_count):
+        held_out_targets = [
+            observation
+            for observation in target_observations
+            if fold_assignment_by_sample_id[observation.sample_id] == held_out_fold
+        ]
+        held_out_controls = [
+            observation
+            for observation in control_observations
+            if fold_assignment_by_sample_id[observation.sample_id] == held_out_fold
+        ]
+        other_fold_controls = [
+            observation
+            for observation in control_observations
+            if fold_assignment_by_sample_id[observation.sample_id] != held_out_fold
+        ]
+        fold_matches = match_held_out_fold(held_out_targets, held_out_controls, other_fold_controls)
+        if fold_matches is None:
+            return None
+        all_matches.extend(fold_matches)
+    return proposal_screen_differential(all_matches)
+
+
 def screen_domain_decision_is_positive(
-    differential_a: DifferentialNatsPerExample | None,
+    differential_a: ScreenDifferential | None,
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
@@ -126,7 +213,7 @@ def raw_target_f1_screen_domain_decision_is_positive(
 
 
 def unmatched_control_screen_domain_decision_is_positive(
-    unmatched_differential: DifferentialNatsPerExample | None,
+    unmatched_differential: ScreenDifferential | None,
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
