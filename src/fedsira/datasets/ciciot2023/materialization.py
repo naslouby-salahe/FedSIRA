@@ -89,8 +89,12 @@ class _ParquetWriter(Protocol):
     def close(self) -> None: ...
 
 
+class _ParquetWriterFactory(Protocol):
+    def __call__(self, where: str, schema: object) -> _ParquetWriter: ...
+
+
 class _ParquetModule(Protocol):
-    def ParquetWriter(self, where: str, schema: object) -> _ParquetWriter: ...
+    ParquetWriter: _ParquetWriterFactory
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,18 @@ class _PreparedViewIdentity:
     canonical_label: CanonicalToken
     role: Role
     row_count: NonNegativeInt
+
+
+def _sqlite_int(value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"expected SQLite integer, received {type(value).__name__}")
+    return value
+
+
+def _sqlite_text(value: object) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"expected SQLite text, received {type(value).__name__}")
+    return value
 
 
 class _SecondaryPreparationStore:
@@ -235,8 +251,8 @@ class _SecondaryPreparationStore:
             row = cast(tuple[object, object], raw_row)
             groups.append(
                 _GroupIdentity(
-                    canonical_label=str(row[0]),
-                    pseudo_domain=CICIoT2023PseudoDomain(int(row[1])),
+                    canonical_label=_sqlite_text(row[0]),
+                    pseudo_domain=CICIoT2023PseudoDomain(_sqlite_int(row[1])),
                 )
             )
         return tuple(groups)
@@ -253,7 +269,7 @@ class _SecondaryPreparationStore:
         if raw_row is None:
             return 0
         row = cast(tuple[object], raw_row)
-        return int(row[0])
+        return _sqlite_int(row[0])
 
     def group_stable_ids(self, group: _GroupIdentity) -> Iterator[ArtifactDigest]:
         cursor = self._connection.execute(
@@ -267,7 +283,7 @@ class _SecondaryPreparationStore:
         )
         for raw_row in cursor:
             row = cast(tuple[object], raw_row)
-            yield str(row[0])
+            yield _sqlite_text(row[0])
 
     def add_role_assignments(
         self,
@@ -299,8 +315,8 @@ class _SecondaryPreparationStore:
         excluded_row = self._connection.execute("SELECT COUNT(*) FROM exclusions").fetchone()
         if retained_row is None or excluded_row is None:
             raise RuntimeError("CIC preprocessing store count query returned no row")
-        retained = int(cast(tuple[object], retained_row)[0])
-        excluded = int(cast(tuple[object], excluded_row)[0])
+        retained = _sqlite_int(cast(tuple[object], retained_row)[0])
+        excluded = _sqlite_int(cast(tuple[object], excluded_row)[0])
         return retained, excluded
 
     def assigned_views(self) -> tuple[_PreparedViewIdentity, ...]:
@@ -317,10 +333,10 @@ class _SecondaryPreparationStore:
             row = cast(tuple[object, object, object, object], raw_row)
             identities.append(
                 _PreparedViewIdentity(
-                    pseudo_domain=CICIoT2023PseudoDomain(int(row[0])),
-                    canonical_label=str(row[1]),
-                    role=_role_from_hash_token(str(row[2])),
-                    row_count=int(row[3]),
+                    pseudo_domain=CICIoT2023PseudoDomain(_sqlite_int(row[0])),
+                    canonical_label=_sqlite_text(row[1]),
+                    role=_role_from_hash_token(_sqlite_text(row[2])),
+                    row_count=_sqlite_int(row[3]),
                 )
             )
         return tuple(identities)
@@ -350,7 +366,7 @@ class _SecondaryPreparationStore:
             feature_blob = row[1]
             if not isinstance(feature_blob, bytes):
                 raise TypeError("CIC prepared feature payload must be bytes")
-            yield str(row[0]), feature_blob
+            yield _sqlite_text(row[0]), feature_blob
 
     def iter_anchor_train_features(self) -> Iterator[bytes]:
         cursor = self._connection.execute(
@@ -381,7 +397,13 @@ class _SecondaryPreparationStore:
         )
         for raw_row in cursor:
             row = cast(tuple[object, object, object, object, object], raw_row)
-            yield str(row[0]), str(row[1]), str(row[2]), int(row[3]), str(row[4])
+            yield (
+                _sqlite_text(row[0]),
+                _sqlite_text(row[1]),
+                _sqlite_text(row[2]),
+                _sqlite_int(row[3]),
+                _sqlite_text(row[4]),
+            )
 
     def iter_role_manifest(self) -> Iterator[tuple[str, str, int, str]]:
         cursor = self._connection.execute(
@@ -393,7 +415,12 @@ class _SecondaryPreparationStore:
         )
         for raw_row in cursor:
             row = cast(tuple[object, object, object, object], raw_row)
-            yield str(row[0]), str(row[1]), int(row[2]), str(row[3])
+            yield (
+                _sqlite_text(row[0]),
+                _sqlite_text(row[1]),
+                _sqlite_int(row[2]),
+                _sqlite_text(row[3]),
+            )
 
     def close(self) -> None:
         self._connection.close()
@@ -550,8 +577,7 @@ def _resolve_row_identifier_columns(
         if canonicalize_token(column) not in ROW_IDENTIFIER_CANONICAL_TOKENS:
             continue
         if all(
-            _is_physical_row_identifier(item.absolute_path, column_index)
-            for item in discovered
+            _is_physical_row_identifier(item.absolute_path, column_index) for item in discovered
         ):
             identifiers.add(column)
     return frozenset(identifiers)
@@ -605,15 +631,15 @@ def _assign_roles(
         uncapped_batches: dict[Role, list[ArtifactDigest]] = {}
         capped_heaps: dict[Role, list[tuple[int, int, ArtifactDigest]]] = {}
         for group_index, stable_row_id in enumerate(store.group_stable_ids(group)):
-            role = role_for_normalized_position(group_index / group_size, windows)
-            if role is None:
+            assigned_role = role_for_normalized_position(group_index / group_size, windows)
+            if assigned_role is None:
                 continue
-            cap = sampling_cap_for_secondary_role(caps, group.canonical_label, role)
+            cap = sampling_cap_for_secondary_role(caps, group.canonical_label, assigned_role)
             if cap is None:
-                batch = uncapped_batches.setdefault(role, [])
+                batch = uncapped_batches.setdefault(assigned_role, [])
                 batch.append(stable_row_id)
                 if len(batch) >= WRITE_BATCH_ROWS:
-                    store.add_role_assignments(group, role, batch)
+                    store.add_role_assignments(group, assigned_role, batch)
                     batch.clear()
                 continue
             if cap == 0:
@@ -622,7 +648,7 @@ def _assign_roles(
                 dataset_manifest_hash,
                 group.canonical_label,
                 group.pseudo_domain,
-                role,
+                assigned_role,
                 stable_row_id,
             )
             candidate = (
@@ -630,28 +656,29 @@ def _assign_roles(
                 -int(ranked_stable_id, 16),
                 stable_row_id,
             )
-            heap = capped_heaps.setdefault(role, [])
+            heap = capped_heaps.setdefault(assigned_role, [])
             if len(heap) < cap:
                 heapq.heappush(heap, candidate)
             elif candidate > heap[0]:
                 heapq.heapreplace(heap, candidate)
 
-        for role, batch in uncapped_batches.items():
-            store.add_role_assignments(group, role, batch)
-        for role, heap in capped_heaps.items():
-            selected_ids = tuple(
+        for uncapped_role, batch in uncapped_batches.items():
+            store.add_role_assignments(group, uncapped_role, batch)
+        for capped_role, heap in capped_heaps.items():
+            ranked_ids: list[ArtifactDigest] = [entry[2] for entry in heap]
+            selected_ids: tuple[ArtifactDigest, ...] = tuple(
                 sorted(
-                    (entry[2] for entry in heap),
+                    ranked_ids,
                     key=lambda stable_row_id: secondary_sampling_selection_key(
                         dataset_manifest_hash,
                         group.canonical_label,
                         group.pseudo_domain,
-                        role,
+                        capped_role,
                         stable_row_id,
                     ),
                 )
             )
-            store.add_role_assignments(group, role, selected_ids)
+            store.add_role_assignments(group, capped_role, selected_ids)
 
 
 def _fit_secondary_scaler(
