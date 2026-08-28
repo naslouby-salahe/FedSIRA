@@ -32,7 +32,12 @@ from fedsira.datasets.scaling import (
     fit_feature_moments,
     standardize_row,
 )
-from fedsira.domain.records import ArtifactDigest, DatasetColumnName, NonNegativeInt
+from fedsira.domain.records import (
+    ArtifactDigest,
+    DatasetClassToken,
+    DatasetColumnName,
+    NonNegativeInt,
+)
 
 NBAIOT_PRIMARY_PREDICTOR_COUNT = 115
 NBAIOT_SAMPLE_ID_PREFIX = "NBAIOT_SAMPLE_ID_V1"

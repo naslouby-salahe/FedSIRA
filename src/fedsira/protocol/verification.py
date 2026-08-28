@@ -11,7 +11,7 @@ from fedsira.domain.records import (
     PositiveFloat,
     PositiveInt,
 )
-from fedsira.runtime.determinism import deterministic_order, derive_uint32
+from fedsira.runtime.determinism import derive_uint32, deterministic_order
 
 VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
 BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value

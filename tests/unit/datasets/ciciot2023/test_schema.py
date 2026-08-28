@@ -3,10 +3,10 @@ from fedsira.datasets.ciciot2023.schema import (
     PSEUDO_DOMAIN_COUNT,
     TARGET_LABEL,
     build_class_registry,
-    normalize_label,
-    normalize_label_token,
     hash_to_pseudo_domain,
     is_row_identifier_column,
+    normalize_label,
+    normalize_label_token,
 )
 
 

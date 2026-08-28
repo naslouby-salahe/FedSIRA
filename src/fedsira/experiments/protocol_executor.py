@@ -140,7 +140,6 @@ from fedsira.evaluation.records import (
     MetricResult,
     ProposalOracleLabel,
 )
-from fedsira.protocol.opening import screen_fold_index
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
@@ -242,6 +241,9 @@ from fedsira.protocol.opening import (
     raw_target_f1_screen_domain_decision_is_positive,
     screen_domain_decision_is_positive,
     screen_domain_order,
+    screen_fold_index,
+    select_source_domain,
+    source_selection_order,
     start_claim,
     unmatched_control_screen_domain_decision_is_positive,
 )
@@ -258,7 +260,6 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
 )
-from fedsira.protocol.opening import select_source_domain, source_selection_order
 from fedsira.protocol.state_machine import (
     apply_logical_cycle_expiry,
     resolve_ternary_outcome,
@@ -296,11 +297,11 @@ from fedsira.protocol.verification import (
 from fedsira.runtime.determinism import derive_uint32
 from fedsira.runtime.state import FailureDetail
 from fedsira.runtime.timing import (
+    ElapsedTimer,
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,
 )
-from fedsira.runtime.timing import ElapsedTimer
 
 EVIDENCE_INSUFFICIENT_REASON = FailureClass.EVIDENCE_INSUFFICIENT.value
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"

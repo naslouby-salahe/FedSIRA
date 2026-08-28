@@ -2,7 +2,7 @@ import math
 from collections.abc import Sequence
 
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import SampleId, NamespaceSeed, NonNegativeInt, Probability
+from fedsira.domain.records import NamespaceSeed, NonNegativeInt, Probability, SampleId
 from fedsira.runtime.determinism import deterministic_order
 
 ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value

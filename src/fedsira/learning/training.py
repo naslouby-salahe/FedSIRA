@@ -6,11 +6,11 @@ from torch import nn, optim
 
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
 from fedsira.domain.records import (
-    SampleId,
     DerivedSeed,
     EpochIndex,
     NonNegativeFloat,
     PositiveFloat,
+    SampleId,
 )
 from fedsira.models.mlp import FedSIRAClassifier
 from fedsira.runtime.determinism import minibatch_order

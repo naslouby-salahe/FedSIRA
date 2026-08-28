@@ -7,14 +7,14 @@ from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmiss
 from fedsira.domain.records import (
     ArtifactDigest,
     CellPhaseIdentity,
+    DomainId,
     FinalGateArtifactValid,
+    FinalGatePredicatesPass,
+    FrozenDomainModel,
     GitCommit,
     InvariantChecksPassed,
     PluralityActive,
     ScientificCellSemanticKey,
-    DomainId,
-    FinalGatePredicatesPass,
-    FrozenDomainModel,
     SeedBundle,
 )
 from fedsira.evaluation.aggregation import quantile_type7

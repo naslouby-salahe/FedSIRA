@@ -4,8 +4,8 @@ from collections.abc import Sequence
 from fedsira.domain.records import (
     ComparisonMargin,
     ComparisonName,
-    PValue,
     PairedDifference,
+    PValue,
     SignFlipSampleCount,
 )
 

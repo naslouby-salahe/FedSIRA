@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
-from fedsira.domain.records import SampleId, DerivedSeed, PositiveFloat, PositiveInt
+from fedsira.domain.records import DerivedSeed, PositiveFloat, PositiveInt, SampleId
 from fedsira.learning.aggregation import federated_averaging
 from fedsira.learning.training import (
     build_loss_function,
