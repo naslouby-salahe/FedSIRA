@@ -109,7 +109,9 @@ def _primary_cell(master_seed: int) -> ScientificCell:
 
 
 def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     outcome = executor.execute_cell(_primary_cell(1), CONFIG)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
@@ -119,7 +121,9 @@ def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root:
 def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     outcome = executor.execute_cell(_primary_cell(4), CONFIG)
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] != 0.0
@@ -128,7 +132,7 @@ def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
 
 
 def test_resolved_core_cell_is_dormant_without_a_resolved_core(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root)
+    executor = ProtocolCellExecutor(primary_primary_prepared_root=prepared_root)
     outcome = executor.execute_cell(_primary_cell(1), CONFIG)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
@@ -137,13 +141,17 @@ def test_resolved_core_cell_is_dormant_without_a_resolved_core(prepared_root: Pa
 
 def test_resolved_core_without_plurality_uses_single_row_requirement(prepared_root: Path) -> None:
     single_row_core = resolve_core_mapping(True, False, True)
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=single_row_core)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=single_row_core
+    )
     outcome = executor.execute_cell(_primary_cell(20), CONFIG)
     assert outcome.terminal_state == "Completed"
 
 
 def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     first = executor.execute_cell(_primary_cell(2), CONFIG)
     second = executor.execute_cell(_primary_cell(2), CONFIG)
     assert first.terminal_state == second.terminal_state
@@ -184,7 +192,9 @@ def _opening_cell(episode: ProposalEpisode, master_seed: int) -> ScientificCell:
 
 
 def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     outcome = executor.execute_cell(
         _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 5), CONFIG
     )
@@ -196,7 +206,9 @@ def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root:
 def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     outcome = executor.execute_cell(
         _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6), CONFIG
     )
@@ -205,7 +217,9 @@ def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
 
 
 def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
@@ -221,7 +235,9 @@ def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -
 def test_client_review_then_retrain_baseline_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
@@ -237,7 +253,9 @@ def test_client_review_then_retrain_baseline_executes_without_crashing(
 def test_client_review_then_retrain_uses_single_verifier_progression_when_review_passes(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
@@ -252,7 +270,9 @@ def test_client_review_then_retrain_uses_single_verifier_progression_when_review
 def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     terminal_states: set[float | None] = set()
     for method in SourceExclusionMethod:
         cell = ScientificCell(
@@ -268,7 +288,9 @@ def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method
 
 
 def test_every_primary_baseline_method_executes_without_crashing(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     for method in BaselineIdentity:
         cell = ScientificCell(
             experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
@@ -285,7 +307,7 @@ def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
 ) -> None:
     verification_required_core = resolve_core_mapping(True, True, True)
     executor = ProtocolCellExecutor(
-        prepared_root=prepared_root, resolved_core=verification_required_core
+        primary_prepared_root=prepared_root, resolved_core=verification_required_core
     )
     core_cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
@@ -309,7 +331,9 @@ def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
 def test_three_row_coordinate_median_baseline_is_routed_and_uses_median_synthesis(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value,
@@ -324,7 +348,9 @@ def test_three_row_coordinate_median_baseline_is_routed_and_uses_median_synthesi
 def test_one_independent_retrain_baseline_uses_single_verifier_progression(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
@@ -340,7 +366,9 @@ def test_resolved_core_single_row_path_admits_via_single_verifier_progression(
     prepared_root: Path,
 ) -> None:
     single_row_core = resolve_core_mapping(True, False, True)
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=single_row_core)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=single_row_core
+    )
     outcome = executor.execute_cell(_primary_cell(24), CONFIG)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
@@ -349,7 +377,9 @@ def test_resolved_core_single_row_path_admits_via_single_verifier_progression(
 def test_fedavg_reference_baseline_trains_and_evaluates_a_real_fedavg_model(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.FEDAVG_REFERENCE.value,
@@ -364,7 +394,9 @@ def test_fedavg_reference_baseline_trains_and_evaluates_a_real_fedavg_model(
 def test_krum_reference_baseline_trains_and_evaluates_a_real_krum_synthesized_model(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
@@ -379,7 +411,9 @@ def test_krum_reference_baseline_trains_and_evaluates_a_real_krum_synthesized_mo
 def test_density_cluster_trimmed_mean_baseline_trains_and_evaluates_a_real_model(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
@@ -394,7 +428,9 @@ def test_density_cluster_trimmed_mean_baseline_trains_and_evaluates_a_real_model
 def test_source_update_sanitization_baseline_clips_and_reviews_the_source_candidate(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
@@ -410,7 +446,9 @@ def test_source_update_sanitization_baseline_clips_and_reviews_the_source_candid
 def test_update_reconstruction_filter_baseline_trains_and_evaluates_a_real_model(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value,
@@ -425,7 +463,9 @@ def test_update_reconstruction_filter_baseline_trains_and_evaluates_a_real_model
 def test_recovery_after_source_admission_baseline_evaluates_the_rollback_decision(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
         method=BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
@@ -441,7 +481,9 @@ def test_recovery_after_source_admission_baseline_evaluates_the_rollback_decisio
 def test_multiple_model_certified_ensemble_baseline_trains_three_group_models(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
@@ -456,7 +498,9 @@ def test_multiple_model_certified_ensemble_baseline_trains_three_group_models(
 def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
@@ -471,7 +515,9 @@ def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
 def test_independent_local_reference_baseline_evaluates_real_reviewer_votes(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
@@ -486,7 +532,9 @@ def test_independent_local_reference_baseline_evaluates_real_reviewer_votes(
 def test_local_only_reference_baseline_evaluates_real_per_domain_checkpoints(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.LOCAL_ONLY_REFERENCE.value,
@@ -501,7 +549,9 @@ def test_local_only_reference_baseline_evaluates_real_per_domain_checkpoints(
 def test_centralized_reference_baseline_trains_and_evaluates_a_real_pooled_model(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         method=BaselineIdentity.CENTRALIZED_REFERENCE.value,
@@ -516,7 +566,9 @@ def test_centralized_reference_baseline_trains_and_evaluates_a_real_pooled_model
 def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=ADMISSION_DELAY_DECOMPOSITION_NAME,
         method="Resolved FedSIRA Core",
@@ -533,7 +585,9 @@ def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
 def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=EFFICIENCY_MEASUREMENT_NAME,
         method="Resolved FedSIRA Core",
@@ -550,7 +604,9 @@ def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
 def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     methods = (
         SourceExclusionMethod.FULL_FEDSIRA.value,
         BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
@@ -570,7 +626,9 @@ def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
 def test_capability_under_specification_boundary_reports_a_real_oracle_label(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
         method=CapabilityContractScope.BROAD_TARGET_ONLY.value,
@@ -594,7 +652,9 @@ def test_capability_under_specification_boundary_reports_a_real_oracle_label(
 def test_shared_epistemic_failure_boundary_reports_real_metrics(
     prepared_root: Path, failure_type: EpistemicFailureType
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
         method="x",
@@ -616,7 +676,9 @@ def test_shared_epistemic_failure_boundary_reports_real_metrics(
 def test_parameter_similarity_certification_ablation_reports_real_committed_rows(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value,
@@ -634,7 +696,9 @@ def test_parameter_similarity_certification_ablation_reports_real_committed_rows
 def test_multiple_reproductions_without_cross_verification_ablation_uses_real_krum_synthesis(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value,
@@ -650,7 +714,9 @@ def test_multiple_reproductions_without_cross_verification_ablation_uses_real_kr
 def test_same_context_verification_only_ablation_uses_a_real_feature_mean_panel(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value,
@@ -666,7 +732,9 @@ def test_same_context_verification_only_ablation_uses_a_real_feature_mean_panel(
 def test_generic_three_row_threshold_ablation_uses_real_coordinate_median_synthesis(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value,
@@ -683,7 +751,9 @@ def test_generic_three_row_threshold_ablation_uses_real_coordinate_median_synthe
 def test_direct_krum_of_retrains_ablation_uses_real_krum_synthesis_without_verification(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.DIRECT_KRUM_OF_RETRAINS.value,
@@ -697,7 +767,9 @@ def test_direct_krum_of_retrains_ablation_uses_real_krum_synthesis_without_verif
 
 
 def test_no_proposal_screen_ablation_uses_the_full_downstream_path(prepared_root: Path) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.NO_PROPOSAL_SCREEN.value,
@@ -713,7 +785,9 @@ def test_no_proposal_screen_ablation_uses_the_full_downstream_path(prepared_root
 def test_candidate_free_reproduction_ablation_uses_the_full_downstream_path(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.CANDIDATE_FREE_REPRODUCTION.value,
@@ -729,7 +803,9 @@ def test_candidate_free_reproduction_ablation_uses_the_full_downstream_path(
 def test_one_independent_reproduction_ablation_uses_single_verifier_progression(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value,
@@ -745,7 +821,9 @@ def test_one_independent_reproduction_ablation_uses_single_verifier_progression(
 def test_no_final_synthesis_gate_ablation_admits_immediately_after_krum(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.NO_FINAL_SYNTHESIS_GATE.value,
@@ -762,7 +840,9 @@ def test_no_final_synthesis_gate_ablation_admits_immediately_after_krum(
 def test_random_committee_profile_ablation_delegates_to_verifier_robustness_mechanism(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.RANDOM_COMMITTEE_PROFILE.value,
@@ -778,7 +858,9 @@ def test_random_committee_profile_ablation_delegates_to_verifier_robustness_mech
 def test_raw_target_f1_screen_only_ablation_ignores_the_matched_differential(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
@@ -794,7 +876,9 @@ def test_raw_target_f1_screen_only_ablation_ignores_the_matched_differential(
 def test_no_matched_control_ablation_uses_the_unmatched_differential(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.NO_MATCHED_CONTROL.value,
@@ -810,7 +894,9 @@ def test_no_matched_control_ablation_uses_the_unmatched_differential(
 def test_no_origin_exclusion_ablation_lets_source_occupy_the_first_reproduction_slot(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.NO_ORIGIN_EXCLUSION.value,
@@ -826,7 +912,9 @@ def test_no_origin_exclusion_ablation_lets_source_occupy_the_first_reproduction_
 def test_byzantine_reproducer_copies_source_ablation_forces_the_first_row(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE.value,
@@ -842,7 +930,9 @@ def test_byzantine_reproducer_copies_source_ablation_forces_the_first_row(
 def test_source_release_after_peer_review_ablation_admits_via_client_review(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value,
@@ -858,7 +948,9 @@ def test_source_release_after_peer_review_ablation_admits_via_client_review(
 def test_source_release_after_full_external_check_ablation_uses_a_real_verifier_panel(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value,
@@ -874,7 +966,9 @@ def test_source_release_after_full_external_check_ablation_uses_a_real_verifier_
 def test_capability_contract_granularity_ablation_reports_real_certification_rate(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value,
@@ -891,7 +985,9 @@ def test_capability_contract_granularity_ablation_reports_real_certification_rat
 def test_krum_robust_aggregation_reference_under_heterogeneous_boundary_uses_real_krum_training(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
         method=BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
@@ -907,7 +1003,9 @@ def test_krum_robust_aggregation_reference_under_heterogeneous_boundary_uses_rea
 def test_feature_shift_heterogeneity_boundary_applies_real_shift_to_training_and_evaluation(
     prepared_root: Path,
 ) -> None:
-    executor = ProtocolCellExecutor(primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE)
+    executor = ProtocolCellExecutor(
+        primary_primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
+    )
     cell = ScientificCell(
         experiment=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
         method="Resolved FedSIRA Core",
