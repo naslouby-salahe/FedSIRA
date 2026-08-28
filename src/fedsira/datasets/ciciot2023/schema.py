@@ -36,7 +36,7 @@ class CICIoT2023PseudoDomain(IntEnum):
 PSEUDO_DOMAIN_COUNT = len(CICIoT2023PseudoDomain)
 PSEUDO_DOMAIN_HASH_SEPARATOR = "CIC_IOT_2023_PSEUDO_DOMAIN"
 
-if PSEUDO_DOMAIN_COUNT != len(NBAIOT_DOMAIN_ORDER):
+if len(NBAIOT_DOMAIN_ORDER) != PSEUDO_DOMAIN_COUNT:
     raise RuntimeError("CICIoT2023 pseudo-domain count must equal the primary device-proxy count")
 
 _NON_ALPHANUMERIC_RUN = re.compile(r"[^0-9A-Za-z]+")
