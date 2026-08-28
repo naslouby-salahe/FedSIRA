@@ -93,12 +93,15 @@ NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 PartitionSalt = Uint32Bound
 DatasetManifestDigest = ArtifactDigest
+DatasetFileDigest = ArtifactDigest
 RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
 
 # Counts and discrete quantities.
 RowCount = NonNegativeInt
+SourceRowIndex = NonNegativeInt
+SamplingCap = NonNegativeInt
 ExampleCount = NonNegativeInt
 MinimumExampleCount = PositiveInt
 DomainCount = PositiveInt
