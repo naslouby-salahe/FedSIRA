@@ -68,7 +68,7 @@ from fedsira.boundaries.epistemic_failure import (
 from fedsira.boundaries.heterogeneity import feature_shift_sign
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
-from fedsira.datasets.nbaiot.materialization import view_parquet_path
+from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_HASH_TOKEN,
