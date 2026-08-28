@@ -23,119 +23,38 @@ jobs:
           python-version: '3.11.9'
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen --dev
-      - name: Fold communication into roadmap owners
+      - name: Remove duplicate communication module
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          enums = Path('src/fedsira/domain/enums.py')
-          text = enums.read_text()
-          block = '''\n\nclass CommunicationMessageType(StrEnum):\n    SOURCE_COMMITMENT = "SOURCE_COMMITMENT"\n    MODEL_DISTRIBUTION = "MODEL_DISTRIBUTION"\n    UPDATE_SUBMISSION = "UPDATE_SUBMISSION"\n    CLAIM_CONTRACT = "CLAIM_CONTRACT"\n    REVIEW_ASSIGNMENT = "REVIEW_ASSIGNMENT"\n    REVIEW_REPORT = "REVIEW_REPORT"\n    VERIFIER_ASSIGNMENT = "VERIFIER_ASSIGNMENT"\n    VERIFIER_REPORT = "VERIFIER_REPORT"\n    FINAL_GATE_ASSIGNMENT = "FINAL_GATE_ASSIGNMENT"\n    FINAL_GATE_REPORT = "FINAL_GATE_REPORT"\n    DECISION = "DECISION"\n\n\nclass TensorParameterKind(StrEnum):\n    MODEL = "model"\n    UPDATE = "update"\n\n\nclass ProposalOracleLabel(StrEnum):\n    ORACLE_VALID = "ORACLE_VALID"\n    ORACLE_INVALID = "ORACLE_INVALID"\n    NA = "NA"\n\n\nclass FalseSameCapabilityReason(StrEnum):\n    NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION = "No Cross-Root-Cause Equivalence Assertion"\n'''
-          if 'class CommunicationMessageType' not in text:
-              text += block
-          enums.write_text(text)
-
-          records_path = Path('src/fedsira/domain/records.py')
-          text = records_path.read_text()
-          marker = 'TensorName = TextValue\n'
-          additions = 'TensorName = TextValue\nTensorDtype = TextValue\nCommunicationSchema = TextValue\n'
-          if 'TensorDtype = TextValue' not in text:
-              text = text.replace(marker, additions)
-          marker = 'ByteCount = NonNegativeInt\n'
-          additions = 'ByteCount = NonNegativeInt\nPayloadTensorCount = NonNegativeInt\nModelTransmissionCount = NonNegativeInt\nMetricDenominator = NonNegativeInt\nTensorShapeDimension = PositiveInt\nLengthPrefixByteCount = PositiveInt\n'
-          if 'PayloadTensorCount = NonNegativeInt' not in text:
-              text = text.replace(marker, additions)
-          records_path.write_text(text)
-
-          records = Path('src/fedsira/evaluation/records.py')
-          text = records.read_text()
-          text = text.replace('import json\n', '')
-          text = text.replace('from collections.abc import Mapping, Sequence\n', '')
-          text = text.replace('from enum import StrEnum\n', '')
-          start = text.index('from fedsira.domain.records import (')
-          end = text.index(')\n', start) + 2
-          new_import = '''from fedsira.domain.enums import (\n    CommunicationMessageType,\n    FalseSameCapabilityReason,\n    ProposalOracleLabel,\n    TensorParameterKind,\n)\nfrom fedsira.domain.records import (\n    ArtifactDigest,\n    ByteCount,\n    CommunicationSchema,\n    FrozenDomainModel,\n    LengthPrefixByteCount,\n    MasterSeed,\n    MessageEndpoint,\n    MetricDenominator,\n    MetricValue,\n    ParameterName,\n    PayloadTensorCount,\n    RoundIndex,\n    TensorDtype,\n    TensorName,\n    TensorShapeDimension,\n)\n'''
-          text = text[:start] + new_import + text[end:]
-          text = text.replace('COMMUNICATION_SCHEMA = "FEDSIRA_COMM_V1"', 'COMMUNICATION_SCHEMA: CommunicationSchema = "FEDSIRA_COMM_V1"')
-          text = text.replace('SERVER_ID: NonEmptyString = "SERVER"', 'SERVER_ID: MessageEndpoint = "SERVER"')
-          text = text.replace('METADATA_LENGTH_PREFIX_BYTES = 8', 'METADATA_LENGTH_PREFIX_BYTES: LengthPrefixByteCount = 8')
-          text = text.replace('TENSOR_METADATA_LENGTH_PREFIX_BYTES = 8', 'TENSOR_METADATA_LENGTH_PREFIX_BYTES: LengthPrefixByteCount = 8')
-          text = text.replace('TENSOR_DTYPE: NonEmptyString = "float32"', 'TENSOR_DTYPE: TensorDtype = "float32"')
-          text = text.replace('\nCommunicationJsonValue = str | int | None | list[int]\n', '\n')
-          text = text.replace('    value: float | None\n    denominator: NonNegativeInt\n', '    value: MetricValue | None\n    denominator: MetricDenominator\n')
-          for field in ('true_positive', 'false_positive', 'false_negative', 'true_negative'):
-              text = text.replace(f'    {field}: NonNegativeInt\n', f'    {field}: MetricDenominator\n')
-          proposal_start = text.find('\nclass ProposalOracleLabel(')
-          admission_start = text.find('\n@dataclass(frozen=True)\nclass AdmissionDelayDecomposition:')
-          if proposal_start != -1 and admission_start != -1:
-              text = text[:proposal_start] + '\n' + text[admission_start:]
-          comm_enum_start = text.find('\nclass CommunicationMessageType(')
-          metadata_start = text.find('\nclass CommunicationMessageMetadata(')
-          if comm_enum_start != -1 and metadata_start != -1:
-              text = text[:comm_enum_start] + '\n' + text[metadata_start:]
-          function_start = text.find('\ndef parameter_tensor_name(')
-          if function_start == -1:
-              raise SystemExit('communication function block not found in evaluation records')
-          text = text[:function_start].rstrip() + '\n'
-          text = text.replace('    sender: NonEmptyString\n', '    sender: MessageEndpoint\n')
-          text = text.replace('    receiver: NonEmptyString\n', '    receiver: MessageEndpoint\n')
-          text = text.replace('    payload_tensor_count: NonNegativeInt\n', '    payload_tensor_count: PayloadTensorCount\n')
-          text = text.replace('    name: NonEmptyString\n', '    name: TensorName\n')
-          text = text.replace('    shape: tuple[PositiveInt, ...]\n', '    shape: tuple[TensorShapeDimension, ...]\n')
-          text = text.replace('    nbytes: NonNegativeInt\n', '    nbytes: ByteCount\n')
-          text = text.replace('    dtype: NonEmptyString = TENSOR_DTYPE\n', '    dtype: TensorDtype = TENSOR_DTYPE\n')
-          records.write_text(text)
-
-          metrics = Path('src/fedsira/evaluation/metrics.py')
-          text = metrics.read_text()
-          text = text.replace('from collections.abc import Mapping, Sequence\n', 'import json\nfrom collections.abc import Mapping, Sequence\n')
-          text = text.replace('from fedsira.domain.records import DatasetClassToken, NonNegativeInt, PositiveInt, Probability\n', '''from fedsira.domain.enums import TensorParameterKind\nfrom fedsira.domain.records import (\n    ByteCount,\n    DatasetClassToken,\n    ModelTransmissionCount,\n    NonNegativeInt,\n    ParameterName,\n    PositiveInt,\n    Probability,\n    TensorName,\n)\n''')
-          text = text.replace('    ConfusionCounts,\n', '''    COMMUNICATION_SCHEMA,\n    METADATA_LENGTH_PREFIX_BYTES,\n    TENSOR_METADATA_LENGTH_PREFIX_BYTES,\n    CommunicationMessageMetadata,\n    ConfusionCounts,\n''')
-          text = text.replace('    ProposalOracleLabel,\n', '    ProposalOracleLabel,\n    TensorPayloadMetadata,\n')
-          communication_functions = '''\n\ndef parameter_tensor_name(kind: TensorParameterKind, parameter_name: ParameterName) -> TensorName:\n    return f"{kind.value}.{parameter_name}"\n\n\ndef _stable_json_bytes(payload: dict[str, str | int | None | list[int]]) -> bytes:\n    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")\n\n\ndef _length_prefixed_bytes(payload: bytes, prefix_bytes: PositiveInt) -> bytes:\n    return len(payload).to_bytes(prefix_bytes, byteorder="big", signed=False) + payload\n\n\ndef encode_message_metadata(metadata: CommunicationMessageMetadata) -> bytes:\n    payload: dict[str, str | int | None | list[int]] = {\n        "schema": COMMUNICATION_SCHEMA,\n        "message_type": metadata.message_type.value,\n        "dataset_manifest_hash": metadata.dataset_manifest_hash,\n        "semantic_cell_key_hash": metadata.semantic_cell_key_hash,\n        "master_seed": metadata.master_seed,\n        "round_index": metadata.round_index,\n        "sender": metadata.sender,\n        "receiver": metadata.receiver,\n        "claim_contract_hash": metadata.claim_contract_hash,\n        "payload_tensor_count": metadata.payload_tensor_count,\n    }\n    return _length_prefixed_bytes(_stable_json_bytes(payload), METADATA_LENGTH_PREFIX_BYTES)\n\n\ndef encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> bytes:\n    payload: dict[str, str | int | None | list[int]] = {\n        "name": tensor_metadata.name,\n        "dtype": tensor_metadata.dtype,\n        "shape": list(tensor_metadata.shape),\n        "nbytes": tensor_metadata.nbytes,\n    }\n    return _length_prefixed_bytes(\n        _stable_json_bytes(payload), TENSOR_METADATA_LENGTH_PREFIX_BYTES\n    )\n\n\ndef encode_message_envelope(\n    metadata: CommunicationMessageMetadata,\n    tensor_payloads: Mapping[TensorName, bytes],\n    tensor_metadata_by_name: Mapping[TensorName, TensorPayloadMetadata],\n) -> bytes:\n    envelope = bytearray(encode_message_metadata(metadata))\n    for tensor_name in sorted(tensor_payloads):\n        envelope += encode_tensor_metadata(tensor_metadata_by_name[tensor_name])\n        envelope += tensor_payloads[tensor_name]\n    return bytes(envelope)\n\n\ndef is_model_transmission(metadata: CommunicationMessageMetadata) -> bool:\n    return metadata.payload_tensor_count > 0\n\n\ndef communication_bytes(envelopes: Sequence[bytes]) -> ByteCount:\n    return sum(len(envelope) for envelope in envelopes)\n\n\ndef model_transmission_count(\n    metadata_records: Sequence[CommunicationMessageMetadata],\n) -> ModelTransmissionCount:\n    return sum(1 for metadata in metadata_records if is_model_transmission(metadata))\n'''
-          if 'def encode_message_metadata(' not in text:
-              text += communication_functions
-          metrics.write_text(text)
-
-          for path in Path('src').rglob('*.py'):
-              if path == records or path == metrics or path == enums:
-                  continue
-              source = path.read_text()
-              source = source.replace('from fedsira.evaluation.communication import (', 'from fedsira.evaluation.metrics import (')
-              source = source.replace('    SERVER_TOKEN,\n', '')
-              source = source.replace('    canonical_parameter_tensor_name,\n', '    parameter_tensor_name,\n')
-              source = source.replace('canonical_parameter_tensor_name(', 'parameter_tensor_name(')
-              source = source.replace('SERVER_TOKEN', 'SERVER_ID')
-              if 'CommunicationMessageMetadata' in source or 'TensorPayloadMetadata' in source:
-                  source = source.replace('from fedsira.evaluation.metrics import (\n    CommunicationMessageMetadata,', 'from fedsira.evaluation.records import (\n    CommunicationMessageMetadata,')
-              path.write_text(source)
-
-          protocol = Path('src/fedsira/experiments/protocol_executor.py')
-          source = protocol.read_text()
-          source = source.replace('from fedsira.evaluation.metrics import (\n    CommunicationMessageMetadata,', 'from fedsira.evaluation.records import (\n    CommunicationMessageMetadata,')
-          source = source.replace('    TensorPayloadMetadata,\n    parameter_tensor_name,\n    communication_bytes,\n    encode_message_envelope,\n    model_transmission_count,\n)', '    TensorPayloadMetadata,\n)\nfrom fedsira.evaluation.metrics import (\n    communication_bytes,\n    encode_message_envelope,\n    model_transmission_count,\n    parameter_tensor_name,\n)')
-          if 'SERVER_ID' not in source:
-              source = source.replace('    TensorPayloadMetadata,\n)', '    SERVER_ID,\n    TensorPayloadMetadata,\n)', 1)
-          protocol.write_text(source)
-
-          test = Path('tests/unit/evaluation/test_communication.py')
-          source = test.read_text()
-          source = source.replace('from fedsira.evaluation.records import (\n    COMMUNICATION_SCHEMA,', 'from fedsira.domain.enums import CommunicationMessageType, TensorParameterKind\nfrom fedsira.evaluation.metrics import (\n    communication_bytes,\n    encode_message_envelope,\n    encode_message_metadata,\n    encode_tensor_metadata,\n    is_model_transmission,\n    model_transmission_count,\n    parameter_tensor_name,\n)\nfrom fedsira.evaluation.records import (\n    COMMUNICATION_SCHEMA,')
-          for name in ('    CommunicationMessageType,\n', '    TensorParameterKind,\n', '    communication_bytes,\n', '    encode_message_envelope,\n', '    encode_message_metadata,\n', '    encode_tensor_metadata,\n', '    is_model_transmission,\n', '    model_transmission_count,\n', '    parameter_tensor_name,\n'):
-              source = source.replace(name, '') if source.count(name) > 1 else source
-          test.write_text(source)
+          for root in (Path('src'), Path('tests')):
+              for path in root.rglob('*.py'):
+                  source = path.read_text()
+                  source = source.replace(
+                      'from fedsira.evaluation.communication import (',
+                      'from fedsira.evaluation.records import (',
+                  )
+                  source = source.replace('SERVER_TOKEN', 'SERVER_ID')
+                  source = source.replace(
+                      'canonical_parameter_tensor_name',
+                      'parameter_tensor_name',
+                  )
+                  path.write_text(source)
 
           obsolete = Path('src/fedsira/evaluation/communication.py')
           if obsolete.exists():
               obsolete.unlink()
           PY
-          uv run ruff check src/fedsira/domain/enums.py src/fedsira/domain/records.py src/fedsira/evaluation src/fedsira/experiments/protocol_executor.py tests/unit/evaluation/test_communication.py --fix || true
-          uv run ruff format src/fedsira/domain/enums.py src/fedsira/domain/records.py src/fedsira/evaluation src/fedsira/experiments/protocol_executor.py tests/unit/evaluation/test_communication.py
+          uv run ruff check src tests/unit/evaluation/test_communication.py --fix || true
+          uv run ruff format src tests/unit/evaluation/test_communication.py
           uv run pytest tests/unit/evaluation/test_communication.py -q
+          test ! -e src/fedsira/evaluation/communication.py
+          ! grep -R 'fedsira.evaluation.communication' -n src tests
           rm .github/workflows/communication-layer-migration.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'refactor: fold communication into evaluation owners'
+          git commit -m 'refactor: remove duplicate communication module'
           git push origin HEAD:refactor/roadmap-completion
