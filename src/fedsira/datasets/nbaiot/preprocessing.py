@@ -32,7 +32,7 @@ from fedsira.datasets.scaling import (
     fit_feature_moments,
     standardize_row,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt
+from fedsira.domain.records import ArtifactDigest, DatasetColumnName, NonNegativeInt
 
 NBAIOT_PRIMARY_PREDICTOR_COUNT = 115
 NBAIOT_SAMPLE_ID_PREFIX = "NBAIOT_SAMPLE_ID_V1"
@@ -40,7 +40,7 @@ PREPARED_VIEW_SCHEMA_VERSION = "fedsira|nbaiot_prepared_view|1"
 SCALER_SCHEMA_VERSION = "fedsira|nbaiot_scaler|1"
 
 
-def validate_predictor_schema(ordered_header: tuple[CanonicalToken, ...]) -> None:
+def validate_predictor_schema(ordered_header: tuple[DatasetColumnName, ...]) -> None:
     if len(set(ordered_header)) != len(ordered_header):
         raise ValueError("primary predictor header contains duplicate names")
     if len(ordered_header) != NBAIOT_PRIMARY_PREDICTOR_COUNT:
@@ -59,7 +59,7 @@ def validate_predictor_schema(ordered_header: tuple[CanonicalToken, ...]) -> Non
 
 
 def validate_consistent_predictor_schema(
-    reference_header: tuple[CanonicalToken, ...], observed_header: tuple[CanonicalToken, ...]
+    reference_header: tuple[DatasetColumnName, ...], observed_header: tuple[DatasetColumnName, ...]
 ) -> None:
     if observed_header != reference_header:
         raise ValueError("primary predictor header does not match the canonical reference schema")
@@ -72,7 +72,7 @@ def classify_row_finiteness(values: Sequence[float]) -> DatasetExclusionReason |
     return None
 
 
-def read_predictor_header(path: Path) -> tuple[CanonicalToken, ...]:
+def read_predictor_header(path: Path) -> tuple[DatasetColumnName, ...]:
     header_frame: pandas.DataFrame = pandas.read_csv(path, nrows=0)
     return tuple(str(name).strip() for name in header_frame.columns)
 
@@ -82,11 +82,13 @@ def count_csv_data_rows(path: Path) -> NonNegativeInt:
         return sum(1 for _ in handle) - 1
 
 
-def validate_all_predictors_finite(path: Path, ordered_header: tuple[CanonicalToken, ...]) -> None:
+def validate_all_predictors_finite(
+    path: Path, ordered_header: tuple[DatasetColumnName, ...]
+) -> None:
     reader: TextFileReader = pandas.read_csv(path, usecols=list(ordered_header), chunksize=100_000)
     chunk_frame: pandas.DataFrame
     for chunk_frame in reader:
-        nonnumeric_columns: list[CanonicalToken] = [
+        nonnumeric_columns: list[DatasetColumnName] = [
             str(column)
             for column in chunk_frame.columns
             if not pandas.api.types.is_numeric_dtype(chunk_frame[column])
@@ -148,7 +150,7 @@ class PreparedView:
     role: Role
     sample_ids: tuple[ArtifactDigest, ...]
     features: tuple[tuple[float, ...], ...]
-    labels: tuple[CanonicalToken, ...]
+    labels: tuple[DatasetColumnName, ...]
 
     @property
     def row_count(self) -> int:
@@ -157,9 +159,9 @@ class PreparedView:
 
 def assign_stream_roles_and_sample_ids(
     dataset_file_sha256: ArtifactDigest,
-    domain_hash_token: CanonicalToken,
+    domain_hash_token: DatasetColumnName,
     class_id: NBaiotClass,
-    normalized_relative_csv_path: CanonicalToken,
+    normalized_relative_csv_path: DatasetColumnName,
     stream_row_count: NonNegativeInt,
     role_intervals: RoleIntervals,
     sampling_caps_per_domain: SamplingCapsPerDomain,
@@ -226,7 +228,7 @@ def materialize_nbaiot_prepared_views(
     sampling_caps = config.datasets.primary.sampling_caps_per_domain
     scaling_config = config.datasets.primary.scaling
 
-    anchor_train_statistics: dict[CanonicalToken, tuple[tuple[float, float, float], ...]] = {}
+    anchor_train_statistics: dict[DatasetColumnName, tuple[tuple[float, float, float], ...]] = {}
     feature_names = read_predictor_header(discovered[0].absolute_path)
 
     for item in discovered:
@@ -275,7 +277,7 @@ def materialize_nbaiot_prepared_views(
             if not selected_rows:
                 continue
             features: list[tuple[float, ...]] = []
-            labels: list[CanonicalToken] = []
+            labels: list[DatasetClassToken] = []
             sample_ids: list[ArtifactDigest] = []
             for original_row_index in selected_rows:
                 raw_row = raw_rows[original_row_index]
@@ -322,7 +324,7 @@ def materialize_nbaiot_prepared_views(
 def _accumulate_anchor_train_statistics(
     item: DiscoveredCsvFile,
     config: ScientificConfig,
-    existing: dict[CanonicalToken, tuple[tuple[float, float, float], ...]],
+    existing: dict[DatasetColumnName, tuple[tuple[float, float, float], ...]],
 ) -> tuple[tuple[float, float, float], ...]:
     role_intervals = config.datasets.primary.role_intervals
     sampling_caps = config.datasets.primary.sampling_caps_per_domain
@@ -355,16 +357,16 @@ def _view_key(view: PreparedView) -> str:
     return f"{domain_token}_{view.class_id.value}_{ROLE_HASH_TOKEN[view.role]}"
 
 
-def view_parquet_path(prepared_root: Path, view_key: CanonicalToken) -> Path:
+def view_parquet_path(prepared_root: Path, view_key: DatasetColumnName) -> Path:
     return prepared_root / f"{view_key}.parquet"
 
 
 def _write_prepared_view_parquet(
     prepared_root: Path,
     view: PreparedView,
-    feature_names: tuple[CanonicalToken, ...],
+    feature_names: tuple[DatasetColumnName, ...],
 ) -> None:
-    columns: dict[str, list[ArtifactDigest] | list[CanonicalToken] | list[float]] = {
+    columns: dict[str, list[ArtifactDigest] | list[DatasetClassToken] | list[float]] = {
         "sample_id": list(view.sample_ids),
         "label": list(view.labels),
     }

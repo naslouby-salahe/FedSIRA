@@ -6,8 +6,12 @@ from fedsira.config.schema import FinalGateConfig
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
 from fedsira.domain.records import (
     ArtifactDigest,
-    BooleanFlag,
-    CanonicalToken,
+    CellPhaseIdentity,
+    FinalGateArtifactValid,
+    GitCommit,
+    InvariantChecksPassed,
+    PluralityActive,
+    ScientificCellSemanticKey,
     DomainId,
     FinalGatePredicatesPass,
     FrozenDomainModel,
@@ -18,7 +22,7 @@ from fedsira.evaluation.records import MetricResult
 
 
 def validate_admission_requires_final_gate(
-    state: ClaimState, final_gate_artifact_is_valid: BooleanFlag
+    state: ClaimState, final_gate_artifact_is_valid: FinalGateArtifactValid
 ) -> None:
     if state is ClaimState.ADMITTED and not final_gate_artifact_is_valid:
         raise ValueError("Admitted state requires a valid final-gate artifact")
@@ -31,7 +35,7 @@ def apply_production_update(
 
 
 def resolve_production_update(
-    is_plurality_active: BooleanFlag,
+    is_plurality_active: PluralityActive,
     krum_selected_update: torch.Tensor | None,
     single_reproduction_update: torch.Tensor | None,
 ) -> torch.Tensor:
@@ -63,7 +67,7 @@ def final_gate_predicates_pass(
     minimum_target_f1: MetricResult,
     pooled_supported_macro_f1_drop: MetricResult,
     pooled_benign_far_increase: MetricResult,
-    no_invariant_failure: BooleanFlag,
+    no_invariant_failure: InvariantChecksPassed,
     final_gate_config: FinalGateConfig,
 ) -> FinalGatePredicatesPass:
     if (
@@ -96,12 +100,12 @@ class AdmissionArtifactContent(FrozenDomainModel):
     final_gate_sample_manifest_identity: ArtifactDigest
     final_gate_metrics_identity: ArtifactDigest
     seed_bundle: SeedBundle
-    semantic_cell_key: CanonicalToken
-    cell_phase_identity: CanonicalToken
+    semantic_cell_key: ScientificCellSemanticKey
+    cell_phase_identity: CellPhaseIdentity
     upstream_dependency_fingerprints: tuple[ArtifactDigest, ...]
     producer_component_fingerprint: ArtifactDigest
     runtime_dependency_fingerprint: ArtifactDigest
-    repository_commit: CanonicalToken
+    repository_commit: GitCommit
     dependency_lock_digest: ArtifactDigest
     environment_fingerprint: ArtifactDigest
 
@@ -109,7 +113,7 @@ class AdmissionArtifactContent(FrozenDomainModel):
 def validate_admission_artifact_content(
     content: AdmissionArtifactContent,
     opening_mode: ClaimOpeningMode,
-    is_plurality_active: BooleanFlag,
+    is_plurality_active: PluralityActive,
 ) -> None:
     if (
         opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED

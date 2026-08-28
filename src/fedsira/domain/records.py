@@ -18,7 +18,7 @@ TextValue = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS, strict=True)]
 DeterministicInteger = Annotated[int, Field(strict=True)]
 FramingField: TypeAlias = TextValue | DeterministicInteger
-FeatureShiftSign: TypeAlias = Literal[-1.0, 1.0]
+FeatureShiftSign: TypeAlias = Literal[-1, 1]
 
 Identifier = Annotated[
     str,
@@ -98,6 +98,19 @@ AttackFamilyDirectoryToken = TextValue
 AttackFamilyName = TextValue
 AttackBasename = TextValue
 ReproductionRowId = TextValue
+ScientificCellSemanticKey = TextValue
+CellPhaseIdentity = TextValue
+RuntimeComponentName = TextValue
+ScientificConfigurationSubset = TextValue
+EnvironmentRecord = TextValue
+CreationContext = TextValue
+TensorName = TextValue
+FigureName = TextValue
+TableName = TextValue
+ClaimEvidenceName = TextValue
+ReportVerificationFailure = TextValue
+PreparedViewKey = TextValue
+RoleHashToken = TextValue
 
 MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
@@ -158,6 +171,8 @@ ModelTransmissionCount = NonNegativeInt
 AdequateFinalGateDomainCount = NonNegativeInt
 MaximumByzantineReproductionRows = NonNegativeInt
 KrumNeighborCount = PositiveInt
+SignFlipSampleCount = NonNegativeInt
+EligibleAttackRowCount = NonNegativeInt
 ObservedPositiveReportCount = NonNegativeInt
 MaximumByzantineReportCount = NonNegativeInt
 MinimumHonestPositiveReportCount = NonNegativeInt
@@ -197,6 +212,9 @@ DbscanEpsilon = PositiveFloat
 ProductionWeight = NonNegativeFloat
 KrumScore = NonNegativeFloat
 FeatureShiftMagnitude = PositiveFloat
+TrainingLoss = NonNegativeFloat
+MetricValue = FiniteFloat
+PredictorValue = FiniteFloat
 
 PoisonFraction = Probability
 AttackStrength = Probability
@@ -240,6 +258,21 @@ ClaimGateDecision = BooleanValue
 CapabilityContractSatisfied = BooleanValue
 SourceExcludedFromKrum = BooleanValue
 KrumCommitteeAdmissible = BooleanValue
+BaselineFullParticipationAllowed = BooleanValue
+FinalGateArtifactValid = BooleanValue
+PluralityActive = BooleanValue
+InvariantChecksPassed = BooleanValue
+AttackCarrierRequired = BooleanValue
+ScreenDomainDecision = BooleanValue
+CandidateFreeOpeningPredicate = BooleanValue
+ResolvedCoreComplete = BooleanValue
+CollapseDecisionPassed = BooleanValue
+ResolvedCoreDependent = BooleanValue
+ProvenancePayloadStale = BooleanValue
+ScientificConfigurationChanged = BooleanValue
+DatasetSplitUpstreamChanged = BooleanValue
+ProducerCodeOrRuntimeChanged = BooleanValue
+ArtifactInvalidated = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):

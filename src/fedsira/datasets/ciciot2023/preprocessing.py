@@ -25,12 +25,12 @@ from fedsira.datasets.ciciot2023.acquisition import (
 from fedsira.datasets.ciciot2023.schema import (
     BENIGN_LABEL,
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
-    ROW_IDENTIFIER_CANONICAL_TOKENS,
+    ROW_IDENTIFIER_TOKENS,
     TARGET_LABEL,
     CICIoT2023PseudoDomain,
-    canonical_class_registry,
-    canonicalize_label,
-    canonicalize_token,
+    build_class_registry,
+    normalize_label,
+    normalize_label_token,
     hash_to_pseudo_domain,
 )
 from fedsira.datasets.ciciot2023.validation import (
@@ -51,8 +51,19 @@ from fedsira.datasets.scaling import (
     fit_feature_moments,
     standardize_row,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt, PositiveInt
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.domain.records import (
+    ArtifactDigest,
+    DatasetClassToken,
+    DatasetColumnName,
+    NonNegativeInt,
+    PositiveInt,
+    PredictorCountMatchesOfficial,
+    PredictorValue,
+    PreparedViewKey,
+    RelativePathText,
+    RoleHashToken,
+)
+from fedsira.runtime.determinism import framed_bytes
 
 STABLE_ROW_ID_PREFIX = "CICIOT2023_SAMPLE_ID_V1"
 PREPARED_VIEW_SCHEMA_VERSION = "fedsira|ciciot2023_prepared_view|1"
@@ -110,18 +121,18 @@ class SecondaryRawRow:
 class SecondaryRetainedRow:
     stable_row_id: ArtifactDigest
     file_sha256: ArtifactDigest
-    relative_path: CanonicalToken
+    relative_path: RelativePathText
     original_row_index: NonNegativeInt
-    canonical_label: CanonicalToken
+    canonical_label: DatasetClassToken
     pseudo_domain: CICIoT2023PseudoDomain
-    features: tuple[float, ...]
+    features: tuple[PredictorValue, ...]
 
 
 @dataclass(frozen=True)
 class SecondaryExcludedRow:
     stable_row_id: ArtifactDigest
     file_sha256: ArtifactDigest
-    relative_path: CanonicalToken
+    relative_path: RelativePathText
     original_row_index: NonNegativeInt
     reason: DatasetExclusionReason
 
@@ -129,7 +140,7 @@ class SecondaryExcludedRow:
 @dataclass(frozen=True)
 class SecondaryRoleAssignment:
     stable_row_id: ArtifactDigest
-    canonical_label: CanonicalToken
+    canonical_label: DatasetClassToken
     pseudo_domain: CICIoT2023PseudoDomain
     role: Role
 
@@ -137,7 +148,7 @@ class SecondaryRoleAssignment:
 @dataclass(frozen=True)
 class SecondaryPreparedViewSummary:
     pseudo_domain: CICIoT2023PseudoDomain
-    canonical_label: CanonicalToken
+    canonical_label: DatasetClassToken
     role: Role
     row_count: NonNegativeInt
     parquet_path: Path
@@ -146,9 +157,9 @@ class SecondaryPreparedViewSummary:
 @dataclass(frozen=True)
 class SecondaryMaterializationSummary:
     dataset_manifest_hash: ArtifactDigest
-    class_registry: tuple[CanonicalToken, ...]
-    predictor_columns: tuple[CanonicalToken, ...]
-    predictor_count_matches_official: bool
+    class_registry: tuple[DatasetClassToken, ...]
+    predictor_columns: tuple[DatasetColumnName, ...]
+    predictor_count_matches_official: PredictorCountMatchesOfficial
     raw_row_count: NonNegativeInt
     retained_row_count: NonNegativeInt
     excluded_row_count: NonNegativeInt
@@ -158,25 +169,25 @@ class SecondaryMaterializationSummary:
 
 @dataclass(frozen=True)
 class _GroupIdentity:
-    canonical_label: CanonicalToken
+    canonical_label: DatasetClassToken
     pseudo_domain: CICIoT2023PseudoDomain
 
 
 @dataclass(frozen=True)
 class _PreparedViewIdentity:
     pseudo_domain: CICIoT2023PseudoDomain
-    canonical_label: CanonicalToken
+    canonical_label: DatasetClassToken
     role: Role
     row_count: NonNegativeInt
 
 
 def compute_stable_row_id(
-    normalized_relative_csv_path: CanonicalToken,
+    normalized_relative_csv_path: RelativePathText,
     file_sha256: ArtifactDigest,
     zero_based_original_row_index: NonNegativeInt,
 ) -> ArtifactDigest:
     return hashlib.sha256(
-        canonical_bytes(
+        framed_bytes(
             STABLE_ROW_ID_PREFIX,
             normalized_relative_csv_path,
             file_sha256,
@@ -186,10 +197,10 @@ def compute_stable_row_id(
 
 
 def resolve_predictor_columns(
-    header: tuple[CanonicalToken, ...],
-    label_column: CanonicalToken,
-    row_identifier_columns: frozenset[CanonicalToken] = frozenset(),
-) -> tuple[CanonicalToken, ...]:
+    header: tuple[DatasetColumnName, ...],
+    label_column: DatasetColumnName,
+    row_identifier_columns: frozenset[DatasetColumnName] = frozenset(),
+) -> tuple[DatasetColumnName, ...]:
     predictors = tuple(
         column
         for column in header
@@ -205,11 +216,11 @@ def resolve_predictor_columns(
 def parse_complete_case_rows(
     raw_rows: Sequence[SecondaryRawRow],
     *,
-    header: tuple[CanonicalToken, ...],
-    relative_path: CanonicalToken,
+    header: tuple[DatasetColumnName, ...],
+    relative_path: RelativePathText,
     file_sha256: ArtifactDigest,
-    label_column: CanonicalToken,
-    predictor_columns: tuple[CanonicalToken, ...],
+    label_column: DatasetColumnName,
+    predictor_columns: tuple[DatasetColumnName, ...],
     dataset_manifest_hash: ArtifactDigest,
     pseudo_domain_partition_salt: PositiveInt,
 ) -> tuple[tuple[SecondaryRetainedRow, ...], tuple[SecondaryExcludedRow, ...]]:
@@ -262,7 +273,7 @@ def parse_complete_case_rows(
                 )
             )
             continue
-        canonical_label = canonicalize_label(raw_row.values[label_index])
+        canonical_label = normalize_label(raw_row.values[label_index])
         pseudo_domain = hash_to_pseudo_domain(
             dataset_manifest_hash,
             canonical_label,
@@ -285,7 +296,7 @@ def parse_complete_case_rows(
 
 def assign_pseudo_domains(
     dataset_manifest_hash: ArtifactDigest,
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     stable_row_ids: tuple[ArtifactDigest, ...],
     pseudo_domain_partition_salt: PositiveInt,
 ) -> tuple[CICIoT2023PseudoDomain, ...]:
@@ -307,7 +318,7 @@ def order_group_by_stable_row_id(
 
 
 def assign_group_local_roles(
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     stable_row_ids_ascending: tuple[ArtifactDigest, ...],
     role_intervals: RoleIntervals,
 ) -> tuple[Role | None, ...]:
@@ -331,7 +342,7 @@ def assign_group_local_roles(
 
 def sampling_cap_for_secondary_role(
     caps: SamplingCapsPerDomain,
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     role: Role,
 ) -> NonNegativeInt | None:
     if canonical_label == TARGET_LABEL:
@@ -362,13 +373,13 @@ def sampling_cap_for_secondary_role(
 
 def secondary_sampling_selection_key(
     dataset_manifest_hash: ArtifactDigest,
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     pseudo_domain: CICIoT2023PseudoDomain,
     role: Role,
     stable_row_id: ArtifactDigest,
 ) -> tuple[bytes, ArtifactDigest]:
     digest = hashlib.sha256(
-        canonical_bytes(
+        framed_bytes(
             dataset_manifest_hash,
             pseudo_domain.display_token,
             canonical_label,
@@ -382,7 +393,7 @@ def secondary_sampling_selection_key(
 
 def apply_secondary_sampling_cap(
     dataset_manifest_hash: ArtifactDigest,
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     pseudo_domain: CICIoT2023PseudoDomain,
     role: Role,
     stable_row_ids: tuple[ArtifactDigest, ...],
@@ -411,7 +422,7 @@ def assign_secondary_roles(
     dataset_manifest_hash: ArtifactDigest,
 ) -> tuple[SecondaryRoleAssignment, ...]:
     rows_by_group: dict[
-        tuple[CanonicalToken, CICIoT2023PseudoDomain], list[SecondaryRetainedRow]
+        tuple[DatasetClassToken, CICIoT2023PseudoDomain], list[SecondaryRetainedRow]
     ] = {}
     for row in rows:
         rows_by_group.setdefault((row.canonical_label, row.pseudo_domain), []).append(row)
@@ -778,7 +789,7 @@ def materialize_ciciot2023_prepared_views(
         database_path.unlink()
     store = _SecondaryPreparationStore(database_path)
     store.reset()
-    raw_labels: set[CanonicalToken] = set()
+    raw_labels: set[DatasetClassToken] = set()
     raw_row_count = 0
     try:
         label_index = reference_header.index(label_column)
@@ -827,9 +838,9 @@ def materialize_ciciot2023_prepared_views(
                     )
 
         validate_label_collisions(frozenset(raw_labels))
-        canonical_labels = frozenset(canonicalize_label(label) for label in raw_labels)
+        canonical_labels = frozenset(normalize_label(label) for label in raw_labels)
         validate_target_label_present(canonical_labels)
-        class_registry = canonical_class_registry(canonical_labels)
+        class_registry = build_class_registry(canonical_labels)
 
         _assign_roles(store, config, dataset_manifest_hash)
         scaler = _fit_secondary_scaler(store, predictor_columns, config)
@@ -860,9 +871,9 @@ def _persist_complete_case_batch(
     store: _SecondaryPreparationStore,
     raw_batch: Sequence[SecondaryRawRow],
     item: SecondaryCsvFile,
-    header: tuple[CanonicalToken, ...],
-    label_column: CanonicalToken,
-    predictor_columns: tuple[CanonicalToken, ...],
+    header: tuple[DatasetColumnName, ...],
+    label_column: DatasetColumnName,
+    predictor_columns: tuple[DatasetColumnName, ...],
     dataset_manifest_hash: ArtifactDigest,
     config: ScientificConfig,
 ) -> None:
@@ -881,14 +892,14 @@ def _persist_complete_case_batch(
 
 def _resolve_row_identifier_columns(
     discovered: Sequence[SecondaryCsvFile],
-    header: tuple[CanonicalToken, ...],
-    label_column: CanonicalToken,
-) -> frozenset[CanonicalToken]:
-    identifiers: set[CanonicalToken] = set()
+    header: tuple[DatasetColumnName, ...],
+    label_column: DatasetColumnName,
+) -> frozenset[DatasetClassToken]:
+    identifiers: set[DatasetClassToken] = set()
     for column_index, column in enumerate(header):
         if column == label_column:
             continue
-        if canonicalize_token(column) not in ROW_IDENTIFIER_CANONICAL_TOKENS:
+        if normalize_label_token(column) not in ROW_IDENTIFIER_TOKENS:
             continue
         if all(
             _is_physical_row_identifier(item.absolute_path, column_index) for item in discovered
@@ -997,7 +1008,7 @@ def _assign_roles(
 
 def _fit_secondary_scaler(
     store: _SecondaryPreparationStore,
-    predictor_columns: tuple[CanonicalToken, ...],
+    predictor_columns: tuple[DatasetColumnName, ...],
     config: ScientificConfig,
 ) -> FeatureMoments:
     statistics = accumulate_feature_statistics(
@@ -1016,7 +1027,7 @@ def _fit_secondary_scaler(
 
 def _write_prepared_views(
     store: _SecondaryPreparationStore,
-    predictor_columns: tuple[CanonicalToken, ...],
+    predictor_columns: tuple[DatasetColumnName, ...],
     scaler: FeatureMoments,
     config: ScientificConfig,
     prepared_root: Path,
@@ -1071,7 +1082,7 @@ def _write_prepared_views(
 
 
 def _new_prepared_columns(
-    predictor_columns: tuple[CanonicalToken, ...],
+    predictor_columns: tuple[DatasetColumnName, ...],
 ) -> dict[str, object]:
     columns: dict[str, object] = {"sample_id": [], "label": []}
     for feature_name in predictor_columns:
@@ -1198,9 +1209,9 @@ def _write_scaler(scaler_root: Path, scaler: FeatureMoments) -> None:
 
 def _view_key(
     pseudo_domain: CICIoT2023PseudoDomain,
-    canonical_label: CanonicalToken,
+    canonical_label: DatasetClassToken,
     role: Role,
-) -> CanonicalToken:
+) -> PreparedViewKey:
     return f"{pseudo_domain.display_token}_{canonical_label}_{ROLE_HASH_TOKEN[role]}"
 
 
@@ -1212,7 +1223,7 @@ def _unpack_features(payload: bytes, feature_count: NonNegativeInt) -> tuple[flo
     return tuple(struct.unpack(f"!{feature_count}d", payload))
 
 
-def _role_from_hash_token(token: CanonicalToken) -> Role:
+def _role_from_hash_token(token: RoleHashToken) -> Role:
     for role, role_token in ROLE_HASH_TOKEN.items():
         if role_token == token:
             return role

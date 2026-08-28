@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
-from fedsira.domain.records import CanonicalToken, DerivedSeed, PositiveFloat, PositiveInt
+from fedsira.domain.records import SampleId, DerivedSeed, PositiveFloat, PositiveInt
 from fedsira.learning.aggregation import federated_averaging
 from fedsira.learning.training import (
     build_loss_function,
@@ -23,7 +23,7 @@ def train_one_client_locally(
     local_epochs: PositiveInt,
     features: torch.Tensor,
     labels: torch.Tensor,
-    sample_ids: Sequence[CanonicalToken],
+    sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
 ) -> tuple[dict[str, torch.Tensor], PositiveInt]:
     model = FedSIRAClassifier(input_width, output_width)
@@ -53,7 +53,7 @@ def run_fedavg_round(
     optimizer_config: OptimizerConfig,
     training_config: TrainingConfig,
     local_epochs: PositiveInt,
-    clients: Sequence[tuple[torch.Tensor, torch.Tensor, Sequence[CanonicalToken], DerivedSeed]],
+    clients: Sequence[tuple[torch.Tensor, torch.Tensor, Sequence[SampleId], DerivedSeed]],
 ) -> dict[str, torch.Tensor]:
     client_state_dicts: list[dict[str, torch.Tensor]] = []
     client_example_counts: list[PositiveInt] = []

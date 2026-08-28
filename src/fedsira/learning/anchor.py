@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.schema import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
-from fedsira.domain.records import CanonicalToken, DerivedSeed, PositiveFloat, PositiveInt
+from fedsira.domain.records import SampleId, DerivedSeed, PositiveFloat, PositiveInt
 from fedsira.learning.federated import run_fedavg_round
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
 
@@ -17,7 +17,7 @@ def run_anchor_fedavg_training(
     training_config: TrainingConfig,
     anchor_config: AnchorFedAvgConfig,
     clients_per_round: Sequence[
-        Sequence[tuple[torch.Tensor, torch.Tensor, Sequence[CanonicalToken], DerivedSeed]]
+        Sequence[tuple[torch.Tensor, torch.Tensor, Sequence[SampleId], DerivedSeed]]
     ],
 ) -> tuple[dict[str, torch.Tensor], tuple[dict[str, torch.Tensor], ...]]:
     if len(clients_per_round) != anchor_config.rounds:

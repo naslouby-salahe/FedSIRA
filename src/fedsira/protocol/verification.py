@@ -54,7 +54,9 @@ def verifier_assignment_seed_for_row(
 def deterministic_verifier_panel(
     eligible_domains: Sequence[DomainId], row_seed: DerivedSeed, panel_size: PositiveInt
 ) -> tuple[DomainId, ...]:
-    return deterministic_order(eligible_domains, VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[:panel_size]
+    return deterministic_order(eligible_domains, VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[
+        :panel_size
+    ]
 
 
 def byzantine_selection_order(

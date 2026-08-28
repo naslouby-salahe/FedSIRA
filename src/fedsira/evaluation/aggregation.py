@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import numpy
 
 from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import CanonicalToken, MasterSeed, PositiveInt, Probability
+from fedsira.domain.records import SampleId, MasterSeed, PositiveInt, Probability
 from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 
@@ -47,20 +47,20 @@ def decile_bin(value: float, boundaries: Sequence[float]) -> int:
 
 
 def match_nearest_within_decile(
-    targets: Sequence[tuple[CanonicalToken, float]],
-    candidates: Sequence[tuple[CanonicalToken, float]],
+    targets: Sequence[tuple[SampleId, float]],
+    candidates: Sequence[tuple[SampleId, float]],
     boundary_values: Sequence[float],
-) -> tuple[tuple[CanonicalToken, CanonicalToken], ...] | None:
+) -> tuple[tuple[SampleId, SampleId], ...] | None:
     if not boundary_values:
         return None
     boundaries = decile_boundaries(boundary_values)
-    candidates_by_bin: dict[int, list[tuple[CanonicalToken, float]]] = {}
+    candidates_by_bin: dict[int, list[tuple[SampleId, float]]] = {}
     for row_id, loss in candidates:
         candidates_by_bin.setdefault(decile_bin(loss, boundaries), []).append((row_id, loss))
     for bin_candidates in candidates_by_bin.values():
         bin_candidates.sort(key=lambda item: item[0])
 
-    matches: list[tuple[CanonicalToken, CanonicalToken]] = []
+    matches: list[tuple[SampleId, SampleId]] = []
     for target_id, target_loss in sorted(targets, key=lambda item: item[0]):
         pool = candidates_by_bin.get(decile_bin(target_loss, boundaries), [])
         if not pool:

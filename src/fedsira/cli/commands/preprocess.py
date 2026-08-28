@@ -81,7 +81,7 @@ def _publish_or_reuse_canonical_dataset_manifest(
         external_dependency_fingerprint=external_fingerprint,
     )
     canonical_directory: Path = REPOSITORY_ROOT / workspace_root_for_family(
-        ArtifactFamily.CANONICAL_DATASET_MANIFEST
+        ArtifactFamily.DATASET_MANIFEST
     )
 
     if is_artifact_complete_and_valid(canonical_directory, identity):
@@ -91,7 +91,7 @@ def _publish_or_reuse_canonical_dataset_manifest(
 
     payload = json.dumps(payload_fields, sort_keys=True, default=str).encode("utf-8")
     staged_manifest = ArtifactManifest(
-        family=ArtifactFamily.CANONICAL_DATASET_MANIFEST,
+        family=ArtifactFamily.DATASET_MANIFEST,
         identity=identity,
         checksum=compute_checksum(payload),
         lifecycle_state=ArtifactLifecycleState.STAGING,

@@ -10,7 +10,7 @@ from fedsira.baselines.registry import (
 from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.domain.enums import DatasetId, RootCauseMixture
 from fedsira.domain.records import (
-    CanonicalToken,
+    ExperimentName,
     ExperimentName,
     FrozenDomainModel,
     ScientificCellCount,
@@ -164,12 +164,12 @@ class SecondaryScenario(StrEnum):
 class ExperimentDefinition(FrozenDomainModel):
     name: ExperimentName
     experiment_class: ExperimentClass
-    methods: tuple[CanonicalToken, ...]
-    conditions: tuple[CanonicalToken, ...]
+    methods: tuple[ExperimentName, ...]
+    conditions: tuple[ExperimentName, ...]
     seed_count: SeedCount
     nominal_cell_count: ScientificCellCount
-    claim_family: CanonicalToken | None
-    prerequisites: tuple[CanonicalToken, ...]
+    claim_family: ExperimentName | None
+    prerequisites: tuple[ExperimentName, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
 
 
@@ -194,14 +194,14 @@ DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME = "Data and Domain Evidence Validation"
 PROTOCOL_INVARIANT_VALIDATION_NAME = "Protocol Invariant Validation"
 BASELINE_IMPLEMENTATION_VALIDATION_NAME = "Baseline Implementation Validation"
 
-COLLAPSE_EXPERIMENT_NAMES: tuple[CanonicalToken, ...] = (
+COLLAPSE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
 )
 
-POST_CORE_EXPERIMENT_NAMES: tuple[CanonicalToken, ...] = (
+POST_CORE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     MECHANISM_ABLATION_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
@@ -225,7 +225,7 @@ _EPISTEMIC_STRENGTHS: dict[EpistemicFailureType, tuple[str, ...]] = {
     EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT: ("0.25", "0.50", "1.00"),
 }
 
-_BASELINE_FIXTURE_BY_NAME: tuple[tuple[CanonicalToken, CanonicalToken], ...] = tuple(
+_BASELINE_FIXTURE_BY_NAME: tuple[tuple[ExperimentName, ExperimentName], ...] = tuple(
     (identity.value, fixture.value)
     for identity, fixture in BASELINE_VALIDATION_FIXTURE_MAP.items()
     if fixture
@@ -236,8 +236,8 @@ _BASELINE_FIXTURE_BY_NAME: tuple[tuple[CanonicalToken, CanonicalToken], ...] = t
     )
 )
 
-_BASELINE_METHODS: tuple[CanonicalToken, ...] = tuple(name for name, _ in _BASELINE_FIXTURE_BY_NAME)
-_BASELINE_FIXTURES: tuple[CanonicalToken, ...] = tuple(
+_BASELINE_METHODS: tuple[ExperimentName, ...] = tuple(name for name, _ in _BASELINE_FIXTURE_BY_NAME)
+_BASELINE_FIXTURES: tuple[ExperimentName, ...] = tuple(
     fixture for _, fixture in _BASELINE_FIXTURE_BY_NAME
 )
 
@@ -486,12 +486,12 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
 )
 
 
-def experiment_by_name(name: CanonicalToken) -> ExperimentDefinition:
+def experiment_by_name(name: ExperimentName) -> ExperimentDefinition:
     for definition in EXPERIMENT_REGISTRY:
         if definition.name == name:
             return definition
     raise KeyError(f"unknown experiment {name!r}")
 
 
-def experiment_names() -> tuple[CanonicalToken, ...]:
+def experiment_names() -> tuple[ExperimentName, ...]:
     return tuple(definition.name for definition in EXPERIMENT_REGISTRY)

@@ -259,9 +259,7 @@ class ResourceHorizonConfig(FrozenConfigModel):
                 "measurement_cycle_end must be strictly greater than measurement_cycle_start"
             )
         if self.measurement_cycle_end > self.maximum_logical_evidence_cycles:
-            raise ValueError(
-                "measurement_cycle_end cannot exceed maximum_logical_evidence_cycles"
-            )
+            raise ValueError("measurement_cycle_end cannot exceed maximum_logical_evidence_cycles")
         return self
 
 
@@ -432,7 +430,9 @@ class HiddenSourceBackdoorConfig(FrozenConfigModel):
         if len(set(self.poison_fraction_sweep)) != len(self.poison_fraction_sweep):
             raise ValueError("poison_fraction_sweep must not contain duplicates")
         if self.confirmatory_poison_fraction not in self.poison_fraction_sweep:
-            raise ValueError("confirmatory_poison_fraction must be included in poison_fraction_sweep")
+            raise ValueError(
+                "confirmatory_poison_fraction must be included in poison_fraction_sweep"
+            )
         return self
 
 

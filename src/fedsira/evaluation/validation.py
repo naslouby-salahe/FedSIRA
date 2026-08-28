@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import DatasetClassToken
 
 
 class EvaluationValidationError(ValueError):
@@ -12,10 +12,10 @@ class EvaluationValidationError(ValueError):
 
 
 def validate_metric_class_membership(
-    class_tokens: Sequence[CanonicalToken],
-    target_class_token: CanonicalToken,
-    benign_class_token: CanonicalToken,
-    supported_class_tokens: Sequence[CanonicalToken],
+    class_tokens: Sequence[DatasetClassToken],
+    target_class_token: DatasetClassToken,
+    benign_class_token: DatasetClassToken,
+    supported_class_tokens: Sequence[DatasetClassToken],
 ) -> None:
     vocabulary = frozenset(class_tokens)
     if target_class_token not in vocabulary:

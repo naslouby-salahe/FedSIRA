@@ -1,21 +1,29 @@
 import itertools
 from collections.abc import Sequence
 
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveFloat, Probability
+from fedsira.domain.records import (
+    ComparisonMargin,
+    ComparisonName,
+    PValue,
+    PairedDifference,
+    SignFlipSampleCount,
+)
 
 
 def enumerate_sign_flip_assignments(
-    sample_count: NonNegativeInt,
-) -> tuple[tuple[float, ...], ...]:
-    return tuple(itertools.product((1.0, -1.0), repeat=sample_count))
+    sample_count: SignFlipSampleCount,
+) -> tuple[tuple[int, ...], ...]:
+    return tuple(itertools.product((1, -1), repeat=sample_count))
 
 
-def _signed_mean(signs: Sequence[float], differences: Sequence[float]) -> float:
+def _signed_mean(signs: Sequence[int], differences: Sequence[PairedDifference]) -> PairedDifference:
     paired = zip(signs, differences, strict=True)
     return sum(sign * difference for sign, difference in paired) / len(differences)
 
 
-def exact_sign_flip_two_sided_p_value(paired_differences: Sequence[float]) -> Probability:
+def exact_sign_flip_two_sided_p_value(
+    paired_differences: Sequence[PairedDifference],
+) -> PValue:
     sample_count = len(paired_differences)
     observed_absolute_mean = abs(sum(paired_differences) / sample_count)
     assignments = enumerate_sign_flip_assignments(sample_count)
@@ -28,8 +36,9 @@ def exact_sign_flip_two_sided_p_value(paired_differences: Sequence[float]) -> Pr
 
 
 def exact_sign_flip_non_inferiority_p_value(
-    paired_differences: Sequence[float], margin: PositiveFloat
-) -> Probability:
+    paired_differences: Sequence[PairedDifference],
+    margin: ComparisonMargin,
+) -> PValue:
     shifted_differences = [difference + margin for difference in paired_differences]
     sample_count = len(shifted_differences)
     observed_mean = sum(shifted_differences) / sample_count
@@ -41,15 +50,16 @@ def exact_sign_flip_non_inferiority_p_value(
 
 
 def holm_adjusted_p_values(
-    named_raw_p_values: Sequence[tuple[CanonicalToken, Probability]],
-) -> tuple[tuple[CanonicalToken, Probability], ...]:
+    named_raw_p_values: Sequence[tuple[ComparisonName, PValue]],
+) -> tuple[tuple[ComparisonName, PValue], ...]:
     ordered = sorted(named_raw_p_values, key=lambda item: (item[1], item[0]))
     comparison_count = len(ordered)
-    adjusted_p_values: list[Probability] = []
-    running_maximum = 0.0
+    adjusted_p_values: list[PValue] = []
+    running_maximum: PValue = 0.0
     for rank, (_, raw_p_value) in enumerate(ordered):
         candidate = min((comparison_count - rank) * raw_p_value, 1.0)
         running_maximum = max(running_maximum, candidate)
         adjusted_p_values.append(running_maximum)
-    paired = zip(ordered, adjusted_p_values, strict=True)
-    return tuple((name, adjusted_p_value) for (name, _), adjusted_p_value in paired)
+    return tuple(
+        (name, adjusted) for (name, _), adjusted in zip(ordered, adjusted_p_values, strict=True)
+    )
