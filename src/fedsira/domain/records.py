@@ -4,39 +4,88 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-UINT32_MODULUS = 4294967296
+UINT32_MODULUS = 4_294_967_296
 
-Probability = Annotated[float, Field(ge=0.0, le=1.0)]
-Percentage = Annotated[float, Field(ge=0.0, le=100.0)]
-NonNegativeInt = Annotated[int, Field(ge=0)]
-PositiveInt = Annotated[int, Field(gt=0)]
-NonNegativeFloat = Annotated[float, Field(ge=0.0)]
-PositiveFloat = Annotated[float, Field(gt=0.0)]
+# Constrained scalar foundations. Production models should expose the semantic aliases
+# below rather than these storage-oriented foundations directly.
+Probability = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
+Percentage = Annotated[float, Field(ge=0.0, le=100.0, allow_inf_nan=False)]
+NonNegativeInt = Annotated[int, Field(ge=0, strict=True)]
+PositiveInt = Annotated[int, Field(gt=0, strict=True)]
+NonNegativeFloat = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
+PositiveFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
-BooleanFlag = Annotated[bool, Field()]
-NonEmptyString = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
-Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS)]
+BooleanValue = Annotated[bool, Field(strict=True)]
+TextValue = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
+Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS, strict=True)]
 
-ExperimentSlug = Annotated[str, StringConstraints(min_length=1, pattern=r"^[a-z][a-z0-9-]*$")]
-ArtifactDigest = Annotated[
-    str, StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+# Identifiers and text domains.
+Identifier = Annotated[
+    str,
+    StringConstraints(
+        min_length=1,
+        max_length=256,
+        strip_whitespace=True,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._: /+@-]*$",
+    ),
 ]
+ExperimentSlug = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9-]*$"),
+]
+ArtifactDigest = Annotated[
+    str,
+    StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
+]
+GitCommit = Annotated[
+    str,
+    StringConstraints(
+        min_length=7,
+        max_length=40,
+        strip_whitespace=True,
+        pattern=r"^[0-9a-f]{7,40}$",
+    ),
+]
+Doi = Annotated[
+    str,
+    StringConstraints(
+        min_length=6,
+        max_length=256,
+        strip_whitespace=True,
+        pattern=r"^10\.[0-9]{4,9}/\S+$",
+    ),
+]
+RepositoryPath = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
+ExperimentName = TextValue
+MethodName = TextValue
+ConditionName = TextValue
+ScenarioName = TextValue
+MetricName = TextValue
+DomainId = TextValue
+ClassLabel = TextValue
+DatasetClassToken = ClassLabel
+FeatureName = TextValue
+RoleName = TextValue
+AlgorithmName = TextValue
+ArtifactName = TextValue
+ParameterName = TextValue
+MessageEndpoint = TextValue
+EnvironmentText = TextValue
+FailureMessage = TextValue
+FixtureCaseName = TextValue
+ComparisonFamilyName = TextValue
+ReportColumnName = TextValue
+
+# Deterministic identities and seeds.
 MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
-CanonicalToken = NonEmptyString
-ExperimentName = NonEmptyString
-DomainId = NonEmptyString
-ClassLabel = NonEmptyString
-FeatureName = NonEmptyString
-DatasetClassToken = ClassLabel
-RepositoryPath = NonEmptyString
-Doi = NonEmptyString
-RoundIndex = Annotated[int, Field(ge=-1)]
+PartitionSalt = Uint32Bound
+RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
-FailureMessage = NonEmptyString
 
+# Counts and discrete quantities.
 RowCount = NonNegativeInt
 ExampleCount = NonNegativeInt
 MinimumExampleCount = PositiveInt
@@ -70,13 +119,13 @@ HashModulus = PositiveInt
 UciDatasetId = PositiveInt
 SeedCount = PositiveInt
 PredictorCount = PositiveInt
-PartitionSalt = Uint32Bound
 TrimCount = NonNegativeInt
 ClusterSize = PositiveInt
 CommittedRowCount = PositiveInt
 MinimumCompletePairCount = PositiveInt
 ConfigFormatVersion = PositiveInt
 
+# Continuous scientific quantities.
 StandardizedValue = FiniteFloat
 MetricDifference = FiniteFloat
 LearningRate = PositiveFloat
@@ -97,8 +146,11 @@ PValueDisplayFloor = PositiveFloat
 DbscanEpsilon = PositiveFloat
 ProductionWeight = NonNegativeFloat
 KrumScore = NonNegativeFloat
+FeatureShiftMagnitude = PositiveFloat
 
+# Probability/rate semantics.
 PoisonFraction = Probability
+AttackStrength = Probability
 ClientDropout = Probability
 TargetF1 = Probability
 TargetF1Gain = Probability
@@ -109,18 +161,28 @@ ConfidenceLevel = Probability
 FamilyWiseAlpha = Probability
 CosineSimilarity = Probability
 HeterogeneityMultiplier = Probability
+OptimizerBeta = Probability
+DefinedDomainFraction = Probability
+RateReduction = Probability
+RateMargin = Probability
+RateWorsening = Probability
+CapabilityCertificationRate = Probability
+AdmissionRateChange = Probability
+TargetF1Change = Probability
+Percentile = Percentage
 
-PinMemoryEnabled = BooleanFlag
-PersistentWorkersEnabled = BooleanFlag
-PredictorCountMatchesOfficial = BooleanFlag
-SourceCommitted = BooleanFlag
-EvidenceAdequate = BooleanFlag
-OpeningPredicateSatisfied = BooleanFlag
-FinalGatePredicatesPass = BooleanFlag
-ReproductionWasTrained = BooleanFlag
-ReproductionCertified = BooleanFlag
-ExternalVerificationActive = BooleanFlag
-ResolvedRowRequirementReached = BooleanFlag
+# Boolean semantics. Each public field uses a meaning-specific alias.
+PinMemoryEnabled = BooleanValue
+PersistentWorkersEnabled = BooleanValue
+PredictorCountMatchesOfficial = BooleanValue
+SourceCommitted = BooleanValue
+EvidenceAdequate = BooleanValue
+OpeningPredicateSatisfied = BooleanValue
+FinalGatePredicatesPass = BooleanValue
+ReproductionWasTrained = BooleanValue
+ReproductionCertified = BooleanValue
+ExternalVerificationActive = BooleanValue
+ResolvedRowRequirementReached = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
