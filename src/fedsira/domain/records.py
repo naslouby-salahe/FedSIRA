@@ -113,6 +113,10 @@ ReportVerificationFailure = TextValue
 PreparedViewKey = TextValue
 ProgramBlockName = TextValue
 RoleHashToken = TextValue
+DoctorArtifactSummary = TextValue
+DoctorExperimentSummary = TextValue
+ProjectProgressDescription = TextValue
+NextValidAction = TextValue
 
 MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
@@ -279,6 +283,9 @@ ArtifactInvalidated = BooleanValue
 OverwriteExisting = BooleanValue
 CellCompletionStatus = BooleanValue
 TerminalExperimentState = BooleanValue
+ConfigurationLoadable = BooleanValue
+DeterministicExecutionReady = BooleanValue
+ArtifactReuseDecision = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
