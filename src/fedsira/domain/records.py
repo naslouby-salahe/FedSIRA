@@ -112,6 +112,7 @@ RetryCount = NonNegativeInt
 RowCount = NonNegativeInt
 SourceRowIndex = NonNegativeInt
 SamplingCap = NonNegativeInt
+FeatureIndex = NonNegativeInt
 ExampleCount = NonNegativeInt
 MinimumExampleCount = PositiveInt
 DomainCount = PositiveInt
