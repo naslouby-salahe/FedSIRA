@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -103,7 +103,22 @@ from fedsira.domain.enums import (
     TernaryOutcome,
     VerificationOmissionMarker,
 )
-from fedsira.domain.records import CanonicalToken, MasterSeed, SeedBundle
+from fedsira.domain.records import (
+    AdequateFinalGateDomainCount,
+    ArtifactDigest,
+    CapabilityContractSatisfied,
+    ClaimId,
+    DatasetClassToken,
+    DomainId,
+    FrozenDomainModel,
+    MasterSeed,
+    ModuleName,
+    PreparedReproductionTargetCount,
+    PreparedScreenTargetCount,
+    PreparedSupportedReplayCount,
+    RequiredReproductionRowCount,
+    SeedBundle,
+)
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
     domain_disparity,
@@ -314,7 +329,7 @@ ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
 def _training_entry_points(
     evidence: PreparedEvidenceCounts,
     config: ScientificConfig,
-) -> tuple[CanonicalToken, ...]:
+) -> tuple[ModuleName, ...]:
     if (
         evidence.reproduction_target_count
         < config.capability_claim.evidence_minima.reproduction_target_examples
@@ -331,29 +346,27 @@ def _training_entry_points(
     return (anchor_entry, post_reference_entry, verifier_aware_entry)
 
 
-@dataclass(frozen=True)
-class PreparedEvidenceCounts:
-    screen_target_count: int
-    reproduction_target_count: int
-    reproduction_supported_count: int
-    final_gate_adequate_domain_count: int
+class PreparedEvidenceCounts(FrozenDomainModel):
+    screen_target_count: PreparedScreenTargetCount
+    reproduction_target_count: PreparedReproductionTargetCount
+    reproduction_supported_count: PreparedSupportedReplayCount
+    final_gate_adequate_domain_count: AdequateFinalGateDomainCount
 
 
-@dataclass(frozen=True)
-class OpeningIdentity:
-    claim_identity: str
-    contract_passes: bool
+class OpeningIdentity(FrozenDomainModel):
+    claim_identity: ClaimId
+    contract_passes: CapabilityContractSatisfied
 
 
 def load_prepared_evidence_counts(
-    prepared_root: Path, target_class_token: CanonicalToken
+    prepared_root: Path, target_class_token: DatasetClassToken
 ) -> PreparedEvidenceCounts | None:
     if not prepared_root.exists():
         return None
     screen_target_count = 0
     reproduction_target_count = 0
     reproduction_supported_count = 0
-    final_gate_target_domains: set[CanonicalToken] = set()
+    final_gate_target_domains: set[DomainId] = set()
     for metadata_path in sorted(prepared_root.glob("*.json")):
         try:
             payload = json.loads(metadata_path.read_text())
@@ -437,7 +450,7 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
 
 def _row_requirement(
     cell: ScientificCell, config: ScientificConfig, resolved_core: ResolvedCore | None = None
-) -> int:
+) -> RequiredReproductionRowCount:
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
         return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
     if cell.method in (
@@ -456,7 +469,7 @@ def _row_requirement(
     return config.protocol.synthesis.committee_size
 
 
-def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> str:
+def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> ArtifactDigest:
     return compute_reproduction_commitment_hash(
         reproducer_domain,
         "c" * 64,
