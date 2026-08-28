@@ -18,6 +18,7 @@ FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 BooleanValue = Annotated[bool, Field(strict=True)]
 TextValue = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS, strict=True)]
+DeterministicInteger = Annotated[int, Field(strict=True)]
 
 # Identifiers and text domains.
 Identifier = Annotated[
@@ -66,6 +67,7 @@ ClassLabel = TextValue
 DatasetClassToken = ClassLabel
 FeatureName = TextValue
 RoleName = TextValue
+RoleToken = TextValue
 AlgorithmName = TextValue
 ArtifactName = TextValue
 ParameterName = TextValue
@@ -74,13 +76,21 @@ EnvironmentText = TextValue
 FailureMessage = TextValue
 FixtureCaseName = TextValue
 ComparisonFamilyName = TextValue
+ComparisonName = TextValue
+ComparisonState = TextValue
 ReportColumnName = TextValue
+CheckpointIdentity = TextValue
+TrainingConditionId = TextValue
+SeedDerivationLabel = TextValue
+SampleId = TextValue
+RelativePathText = TextValue
 
 # Deterministic identities and seeds.
 MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 PartitionSalt = Uint32Bound
+DatasetManifestDigest = ArtifactDigest
 RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
@@ -124,10 +134,19 @@ ClusterSize = PositiveInt
 CommittedRowCount = PositiveInt
 MinimumCompletePairCount = PositiveInt
 ConfigFormatVersion = PositiveInt
+CompleteSeedCount = NonNegativeInt
+ByteCount = NonNegativeInt
+MemoryBytes = NonNegativeInt
+ModelTransmissionCount = NonNegativeInt
 
 # Continuous scientific quantities.
 StandardizedValue = FiniteFloat
 MetricDifference = FiniteFloat
+PairedDifference = FiniteFloat
+ConfidenceIntervalBound = FiniteFloat
+ComparisonMargin = NonNegativeFloat
+MaterialThreshold = NonNegativeFloat
+EffectSize = Annotated[float, Field(allow_inf_nan=True)]
 LearningRate = PositiveFloat
 OptimizerEpsilon = PositiveFloat
 NumericalEpsilon = PositiveFloat
@@ -144,6 +163,7 @@ DeltaScale = PositiveFloat
 MetricTolerance = PositiveFloat
 ProbabilityTolerance = PositiveFloat
 DurationToleranceSeconds = PositiveFloat
+DurationSeconds = NonNegativeFloat
 PValueDisplayFloor = PositiveFloat
 DbscanEpsilon = PositiveFloat
 ProductionWeight = NonNegativeFloat
@@ -187,6 +207,7 @@ ReproductionWasTrained = BooleanValue
 ReproductionCertified = BooleanValue
 ExternalVerificationActive = BooleanValue
 ResolvedRowRequirementReached = BooleanValue
+MaterialityDecision = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
