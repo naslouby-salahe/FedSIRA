@@ -258,7 +258,7 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
 )
-from fedsira.protocol.source_selection import select_source_domain, source_selection_order
+from fedsira.protocol.opening import select_source_domain, source_selection_order
 from fedsira.protocol.state_machine import (
     apply_logical_cycle_expiry,
     resolve_ternary_outcome,
@@ -416,14 +416,14 @@ def _opening_identity(config: ScientificConfig) -> OpeningIdentity:
 
 def _source_domain_for_cell(cell: ScientificCell) -> NBaiotDomain | None:
     source_order = source_selection_order(
-        derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
+        NBAIOT_DOMAIN_ORDER, derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
     )
     validate_exactly_one_source_domain((source_order[0],))
     return select_source_domain(
         source_order,
         frozenset(NBAIOT_DOMAIN_ORDER),
-        requires_gafgyt_udp_carrier=False,
-        domains_with_gafgyt_udp=frozenset(),
+        requires_attack_carrier=False,
+        domains_with_attack_carrier=frozenset(),
     )
 
 
