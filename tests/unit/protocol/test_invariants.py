@@ -6,12 +6,12 @@ import pytest
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import DatasetId, TernaryOutcome
-from fedsira.evaluation.communication import (
+from fedsira.evaluation.records import (
+    AdmissionDelayDecomposition,
     CommunicationMessageMetadata,
     CommunicationMessageType,
     encode_message_metadata,
 )
-from fedsira.evaluation.records import AdmissionDelayDecomposition
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.protocol.claim_contract import build_capability_claim_contract
 from fedsira.protocol.verification import reproduction_row_is_certified

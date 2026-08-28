@@ -1,18 +1,18 @@
 import json
 
-from fedsira.evaluation.communication import (
+from fedsira.evaluation.records import (
     COMMUNICATION_SCHEMA,
     CommunicationMessageMetadata,
     CommunicationMessageType,
     TensorParameterKind,
     TensorPayloadMetadata,
-    canonical_parameter_tensor_name,
     communication_bytes,
     encode_message_envelope,
     encode_message_metadata,
     encode_tensor_metadata,
     is_model_transmission,
     model_transmission_count,
+    parameter_tensor_name,
 )
 
 DIGEST = "a" * 64
@@ -32,16 +32,16 @@ def make_metadata(payload_tensor_count: int = 0) -> CommunicationMessageMetadata
     )
 
 
-def test_canonical_parameter_tensor_name_prefixes() -> None:
-    assert canonical_parameter_tensor_name(TensorParameterKind.MODEL, "hidden_1.weight") == (
+def test_parameter_tensor_name_prefixes_kind() -> None:
+    assert parameter_tensor_name(TensorParameterKind.MODEL, "hidden_1.weight") == (
         "model.hidden_1.weight"
     )
-    assert canonical_parameter_tensor_name(TensorParameterKind.UPDATE, "hidden_1.weight") == (
+    assert parameter_tensor_name(TensorParameterKind.UPDATE, "hidden_1.weight") == (
         "update.hidden_1.weight"
     )
 
 
-def test_encode_message_metadata_has_length_prefix_and_canonical_json() -> None:
+def test_encode_message_metadata_has_length_prefix_and_stable_json() -> None:
     metadata = make_metadata()
     envelope = encode_message_metadata(metadata)
     length = int.from_bytes(envelope[:8], byteorder="big")
