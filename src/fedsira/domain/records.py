@@ -86,6 +86,11 @@ SeedDerivationLabel = TextValue
 SampleId = TextValue
 SampleIdPrefix = TextValue
 RelativePathText = TextValue
+ModuleName = TextValue
+SchemaVersion = TextValue
+DependencyImportName = TextValue
+FingerprintPayload = TextValue
+AstDumpText = TextValue
 
 # Deterministic identities and seeds.
 MasterSeed = Uint32Bound
