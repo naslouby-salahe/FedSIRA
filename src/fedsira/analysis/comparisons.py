@@ -75,6 +75,7 @@ class ComparisonState(StrEnum):
     PENDING = "Pending"
     PASSED = "Passed"
     FAILED = "Failed"
+    INCONCLUSIVE_TECHNICAL = "Inconclusive Technical"
 
 
 class ComparisonMetric(StrEnum):

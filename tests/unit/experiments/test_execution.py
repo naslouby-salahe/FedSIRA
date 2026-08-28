@@ -43,7 +43,7 @@ def _cell(experiment: str, method: str, condition: str, master_seed: int) -> Sci
 def _completed_outcome(cell: ScientificCell) -> CellExecutionOutcome:
     return CellExecutionOutcome(
         cell=cell,
-        terminal_state=ExperimentLifecycleState.COMPLETED.value,
+        terminal_state=ExperimentLifecycleState.COMPLETED,
         failure=None,
         metrics=(("terminal-state", 1.0),),
     )
@@ -97,7 +97,7 @@ def test_execution_record_digest_deterministic_and_sensitive() -> None:
     assert first == second
     changed = CellExecutionOutcome(
         cell=cell,
-        terminal_state=ExperimentLifecycleState.FAILED.value,
+        terminal_state=ExperimentLifecycleState.FAILED,
         failure=None,
         metrics=(),
     )
@@ -112,7 +112,7 @@ def test_record_store_round_trip(tmp_path: Path) -> None:
     restored = store.read_outcome(cell.experiment, cell.semantic_key)
     assert restored is not None
     assert isinstance(restored, PersistedExecutionRecord)
-    assert restored.terminal_state == ExperimentLifecycleState.COMPLETED.value
+    assert restored.terminal_state == ExperimentLifecycleState.COMPLETED
     assert restored.semantic_key == cell.semantic_key
     all_outcomes = store.read_all_outcomes(cell.experiment)
     assert len(all_outcomes) == 1
@@ -251,7 +251,7 @@ def test_run_experiment_invalid_outcome_yields_invalid_lifecycle(
         def execute_cell(self, cell: ScientificCell, config: object) -> CellExecutionOutcome:
             return CellExecutionOutcome(
                 cell=cell,
-                terminal_state=ExperimentLifecycleState.INVALID.value,
+                terminal_state=ExperimentLifecycleState.INVALID,
                 failure=None,
                 metrics=(),
             )
@@ -272,7 +272,7 @@ def test_run_experiment_failed_outcome_yields_failed_lifecycle(
         def execute_cell(self, cell: ScientificCell, config: object) -> CellExecutionOutcome:
             return CellExecutionOutcome(
                 cell=cell,
-                terminal_state=ExperimentLifecycleState.FAILED.value,
+                terminal_state=ExperimentLifecycleState.FAILED,
                 failure=None,
                 metrics=(),
             )

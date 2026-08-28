@@ -6,12 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-import pydantic
-
 from fedsira.analysis.comparisons import (
     ComparisonFamilyResult,
     ComparisonOrientation,
     ComparisonResult,
+    ComparisonState,
     ComparisonTestKind,
     PairingKey,
     apply_holm_adjustment,
@@ -28,7 +27,28 @@ from fedsira.domain.enums import (
     FailureClass,
     ScientificCellPhase,
 )
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, MasterSeed
+from fedsira.domain.records import (
+    ArtifactDigest,
+    CellCompletionStatus,
+    CollapseDecisionPassed,
+    CompleteSeedCount,
+    ExecutionSchemaVersion,
+    ExperimentName,
+    FailureMessage,
+    FrozenDomainModel,
+    MasterSeed,
+    MethodName,
+    MetricName,
+    MetricObservation,
+    MetricValue,
+    OverwriteExisting,
+    PairedDifference,
+    ResolvedCoreComplete,
+    ScientificCellCount,
+    ScientificCellSemanticKey,
+    ScenarioName,
+    TerminalExperimentState,
+)
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.experiments.registry import ClaimFamily
 from fedsira.experiments.validation import (
@@ -42,7 +62,7 @@ from fedsira.experiments.validation import (
 from fedsira.runtime.determinism import framed_bytes
 from fedsira.runtime.state import FailureDetail
 
-EXECUTION_RECORD_SCHEMA_VERSION = "fedsira|execution_record|1"
+EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 
 TERMINAL_EXPERIMENT_STATES = frozenset(
     {
@@ -53,50 +73,46 @@ TERMINAL_EXPERIMENT_STATES = frozenset(
 )
 
 
-class PersistedFailureDetail(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
-
+class PersistedFailureDetail(FrozenDomainModel):
     failure_class: FailureClass
-    message: CanonicalToken
+    message: FailureMessage
     cell_phase: ScientificCellPhase | None
 
 
-class PersistedExecutionRecord(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(frozen=True, extra="forbid")
-
-    schema_version: str
-    semantic_key: CanonicalToken
-    experiment: CanonicalToken
-    method: CanonicalToken
-    condition: CanonicalToken
+class PersistedExecutionRecord(FrozenDomainModel):
+    schema_version: ExecutionSchemaVersion
+    semantic_key: ScientificCellSemanticKey
+    experiment: ExperimentName
+    method: MethodName
+    condition: ScenarioName
     master_seed: MasterSeed
-    terminal_state: CanonicalToken
-    metrics: tuple[tuple[CanonicalToken, float | None], ...]
+    terminal_state: ExperimentLifecycleState
+    metrics: tuple[MetricObservation, ...]
     failure: PersistedFailureDetail | None
 
 
 @dataclass(frozen=True)
 class CellExecutionOutcome:
     cell: ScientificCell
-    terminal_state: str
+    terminal_state: ExperimentLifecycleState
     failure: FailureDetail | None
-    metrics: tuple[tuple[CanonicalToken, float | None], ...] = ()
+    metrics: tuple[MetricObservation, ...] = ()
 
     @property
-    def completed(self) -> bool:
-        return self.terminal_state == ExperimentLifecycleState.COMPLETED.value
+    def completed(self) -> CellCompletionStatus:
+        return self.terminal_state is ExperimentLifecycleState.COMPLETED
 
 
 @dataclass(frozen=True)
 class ExperimentExecutionResult:
-    experiment: CanonicalToken
+    experiment: ExperimentName
     lifecycle_state: ExperimentLifecycleState
     outcomes: tuple[CellExecutionOutcome, ...]
     comparison_results: tuple[ComparisonFamilyResult, ...] = ()
-    execution_digest: ArtifactDigest = ""
+    execution_digest: ArtifactDigest | None = None
 
     @property
-    def cell_completion_count(self) -> int:
+    def cell_completion_count(self) -> ScientificCellCount:
         return sum(1 for outcome in self.outcomes if outcome.completed)
 
 
@@ -110,7 +126,7 @@ class ExecutionRecordStore:
     def __init__(self, workspace_root: Path) -> None:
         self._workspace_root = workspace_root
 
-    def _record_directory(self, experiment: CanonicalToken) -> Path:
+    def _record_directory(self, experiment: ExperimentName) -> Path:
         return self._workspace_root / "experiments" / experiment / "evaluations" / "records"
 
     def write_outcome(self, outcome: CellExecutionOutcome) -> None:
@@ -140,7 +156,7 @@ class ExecutionRecordStore:
         (directory / f"{digest}.json").write_text(record.model_dump_json(indent=2))
 
     def read_outcome(
-        self, experiment: CanonicalToken, semantic_key: CanonicalToken
+        self, experiment: ExperimentName, semantic_key: ScientificCellSemanticKey
     ) -> PersistedExecutionRecord | None:
         digest = hashlib.sha256(framed_bytes(semantic_key)).hexdigest()
         path = self._record_directory(experiment) / f"{digest}.json"
@@ -148,7 +164,7 @@ class ExecutionRecordStore:
             return None
         return PersistedExecutionRecord.model_validate_json(path.read_text())
 
-    def read_all_outcomes(self, experiment: CanonicalToken) -> tuple[PersistedExecutionRecord, ...]:
+    def read_all_outcomes(self, experiment: ExperimentName) -> tuple[PersistedExecutionRecord, ...]:
         directory = self._record_directory(experiment)
         if not directory.exists():
             return ()
@@ -159,7 +175,7 @@ class ExecutionRecordStore:
 
 
 def comparison_results_for_experiment(
-    experiment: CanonicalToken,
+    experiment: ExperimentName,
     dataset: DatasetId,
     outcomes: Sequence[CellExecutionOutcome],
     config: ScientificConfig,
@@ -175,7 +191,7 @@ def comparison_results_for_experiment(
     )
     if not definitions:
         return ()
-    seed_metrics: dict[tuple[PairingKey, CanonicalToken], dict[CanonicalToken, float | None]] = {}
+    seed_metrics: dict[tuple[PairingKey, MethodName], dict[MetricName, MetricValue | None]] = {}
     for outcome in outcomes:
         pairing = PairingKey(
             dataset=dataset.value,
@@ -198,10 +214,10 @@ def comparison_results_for_experiment(
                 ComparisonTestKind.NON_INFERIORITY,
             ):
                 raise ValueError(f"unsupported comparison test kind {definition.test_kind}")
-            paired: list[float] = []
-            complete_seeds = 0
+            paired: list[PairedDifference] = []
+            complete_seeds: CompleteSeedCount = 0
             scenario = definition.scientific_scenario
-            scenario_metrics: dict[MasterSeed, dict[CanonicalToken, float | None]] = {}
+            scenario_metrics: dict[MasterSeed, dict[MethodName, MetricValue | None]] = {}
             for (pairing, method), values in seed_metrics.items():
                 if pairing.experiment == experiment and pairing.scientific_scenario == scenario:
                     scenario_metrics.setdefault(pairing.master_seed, {})[method] = values.get(
@@ -238,7 +254,7 @@ def comparison_results_for_experiment(
                         adjusted_p_value=None,
                         confidence_interval=None,
                         materiality_passes=None,
-                        comparison_state="Inconclusive Technical",
+                        comparison_state=ComparisonState.INCONCLUSIVE_TECHNICAL,
                     )
                 )
                 continue
@@ -261,12 +277,12 @@ def comparison_results_for_experiment(
 
 
 def run_experiment(
-    experiment: CanonicalToken,
+    experiment: ExperimentName,
     executor: CellExecutor,
-    overwrite: bool = False,
+    overwrite: OverwriteExisting = False,
     config_path: Path = PRODUCTION_CONFIG_PATH,
-    resolved_core_complete: bool = False,
-    collapse_decision_states: Sequence[tuple[CanonicalToken, bool]] | None = None,
+    resolved_core_complete: ResolvedCoreComplete = False,
+    collapse_decision_states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]] | None = None,
 ) -> ExperimentExecutionResult:
     validate_experiment_name_is_registered(experiment)
     config = load_scientific_config(config_path)
@@ -284,11 +300,11 @@ def run_experiment(
             outcomes=(),
         )
     store = ExecutionRecordStore(Path("outputs"))
-    prerequisite_states: dict[CanonicalToken, ExperimentLifecycleState] = {}
+    prerequisite_states: dict[ExperimentName, ExperimentLifecycleState] = {}
     for prereq in planned.prerequisites:
         prereq_outcomes = store.read_all_outcomes(prereq)
         if prereq_outcomes and all(
-            outcome.terminal_state == ExperimentLifecycleState.COMPLETED.value
+            outcome.terminal_state is ExperimentLifecycleState.COMPLETED
             for outcome in prereq_outcomes
         ):
             prerequisite_states[prereq] = ExperimentLifecycleState.COMPLETED
@@ -319,7 +335,7 @@ def run_experiment(
         )
         terminal_phase = (
             CellPhaseState.COMPLETED
-            if outcome.terminal_state == ExperimentLifecycleState.COMPLETED.value
+            if outcome.terminal_state is ExperimentLifecycleState.COMPLETED
             else CellPhaseState.FAILED
         )
         validate_cell_terminal_record(cell, terminal_phase)
@@ -343,25 +359,29 @@ def run_experiment(
     )
 
 
-def derive_lifecycle_state(terminal_states: Sequence[str]) -> ExperimentLifecycleState:
+def derive_lifecycle_state(
+    terminal_states: Sequence[ExperimentLifecycleState],
+) -> ExperimentLifecycleState:
     if not terminal_states:
         return ExperimentLifecycleState.NOT_STARTED
     terminal_state_set = set(terminal_states)
-    invalid_state = ExperimentLifecycleState.INVALID.value
-    failed_state = ExperimentLifecycleState.FAILED.value
+    invalid_state = ExperimentLifecycleState.INVALID
+    failed_state = ExperimentLifecycleState.FAILED
     if terminal_state_set & {invalid_state, failed_state}:
         return (
             ExperimentLifecycleState.INVALID
             if invalid_state in terminal_state_set
             else ExperimentLifecycleState.FAILED
         )
-    completed_state = ExperimentLifecycleState.COMPLETED.value
+    completed_state = ExperimentLifecycleState.COMPLETED
     if all(state == completed_state for state in terminal_states):
         return ExperimentLifecycleState.COMPLETED
     return ExperimentLifecycleState.RUNNING
 
 
-def is_terminal_experiment_state(state: ExperimentLifecycleState) -> bool:
+def is_terminal_experiment_state(
+    state: ExperimentLifecycleState,
+) -> TerminalExperimentState:
     return state in TERMINAL_EXPERIMENT_STATES
 
 
@@ -378,5 +398,5 @@ def _to_failure_detail(failure: PersistedFailureDetail | None) -> FailureDetail 
 def execution_record_digest(outcomes: Sequence[CellExecutionOutcome]) -> ArtifactDigest:
     hasher = hashlib.sha256()
     for outcome in outcomes:
-        hasher.update(framed_bytes(outcome.cell.semantic_key, outcome.terminal_state))
+        hasher.update(framed_bytes(outcome.cell.semantic_key, outcome.terminal_state.value))
     return hasher.hexdigest()
