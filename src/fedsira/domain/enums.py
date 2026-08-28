@@ -6,6 +6,18 @@ class DatasetId(StrEnum):
     CICIOT2023 = "CICIoT2023"
 
 
+class Role(StrEnum):
+    ANCHOR_TRAIN = "Anchor Train"
+    ANCHOR_VALIDATION = "Anchor Validation"
+    POST_REFERENCE_REPLAY = "Post-Reference Replay"
+    ROW_VERIFICATION = "Row Verification"
+    FINAL_GATE = "Final Gate"
+    REPORT_TEST = "Report Test"
+    SOURCE_PROPOSAL = "Source Proposal"
+    CANDIDATE_SCREEN = "Candidate Screen"
+    REPRODUCTION = "Reproduction"
+
+
 class ByteUnit(StrEnum):
     IEC = "IEC"
 
@@ -76,7 +88,7 @@ class FailureClass(StrEnum):
 
 class ArtifactFamily(StrEnum):
     RAW_DATASET_IDENTITY = "Raw dataset identity"
-    CANONICAL_DATASET_MANIFEST = "Canonical dataset/schema/exclusion manifest"
+    DATASET_MANIFEST = "Dataset/schema/exclusion manifest"
     ROLE_SPLIT_SAMPLE_MANIFEST = "Role/split/sample manifest"
     SCALER = "Scaler"
     PREPARED_ROLE_VIEW = "Prepared role view"
