@@ -28,7 +28,7 @@ from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
-from fedsira.datasets.ciciot2023.materialization import materialize_ciciot2023_prepared_views
+from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
@@ -140,7 +140,9 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
         },
     )
 
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DATASET_PACKAGE_NAME[DatasetId.N_BAIOT])
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
+        DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
+    )
     scaler_root = REPOSITORY_ROOT / prepared_feature_root()
     from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
 
@@ -164,10 +166,7 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
 def _preprocess_ciciot2023(overwrite: bool) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_root = (
-        REPOSITORY_ROOT
-        / config.runtime.repository_layout.raw_data
-        / "CIC_IOT_Dataset2023"
-        / "CSV"
+        REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
     prepared_root = REPOSITORY_ROOT / prepared_evidence_root(
