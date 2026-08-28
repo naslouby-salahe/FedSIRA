@@ -6,17 +6,35 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
 DOMAIN_CONCEPT_SUFFIXES = ("_id", "_seed", "_hash", "_digest", "_path", "_token")
 PRIMITIVE_ANNOTATION_NAMES = {"str", "int", "float", "bool"}
+SCALAR_FOUNDATION_NAMES = {
+    "Probability",
+    "Percentage",
+    "NonNegativeInt",
+    "PositiveInt",
+    "NonNegativeFloat",
+    "PositiveFloat",
+    "FiniteFloat",
+    "BooleanValue",
+    "TextValue",
+    "Uint32Bound",
+}
 SEMANTIC_TYPE_DEFINITION_FILE = SRC_ROOT / "domain" / "records.py"
-MODEL_BASE_NAMES = {"BaseModel", "FrozenModel", "FrozenDomainModel"}
+CONFIG_SCHEMA_FILE = SRC_ROOT / "config" / "schema.py"
+MODEL_BASE_NAMES = {
+    "BaseModel",
+    "FrozenConfigModel",
+    "FrozenDomainModel",
+    "TensorDomainModel",
+}
 DATACLASS_DECORATOR_NAMES = {"dataclass"}
 
 
+def _annotation_names(annotation: ast.expr) -> set[str]:
+    return {node.id for node in ast.walk(annotation) if isinstance(node, ast.Name)}
+
+
 def _annotation_primitive_names(annotation: ast.expr) -> list[str]:
-    found: list[str] = []
-    for node in ast.walk(annotation):
-        if isinstance(node, ast.Name) and node.id in PRIMITIVE_ANNOTATION_NAMES:
-            found.append(node.id)
-    return found
+    return sorted(_annotation_names(annotation) & PRIMITIVE_ANNOTATION_NAMES)
 
 
 def _base_name(base: ast.expr) -> str | None:
@@ -60,6 +78,22 @@ def model_field_primitive_violations(tree: ast.Module) -> list[str]:
     return found
 
 
+def config_scalar_foundation_violations(tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    for class_node in (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)):
+        if not _is_model_or_record(class_node):
+            continue
+        for statement in class_node.body:
+            if not isinstance(statement, ast.AnnAssign) or not isinstance(
+                statement.target, ast.Name
+            ):
+                continue
+            leaked = sorted(_annotation_names(statement.annotation) & SCALAR_FOUNDATION_NAMES)
+            for type_name in leaked:
+                found.append(f"{class_node.name}.{statement.target.id}: {type_name}")
+    return found
+
+
 def domain_identifier_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for node in ast.walk(tree):
@@ -88,6 +122,11 @@ def test_no_primitive_model_or_record_fields() -> None:
     assert not offenders, f"Primitive-typed model/record fields: {offenders}"
 
 
+def test_config_models_use_meaning_specific_aliases() -> None:
+    offenders = config_scalar_foundation_violations(parse(CONFIG_SCHEMA_FILE))
+    assert not offenders, f"Config fields use storage-oriented scalar aliases: {offenders}"
+
+
 def test_no_primitive_leaks_for_domain_identifiers() -> None:
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
@@ -113,6 +152,20 @@ def test_model_field_violation_detected() -> None:
         ]
 
 
+def test_config_foundation_alias_violation_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        offending = Path(tmp) / "offending.py"
+        offending.write_text(
+            "from pydantic import BaseModel\n"
+            "from fedsira.domain.records import Probability\n\n"
+            "class SampleConfig(BaseModel):\n"
+            "    threshold: Probability\n"
+        )
+        assert config_scalar_foundation_violations(parse(offending)) == [
+            "SampleConfig.threshold: Probability"
+        ]
+
+
 def test_identifier_violation_detected_for_primitive_identifier() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         offending = Path(tmp) / "offending.py"
@@ -125,10 +178,10 @@ def test_semantic_model_fields_pass() -> None:
         compliant = Path(tmp) / "compliant.py"
         compliant.write_text(
             "from dataclasses import dataclass\n"
-            "from fedsira.domain.records import CanonicalToken, PositiveInt\n\n"
+            "from fedsira.domain.records import DomainId, RowCount\n\n"
             "@dataclass(frozen=True)\n"
             "class Sample:\n"
-            "    identity: CanonicalToken\n"
-            "    count: PositiveInt\n"
+            "    domain_id: DomainId\n"
+            "    count: RowCount\n"
         )
         assert model_field_primitive_violations(parse(compliant)) == []
