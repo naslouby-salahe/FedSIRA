@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated, Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -19,6 +19,7 @@ BooleanValue = Annotated[bool, Field(strict=True)]
 TextValue = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS, strict=True)]
 DeterministicInteger = Annotated[int, Field(strict=True)]
+FramingField: TypeAlias = TextValue | DeterministicInteger
 
 # Identifiers and text domains.
 Identifier = Annotated[
