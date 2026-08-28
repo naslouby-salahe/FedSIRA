@@ -106,9 +106,11 @@ PersistentWorkersEnabled = BooleanFlag
 PredictorCountMatchesOfficial = BooleanFlag
 
 
-class SeedBundle(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+class FrozenDomainModel(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", protected_namespaces=())
 
+
+class SeedBundle(FrozenDomainModel):
     master_seeds: tuple[MasterSeed, ...]
     analysis_seed: MasterSeed
     smoke_seed: MasterSeed
