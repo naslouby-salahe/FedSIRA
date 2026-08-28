@@ -38,6 +38,7 @@ from fedsira.datasets.nbaiot.acquisition import (
     discover_primary_csv_files,
 )
 from fedsira.datasets.nbaiot.preprocessing import (
+    materialize_nbaiot_prepared_views,
     read_predictor_header,
     validate_all_predictors_finite,
     validate_consistent_predictor_schema,
@@ -144,8 +145,6 @@ def _preprocess_nbaiot(overwrite: bool) -> None:
         DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
     )
     scaler_root = REPOSITORY_ROOT / prepared_feature_root()
-    from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
-
     views, moments = materialize_nbaiot_prepared_views(
         discovered, config, prepared_root, scaler_root, overwrite
     )
