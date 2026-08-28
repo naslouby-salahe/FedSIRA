@@ -182,7 +182,10 @@ def test_parameter_similarity_certifies_at_threshold() -> None:
 
 def test_parameter_similarity_certification_requires_five_committed_rows() -> None:
     rows = tuple(
-        CertifiedReproductionRow(domain, torch.tensor([1.0, 0.0]))
+        CertifiedReproductionRow(
+            reproducer_domain=domain,
+            update_vector=torch.tensor([1.0, 0.0]),
+        )
         for domain in NBAIOT_DOMAIN_ORDER[:4]
     )
     with pytest.raises(ValueError):
@@ -191,7 +194,10 @@ def test_parameter_similarity_certification_requires_five_committed_rows() -> No
 
 def test_parameter_similarity_certification_row_results_with_five_rows() -> None:
     rows = tuple(
-        CertifiedReproductionRow(domain, torch.tensor([1.0, 0.0]))
+        CertifiedReproductionRow(
+            reproducer_domain=domain,
+            update_vector=torch.tensor([1.0, 0.0]),
+        )
         for domain in NBAIOT_DOMAIN_ORDER[:5]
     )
     results = parameter_similarity_certification_row_results(
