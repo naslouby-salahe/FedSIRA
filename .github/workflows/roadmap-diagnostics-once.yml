@@ -1,0 +1,49 @@
+name: roadmap-diagnostics-once
+
+on:
+  push:
+    branches:
+      - refactor/roadmap-completion
+    paths:
+      - .github/workflows/roadmap-diagnostics-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: astral-sh/setup-uv@v6
+      - name: Install
+        run: uv sync --frozen --dev
+      - name: Capture diagnostics and self-delete
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '===== ruff check ====='
+            uv run ruff check .
+            echo
+            echo '===== pyright ====='
+            uv run pyright
+            echo
+            echo '===== architecture ====='
+            uv run pytest tests/architecture -q
+            echo
+            echo '===== full pytest ====='
+            uv run pytest -q
+          } > roadmap-diagnostics.txt 2>&1
+          rm .github/workflows/roadmap-diagnostics-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add roadmap-diagnostics.txt .github/workflows/roadmap-diagnostics-once.yml
+          git commit -m 'chore: capture roadmap diagnostics'
+          git push origin HEAD:refactor/roadmap-completion
