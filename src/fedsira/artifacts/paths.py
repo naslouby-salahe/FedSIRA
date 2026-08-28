@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
-from fedsira.domain.records import CanonicalToken, ExperimentId
+from fedsira.domain.records import CanonicalToken, ExperimentName
 
 ARTIFACT_FAMILY_PATH_SCOPE: dict[ArtifactFamily, ArtifactPathScope] = {
     ArtifactFamily.RAW_DATASET_IDENTITY: ArtifactPathScope.PREPROCESSING,
@@ -57,7 +57,7 @@ def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
 
 
 def workspace_root_for_family(
-    family: ArtifactFamily, experiment: ExperimentId | None = None
+    family: ArtifactFamily, experiment: ExperimentName | None = None
 ) -> Path:
     scope = path_scope_for_family(family)
     if scope is ArtifactPathScope.PREPROCESSING:
