@@ -1,0 +1,63 @@
+name: theory-semantic-types
+
+on:
+  push:
+    branches:
+      - refactor/roadmap-completion
+    paths:
+      - .github/workflows/theory-semantic-types.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-groups --frozen
+      - name: Apply semantic type migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          records = Path('src/fedsira/domain/records.py')
+          text = records.read_text()
+          marker = 'KrumNeighborCount = PositiveInt\n'
+          addition = '''KrumNeighborCount = PositiveInt\nObservedPositiveReportCount = NonNegativeInt\nMaximumByzantineReportCount = NonNegativeInt\nMinimumHonestPositiveReportCount = NonNegativeInt\nEligibleEvidenceHolderCount = NonNegativeInt\nMinimumEligibleEvidenceHolderCount = PositiveInt\nEvidenceArrivalCycleIndex = NonNegativeInt\nClaimedCompletionCycleIndex = NonNegativeInt\nEligiblePoolSize = PositiveInt\nByzantineDomainCount = NonNegativeInt\n'''
+          if 'ObservedPositiveReportCount = NonNegativeInt' not in text:
+              if marker not in text:
+                  raise SystemExit('records count marker missing')
+              text = text.replace(marker, addition, 1)
+          marker = 'SourceExcludedFromKrum = BooleanValue\n'
+          addition = '''SourceExcludedFromKrum = BooleanValue\nKrumCommitteeAdmissible = BooleanValue\n'''
+          if 'KrumCommitteeAdmissible = BooleanValue' not in text:
+              if marker not in text:
+                  raise SystemExit('records boolean marker missing')
+              text = text.replace(marker, addition, 1)
+          marker = 'Percentile = Percentage\n'
+          addition = '''AtLeastTwoByzantineProbability = Probability\nPercentile = Percentage\n'''
+          if 'AtLeastTwoByzantineProbability = Probability' not in text:
+              if marker not in text:
+                  raise SystemExit('records probability marker missing')
+              text = text.replace(marker, addition, 1)
+          records.write_text(text)
+
+          theory = Path('src/fedsira/protocol/theory.py')
+          theory.write_text('''import math\nfrom collections.abc import Sequence\n\nimport torch\n\nfrom fedsira.domain.enums import TernaryOutcome\nfrom fedsira.domain.records import (\n    AtLeastTwoByzantineProbability,\n    ByzantineDomainCount,\n    ClaimedCompletionCycleIndex,\n    CommitteeSize,\n    DomainId,\n    EligibleEvidenceHolderCount,\n    EligiblePoolSize,\n    EvidenceArrivalCycleIndex,\n    KrumCommitteeAdmissible,\n    MaximumByzantineReportCount,\n    MaximumByzantineReproductionRows,\n    MinimumEligibleEvidenceHolderCount,\n    MinimumHonestPositiveReportCount,\n    ObservedPositiveReportCount,\n)\n\n\ndef minimum_honest_positive_count(\n    observed_positive_count: ObservedPositiveReportCount,\n    maximum_byzantine_count: MaximumByzantineReportCount,\n) -> MinimumHonestPositiveReportCount:\n    return max(observed_positive_count - maximum_byzantine_count, 0)\n\n\ndef krum_minimum_committee_size(\n    maximum_byzantine_rows: MaximumByzantineReproductionRows,\n) -> CommitteeSize:\n    return 2 * maximum_byzantine_rows + 3\n\n\ndef krum_committee_is_admissible(\n    committee_size: CommitteeSize,\n    maximum_byzantine_rows: MaximumByzantineReproductionRows,\n) -> KrumCommitteeAdmissible:\n    return committee_size >= krum_minimum_committee_size(maximum_byzantine_rows)\n\n\ndef first_cycle_with_minimum_eligible_evidence_holders(\n    eligible_holder_counts_by_cycle: Sequence[EligibleEvidenceHolderCount],\n    minimum_required: MinimumEligibleEvidenceHolderCount,\n) -> EvidenceArrivalCycleIndex | None:\n    for cycle_index, count in enumerate(eligible_holder_counts_by_cycle):\n        if count >= minimum_required:\n            return cycle_index\n    return None\n\n\ndef validate_no_safety_claim_before_tau_k(\n    claimed_completion_cycle: ClaimedCompletionCycleIndex,\n    tau_k: EvidenceArrivalCycleIndex | None,\n) -> None:\n    if tau_k is None or claimed_completion_cycle < tau_k:\n        raise ValueError("safety completion claimed before the required evidence-arrival cycle")\n\n\ndef deduplicate_reports_by_proxy(\n    reports: Sequence[tuple[DomainId, TernaryOutcome]],\n) -> dict[DomainId, TernaryOutcome]:\n    deduplicated: dict[DomainId, TernaryOutcome] = {}\n    for domain, outcome in reports:\n        deduplicated.setdefault(domain, outcome)\n    return deduplicated\n\n\ndef validate_exactly_one_source_domain(source_domains: Sequence[DomainId]) -> None:\n    if len(source_domains) != 1:\n        raise ValueError(\n            f"a claim instance must have exactly one source domain, got {len(source_domains)}"\n        )\n\n\ndef diagnostic_at_least_two_byzantine_probability(\n    eligible_pool_size: EligiblePoolSize,\n    byzantine_domain_count: ByzantineDomainCount,\n    committee_size: CommitteeSize,\n) -> AtLeastTwoByzantineProbability:\n    upper_bound = min(committee_size, byzantine_domain_count)\n    numerator = sum(\n        math.comb(byzantine_domain_count, compromised_count)\n        * math.comb(\n            eligible_pool_size - byzantine_domain_count,\n            committee_size - compromised_count,\n        )\n        for compromised_count in range(2, upper_bound + 1)\n    )\n    denominator = math.comb(eligible_pool_size, committee_size)\n    return numerator / denominator\n\n\ndef reproduction_update_vector(\n    anchor_flat_parameters: torch.Tensor,\n    reproduced_flat_parameters: torch.Tensor,\n) -> torch.Tensor:\n    return reproduced_flat_parameters - anchor_flat_parameters\n''')
+          PY
+          uv run ruff format src/fedsira/domain/records.py src/fedsira/protocol/theory.py
+          uv run ruff check --fix src/fedsira/domain/records.py src/fedsira/protocol/theory.py
+      - name: Commit refactor
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/fedsira/domain/records.py src/fedsira/protocol/theory.py
+          git commit -m "refactor: type protocol theory semantics"
+          git push
