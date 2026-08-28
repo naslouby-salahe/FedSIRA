@@ -17,7 +17,7 @@ BooleanFlag = Annotated[bool, Field()]
 NonEmptyString = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS)]
 
-ExperimentId = Annotated[str, StringConstraints(min_length=1, pattern=r"^[a-z][a-z0-9-]*$")]
+ExperimentSlug = Annotated[str, StringConstraints(min_length=1, pattern=r"^[a-z][a-z0-9-]*$")]
 ArtifactDigest = Annotated[
     str, StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
 ]
@@ -25,6 +25,7 @@ MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
 CanonicalToken = NonEmptyString
+ExperimentName = CanonicalToken
 DatasetClassToken = CanonicalToken
 RepositoryPath = NonEmptyString
 Doi = NonEmptyString
@@ -43,6 +44,7 @@ ScreenDomainCount = PositiveInt
 VerifierCount = PositiveInt
 CommitteeSize = PositiveInt
 ReproductionRowCount = NonNegativeInt
+ScientificCellCount = NonNegativeInt
 LogicalEvidenceCycleCount = PositiveInt
 EvidenceCycleIndex = NonNegativeInt
 FoldCount = PositiveInt
