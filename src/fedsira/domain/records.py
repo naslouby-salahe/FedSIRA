@@ -88,6 +88,7 @@ SeedDerivationLabel = TextValue
 SampleId = TextValue
 SampleIdPrefix = TextValue
 RelativePathText = TextValue
+PathToken = TextValue
 ModuleName = TextValue
 SchemaVersion = TextValue
 DependencyImportName = TextValue
@@ -98,6 +99,7 @@ ClaimScopeText = TextValue
 ClaimReason = TextValue
 AttackFamilyDirectoryToken = TextValue
 AttackFamilyName = TextValue
+AttackBasename = TextValue
 
 # Deterministic identities and seeds.
 MasterSeed = Uint32Bound
