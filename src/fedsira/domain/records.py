@@ -88,6 +88,7 @@ RelativePathText = TextValue
 PathToken = TextValue
 ModuleName = TextValue
 SchemaVersion = TextValue
+ExecutionSchemaVersion = SchemaVersion
 DependencyImportName = TextValue
 FingerprintPayload = TextValue
 AstDumpText = TextValue
@@ -216,6 +217,7 @@ FeatureShiftMagnitude = PositiveFloat
 TrainingLoss = NonNegativeFloat
 MetricValue = FiniteFloat
 PredictorValue = FiniteFloat
+MetricObservation: TypeAlias = tuple[MetricName, MetricValue | None]
 
 PoisonFraction = Probability
 AttackStrength = Probability
@@ -274,6 +276,9 @@ ScientificConfigurationChanged = BooleanValue
 DatasetSplitUpstreamChanged = BooleanValue
 ProducerCodeOrRuntimeChanged = BooleanValue
 ArtifactInvalidated = BooleanValue
+OverwriteExisting = BooleanValue
+CellCompletionStatus = BooleanValue
+TerminalExperimentState = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):

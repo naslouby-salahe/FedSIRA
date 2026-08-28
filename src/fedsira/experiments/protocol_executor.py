@@ -1766,7 +1766,7 @@ class ProtocolCellExecutor(CellExecutor):
         except ValueError as error:
             return CellExecutionOutcome(
                 cell=cell,
-                terminal_state=ExperimentLifecycleState.INVALID.value,
+                terminal_state=ExperimentLifecycleState.INVALID,
                 failure=FailureDetail(
                     failure_class=FailureClass.INVARIANT_VIOLATION,
                     message=str(error),
@@ -1775,7 +1775,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
         return CellExecutionOutcome(
             cell=cell,
-            terminal_state=ExperimentLifecycleState.COMPLETED.value,
+            terminal_state=ExperimentLifecycleState.COMPLETED,
             failure=None,
             metrics=metrics,
         )
