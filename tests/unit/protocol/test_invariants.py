@@ -1,10 +1,11 @@
-import dataclasses
 import inspect
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass
 from fedsira.domain.enums import DatasetId, TernaryOutcome
 from fedsira.evaluation.records import (
     AdmissionDelayDecomposition,
@@ -27,10 +28,17 @@ def test_honest_reproduction_constructor_has_no_source_artifact_parameter() -> N
 
 def test_capability_claim_contract_mutation_after_construction_is_rejected() -> None:
     contract = build_capability_claim_contract(
-        "a" * 64, "POST_REFERENCE_REPLAY", DatasetId.N_BAIOT, 9, "b" * 64, CAPABILITY_CLAIM_CONFIG
+        dataset_manifest_hash="a" * 64,
+        supported_control_role="POST_REFERENCE_REPLAY",
+        dataset_id=DatasetId.N_BAIOT,
+        domain_count=9,
+        feature_schema_hash="b" * 64,
+        target_class=NBaiotClass.GAFGYT_COMBO.value,
+        supported_class_count=len(NBAIOT_CLASS_ORDER) - 1,
+        capability_claim_config=CAPABILITY_CLAIM_CONFIG,
     )
-    with pytest.raises(dataclasses.FrozenInstanceError):
-        contract.__setattr__("target_f1_minimum", 0.99)
+    with pytest.raises(ValidationError):
+        contract.target_f1_minimum = 0.99
 
 
 def test_abstain_is_never_treated_as_a_positive_or_negative_vote() -> None:
