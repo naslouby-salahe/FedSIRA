@@ -1,0 +1,85 @@
+name: registry-domain-migration
+
+on:
+  push:
+    branches:
+      - refactor/roadmap-completion
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message != 'Migrate experiment registry to domain Pydantic model'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - name: Migrate registry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/fedsira/experiments/registry.py')
+          text = path.read_text()
+          text = text.replace('from dataclasses import dataclass\n', '')
+          text = text.replace(
+              'from fedsira.domain.enums import DatasetId\n'
+              'from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt\n\n'
+              'ExperimentId = CanonicalToken\n',
+              'from fedsira.domain.enums import DatasetId, RootCauseMixture\n'
+              'from fedsira.domain.records import (\n'
+              '    CanonicalToken,\n'
+              '    ExperimentName,\n'
+              '    FrozenDomainModel,\n'
+              '    ScientificCellCount,\n'
+              '    SeedCount,\n'
+              ')\n',
+          )
+          text = text.replace(
+              '\n\nclass RootCauseMixture(StrEnum):\n'
+              '    BALANCED_50_50 = "Balanced 50/50"\n'
+              '    A_DOMINANT_80_20 = "A-Dominant 80/20"\n',
+              '',
+          )
+          text = text.replace(
+              '@dataclass(frozen=True)\n'
+              'class ExperimentDefinition:\n'
+              '    name: ExperimentId\n'
+              '    experiment_class: ExperimentClass\n'
+              '    methods: tuple[CanonicalToken, ...]\n'
+              '    conditions: tuple[CanonicalToken, ...]\n'
+              '    seed_count: PositiveInt\n'
+              '    nominal_cell_count: NonNegativeInt\n'
+              '    claim_family: CanonicalToken | None\n'
+              '    prerequisites: tuple[CanonicalToken, ...]\n'
+              '    dataset: DatasetId = DatasetId.N_BAIOT\n',
+              'class ExperimentDefinition(FrozenDomainModel):\n'
+              '    name: ExperimentName\n'
+              '    experiment_class: ExperimentClass\n'
+              '    methods: tuple[CanonicalToken, ...]\n'
+              '    conditions: tuple[CanonicalToken, ...]\n'
+              '    seed_count: SeedCount\n'
+              '    nominal_cell_count: ScientificCellCount\n'
+              '    claim_family: CanonicalToken | None\n'
+              '    prerequisites: tuple[CanonicalToken, ...]\n'
+              '    dataset: DatasetId = DatasetId.N_BAIOT\n',
+          )
+          path.write_text(text)
+          PY
+          python -m pip install --quiet ruff==0.7.4
+          ruff format src/fedsira/experiments/registry.py
+          ruff check src/fedsira/experiments/registry.py
+      - name: Commit migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/fedsira/experiments/registry.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Migrate experiment registry to domain Pydantic model'
+          git pull --rebase origin refactor/roadmap-completion
+          git push origin HEAD:refactor/roadmap-completion
