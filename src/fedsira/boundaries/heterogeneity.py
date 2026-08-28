@@ -78,4 +78,4 @@ def feature_shift_sign(
             feature_name,
         )
     ).digest()
-    return 1.0 if (digest[-1] & 1) == 1 else -1.0
+    return 1 if (digest[-1] & 1) == 1 else -1
