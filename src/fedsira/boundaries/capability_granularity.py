@@ -1,15 +1,17 @@
 import hashlib
+from collections.abc import Sequence
 
 import torch
 
-from fedsira.domain.enums import CapabilityContractScope, RootCause
+from fedsira.domain.enums import CapabilityContractScope, RootCause, SeedNamespace
 from fedsira.domain.records import (
     FeatureIndex,
+    NamespaceSeed,
     SampleId,
     SeedDerivationLabel,
     StandardizedValue,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime.determinism import deterministic_order, framed_bytes
 
 ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
 
@@ -61,3 +63,19 @@ def validate_excluded_root_cause_not_supported(
         root_cause_a_row_ids
     ):
         raise ValueError("the excluded root cause must never become a supported-control class")
+
+
+def balanced_capability_selection(
+    root_cause_a_row_ids: Sequence[SampleId],
+    root_cause_b_row_ids: Sequence[SampleId],
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[tuple[SampleId, ...], tuple[SampleId, ...]]:
+    selected_count = min(len(root_cause_a_row_ids), len(root_cause_b_row_ids))
+    separator = SeedNamespace.ATTACK_GENERATION.value
+    ordered_a = deterministic_order(
+        root_cause_a_row_ids, separator, attack_generation_namespace_seed
+    )
+    ordered_b = deterministic_order(
+        root_cause_b_row_ids, separator, attack_generation_namespace_seed
+    )
+    return ordered_a[:selected_count], ordered_b[:selected_count]

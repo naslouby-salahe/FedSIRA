@@ -13,7 +13,6 @@ from fedsira.attacks.source_backdoor import (
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
 )
-from fedsira.attacks.transform import balanced_50_50_selection
 from fedsira.baselines.calibration import (
     clip_source_update,
     cosine_distance_matrix,
@@ -53,6 +52,7 @@ from fedsira.baselines.robust_aggregation import (
 from fedsira.baselines.source_authority import secure_continual_assessment_post_reference_rounds
 from fedsira.boundaries.capability_granularity import (
     apply_root_cause_feature_shift,
+    balanced_capability_selection,
     root_cause_for_sample,
     target_row_ids_for_contract,
 )
@@ -263,7 +263,7 @@ def _scope_and_shift_rows(
     )
     root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
     if root_cause_scope.balanced_selection_seed is not None:
-        selected_a_ids, selected_b_ids = balanced_50_50_selection(
+        selected_a_ids, selected_b_ids = balanced_capability_selection(
             sorted(root_cause_a_ids),
             sorted(root_cause_b_ids),
             root_cause_scope.balanced_selection_seed,
