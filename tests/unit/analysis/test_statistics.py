@@ -1,4 +1,4 @@
-from fedsira.evaluation.statistics import (
+from fedsira.analysis.statistics import (
     enumerate_sign_flip_assignments,
     exact_sign_flip_non_inferiority_p_value,
     exact_sign_flip_two_sided_p_value,

@@ -10,7 +10,7 @@ from fedsira.config.schema import BootstrapConfig, MaterialityConfig, Multiplici
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.records import CanonicalToken, MasterSeed, Probability
 from fedsira.evaluation.aggregation import bootstrap_percentile_confidence_interval
-from fedsira.evaluation.statistics import (
+from fedsira.analysis.statistics import (
     exact_sign_flip_non_inferiority_p_value,
     exact_sign_flip_two_sided_p_value,
     holm_adjusted_p_values,
