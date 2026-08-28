@@ -1,17 +1,17 @@
 from collections.abc import Sequence
 
 from fedsira.config.schema import VerificationConfig
-from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
 from fedsira.domain.records import (
     ArtifactDigest,
     DerivedSeed,
+    DomainId,
     NamespaceSeed,
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
 )
-from fedsira.runtime.determinism import derive_uint32
+from fedsira.runtime.determinism import deterministic_order, derive_uint32
 
 VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
 BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value
@@ -19,9 +19,9 @@ COMMITTEE_DRAW_SEPARATOR = SeedNamespace.COMMITTEE_DRAW.value
 
 
 def verifier_is_eligible(
-    verifier_domain: NBaiotDomain,
-    source_domain: NBaiotDomain | None,
-    reproducer_domain: NBaiotDomain,
+    verifier_domain: DomainId,
+    source_domain: DomainId | None,
+    reproducer_domain: DomainId,
     allow_source_as_verifier: bool = False,
 ) -> bool:
     if verifier_domain == reproducer_domain:
@@ -37,7 +37,7 @@ def verifier_assignment_timestamp_is_valid(
     return verifier_assignment_timestamp > reproduction_commitment_timestamp
 
 
-def panel_votes_are_one_per_domain(panel_domain_votes: Sequence[NBaiotDomain]) -> bool:
+def panel_votes_are_one_per_domain(panel_domain_votes: Sequence[DomainId]) -> bool:
     return len(panel_domain_votes) == len(set(panel_domain_votes))
 
 
@@ -52,42 +52,40 @@ def verifier_assignment_seed_for_row(
 
 
 def deterministic_verifier_panel(
-    eligible_domains: Sequence[NBaiotDomain], row_seed: DerivedSeed, panel_size: PositiveInt
-) -> tuple[NBaiotDomain, ...]:
-    return deterministic_domain_order(eligible_domains, VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[
-        :panel_size
-    ]
+    eligible_domains: Sequence[DomainId], row_seed: DerivedSeed, panel_size: PositiveInt
+) -> tuple[DomainId, ...]:
+    return deterministic_order(eligible_domains, VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[:panel_size]
 
 
 def byzantine_selection_order(
-    eligible_domains: Sequence[NBaiotDomain], byzantine_selection_namespace_seed: NamespaceSeed
-) -> tuple[NBaiotDomain, ...]:
-    return deterministic_domain_order(
+    eligible_domains: Sequence[DomainId], byzantine_selection_namespace_seed: NamespaceSeed
+) -> tuple[DomainId, ...]:
+    return deterministic_order(
         eligible_domains, BYZANTINE_SELECTION_SEPARATOR, byzantine_selection_namespace_seed
     )
 
 
 def select_compromised_verifiers(
-    byzantine_order: Sequence[NBaiotDomain], compromised_count: NonNegativeInt
-) -> frozenset[NBaiotDomain]:
+    byzantine_order: Sequence[DomainId], compromised_count: NonNegativeInt
+) -> frozenset[DomainId]:
     return frozenset(byzantine_order[:compromised_count])
 
 
 def construct_above_bound_panel(
-    compromised_domains: Sequence[NBaiotDomain],
-    honest_post_commitment_order: Sequence[NBaiotDomain],
+    compromised_domains: Sequence[DomainId],
+    honest_post_commitment_order: Sequence[DomainId],
     panel_size: PositiveInt,
-) -> tuple[NBaiotDomain, ...]:
+) -> tuple[DomainId, ...]:
     remaining_slots = panel_size - len(compromised_domains)
     return tuple(compromised_domains) + tuple(honest_post_commitment_order[:remaining_slots])
 
 
 def diagnostic_committee_panel(
-    eligible_domains: Sequence[NBaiotDomain],
+    eligible_domains: Sequence[DomainId],
     committee_draw_namespace_seed: NamespaceSeed,
     panel_size: PositiveInt,
-) -> tuple[NBaiotDomain, ...]:
-    return deterministic_domain_order(
+) -> tuple[DomainId, ...]:
+    return deterministic_order(
         eligible_domains, COMMITTEE_DRAW_SEPARATOR, committee_draw_namespace_seed
     )[:panel_size]
 

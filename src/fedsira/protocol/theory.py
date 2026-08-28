@@ -3,9 +3,8 @@ from collections.abc import Sequence
 
 import torch
 
-from fedsira.datasets.nbaiot.schema import NBaiotDomain
 from fedsira.domain.enums import TernaryOutcome
-from fedsira.domain.records import NonNegativeInt, PositiveInt, Probability
+from fedsira.domain.records import DomainId, NonNegativeInt, PositiveInt, Probability
 
 
 def minimum_honest_positive_count(
@@ -41,15 +40,15 @@ def validate_no_safety_claim_before_tau_k(
 
 
 def deduplicate_reports_by_proxy(
-    reports: Sequence[tuple[NBaiotDomain, TernaryOutcome]],
-) -> dict[NBaiotDomain, TernaryOutcome]:
-    deduplicated: dict[NBaiotDomain, TernaryOutcome] = {}
+    reports: Sequence[tuple[DomainId, TernaryOutcome]],
+) -> dict[DomainId, TernaryOutcome]:
+    deduplicated: dict[DomainId, TernaryOutcome] = {}
     for domain, outcome in reports:
         deduplicated.setdefault(domain, outcome)
     return deduplicated
 
 
-def validate_exactly_one_source_domain(source_domains: Sequence[NBaiotDomain]) -> None:
+def validate_exactly_one_source_domain(source_domains: Sequence[DomainId]) -> None:
     if len(source_domains) != 1:
         raise ValueError(
             f"a claim instance must have exactly one source domain, got {len(source_domains)}"
