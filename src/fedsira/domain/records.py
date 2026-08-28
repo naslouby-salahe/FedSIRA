@@ -91,6 +91,9 @@ SchemaVersion = TextValue
 DependencyImportName = TextValue
 FingerprintPayload = TextValue
 AstDumpText = TextValue
+ClaimId = TextValue
+ClaimScopeText = TextValue
+ClaimReason = TextValue
 
 # Deterministic identities and seeds.
 MasterSeed = Uint32Bound
@@ -116,7 +119,7 @@ ScreenDomainCount = PositiveInt
 VerifierCount = PositiveInt
 CommitteeSize = PositiveInt
 ReproductionRowCount = NonNegativeInt
-CompromisedReproducerCount = PositiveInt
+CompromisedReproducerCount = NonNegativeInt
 ScientificCellCount = NonNegativeInt
 LogicalEvidenceCycleCount = PositiveInt
 EvidenceCycleIndex = NonNegativeInt
@@ -219,6 +222,7 @@ ReproductionCertified = BooleanValue
 ExternalVerificationActive = BooleanValue
 ResolvedRowRequirementReached = BooleanValue
 MaterialityDecision = BooleanValue
+ClaimGateDecision = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
