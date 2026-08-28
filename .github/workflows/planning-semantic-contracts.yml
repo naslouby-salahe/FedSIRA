@@ -1,0 +1,74 @@
+name: planning-semantic-contracts
+
+on:
+  push:
+    branches: [refactor/roadmap-completion]
+    paths: [.github/workflows/planning-semantic-contracts.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-groups --frozen
+      - name: Type planning contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          records = Path('src/fedsira/domain/records.py')
+          text = records.read_text()
+          if 'ProgramBlockName = TextValue' not in text:
+              text = text.replace('PreparedViewKey = TextValue\n', 'PreparedViewKey = TextValue\nProgramBlockName = TextValue\n', 1)
+          records.write_text(text)
+
+          path = Path('src/fedsira/experiments/planning.py')
+          text = path.read_text()
+          text = text.replace(
+              'from fedsira.domain.records import CanonicalToken, MasterSeed, PositiveInt',
+              '''from fedsira.domain.records import (\n    CollapseDecisionPassed,\n    ConditionName,\n    ExperimentName,\n    MasterSeed,\n    MethodName,\n    ProgramBlockName,\n    ResolvedCoreComplete,\n    ResolvedCoreDependent,\n    ScientificCellCount,\n    ScientificCellSemanticKey,\n)''',
+          )
+          replacements = {
+              'experiment: CanonicalToken': 'experiment: ExperimentName',
+              'method: CanonicalToken': 'method: MethodName',
+              'condition: CanonicalToken': 'condition: ConditionName',
+              'def semantic_key(self) -> CanonicalToken:': 'def semantic_key(self) -> ScientificCellSemanticKey:',
+              'PRE_CORE_EXPERIMENT_NAMES: frozenset[CanonicalToken]': 'PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName]',
+              'prerequisites: tuple[CanonicalToken, ...]': 'prerequisites: tuple[ExperimentName, ...]',
+              'resolved_core_dependent: bool': 'resolved_core_dependent: ResolvedCoreDependent',
+              'def experiment(self, name: CanonicalToken)': 'def experiment(self, name: ExperimentName)',
+              'def total_cell_count(self) -> PositiveInt:': 'def total_cell_count(self) -> ScientificCellCount:',
+              'def pre_core_cell_count(self) -> PositiveInt:': 'def pre_core_cell_count(self) -> ScientificCellCount:',
+              'def post_core_cell_count(self) -> PositiveInt:': 'def post_core_cell_count(self) -> ScientificCellCount:',
+              'experiment: CanonicalToken,': 'experiment: ExperimentName,',
+              'resolved_core_complete: bool = False,': 'resolved_core_complete: ResolvedCoreComplete = False,',
+              'collapse_decision_states: Sequence[tuple[CanonicalToken, bool]] | None = None,': 'collapse_decision_states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]] | None = None,',
+              'def plan_cell_count_by_program_block() -> dict[CanonicalToken, PositiveInt]:': 'def plan_cell_count_by_program_block() -> dict[ProgramBlockName, ScientificCellCount]:',
+          }
+          for old, new in replacements.items():
+              text = text.replace(old, new)
+          path.write_text(text)
+
+          registry = Path('src/fedsira/experiments/registry.py')
+          text = registry.read_text()
+          text = text.replace('    ExperimentName,\n    ExperimentName,\n', '    ExperimentName,\n')
+          registry.write_text(text)
+          PY
+          uv run ruff format src/fedsira/domain/records.py src/fedsira/experiments/planning.py src/fedsira/experiments/registry.py
+          uv run ruff check --fix src/fedsira/domain/records.py src/fedsira/experiments/planning.py src/fedsira/experiments/registry.py
+      - name: Commit migration
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/fedsira/domain/records.py src/fedsira/experiments/planning.py src/fedsira/experiments/registry.py
+          git commit -m "refactor: type experiment planning semantics"
+          git push
