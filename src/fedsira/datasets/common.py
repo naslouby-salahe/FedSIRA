@@ -4,29 +4,21 @@ from typing import Self
 
 from pydantic import model_validator
 
+from fedsira.domain.enums import Role
 from fedsira.domain.records import (
     ArtifactDigest,
     FrozenDomainModel,
-    NonEmptyString,
     NonNegativeInt,
-    Probability,
+    RelativePathText,
+    RoleBoundary,
+    RolePosition,
+    RoleToken,
+    SampleIdPrefix,
 )
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.runtime.determinism import framed_bytes
 
 
-class Role(StrEnum):
-    ANCHOR_TRAIN = "Anchor Train"
-    ANCHOR_VALIDATION = "Anchor Validation"
-    POST_REFERENCE_REPLAY = "Post-Reference Replay"
-    ROW_VERIFICATION = "Row Verification"
-    FINAL_GATE = "Final Gate"
-    REPORT_TEST = "Report Test"
-    SOURCE_PROPOSAL = "Source Proposal"
-    CANDIDATE_SCREEN = "Candidate Screen"
-    REPRODUCTION = "Reproduction"
-
-
-ROLE_HASH_TOKEN: dict[Role, NonEmptyString] = {
+ROLE_HASH_TOKEN: dict[Role, RoleToken] = {
     Role.ANCHOR_TRAIN: "ANCHOR_TRAIN",
     Role.ANCHOR_VALIDATION: "ANCHOR_VALIDATION",
     Role.POST_REFERENCE_REPLAY: "POST_REFERENCE_REPLAY",
@@ -79,8 +71,8 @@ class DatasetExclusionReason(StrEnum):
 
 class RoleWindow(FrozenDomainModel):
     role: Role
-    lower_inclusive: Probability
-    upper_exclusive: Probability
+    lower_inclusive: RoleBoundary
+    upper_exclusive: RoleBoundary
 
     @model_validator(mode="after")
     def _validate_bounds(self) -> Self:
@@ -91,12 +83,12 @@ class RoleWindow(FrozenDomainModel):
             )
         return self
 
-    def contains(self, normalized_position: Probability) -> bool:
+    def contains(self, normalized_position: RolePosition) -> bool:
         return self.lower_inclusive <= normalized_position < self.upper_exclusive
 
 
 def role_for_normalized_position(
-    normalized_position: Probability, windows: tuple[RoleWindow, ...]
+    normalized_position: RolePosition, windows: tuple[RoleWindow, ...]
 ) -> Role | None:
     for window in windows:
         if window.contains(normalized_position):
@@ -109,13 +101,13 @@ if not TRAINING_AND_SCREENING_ROLES.isdisjoint(EVIDENCE_ROLES):
 
 
 def compute_sample_id(
-    sample_id_prefix: NonEmptyString,
-    normalized_relative_csv_path: NonEmptyString,
+    sample_id_prefix: SampleIdPrefix,
+    normalized_relative_csv_path: RelativePathText,
     file_sha256: ArtifactDigest,
     zero_based_original_row_index: NonNegativeInt,
 ) -> ArtifactDigest:
     return hashlib.sha256(
-        canonical_bytes(
+        framed_bytes(
             sample_id_prefix,
             normalized_relative_csv_path,
             file_sha256,
