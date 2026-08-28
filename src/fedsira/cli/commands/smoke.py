@@ -1,4 +1,4 @@
-from fedsira.experiments.smoke import render_smoke, run_smoke_suite
+from fedsira.experiments.validation import render_smoke, run_smoke_suite
 
 
 def execute(overwrite: bool) -> None:
