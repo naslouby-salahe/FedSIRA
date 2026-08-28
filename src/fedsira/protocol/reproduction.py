@@ -8,7 +8,7 @@ import torch
 from fedsira.domain.enums import ClaimState
 from fedsira.domain.records import (
     ArtifactDigest,
-    CanonicalToken,
+    CheckpointIdentity,
     CompromisedReproducerCount,
     DerivedSeed,
     DomainId,
@@ -17,10 +17,11 @@ from fedsira.domain.records import (
     ReproductionCertified,
     ReproductionWasTrained,
     ResolvedRowRequirementReached,
+    SeedDerivationLabel,
 )
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.runtime.determinism import framed_bytes
 
-REPRODUCTION_COMMITMENT_SEPARATOR = "REPRODUCTION_COMMITMENT"
+REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
 
 
 class _ListConvertibleTensor(Protocol):
@@ -72,7 +73,8 @@ def handle_no_adequate_unconsumed_domain(
 
 
 def validate_reproduction_start_checkpoint(
-    start_checkpoint_id: CanonicalToken, source_checkpoint_ids: frozenset[CanonicalToken]
+    start_checkpoint_id: CheckpointIdentity,
+    source_checkpoint_ids: frozenset[CheckpointIdentity],
 ) -> None:
     if start_checkpoint_id in source_checkpoint_ids:
         raise ValueError(
@@ -97,7 +99,7 @@ def compute_reproduction_commitment_hash(
         _ListConvertibleTensor, reproduced_flat_parameters.detach().to(torch.float64)
     ).tolist()
     parameter_bytes = struct.pack(f">{len(flat_values)}d", *flat_values)
-    header = canonical_bytes(
+    header = framed_bytes(
         REPRODUCTION_COMMITMENT_SEPARATOR,
         reproducer_domain,
         claim_identity,
