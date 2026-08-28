@@ -7,20 +7,27 @@ from pathlib import Path
 import torch
 
 from fedsira.domain.enums import DatasetId, ProducerFingerprintFamily
-from fedsira.domain.records import ArtifactDigest, CanonicalToken
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.domain.records import (
+    ArtifactDigest,
+    AstDumpText,
+    DependencyImportName,
+    FingerprintPayload,
+    ModuleName,
+    SchemaVersion,
+)
+from fedsira.runtime.determinism import framed_bytes
 
-IMPORT_NAME_TO_DISTRIBUTION_NAME: dict[str, str] = {
+IMPORT_NAME_TO_DISTRIBUTION_NAME: dict[DependencyImportName, DependencyImportName] = {
     "sklearn": "scikit-learn",
     "yaml": "pyyaml",
 }
 
-DATASET_PACKAGE_NAME: dict[DatasetId, str] = {
+DATASET_PACKAGE_NAME: dict[DatasetId, ModuleName] = {
     DatasetId.N_BAIOT: "nbaiot",
     DatasetId.CICIOT2023: "ciciot2023",
 }
 
-PRODUCER_ENTRY_MODULES: dict[ProducerFingerprintFamily, tuple[CanonicalToken, ...]] = {
+PRODUCER_ENTRY_MODULES: dict[ProducerFingerprintFamily, tuple[ModuleName, ...]] = {
     ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER: (
         "fedsira.datasets.roles",
         "fedsira.datasets.sampling",
@@ -68,9 +75,15 @@ PRODUCER_ENTRY_MODULES: dict[ProducerFingerprintFamily, tuple[CanonicalToken, ..
     ProducerFingerprintFamily.REPORT_SOURCE_EXPORT: ("fedsira.reporting",),
 }
 
-PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES: dict[ProducerFingerprintFamily, tuple[str, ...]] = {
+PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES: dict[
+    ProducerFingerprintFamily, tuple[DependencyImportName, ...]
+] = {
     ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST: ("pandas", "numpy"),
-    ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER: ("pandas", "numpy", "pyarrow"),
+    ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER: (
+        "pandas",
+        "numpy",
+        "pyarrow",
+    ),
     ProducerFingerprintFamily.ANCHOR_FEDAVG_CHECKPOINTS: ("torch", "numpy"),
     ProducerFingerprintFamily.SOURCE_REPRODUCTION_CHECKPOINTS: ("torch", "numpy"),
     ProducerFingerprintFamily.BASELINE_CHECKPOINT_CALIBRATION: (
@@ -87,13 +100,17 @@ PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES: dict[ProducerFingerprintFamily, tuple[s
     ),
     ProducerFingerprintFamily.BOUNDARY_TRANSFORMATION: ("numpy", "pandas", "pyarrow"),
     ProducerFingerprintFamily.METRIC_ARTIFACT: ("numpy", "sklearn"),
-    ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT: ("numpy", "scipy", "statsmodels"),
+    ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT: (
+        "numpy",
+        "scipy",
+        "statsmodels",
+    ),
     ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT: ("numpy",),
     ProducerFingerprintFamily.REPORT_SOURCE_EXPORT: ("pandas", "pyarrow", "matplotlib"),
 }
 
 
-def raw_schema_exclusion_manifest_entry_modules(dataset: DatasetId) -> tuple[CanonicalToken, ...]:
+def raw_schema_exclusion_manifest_entry_modules(dataset: DatasetId) -> tuple[ModuleName, ...]:
     package = DATASET_PACKAGE_NAME[dataset]
     return (
         f"fedsira.datasets.{package}.acquisition",
@@ -103,16 +120,16 @@ def raw_schema_exclusion_manifest_entry_modules(dataset: DatasetId) -> tuple[Can
 
 
 def compute_artifact_dependency_fingerprint(
-    schema_version: CanonicalToken,
-    scientific_configuration_subset: CanonicalToken,
-    dataset_split_view_identities: CanonicalToken,
-    semantic_coordinates_and_seed_namespaces: CanonicalToken,
+    schema_version: SchemaVersion,
+    scientific_configuration_subset: FingerprintPayload,
+    dataset_split_view_identities: FingerprintPayload,
+    semantic_coordinates_and_seed_namespaces: FingerprintPayload,
     upstream_artifact_identities: tuple[ArtifactDigest, ...],
     producer_component_fingerprint: ArtifactDigest,
     external_dependency_fingerprint: ArtifactDigest,
 ) -> ArtifactDigest:
-    digest = hashlib.sha256(
-        canonical_bytes(
+    return hashlib.sha256(
+        framed_bytes(
             schema_version,
             scientific_configuration_subset,
             dataset_split_view_identities,
@@ -122,17 +139,16 @@ def compute_artifact_dependency_fingerprint(
             external_dependency_fingerprint,
         )
     ).hexdigest()
-    return digest
 
 
-def _module_file_path(dotted_name: CanonicalToken) -> Path:
+def _module_file_path(dotted_name: ModuleName) -> Path:
     spec = importlib.util.find_spec(dotted_name)
     if spec is None or spec.origin is None:
         raise ValueError(f"cannot resolve producer module {dotted_name}")
     return Path(spec.origin)
 
 
-def _try_module_file_path(dotted_name: CanonicalToken) -> Path | None:
+def _try_module_file_path(dotted_name: ModuleName) -> Path | None:
     try:
         spec = importlib.util.find_spec(dotted_name)
     except (ImportError, ValueError):
@@ -158,10 +174,10 @@ def _type_checking_guarded_node_ids(tree: ast.Module) -> set[int]:
     return guarded
 
 
-def _imported_fedsira_modules(tree: ast.Module) -> tuple[set[CanonicalToken], set[CanonicalToken]]:
+def _imported_fedsira_modules(tree: ast.Module) -> tuple[set[ModuleName], set[ModuleName]]:
     guarded_ids = _type_checking_guarded_node_ids(tree)
-    certain: set[CanonicalToken] = set()
-    speculative: set[CanonicalToken] = set()
+    certain: set[ModuleName] = set()
+    speculative: set[ModuleName] = set()
     for node in ast.walk(tree):
         if id(node) in guarded_ids:
             continue
@@ -192,10 +208,8 @@ def _has_dynamic_import(tree: ast.Module) -> bool:
     return False
 
 
-def resolve_producer_import_closure(
-    entry_modules: tuple[CanonicalToken, ...],
-) -> dict[CanonicalToken, Path]:
-    resolved: dict[CanonicalToken, Path] = {}
+def resolve_producer_import_closure(entry_modules: tuple[ModuleName, ...]) -> dict[ModuleName, Path]:
+    resolved: dict[ModuleName, Path] = {}
     frontier = list(entry_modules)
     while frontier:
         dotted = frontier.pop()
@@ -254,10 +268,10 @@ def _strip_docstrings(tree: ast.Module) -> None:
 
 
 def compute_producer_component_fingerprint(
-    entry_modules: tuple[CanonicalToken, ...], schema_version: CanonicalToken
+    entry_modules: tuple[ModuleName, ...], schema_version: SchemaVersion
 ) -> ArtifactDigest:
     closure = resolve_producer_import_closure(entry_modules)
-    normalized_pairs: list[tuple[CanonicalToken, str]] = []
+    normalized_pairs: list[tuple[ModuleName, AstDumpText]] = []
     for dotted, path in sorted(closure.items()):
         source = path.read_text(encoding="utf-8")
         try:
@@ -274,13 +288,13 @@ def compute_producer_component_fingerprint(
         )
     hasher = hashlib.sha256()
     for dotted, normalized_dump in normalized_pairs:
-        hasher.update(canonical_bytes(dotted, normalized_dump))
-    hasher.update(canonical_bytes(schema_version))
+        hasher.update(framed_bytes(dotted, normalized_dump))
+    hasher.update(framed_bytes(schema_version))
     return hasher.hexdigest()
 
 
-def _imported_top_level_packages(tree: ast.Module) -> set[str]:
-    packages: set[str] = set()
+def _imported_top_level_packages(tree: ast.Module) -> set[DependencyImportName]:
+    packages: set[DependencyImportName] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -292,12 +306,12 @@ def _imported_top_level_packages(tree: ast.Module) -> set[str]:
 
 def compute_cuda_environment_fingerprint() -> ArtifactDigest:
     if not torch.cuda.is_available():
-        return hashlib.sha256(canonical_bytes("cuda_unavailable")).hexdigest()
+        return hashlib.sha256(framed_bytes("cuda_unavailable")).hexdigest()
     major, minor = torch.cuda.get_device_capability(0)
     cudnn_version = torch.backends.cudnn.version()
     return hashlib.sha256(
-        canonical_bytes(
-            torch.version.cuda or "",
+        framed_bytes(
+            torch.version.cuda or "cuda_version_unavailable",
             cudnn_version if cudnn_version is not None else 0,
             f"{major}.{minor}",
             torch.backends.cudnn.deterministic,
@@ -307,10 +321,11 @@ def compute_cuda_environment_fingerprint() -> ArtifactDigest:
 
 
 def compute_external_dependency_fingerprint(
-    entry_modules: tuple[CanonicalToken, ...], relevant_import_names: tuple[str, ...]
+    entry_modules: tuple[ModuleName, ...],
+    relevant_import_names: tuple[DependencyImportName, ...],
 ) -> ArtifactDigest:
     closure = resolve_producer_import_closure(entry_modules)
-    imported_packages: set[str] = set()
+    imported_packages: set[DependencyImportName] = set()
     for path in closure.values():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         imported_packages |= _imported_top_level_packages(tree)
@@ -319,7 +334,7 @@ def compute_external_dependency_fingerprint(
     for import_name in actually_relevant:
         distribution_name = IMPORT_NAME_TO_DISTRIBUTION_NAME.get(import_name, import_name)
         version = importlib.metadata.version(distribution_name)
-        hasher.update(canonical_bytes(import_name, version))
+        hasher.update(framed_bytes(import_name, version))
     if "torch" in actually_relevant:
-        hasher.update(canonical_bytes(compute_cuda_environment_fingerprint()))
+        hasher.update(framed_bytes(compute_cuda_environment_fingerprint()))
     return hasher.hexdigest()
