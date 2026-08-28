@@ -157,6 +157,11 @@ class CapabilityContractScope(StrEnum):
     ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"
 
 
+class RootCauseMixture(StrEnum):
+    BALANCED_50_50 = "Balanced 50/50"
+    A_DOMINANT_80_20 = "A-Dominant 80/20"
+
+
 class EvaluationInsufficiencyReason(StrEnum):
     INSUFFICIENT_MATCHED_BENIGN_REPORT_TEST_CONTROLS = (
         "Insufficient Matched Benign Report-Test Controls"
