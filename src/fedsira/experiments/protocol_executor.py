@@ -140,7 +140,7 @@ from fedsira.evaluation.records import (
     MetricResult,
     ProposalOracleLabel,
 )
-from fedsira.evaluation.screen import screen_fold_index
+from fedsira.protocol.opening import screen_fold_index
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
