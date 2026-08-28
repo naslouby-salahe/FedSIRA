@@ -1,0 +1,43 @@
+name: branch-audit
+
+on:
+  push:
+    branches: [refactor/roadmap-completion]
+    paths: [.github/workflows/branch-audit.yml]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/roadmap-completion
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-groups --frozen
+      - name: Primitive token inventory
+        run: |
+          echo '=== CanonicalToken ==='
+          grep -RIn --include='*.py' 'CanonicalToken' src tests || true
+          echo '=== BooleanFlag ==='
+          grep -RIn --include='*.py' 'BooleanFlag' src tests || true
+          echo '=== raw model fields ==='
+          grep -RInE --include='*.py' '^\s+[a-zA-Z_][a-zA-Z0-9_]*:\s*(str|int|float|bool)(\s|$|\||=)' src/fedsira || true
+      - name: Ruff format
+        if: always()
+        run: uv run ruff format --check .
+      - name: Ruff lint
+        if: always()
+        run: uv run ruff check .
+      - name: Pyright
+        if: always()
+        run: uv run pyright
+      - name: Architecture
+        if: always()
+        run: uv run pytest tests/architecture -q
+      - name: Tests
+        if: always()
+        run: uv run pytest tests -q
