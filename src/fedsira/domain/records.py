@@ -108,6 +108,7 @@ DerivedSeed = Uint32Bound
 PartitionSalt = Uint32Bound
 DatasetManifestDigest = ArtifactDigest
 DatasetFileDigest = ArtifactDigest
+FeatureSchemaDigest = ArtifactDigest
 RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
@@ -230,6 +231,7 @@ ExternalVerificationActive = BooleanValue
 ResolvedRowRequirementReached = BooleanValue
 MaterialityDecision = BooleanValue
 ClaimGateDecision = BooleanValue
+CapabilityContractSatisfied = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
