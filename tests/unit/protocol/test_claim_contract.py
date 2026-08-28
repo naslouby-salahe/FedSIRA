@@ -1,6 +1,7 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBaiotClass
+from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass
 from fedsira.domain.enums import DatasetId
+from fedsira.domain.records import ArtifactDigest, ClassCount
 from fedsira.evaluation.records import MetricResult
 from fedsira.protocol.claim_contract import (
     CapabilityClaimContract,
@@ -16,24 +17,29 @@ from fedsira.protocol.claim_contract import (
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 CAPABILITY_CLAIM_CONFIG = CONFIG.capability_claim
 EVIDENCE_MINIMA = CAPABILITY_CLAIM_CONFIG.evidence_minima
+SUPPORTED_CLASS_COUNT: ClassCount = len(NBAIOT_CLASS_ORDER) - 1
 
 
 def _contract(
-    dataset_manifest_hash: str = "a" * 64, feature_schema_hash: str = "b" * 64
+    dataset_manifest_hash: ArtifactDigest = "a" * 64,
+    feature_schema_hash: ArtifactDigest = "b" * 64,
 ) -> CapabilityClaimContract:
     return build_capability_claim_contract(
-        dataset_manifest_hash,
-        "POST_REFERENCE_REPLAY",
-        DatasetId.N_BAIOT,
-        9,
-        feature_schema_hash,
-        CAPABILITY_CLAIM_CONFIG,
+        dataset_manifest_hash=dataset_manifest_hash,
+        supported_control_role="POST_REFERENCE_REPLAY",
+        dataset_id=DatasetId.N_BAIOT,
+        domain_count=9,
+        feature_schema_hash=feature_schema_hash,
+        target_class=NBaiotClass.GAFGYT_COMBO.value,
+        supported_class_count=SUPPORTED_CLASS_COUNT,
+        capability_claim_config=CAPABILITY_CLAIM_CONFIG,
     )
 
 
-def test_build_capability_claim_contract_uses_configured_thresholds() -> None:
+def test_build_capability_claim_contract_uses_dataset_scope_and_configured_thresholds() -> None:
     contract = _contract()
-    assert contract.target_class is NBaiotClass.GAFGYT_COMBO
+    assert contract.target_class == NBaiotClass.GAFGYT_COMBO.value
+    assert contract.supported_class_count == SUPPORTED_CLASS_COUNT
     assert contract.target_f1_minimum == CAPABILITY_CLAIM_CONFIG.target_f1_minimum
     assert (
         contract.benign_false_alarm_rate_increase_maximum
