@@ -3,24 +3,30 @@ from __future__ import annotations
 import csv
 import hashlib
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
-from fedsira.datasets.ciciot2023.schema import canonicalize_token
-from fedsira.domain.records import ArtifactDigest, CanonicalToken
-from fedsira.runtime.determinism import canonical_bytes
+from fedsira.datasets.ciciot2023.schema import normalize_label_token
+from fedsira.domain.records import (
+    DatasetColumnName,
+    DatasetFileDigest,
+    DatasetManifestDigest,
+    FrozenDomainModel,
+    RelativePathText,
+    SeedDerivationLabel,
+)
+from fedsira.runtime.determinism import framed_bytes
 
 _ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
+DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"
 
 
-@dataclass(frozen=True)
-class SecondaryCsvFile:
+class SecondaryCsvFile(FrozenDomainModel):
     absolute_path: Path
-    relative_path: CanonicalToken
-    file_sha256: ArtifactDigest
+    relative_path: RelativePathText
+    file_sha256: DatasetFileDigest
 
 
-def compute_file_checksum(path: Path) -> ArtifactDigest:
+def compute_file_checksum(path: Path) -> DatasetFileDigest:
     hasher = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1_048_576), b""):
@@ -42,18 +48,18 @@ def discover_secondary_csv_files(csv_root: Path) -> tuple[SecondaryCsvFile, ...]
     )
 
 
-def compute_dataset_manifest_hash(discovered: Sequence[SecondaryCsvFile]) -> ArtifactDigest:
+def compute_dataset_manifest_hash(
+    discovered: Sequence[SecondaryCsvFile],
+) -> DatasetManifestDigest:
     if not discovered:
         raise ValueError("secondary dataset manifest requires at least one CSV shard")
-    manifest_fields: list[CanonicalToken] = []
+    fields: list[str | int] = []
     for item in sorted(discovered, key=lambda discovered_file: discovered_file.relative_path):
-        manifest_fields.extend((item.relative_path, item.file_sha256))
-    return hashlib.sha256(
-        canonical_bytes("CICIOT2023_DATASET_MANIFEST_V1", *manifest_fields)
-    ).hexdigest()
+        fields.extend((item.relative_path, item.file_sha256))
+    return hashlib.sha256(framed_bytes(DATASET_MANIFEST_SEPARATOR, *fields)).hexdigest()
 
 
-def read_csv_header(path: Path) -> tuple[CanonicalToken, ...]:
+def read_csv_header(path: Path) -> tuple[DatasetColumnName, ...]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
         try:
@@ -63,8 +69,8 @@ def read_csv_header(path: Path) -> tuple[CanonicalToken, ...]:
     return tuple(name.strip(_ASCII_HEADER_WHITESPACE) for name in raw_header)
 
 
-def resolve_label_column(header: tuple[CanonicalToken, ...]) -> CanonicalToken:
-    label_columns = [column for column in header if canonicalize_token(column) == "LABEL"]
+def resolve_label_column(header: tuple[DatasetColumnName, ...]) -> DatasetColumnName:
+    label_columns = [column for column in header if normalize_label_token(column) == "LABEL"]
     if len(label_columns) != 1:
         raise ValueError(
             "expected exactly one column named 'label' (case-insensitive), "
@@ -74,7 +80,8 @@ def resolve_label_column(header: tuple[CanonicalToken, ...]) -> CanonicalToken:
 
 
 def validate_consistent_header(
-    reference_header: tuple[CanonicalToken, ...], observed_header: tuple[CanonicalToken, ...]
+    reference_header: tuple[DatasetColumnName, ...],
+    observed_header: tuple[DatasetColumnName, ...],
 ) -> None:
     if observed_header != reference_header:
-        raise ValueError("secondary CSV header does not match the canonical reference schema")
+        raise ValueError("secondary CSV header does not match the reference schema")
