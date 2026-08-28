@@ -142,6 +142,8 @@ ScreenLoss = NonNegativeFloat
 ScaleFactor = PositiveFloat
 DeltaScale = PositiveFloat
 MetricTolerance = PositiveFloat
+ProbabilityTolerance = PositiveFloat
+DurationToleranceSeconds = PositiveFloat
 PValueDisplayFloor = PositiveFloat
 DbscanEpsilon = PositiveFloat
 ProductionWeight = NonNegativeFloat
@@ -159,6 +161,7 @@ BenignFalseAlarmRateIncrease = Probability
 ContaminationRisk = Probability
 ConfidenceLevel = Probability
 FamilyWiseAlpha = Probability
+PValue = Probability
 CosineSimilarity = Probability
 HeterogeneityMultiplier = Probability
 OptimizerBeta = Probability
@@ -170,6 +173,7 @@ CapabilityCertificationRate = Probability
 AdmissionRateChange = Probability
 TargetF1Change = Probability
 Percentile = Percentage
+RoleBoundary = Probability
 
 # Boolean semantics. Each public field uses a meaning-specific alias.
 PinMemoryEnabled = BooleanValue
