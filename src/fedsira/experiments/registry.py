@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 
 from fedsira.baselines.registry import (
@@ -9,10 +8,14 @@ from fedsira.baselines.registry import (
     BaselineValidationFixture,
 )
 from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
-from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt
-
-ExperimentId = CanonicalToken
+from fedsira.domain.enums import DatasetId, RootCauseMixture
+from fedsira.domain.records import (
+    CanonicalToken,
+    ExperimentName,
+    FrozenDomainModel,
+    ScientificCellCount,
+    SeedCount,
+)
 
 
 class ClaimFamily(StrEnum):
@@ -146,11 +149,6 @@ class CapabilityContractGranularity(StrEnum):
     ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"
 
 
-class RootCauseMixture(StrEnum):
-    BALANCED_50_50 = "Balanced 50/50"
-    A_DOMINANT_80_20 = "A-Dominant 80/20"
-
-
 class HeterogeneityRegime(StrEnum):
     NATURAL = "Natural"
     QUANTITY_SKEW = "Quantity Skew"
@@ -163,14 +161,13 @@ class SecondaryScenario(StrEnum):
     ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
 
 
-@dataclass(frozen=True)
-class ExperimentDefinition:
-    name: ExperimentId
+class ExperimentDefinition(FrozenDomainModel):
+    name: ExperimentName
     experiment_class: ExperimentClass
     methods: tuple[CanonicalToken, ...]
     conditions: tuple[CanonicalToken, ...]
-    seed_count: PositiveInt
-    nominal_cell_count: NonNegativeInt
+    seed_count: SeedCount
+    nominal_cell_count: ScientificCellCount
     claim_family: CanonicalToken | None
     prerequisites: tuple[CanonicalToken, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
