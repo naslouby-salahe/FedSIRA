@@ -1,20 +1,29 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
-from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
-from fedsira.domain.records import NamespaceSeed, NonNegativeFloat, PositiveInt
+from fedsira.domain.records import (
+    BooleanFlag,
+    DifferentialNatsPerExample,
+    DomainId,
+    EvidenceAdequate,
+    FrozenDomainModel,
+    NamespaceSeed,
+    OpeningPredicateSatisfied,
+    ProductionWeight,
+    ScreenDomainCount,
+    SourceCommitted,
+)
 from fedsira.evaluation.records import MetricResult
+from fedsira.runtime.determinism import deterministic_order
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 
 
-@dataclass(frozen=True)
-class ClaimOpeningEntry:
+class ClaimOpeningEntry(FrozenDomainModel):
     state: ClaimState
-    source_committed: bool
-    direct_production_weight: NonNegativeFloat
+    source_committed: SourceCommitted
+    direct_production_weight: ProductionWeight
 
 
 def start_claim(opening_mode: ClaimOpeningMode) -> ClaimOpeningEntry:
@@ -25,19 +34,18 @@ def start_claim(opening_mode: ClaimOpeningMode) -> ClaimOpeningEntry:
     )
 
 
-@dataclass(frozen=True)
-class ScreenDomainResult:
-    domain: NBaiotDomain
-    is_evidence_adequate: bool
-    meets_opening_predicate: bool
+class ScreenDomainResult(FrozenDomainModel):
+    domain: DomainId
+    is_evidence_adequate: EvidenceAdequate
+    meets_opening_predicate: OpeningPredicateSatisfied
 
 
 def screen_domain_order(
-    eligible_non_source_domains: Sequence[NBaiotDomain],
+    eligible_non_source_domains: Sequence[DomainId],
     screen_domain_order_namespace_seed: NamespaceSeed,
-    screen_domain_count: PositiveInt,
-) -> tuple[NBaiotDomain, ...]:
-    ordered = deterministic_domain_order(
+    screen_domain_count: ScreenDomainCount,
+) -> tuple[DomainId, ...]:
+    ordered = deterministic_order(
         eligible_non_source_domains,
         SCREEN_DOMAIN_ORDER_SEPARATOR,
         screen_domain_order_namespace_seed,
@@ -46,13 +54,13 @@ def screen_domain_order(
 
 
 def screen_domain_decision_is_positive(
-    differential_a: float | None,
+    differential_a: DifferentialNatsPerExample | None,
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
     capability_claim_config: CapabilityClaimConfig,
-) -> bool:
+) -> BooleanFlag:
     if differential_a is None:
         return False
     if (
@@ -75,7 +83,7 @@ def raw_target_f1_screen_domain_decision_is_positive(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     capability_claim_config: CapabilityClaimConfig,
-) -> bool:
+) -> BooleanFlag:
     if (
         target_f1_gain.value is None
         or supported_macro_f1_drop.value is None
@@ -91,13 +99,13 @@ def raw_target_f1_screen_domain_decision_is_positive(
 
 
 def unmatched_control_screen_domain_decision_is_positive(
-    unmatched_differential: float | None,
+    unmatched_differential: DifferentialNatsPerExample | None,
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
     capability_claim_config: CapabilityClaimConfig,
-) -> bool:
+) -> BooleanFlag:
     if unmatched_differential is None:
         return False
     if (
@@ -117,7 +125,7 @@ def unmatched_control_screen_domain_decision_is_positive(
 
 def candidate_free_screen_domain_predicate(
     anchor_target_f1: MetricResult, capability_claim_config: CapabilityClaimConfig
-) -> bool:
+) -> BooleanFlag:
     if anchor_target_f1.value is None:
         return False
     return anchor_target_f1.value < capability_claim_config.candidate_free_anchor_target_f1_maximum
