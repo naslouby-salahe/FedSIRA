@@ -1,8 +1,16 @@
 import hashlib
-from dataclasses import dataclass
 from enum import StrEnum
+from typing import Self
 
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, NonNegativeInt
+from pydantic import model_validator
+
+from fedsira.domain.records import (
+    ArtifactDigest,
+    FrozenDomainModel,
+    NonEmptyString,
+    NonNegativeInt,
+    Probability,
+)
 from fedsira.runtime.determinism import canonical_bytes
 
 
@@ -18,7 +26,7 @@ class Role(StrEnum):
     REPRODUCTION = "Reproduction"
 
 
-ROLE_HASH_TOKEN: dict[Role, CanonicalToken] = {
+ROLE_HASH_TOKEN: dict[Role, NonEmptyString] = {
     Role.ANCHOR_TRAIN: "ANCHOR_TRAIN",
     Role.ANCHOR_VALIDATION: "ANCHOR_VALIDATION",
     Role.POST_REFERENCE_REPLAY: "POST_REFERENCE_REPLAY",
@@ -69,25 +77,26 @@ class DatasetExclusionReason(StrEnum):
     UNPARSEABLE_PREDICTOR = "unparseable_predictor"
 
 
-@dataclass(frozen=True)
-class RoleWindow:
+class RoleWindow(FrozenDomainModel):
     role: Role
-    lower_inclusive: float
-    upper_exclusive: float
+    lower_inclusive: Probability
+    upper_exclusive: Probability
 
-    def __post_init__(self) -> None:
-        if not (0.0 <= self.lower_inclusive < self.upper_exclusive <= 1.0):
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> Self:
+        if self.lower_inclusive >= self.upper_exclusive:
             raise ValueError(
-                f"role interval for {self.role.value} must satisfy "
-                f"0.0 <= lower < upper <= 1.0, got [{self.lower_inclusive}, {self.upper_exclusive})"
+                f"role interval for {self.role.value} must satisfy lower < upper, "
+                f"got [{self.lower_inclusive}, {self.upper_exclusive})"
             )
+        return self
 
-    def contains(self, normalized_position: float) -> bool:
+    def contains(self, normalized_position: Probability) -> bool:
         return self.lower_inclusive <= normalized_position < self.upper_exclusive
 
 
 def role_for_normalized_position(
-    normalized_position: float, windows: tuple[RoleWindow, ...]
+    normalized_position: Probability, windows: tuple[RoleWindow, ...]
 ) -> Role | None:
     for window in windows:
         if window.contains(normalized_position):
@@ -100,8 +109,8 @@ if not TRAINING_AND_SCREENING_ROLES.isdisjoint(EVIDENCE_ROLES):
 
 
 def compute_sample_id(
-    sample_id_prefix: CanonicalToken,
-    normalized_relative_csv_path: CanonicalToken,
+    sample_id_prefix: NonEmptyString,
+    normalized_relative_csv_path: NonEmptyString,
     file_sha256: ArtifactDigest,
     zero_based_original_row_index: NonNegativeInt,
 ) -> ArtifactDigest:
