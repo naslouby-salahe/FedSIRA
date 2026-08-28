@@ -6,8 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 UINT32_MODULUS = 4_294_967_296
 
-# Constrained scalar foundations. Production models should expose the semantic aliases
-# below rather than these storage-oriented foundations directly.
 Probability = Annotated[float, Field(ge=0.0, le=1.0, allow_inf_nan=False)]
 Percentage = Annotated[float, Field(ge=0.0, le=100.0, allow_inf_nan=False)]
 NonNegativeInt = Annotated[int, Field(ge=0, strict=True)]
@@ -22,7 +20,6 @@ DeterministicInteger = Annotated[int, Field(strict=True)]
 FramingField: TypeAlias = TextValue | DeterministicInteger
 FeatureShiftSign: TypeAlias = Literal[-1.0, 1.0]
 
-# Identifiers and text domains.
 Identifier = Annotated[
     str,
     StringConstraints(
@@ -100,8 +97,8 @@ ClaimReason = TextValue
 AttackFamilyDirectoryToken = TextValue
 AttackFamilyName = TextValue
 AttackBasename = TextValue
+ReproductionRowId = TextValue
 
-# Deterministic identities and seeds.
 MasterSeed = Uint32Bound
 NamespaceSeed = Uint32Bound
 DerivedSeed = Uint32Bound
@@ -113,7 +110,6 @@ RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
 
-# Counts and discrete quantities.
 RowCount = NonNegativeInt
 SourceRowIndex = NonNegativeInt
 SamplingCap = NonNegativeInt
@@ -159,8 +155,10 @@ CompleteSeedCount = NonNegativeInt
 ByteCount = NonNegativeInt
 MemoryBytes = NonNegativeInt
 ModelTransmissionCount = NonNegativeInt
+AdequateFinalGateDomainCount = NonNegativeInt
+MaximumByzantineReproductionRows = NonNegativeInt
+KrumNeighborCount = PositiveInt
 
-# Continuous scientific quantities.
 StandardizedValue = FiniteFloat
 MetricDifference = FiniteFloat
 PairedDifference = FiniteFloat
@@ -191,7 +189,6 @@ ProductionWeight = NonNegativeFloat
 KrumScore = NonNegativeFloat
 FeatureShiftMagnitude = PositiveFloat
 
-# Probability/rate semantics.
 PoisonFraction = Probability
 AttackStrength = Probability
 ClientDropout = Probability
@@ -217,7 +214,6 @@ Percentile = Percentage
 RoleBoundary = Probability
 RolePosition = Probability
 
-# Boolean semantics. Each public field uses a meaning-specific alias.
 PinMemoryEnabled = BooleanValue
 PersistentWorkersEnabled = BooleanValue
 PredictorCountMatchesOfficial = BooleanValue
@@ -232,6 +228,7 @@ ResolvedRowRequirementReached = BooleanValue
 MaterialityDecision = BooleanValue
 ClaimGateDecision = BooleanValue
 CapabilityContractSatisfied = BooleanValue
+SourceExcludedFromKrum = BooleanValue
 
 
 class FrozenDomainModel(BaseModel):
