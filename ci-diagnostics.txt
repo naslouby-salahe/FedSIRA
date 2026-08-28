@@ -797,7 +797,7 @@ exit=1
 
 ===== uv run pyright =====
 
-added 1 package, and audited 2 packages in 5s
+added 1 package, and audited 2 packages in 8s
 
 found 0 vulnerabilities
 /home/runner/work/FedSIRA/FedSIRA/src/fedsira/analysis/comparisons.py
@@ -4029,7 +4029,7 @@ E   ImportError: cannot import name 'CanonicalToken' from 'fedsira.domain.record
 =========================== short test summary info ============================
 ERROR tests/architecture/test_producer_import_closure.py
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
-1 error in 2.86s
+1 error in 2.18s
 
 exit=1
 
@@ -4063,6 +4063,6 @@ E   ImportError: cannot import name 'CanonicalToken' from 'fedsira.domain.record
 =========================== short test summary info ============================
 ERROR tests/architecture/test_producer_import_closure.py
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
-1 error in 1.35s
+1 error in 1.17s
 
 exit=1
