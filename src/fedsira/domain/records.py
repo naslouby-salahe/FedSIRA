@@ -96,6 +96,8 @@ AstDumpText = TextValue
 ClaimId = TextValue
 ClaimScopeText = TextValue
 ClaimReason = TextValue
+AttackFamilyDirectoryToken = TextValue
+AttackFamilyName = TextValue
 
 # Deterministic identities and seeds.
 MasterSeed = Uint32Bound
