@@ -7,7 +7,7 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 DOMAIN_CONCEPT_SUFFIXES = ("_id", "_seed", "_hash", "_digest", "_path", "_token")
 PRIMITIVE_ANNOTATION_NAMES = {"str", "int", "float", "bool"}
 SEMANTIC_TYPE_DEFINITION_FILE = SRC_ROOT / "domain" / "records.py"
-MODEL_BASE_NAMES = {"BaseModel", "FrozenModel"}
+MODEL_BASE_NAMES = {"BaseModel", "FrozenModel", "FrozenDomainModel"}
 DATACLASS_DECORATOR_NAMES = {"dataclass"}
 
 
