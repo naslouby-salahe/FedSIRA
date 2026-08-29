@@ -1,5 +1,3 @@
-import json
-from collections.abc import Mapping
 from pathlib import Path
 
 from fedsira.artifacts.fingerprints import (
@@ -15,7 +13,12 @@ from fedsira.artifacts.paths import (
     preprocessing_metadata_root,
     workspace_root_for_family,
 )
-from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts.records import (
+    ArtifactManifest,
+    CICIoT2023DatasetManifestPayload,
+    DatasetManifestPayload,
+    NBaiotDatasetManifestPayload,
+)
 from fedsira.artifacts.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
@@ -61,14 +64,17 @@ from fedsira.domain.records import (
 )
 
 
-def _publish_or_reuse_canonical_dataset_manifest(
+def _publish_or_reuse_dataset_manifest(
     dataset: DatasetId,
     config: ScientificConfig,
     dataset_split_view_identities: DatasetManifestDigest,
-    payload_fields: Mapping[str, object],
+    payload: DatasetManifestPayload,
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
-    producer_fingerprint = compute_producer_component_fingerprint(entry_modules, schema_version="1")
+    producer_fingerprint = compute_producer_component_fingerprint(
+        entry_modules,
+        schema_version="1",
+    )
     external_fingerprint = compute_external_dependency_fingerprint(
         entry_modules,
         PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES[
@@ -84,34 +90,46 @@ def _publish_or_reuse_canonical_dataset_manifest(
         producer_component_fingerprint=producer_fingerprint,
         external_dependency_fingerprint=external_fingerprint,
     )
-    canonical_directory: Path = REPOSITORY_ROOT / workspace_root_for_family(
+    published_directory = REPOSITORY_ROOT / workspace_root_for_family(
         ArtifactFamily.DATASET_MANIFEST
     )
 
-    if is_artifact_complete_and_valid(canonical_directory, identity):
-        reused_manifest = read_published_manifest(canonical_directory, identity)
+    if is_artifact_complete_and_valid(published_directory, identity):
+        reused_manifest = read_published_manifest(published_directory, identity)
         if reused_manifest is not None:
             return reused_manifest, True
 
-    payload = json.dumps(payload_fields, sort_keys=True, default=str).encode("utf-8")
+    payload_bytes = payload.model_dump_json().encode("utf-8")
     staged_manifest = ArtifactManifest(
         family=ArtifactFamily.DATASET_MANIFEST,
         identity=identity,
-        checksum=compute_checksum(payload),
+        checksum=compute_checksum(payload_bytes),
         lifecycle_state=ArtifactLifecycleState.STAGING,
         upstream_identities=(),
     )
     staging_root = (
-        REPOSITORY_ROOT / config.runtime.repository_layout.execution_workspace / "cache" / "staging"
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.execution_workspace
+        / "cache"
+        / "staging"
     )
-    staged_path = stage_payload(staging_root, payload)
-    published = publish_artifact_to_disk(staged_path, canonical_directory, staged_manifest, payload)
+    staged_path = stage_payload(staging_root, payload_bytes)
+    published = publish_artifact_to_disk(
+        staged_path,
+        published_directory,
+        staged_manifest,
+        payload_bytes,
+    )
     return published, False
 
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
+    raw_root = (
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.raw_data
+        / DatasetId.N_BAIOT.value
+    )
     extraction_cache_root = (
         REPOSITORY_ROOT
         / config.runtime.repository_layout.execution_workspace
@@ -121,7 +139,9 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
     validate_target_holder_feasibility(
         discovered,
-        minimum_target_holding_domains=config.datasets.primary.minimum_target_holding_domains,
+        minimum_target_holding_domains=(
+            config.datasets.primary.minimum_target_holding_domains
+        ),
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
     unavailable_classes = tuple(
@@ -135,20 +155,24 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         validate_consistent_predictor_schema(reference_header, observed_header)
         validate_all_predictors_finite(item.absolute_path, reference_header)
 
-    _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
+    _artifact_manifest, reused = _publish_or_reuse_dataset_manifest(
         DatasetId.N_BAIOT,
         config,
         manifest_hash,
-        {
-            "dataset_file_manifest_hash": manifest_hash,
-            "structurally_unavailable_classes": list(unavailable_classes),
-        },
+        NBaiotDatasetManifestPayload(
+            dataset_file_manifest_hash=manifest_hash,
+            structurally_unavailable_classes=unavailable_classes,
+        ),
     )
 
     prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
     scaler_root = REPOSITORY_ROOT / prepared_feature_root()
     views, moments = materialize_nbaiot_prepared_views(
-        discovered, config, prepared_root, scaler_root, overwrite
+        discovered,
+        config,
+        prepared_root,
+        scaler_root,
+        overwrite,
     )
     role_counts: dict[str, int] = {}
     for view in views:
@@ -159,7 +183,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         f"structurally_unavailable_classes={list(unavailable_classes)}, "
         f"prepared_views={len(views)}, "
         f"scaler_training_rows={moments.training_row_count}, "
-        f"canonical_dataset_manifest_reused={reused}"
+        f"dataset_manifest_reused={reused}"
     )
     print(f"role row totals: {role_counts}")
 
@@ -167,7 +191,10 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_root = (
-        REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
+        REPOSITORY_ROOT
+        / config.runtime.repository_layout.raw_data
+        / "CIC_IOT_Dataset2023"
+        / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
     prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023)
@@ -188,25 +215,29 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         cache_root,
         overwrite,
     )
-    _artifact_manifest, reused = _publish_or_reuse_canonical_dataset_manifest(
+    _artifact_manifest, reused = _publish_or_reuse_dataset_manifest(
         DatasetId.CICIOT2023,
         config,
         summary.dataset_manifest_hash,
-        {
-            "dataset_file_manifest_hash": summary.dataset_manifest_hash,
-            "file_count": len(discovered),
-            "raw_row_count": summary.raw_row_count,
-            "retained_row_count": summary.retained_row_count,
-            "excluded_row_count": summary.excluded_row_count,
-            "predictor_count": len(summary.predictor_columns),
-            "official_expected_predictor_count": OFFICIAL_EXPECTED_PREDICTOR_COUNT,
-            "predictor_count_matches_official": summary.predictor_count_matches_official,
-            "class_registry": list(summary.class_registry),
-            "pseudo_domain_count": PSEUDO_DOMAIN_COUNT,
-        },
+        CICIoT2023DatasetManifestPayload(
+            dataset_file_manifest_hash=summary.dataset_manifest_hash,
+            file_count=len(discovered),
+            raw_row_count=summary.raw_row_count,
+            retained_row_count=summary.retained_row_count,
+            excluded_row_count=summary.excluded_row_count,
+            predictor_count=len(summary.predictor_columns),
+            official_expected_predictor_count=OFFICIAL_EXPECTED_PREDICTOR_COUNT,
+            predictor_count_matches_official=(
+                summary.predictor_count_matches_official
+            ),
+            class_registry=summary.class_registry,
+            pseudo_domain_count=PSEUDO_DOMAIN_COUNT,
+        ),
     )
     exclusion_rate = (
-        summary.excluded_row_count / summary.raw_row_count if summary.raw_row_count else 0.0
+        summary.excluded_row_count / summary.raw_row_count
+        if summary.raw_row_count
+        else 0.0
     )
     role_counts: dict[str, int] = {}
     for view in summary.views:
@@ -215,12 +246,15 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         "CICIoT2023 preprocessing complete: "
         f"dataset_file_manifest_hash={summary.dataset_manifest_hash}, "
         f"files={len(discovered)}, raw_rows={summary.raw_row_count}, "
-        f"retained_rows={summary.retained_row_count}, excluded_rows={summary.excluded_row_count}, "
-        f"exclusion_rate={exclusion_rate:.8f}, predictor_count={len(summary.predictor_columns)}, "
+        f"retained_rows={summary.retained_row_count}, "
+        f"excluded_rows={summary.excluded_row_count}, "
+        f"exclusion_rate={exclusion_rate:.8f}, "
+        f"predictor_count={len(summary.predictor_columns)}, "
         f"predictor_count_matches_official={summary.predictor_count_matches_official}, "
-        f"class_count={len(summary.class_registry)}, prepared_views={len(summary.views)}, "
+        f"class_count={len(summary.class_registry)}, "
+        f"prepared_views={len(summary.views)}, "
         f"scaler_training_rows={summary.scaler.training_row_count}, "
-        f"canonical_dataset_manifest_reused={reused}"
+        f"dataset_manifest_reused={reused}"
     )
     print(f"role row totals: {role_counts}")
 
