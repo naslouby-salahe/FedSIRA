@@ -1,6 +1,7 @@
 import torch
 
 from fedsira.domain.records import ParameterName, PositiveInt, TensorDomainModel
+from fedsira.models.mlp import FedSIRAClassifier
 
 
 class ModelParameter(TensorDomainModel):
@@ -15,6 +16,28 @@ class ModelState(TensorDomainModel):
 class WeightedModelState(TensorDomainModel):
     state: ModelState
     example_count: PositiveInt
+
+
+def model_state_from_classifier(model: FedSIRAClassifier) -> ModelState:
+    return ModelState(
+        parameters=tuple(
+            ModelParameter(name=name, value=parameter.detach().clone())
+            for name, parameter in model.named_parameters()
+        )
+    )
+
+
+def load_model_state(model: FedSIRAClassifier, state: ModelState) -> None:
+    expected_names = tuple(name for name, _parameter in model.named_parameters())
+    observed_names = tuple(parameter.name for parameter in state.parameters)
+    if observed_names != expected_names:
+        raise ValueError("model parameter schema does not match classifier architecture")
+    with torch.no_grad():
+        for name, parameter in model.named_parameters():
+            source = model_parameter(state, name)
+            if source.value.shape != parameter.shape:
+                raise ValueError(f"shape mismatch for model parameter {name}")
+            parameter.copy_(source.value)
 
 
 def model_parameter(
