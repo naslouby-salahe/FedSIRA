@@ -11,9 +11,16 @@ import matplotlib.pyplot as pyplot
 
 from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import (
+    EvidenceCycleIndex,
+    FigureName,
+    MethodName,
+    MetricName,
+    MetricValue,
+    Probability,
+)
 
-MANDATORY_FIGURE_NAMES: tuple[CanonicalToken, ...] = (
+MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "FedSIRA Protocol Schematic",
     "Primary Security-Utility Tradeoff",
     "Useful Backdoored Source",
@@ -34,7 +41,7 @@ _REFERENCE_LINE_WIDTH = 1
 
 def validate_mandatory_figures_covered(
     rendered_figures: Sequence[Path],
-) -> tuple[CanonicalToken, ...]:
+) -> tuple[FigureName, ...]:
     rendered_names = {path.stem for path in rendered_figures}
     missing = [name for name in MANDATORY_FIGURE_NAMES if name not in rendered_names]
     return tuple(missing)
@@ -120,16 +127,16 @@ def render_security_utility_tradeoff(
 
 
 def render_evidence_arrival_trajectory(
-    state_fractions_by_cycle: Mapping[int, Mapping[CanonicalToken, float]],
+    state_fractions_by_cycle: Mapping[EvidenceCycleIndex, Mapping[ClaimState, Probability]],
     destination: Path,
 ) -> Path:
     figure, axis = pyplot.subplots(figsize=(8, 5))
     cycles = sorted(state_fractions_by_cycle)
     states = (
-        ClaimState.DORMANT.value,
-        ClaimState.VERIFICATION_PENDING.value,
-        ClaimState.ADMITTED.value,
-        ClaimState.EXPIRED.value,
+        ClaimState.DORMANT,
+        ClaimState.VERIFICATION_PENDING,
+        ClaimState.ADMITTED,
+        ClaimState.EXPIRED,
     )
     if not cycles:
         axis.text(0.5, 0.5, "no evidence", ha="center", va="center")
@@ -141,7 +148,7 @@ def render_evidence_arrival_trajectory(
                 cycles,
                 [state_fractions_by_cycle[cycle].get(state, 0.0) for cycle in cycles],
                 marker="o",
-                label=state,
+                label=state.value,
             )
         axis.set_xlabel("logical evidence cycle")
         axis.set_ylabel("fraction of seed instances")
@@ -153,8 +160,8 @@ def render_evidence_arrival_trajectory(
 
 
 def render_efficiency_profile(
-    metric_values: Mapping[CanonicalToken, Mapping[CanonicalToken, float]],
-    metric: CanonicalToken,
+    metric_values: Mapping[MethodName, Mapping[MetricName, MetricValue]],
+    metric: MetricName,
     destination: Path,
 ) -> Path:
     figure, axis = pyplot.subplots(figsize=(8, 5))
