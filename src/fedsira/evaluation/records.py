@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from enum import StrEnum
+from typing import Annotated
+
+from pydantic import Field
 
 from fedsira.domain.records import (
     ArtifactDigest,
+    BooleanValue,
     ByteCount,
     FiniteFloat,
     FrozenDomainModel,
@@ -28,17 +29,15 @@ METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
 TENSOR_METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
 TENSOR_DTYPE: SchemaVersion = "float32"
 
-CommunicationJsonValue = str | int | None | list[int]
+EncodedBytes = Annotated[bytes, Field()]
 
 
-@dataclass(frozen=True)
-class MetricResult:
+class MetricResult(FrozenDomainModel):
     value: FiniteFloat | None
     denominator: NonNegativeInt
 
 
-@dataclass(frozen=True)
-class ConfusionCounts:
+class ConfusionCounts(FrozenDomainModel):
     true_positive: NonNegativeInt
     false_positive: NonNegativeInt
     false_negative: NonNegativeInt
@@ -55,8 +54,7 @@ class FalseSameCapabilityReason(StrEnum):
     NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION = "No Cross-Root-Cause Equivalence Assertion"
 
 
-@dataclass(frozen=True)
-class AdmissionDelayDecomposition:
+class AdmissionDelayDecomposition(FrozenDomainModel):
     logical_information_arrival_cycles: NonNegativeInt
     assignment_seconds: NonNegativeFloat
     reproduce_seconds: NonNegativeFloat
@@ -111,65 +109,98 @@ class TensorPayloadMetadata(FrozenDomainModel):
     dtype: SchemaVersion = TENSOR_DTYPE
 
 
+class TensorEnvelopePayload(FrozenDomainModel):
+    metadata: TensorPayloadMetadata
+    payload: EncodedBytes
+
+
+class _CommunicationMetadataWire(FrozenDomainModel):
+    claim_contract_hash: ArtifactDigest | None
+    dataset_manifest_hash: ArtifactDigest
+    master_seed: MasterSeed
+    message_type: CommunicationMessageType
+    payload_tensor_count: NonNegativeInt
+    receiver: MessageEndpoint
+    round_index: RoundIndex | None
+    schema: SchemaVersion
+    semantic_cell_key_hash: ArtifactDigest
+    sender: MessageEndpoint
+
+
+class _TensorMetadataWire(FrozenDomainModel):
+    dtype: SchemaVersion
+    name: TensorName
+    nbytes: ByteCount
+    shape: tuple[PositiveInt, ...]
+
+
 def parameter_tensor_name(kind: TensorParameterKind, parameter_name: ParameterName) -> TensorName:
     return f"{kind.value}.{parameter_name}"
 
 
-def stable_json_bytes(payload: Mapping[str, CommunicationJsonValue]) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+def _wire_bytes(model: FrozenDomainModel) -> EncodedBytes:
+    return model.model_dump_json().encode("utf-8")
 
 
-def length_prefixed_bytes(payload: bytes, prefix_bytes: PositiveInt) -> bytes:
+def length_prefixed_bytes(payload: EncodedBytes, prefix_bytes: PositiveInt) -> EncodedBytes:
     return len(payload).to_bytes(prefix_bytes, byteorder="big", signed=False) + payload
 
 
-def encode_message_metadata(metadata: CommunicationMessageMetadata) -> bytes:
-    payload: dict[str, CommunicationJsonValue] = {
-        "schema": COMMUNICATION_SCHEMA,
-        "message_type": metadata.message_type.value,
-        "dataset_manifest_hash": metadata.dataset_manifest_hash,
-        "semantic_cell_key_hash": metadata.semantic_cell_key_hash,
-        "master_seed": metadata.master_seed,
-        "round_index": metadata.round_index,
-        "sender": metadata.sender,
-        "receiver": metadata.receiver,
-        "claim_contract_hash": metadata.claim_contract_hash,
-        "payload_tensor_count": metadata.payload_tensor_count,
-    }
-    return length_prefixed_bytes(stable_json_bytes(payload), METADATA_LENGTH_PREFIX_BYTES)
+def encode_message_metadata(metadata: CommunicationMessageMetadata) -> EncodedBytes:
+    wire = _CommunicationMetadataWire(
+        claim_contract_hash=metadata.claim_contract_hash,
+        dataset_manifest_hash=metadata.dataset_manifest_hash,
+        master_seed=metadata.master_seed,
+        message_type=metadata.message_type,
+        payload_tensor_count=metadata.payload_tensor_count,
+        receiver=metadata.receiver,
+        round_index=metadata.round_index,
+        schema=COMMUNICATION_SCHEMA,
+        semantic_cell_key_hash=metadata.semantic_cell_key_hash,
+        sender=metadata.sender,
+    )
+    return length_prefixed_bytes(_wire_bytes(wire), METADATA_LENGTH_PREFIX_BYTES)
 
 
-def encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> bytes:
-    payload: dict[str, CommunicationJsonValue] = {
-        "name": tensor_metadata.name,
-        "dtype": tensor_metadata.dtype,
-        "shape": list(tensor_metadata.shape),
-        "nbytes": tensor_metadata.nbytes,
-    }
-    return length_prefixed_bytes(stable_json_bytes(payload), TENSOR_METADATA_LENGTH_PREFIX_BYTES)
+def encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> EncodedBytes:
+    wire = _TensorMetadataWire(
+        dtype=tensor_metadata.dtype,
+        name=tensor_metadata.name,
+        nbytes=tensor_metadata.nbytes,
+        shape=tensor_metadata.shape,
+    )
+    return length_prefixed_bytes(_wire_bytes(wire), TENSOR_METADATA_LENGTH_PREFIX_BYTES)
 
 
 def encode_message_envelope(
     metadata: CommunicationMessageMetadata,
-    tensor_payloads: Mapping[TensorName, bytes],
-    tensor_metadata_by_name: Mapping[TensorName, TensorPayloadMetadata],
-) -> bytes:
+    tensor_payloads: tuple[TensorEnvelopePayload, ...],
+) -> EncodedBytes:
+    if metadata.payload_tensor_count != len(tensor_payloads):
+        raise ValueError("message metadata tensor count does not match envelope payloads")
+    ordered_payloads = tuple(sorted(tensor_payloads, key=lambda item: item.metadata.name))
+    if len(frozenset(item.metadata.name for item in ordered_payloads)) != len(ordered_payloads):
+        raise ValueError("tensor envelope payload names must be unique")
     envelope = bytearray(encode_message_metadata(metadata))
-    for tensor_name in sorted(tensor_payloads):
-        envelope += encode_tensor_metadata(tensor_metadata_by_name[tensor_name])
-        envelope += tensor_payloads[tensor_name]
+    for tensor_payload in ordered_payloads:
+        if tensor_payload.metadata.nbytes != len(tensor_payload.payload):
+            raise ValueError(
+                f"tensor payload byte count mismatch for {tensor_payload.metadata.name}"
+            )
+        envelope += encode_tensor_metadata(tensor_payload.metadata)
+        envelope += tensor_payload.payload
     return bytes(envelope)
 
 
-def is_model_transmission(metadata: CommunicationMessageMetadata) -> bool:
+def is_model_transmission(metadata: CommunicationMessageMetadata) -> BooleanValue:
     return metadata.payload_tensor_count > 0
 
 
-def communication_bytes(envelopes: Sequence[bytes]) -> ByteCount:
+def communication_bytes(envelopes: tuple[EncodedBytes, ...]) -> ByteCount:
     return sum(len(envelope) for envelope in envelopes)
 
 
 def model_transmission_count(
-    metadata_records: Sequence[CommunicationMessageMetadata],
+    metadata_records: tuple[CommunicationMessageMetadata, ...],
 ) -> ModelTransmissionCount:
     return sum(1 for metadata in metadata_records if is_model_transmission(metadata))
