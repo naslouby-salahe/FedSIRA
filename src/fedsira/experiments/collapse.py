@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from enum import StrEnum
 from pathlib import Path
 
 from fedsira.analysis.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
+    ComparisonResult,
     ComparisonState,
 )
-from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.artifacts.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
@@ -24,6 +24,7 @@ from fedsira.domain.records import (
     ArtifactDigest,
     BooleanValue,
     FrozenDomainModel,
+    MaterialThreshold,
     MetricDifference,
     MetricName,
     PValue,
@@ -99,6 +100,13 @@ class ResolvedCore(FrozenDomainModel):
         )
 
 
+class ResolvedCoreCase(FrozenDomainModel):
+    proposal_survives: BooleanValue
+    plurality_survives: BooleanValue
+    external_verification_survives: BooleanValue
+    core: ResolvedCore
+
+
 class CollapseEvaluationInput(FrozenDomainModel):
     proposal_legitimate_admission_degradation: MetricDifference | None
     proposal_malicious_admission_worsening: MetricDifference | None
@@ -167,21 +175,24 @@ def resolve_core_mapping(
     )
 
 
-def resolve_all_eight_cases() -> dict[tuple[bool, bool, bool], ResolvedCore]:
-    return {
-        (proposal, plurality, verification): resolve_core_mapping(
-            proposal, plurality, verification
+def resolve_all_eight_cases() -> tuple[ResolvedCoreCase, ...]:
+    return tuple(
+        ResolvedCoreCase(
+            proposal_survives=proposal,
+            plurality_survives=plurality,
+            external_verification_survives=verification,
+            core=resolve_core_mapping(proposal, plurality, verification),
         )
         for proposal in (True, False)
         for plurality in (True, False)
         for verification in (True, False)
-    }
+    )
 
 
 def _family_comparisons(
     family: ClaimFamily,
-    comparison_results: Sequence[ComparisonFamilyResult],
-):
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+) -> tuple[ComparisonResult, ...]:
     return tuple(
         comparison
         for result in comparison_results
@@ -192,7 +203,7 @@ def _family_comparisons(
 
 def _best_passed_metric(
     family: ClaimFamily,
-    comparison_results: Sequence[ComparisonFamilyResult],
+    comparison_results: tuple[ComparisonFamilyResult, ...],
     allowed_metrics: frozenset[ComparisonMetric],
 ) -> tuple[MetricName | None, PValue | None]:
     passed = tuple(
@@ -213,7 +224,10 @@ def _best_passed_metric(
     return selected.definition.metric.value, selected.adjusted_p_value
 
 
-def _defined_within(value: MetricDifference | None, maximum: float) -> BooleanValue:
+def _defined_within(
+    value: MetricDifference | None,
+    maximum: MaterialThreshold,
+) -> BooleanValue:
     return value is not None and value <= maximum
 
 
@@ -278,34 +292,28 @@ def _decision_kind(family: ClaimFamily) -> CollapseDecisionKind:
 def _positive_metrics(family: ClaimFamily) -> frozenset[ComparisonMetric]:
     if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
         return frozenset(
-            {
+            (
                 ComparisonMetric.FALSE_LAUNCH,
                 ComparisonMetric.REPRODUCTION_ATTEMPTS,
                 ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            }
+            )
         )
     if family is ClaimFamily.PLURALITY_NECESSITY:
         return frozenset(
-            {
-                ComparisonMetric.MALICIOUS_ADMISSION,
-                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            }
+            (ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1)
         )
     if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
-        return frozenset({ComparisonMetric.ATTACK_SUCCESS_RATE})
+        return frozenset((ComparisonMetric.ATTACK_SUCCESS_RATE,))
     if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
         return frozenset(
-            {
-                ComparisonMetric.MALICIOUS_ADMISSION,
-                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            }
+            (ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1)
         )
     raise ValueError(f"{family.value} is not a collapse family")
 
 
 def collapse_decision_from_comparison_families(
     family: ClaimFamily,
-    comparison_results: Sequence[ComparisonFamilyResult],
+    comparison_results: tuple[ComparisonFamilyResult, ...],
     evaluation: CollapseEvaluationInput | None,
     materiality_config: MaterialityConfig | None,
 ) -> CollapseDecision:
@@ -334,30 +342,55 @@ def collapse_decision_from_comparison_families(
     )
 
 
-def materialize_resolved_core(decisions: Sequence[CollapseDecision]) -> ResolvedCore:
-    by_kind = {decision.kind: decision for decision in decisions}
-    proposal = by_kind[CollapseDecisionKind.PROPOSAL_ASSISTANCE]
-    plurality = by_kind[CollapseDecisionKind.PLURALITY]
-    source_exclusion = by_kind[CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION]
-    verification = by_kind[CollapseDecisionKind.EXTERNAL_VERIFICATION]
-    core = resolve_core_mapping(
+def _decision_for_kind(
+    decisions: tuple[CollapseDecision, ...],
+    kind: CollapseDecisionKind,
+) -> CollapseDecision:
+    matching = tuple(decision for decision in decisions if decision.kind is kind)
+    if len(matching) != 1:
+        raise ValueError(f"expected exactly one collapse decision for {kind.value}")
+    return matching[0]
+
+
+def materialize_resolved_core(
+    decisions: tuple[CollapseDecision, ...],
+) -> ResolvedCore:
+    proposal = _decision_for_kind(decisions, CollapseDecisionKind.PROPOSAL_ASSISTANCE)
+    plurality = _decision_for_kind(decisions, CollapseDecisionKind.PLURALITY)
+    source_exclusion = _decision_for_kind(decisions, CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION)
+    verification = _decision_for_kind(decisions, CollapseDecisionKind.EXTERNAL_VERIFICATION)
+    mapped = resolve_core_mapping(
         proposal.survives,
         plurality.survives,
         verification.survives,
     )
-    expected = resolve_all_eight_cases()[
-        (proposal.survives, plurality.survives, verification.survives)
-    ]
-    if expected.decision_identity != core.decision_identity:
+    expected = next(
+        case.core
+        for case in resolve_all_eight_cases()
+        if case.proposal_survives == proposal.survives
+        and case.plurality_survives == plurality.survives
+        and case.external_verification_survives == verification.survives
+    )
+    if expected.decision_identity != mapped.decision_identity:
         raise ValueError("resolved-core mapping deviates from the fixed Section 18.7 table")
-    return core.model_copy(
-        update={"direct_source_exclusion_survives": source_exclusion.survives}
+    return ResolvedCore(
+        proposal_assistance_survives=mapped.proposal_assistance_survives,
+        plurality_survives=mapped.plurality_survives,
+        direct_source_exclusion_survives=source_exclusion.survives,
+        external_verification_survives=mapped.external_verification_survives,
+        opening_mode=mapped.opening_mode,
+        reproduction_row_requirement=mapped.reproduction_row_requirement,
+        row_verification_mode=mapped.row_verification_mode,
+        production_update_rule=mapped.production_update_rule,
+        final_gate_required=mapped.final_gate_required,
+        source_excluded=mapped.source_excluded,
     )
 
 
 RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
+RESOLVED_CORE_IDENTITY_PAYLOAD: ArtifactPayloadBytes = b"RESOLVED_FEDSIRA_CORE_SECTION_18_7"
 RESOLVED_CORE_ARTIFACT_IDENTITY: ArtifactDigest = compute_checksum(
-    b"RESOLVED_FEDSIRA_CORE_SECTION_18_7"
+    RESOLVED_CORE_IDENTITY_PAYLOAD
 )
 
 
@@ -365,7 +398,7 @@ def publish_resolved_core(
     published_directory: Path,
     core: ResolvedCore,
 ) -> ArtifactManifest:
-    payload = core.model_dump_json().encode("utf-8")
+    payload: ArtifactPayloadBytes = core.model_dump_json().encode("utf-8")
     staged_manifest = ArtifactManifest(
         family=RESOLVED_CORE_ARTIFACT_FAMILY,
         identity=RESOLVED_CORE_ARTIFACT_IDENTITY,
