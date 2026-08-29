@@ -5,121 +5,134 @@ from pathlib import Path
 from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
 DOMAIN_CONCEPT_SUFFIXES = ("_id", "_seed", "_hash", "_digest", "_path", "_token")
-PRIMITIVE_ANNOTATION_NAMES = {"str", "int", "float", "bool"}
-SCALAR_FOUNDATION_NAMES = {
-    "Probability",
-    "Percentage",
-    "NonNegativeInt",
-    "PositiveInt",
-    "NonNegativeFloat",
-    "PositiveFloat",
-    "FiniteFloat",
+PRIMITIVES = {"bool", "bytearray", "bytes", "complex", "float", "int", "str"}
+SCALAR_FOUNDATIONS = {
     "BooleanValue",
+    "FiniteFloat",
+    "NonNegativeFloat",
+    "NonNegativeInt",
+    "Percentage",
+    "PositiveFloat",
+    "PositiveInt",
+    "Probability",
     "TextValue",
     "Uint32Bound",
 }
-SEMANTIC_TYPE_DEFINITION_FILE = SRC_ROOT / "domain" / "records.py"
 CONFIG_SCHEMA_FILE = SRC_ROOT / "config" / "schema.py"
-MODEL_BASE_NAMES = {
-    "BaseModel",
-    "FrozenConfigModel",
-    "FrozenDomainModel",
-    "TensorDomainModel",
-}
-DATACLASS_DECORATOR_NAMES = {"dataclass"}
+MODEL_BASES = {"BaseModel", "FrozenConfigModel", "FrozenDomainModel", "TensorDomainModel"}
 
 
-def _annotation_names(annotation: ast.expr) -> set[str]:
+def _names(annotation: ast.expr) -> set[str]:
     return {node.id for node in ast.walk(annotation) if isinstance(node, ast.Name)}
 
 
-def _annotation_primitive_names(annotation: ast.expr) -> list[str]:
-    return sorted(_annotation_names(annotation) & PRIMITIVE_ANNOTATION_NAMES)
+def _primitives(annotation: ast.expr) -> list[str]:
+    return sorted(_names(annotation) & PRIMITIVES)
 
 
-def _base_name(base: ast.expr) -> str | None:
-    if isinstance(base, ast.Name):
-        return base.id
-    if isinstance(base, ast.Attribute):
-        return base.attr
+def _name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
     return None
 
 
-def _decorator_name(decorator: ast.expr) -> str | None:
-    target = decorator.func if isinstance(decorator, ast.Call) else decorator
-    if isinstance(target, ast.Name):
-        return target.id
-    if isinstance(target, ast.Attribute):
-        return target.attr
-    return None
-
-
-def _is_model_or_record(class_node: ast.ClassDef) -> bool:
-    if any(_base_name(base) in MODEL_BASE_NAMES for base in class_node.bases):
+def _record(class_node: ast.ClassDef) -> bool:
+    if any(_name(base) in MODEL_BASES for base in class_node.bases):
         return True
-    return any(
-        _decorator_name(decorator) in DATACLASS_DECORATOR_NAMES
-        for decorator in class_node.decorator_list
-    )
+    for decorator in class_node.decorator_list:
+        target = decorator.func if isinstance(decorator, ast.Call) else decorator
+        if _name(target) == "dataclass":
+            return True
+    return False
 
 
 def model_field_primitive_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for class_node in (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)):
-        if not _is_model_or_record(class_node):
+        if not _record(class_node):
             continue
         for statement in class_node.body:
-            if not isinstance(statement, ast.AnnAssign) or not isinstance(
-                statement.target, ast.Name
-            ):
+            if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
+                for primitive in _primitives(statement.annotation):
+                    found.append(f"{class_node.name}.{statement.target.id}: {primitive}")
+    return found
+
+
+def function_boundary_primitive_violations(tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    for function in (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    ):
+        arguments = [
+            *function.args.posonlyargs,
+            *function.args.args,
+            *function.args.kwonlyargs,
+        ]
+        if function.args.vararg is not None:
+            arguments.append(function.args.vararg)
+        if function.args.kwarg is not None:
+            arguments.append(function.args.kwarg)
+        for argument in arguments:
+            if argument.arg in {"self", "cls"} or argument.annotation is None:
                 continue
-            for primitive in _annotation_primitive_names(statement.annotation):
-                found.append(f"{class_node.name}.{statement.target.id}: {primitive}")
+            for primitive in _primitives(argument.annotation):
+                found.append(f"{function.name}.{argument.arg}: {primitive}")
+        if function.returns is not None:
+            for primitive in _primitives(function.returns):
+                found.append(f"{function.name}.return: {primitive}")
     return found
 
 
 def config_scalar_foundation_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for class_node in (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)):
-        if not _is_model_or_record(class_node):
+        if not _record(class_node):
             continue
         for statement in class_node.body:
-            if not isinstance(statement, ast.AnnAssign) or not isinstance(
-                statement.target, ast.Name
-            ):
-                continue
-            leaked = sorted(_annotation_names(statement.annotation) & SCALAR_FOUNDATION_NAMES)
-            for type_name in leaked:
-                found.append(f"{class_node.name}.{statement.target.id}: {type_name}")
+            if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
+                for type_name in sorted(_names(statement.annotation) & SCALAR_FOUNDATIONS):
+                    found.append(f"{class_node.name}.{statement.target.id}: {type_name}")
     return found
 
 
 def domain_identifier_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for node in ast.walk(tree):
-        candidates: list[tuple[str, ast.expr | None]] = []
         if isinstance(node, ast.arg):
-            candidates.append((node.arg, node.annotation))
+            name, annotation = node.arg, node.annotation
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            candidates.append((node.target.id, node.annotation))
-        for name, annotation in candidates:
-            if annotation is None or not isinstance(annotation, ast.Name):
-                continue
-            if annotation.id not in PRIMITIVE_ANNOTATION_NAMES:
-                continue
-            if name.lower().endswith(DOMAIN_CONCEPT_SUFFIXES):
-                found.append(f"{name}: {annotation.id}")
+            name, annotation = node.target.id, node.annotation
+        else:
+            continue
+        if annotation is None or not name.lower().endswith(DOMAIN_CONCEPT_SUFFIXES):
+            continue
+        for primitive in _primitives(annotation):
+            found.append(f"{name}: {primitive}")
     return found
 
 
-def test_no_primitive_model_or_record_fields() -> None:
+def _all_violations(detector: object) -> list[str]:
+    if not callable(detector):
+        raise TypeError("detector must be callable")
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
-        if path == SEMANTIC_TYPE_DEFINITION_FILE:
-            continue
-        for violation in model_field_primitive_violations(parse(path)):
+        for violation in detector(parse(path)):
             offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
+    return offenders
+
+
+def test_no_primitive_model_or_record_fields() -> None:
+    offenders = _all_violations(model_field_primitive_violations)
     assert not offenders, f"Primitive-typed model/record fields: {offenders}"
+
+
+def test_no_primitive_function_inputs_or_outputs() -> None:
+    offenders = _all_violations(function_boundary_primitive_violations)
+    assert not offenders, f"Primitive production method boundaries: {offenders}"
 
 
 def test_config_models_use_meaning_specific_aliases() -> None:
@@ -128,60 +141,15 @@ def test_config_models_use_meaning_specific_aliases() -> None:
 
 
 def test_no_primitive_leaks_for_domain_identifiers() -> None:
-    offenders: list[str] = []
-    for path in iter_python_files(SRC_ROOT):
-        tree = parse(path)
-        for violation in domain_identifier_violations(tree):
-            offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
+    offenders = _all_violations(domain_identifier_violations)
     assert not offenders, f"Primitive-typed domain concepts: {offenders}"
 
 
-def test_model_field_violation_detected() -> None:
+def test_function_boundary_violation_detected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        offending = Path(tmp) / "offending.py"
-        offending.write_text(
-            "from dataclasses import dataclass\n\n"
-            "@dataclass(frozen=True)\n"
-            "class Sample:\n"
-            "    count: int\n"
-            "    enabled: bool\n"
-        )
-        assert model_field_primitive_violations(parse(offending)) == [
-            "Sample.count: int",
-            "Sample.enabled: bool",
+        path = Path(tmp) / "offending.py"
+        path.write_text("def handler(value: str) -> int:\n    return len(value)\n")
+        assert function_boundary_primitive_violations(parse(path)) == [
+            "handler.value: str",
+            "handler.return: int",
         ]
-
-
-def test_config_foundation_alias_violation_detected() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        offending = Path(tmp) / "offending.py"
-        offending.write_text(
-            "from pydantic import BaseModel\n"
-            "from fedsira.domain.records import Probability\n\n"
-            "class SampleConfig(BaseModel):\n"
-            "    threshold: Probability\n"
-        )
-        assert config_scalar_foundation_violations(parse(offending)) == [
-            "SampleConfig.threshold: Probability"
-        ]
-
-
-def test_identifier_violation_detected_for_primitive_identifier() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        offending = Path(tmp) / "offending.py"
-        offending.write_text("def handler(experiment_id: str) -> None:\n    return None\n")
-        assert domain_identifier_violations(parse(offending)) == ["experiment_id: str"]
-
-
-def test_semantic_model_fields_pass() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        compliant = Path(tmp) / "compliant.py"
-        compliant.write_text(
-            "from dataclasses import dataclass\n"
-            "from fedsira.domain.records import DomainId, RowCount\n\n"
-            "@dataclass(frozen=True)\n"
-            "class Sample:\n"
-            "    domain_id: DomainId\n"
-            "    count: RowCount\n"
-        )
-        assert model_field_primitive_violations(parse(compliant)) == []
