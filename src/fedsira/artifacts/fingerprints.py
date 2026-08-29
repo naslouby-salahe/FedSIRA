@@ -10,108 +10,138 @@ from fedsira.domain.enums import DatasetId, ProducerFingerprintFamily
 from fedsira.domain.records import (
     ArtifactDigest,
     AstDumpText,
+    BooleanValue,
     DependencyImportName,
     FingerprintPayload,
+    FrozenDomainModel,
     ModuleName,
     SchemaVersion,
 )
 from fedsira.runtime.determinism import framed_bytes
 
-IMPORT_NAME_TO_DISTRIBUTION_NAME: dict[DependencyImportName, DependencyImportName] = {
-    "sklearn": "scikit-learn",
-    "yaml": "pyyaml",
-}
 
-DATASET_PACKAGE_NAME: dict[DatasetId, ModuleName] = {
-    DatasetId.N_BAIOT: "nbaiot",
-    DatasetId.CICIOT2023: "ciciot2023",
-}
-
-PRODUCER_ENTRY_MODULES: dict[ProducerFingerprintFamily, tuple[ModuleName, ...]] = {
-    ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER: (
-        "fedsira.datasets.roles",
-        "fedsira.datasets.sampling",
-        "fedsira.datasets.scaling",
-    ),
-    ProducerFingerprintFamily.ANCHOR_FEDAVG_CHECKPOINTS: (
-        "fedsira.models.mlp",
-        "fedsira.learning.training",
-        "fedsira.learning.federated",
-        "fedsira.learning.anchor",
-        "fedsira.runtime.determinism",
-    ),
-    ProducerFingerprintFamily.SOURCE_REPRODUCTION_CHECKPOINTS: (
-        "fedsira.models.mlp",
-        "fedsira.learning.training",
-        "fedsira.learning.post_reference",
-        "fedsira.runtime.determinism",
-    ),
-    ProducerFingerprintFamily.BASELINE_CHECKPOINT_CALIBRATION: (
-        "fedsira.baselines.registry",
-        "fedsira.runtime.determinism",
-    ),
-    ProducerFingerprintFamily.MODEL_SCORES: (
-        "fedsira.models.mlp",
-        "fedsira.learning.scoring",
-    ),
-    ProducerFingerprintFamily.OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE: (
-        "fedsira.evaluation.metrics",
-        "fedsira.learning.aggregation",
-    ),
-    ProducerFingerprintFamily.BOUNDARY_TRANSFORMATION: ("fedsira.datasets.sampling",),
-    ProducerFingerprintFamily.METRIC_ARTIFACT: (
-        "fedsira.evaluation.metrics",
-        "fedsira.evaluation.aggregation",
-        "fedsira.evaluation.validation",
-    ),
-    ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT: (
-        "fedsira.analysis.statistics",
-        "fedsira.analysis.comparisons",
-    ),
-    ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT: (
-        "fedsira.analysis.claims",
-        "fedsira.analysis.comparisons",
-    ),
-    ProducerFingerprintFamily.REPORT_SOURCE_EXPORT: ("fedsira.reporting",),
-}
-
-PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES: dict[
-    ProducerFingerprintFamily, tuple[DependencyImportName, ...]
-] = {
-    ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST: ("pandas", "numpy"),
-    ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER: (
-        "pandas",
-        "numpy",
-        "pyarrow",
-    ),
-    ProducerFingerprintFamily.ANCHOR_FEDAVG_CHECKPOINTS: ("torch", "numpy"),
-    ProducerFingerprintFamily.SOURCE_REPRODUCTION_CHECKPOINTS: ("torch", "numpy"),
-    ProducerFingerprintFamily.BASELINE_CHECKPOINT_CALIBRATION: (
-        "torch",
-        "numpy",
-        "scipy",
-        "sklearn",
-    ),
-    ProducerFingerprintFamily.MODEL_SCORES: ("torch", "numpy"),
-    ProducerFingerprintFamily.OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE: (
-        "numpy",
-        "scipy",
-        "sklearn",
-    ),
-    ProducerFingerprintFamily.BOUNDARY_TRANSFORMATION: ("numpy", "pandas", "pyarrow"),
-    ProducerFingerprintFamily.METRIC_ARTIFACT: ("numpy", "sklearn"),
-    ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT: (
-        "numpy",
-        "scipy",
-        "statsmodels",
-    ),
-    ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT: ("numpy",),
-    ProducerFingerprintFamily.REPORT_SOURCE_EXPORT: ("pandas", "pyarrow", "matplotlib"),
-}
+class DependencyDistributionBinding(FrozenDomainModel):
+    import_name: DependencyImportName
+    distribution_name: DependencyImportName
 
 
-def raw_schema_exclusion_manifest_entry_modules(dataset: DatasetId) -> tuple[ModuleName, ...]:
-    package = DATASET_PACKAGE_NAME[dataset]
+class ProducerFingerprintSpecification(FrozenDomainModel):
+    family: ProducerFingerprintFamily
+    entry_modules: tuple[ModuleName, ...]
+    relevant_external_import_names: tuple[DependencyImportName, ...]
+
+
+class ProducerModuleSource(FrozenDomainModel):
+    module: ModuleName
+    path: Path
+
+
+DEPENDENCY_DISTRIBUTION_BINDINGS: tuple[DependencyDistributionBinding, ...] = (
+    DependencyDistributionBinding(import_name="sklearn", distribution_name="scikit-learn"),
+    DependencyDistributionBinding(import_name="yaml", distribution_name="pyyaml"),
+)
+
+PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...] = (
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST,
+        entry_modules=(),
+        relevant_external_import_names=("pandas", "numpy"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER,
+        entry_modules=(
+            "fedsira.datasets.roles",
+            "fedsira.datasets.sampling",
+            "fedsira.datasets.scaling",
+        ),
+        relevant_external_import_names=("pandas", "numpy", "pyarrow"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.ANCHOR_FEDAVG_CHECKPOINTS,
+        entry_modules=(
+            "fedsira.models.mlp",
+            "fedsira.learning.training",
+            "fedsira.learning.federated",
+            "fedsira.learning.anchor",
+            "fedsira.runtime.determinism",
+        ),
+        relevant_external_import_names=("torch", "numpy"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.SOURCE_REPRODUCTION_CHECKPOINTS,
+        entry_modules=(
+            "fedsira.models.mlp",
+            "fedsira.learning.training",
+            "fedsira.learning.post_reference",
+            "fedsira.runtime.determinism",
+        ),
+        relevant_external_import_names=("torch", "numpy"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.BASELINE_CHECKPOINT_CALIBRATION,
+        entry_modules=("fedsira.baselines.registry", "fedsira.runtime.determinism"),
+        relevant_external_import_names=("torch", "numpy", "scipy", "sklearn"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.MODEL_SCORES,
+        entry_modules=("fedsira.models.mlp", "fedsira.learning.scoring"),
+        relevant_external_import_names=("torch", "numpy"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE,
+        entry_modules=("fedsira.evaluation.metrics", "fedsira.learning.aggregation"),
+        relevant_external_import_names=("numpy", "scipy", "sklearn"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.BOUNDARY_TRANSFORMATION,
+        entry_modules=("fedsira.datasets.sampling",),
+        relevant_external_import_names=("numpy", "pandas", "pyarrow"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.METRIC_ARTIFACT,
+        entry_modules=(
+            "fedsira.evaluation.metrics",
+            "fedsira.evaluation.aggregation",
+            "fedsira.evaluation.validation",
+        ),
+        relevant_external_import_names=("numpy", "sklearn"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT,
+        entry_modules=("fedsira.analysis.statistics", "fedsira.analysis.comparisons"),
+        relevant_external_import_names=("numpy", "scipy", "statsmodels"),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT,
+        entry_modules=("fedsira.analysis.claims", "fedsira.analysis.comparisons"),
+        relevant_external_import_names=("numpy",),
+    ),
+    ProducerFingerprintSpecification(
+        family=ProducerFingerprintFamily.REPORT_SOURCE_EXPORT,
+        entry_modules=("fedsira.reporting",),
+        relevant_external_import_names=("pandas", "pyarrow", "matplotlib"),
+    ),
+)
+
+
+def producer_fingerprint_specification(
+    family: ProducerFingerprintFamily,
+) -> ProducerFingerprintSpecification:
+    for specification in PRODUCER_FINGERPRINT_SPECIFICATIONS:
+        if specification.family is family:
+            return specification
+    raise ValueError(f"unsupported producer fingerprint family: {family}")
+
+
+def raw_schema_exclusion_manifest_entry_modules(
+    dataset: DatasetId,
+) -> tuple[ModuleName, ...]:
+    if dataset is DatasetId.N_BAIOT:
+        package: ModuleName = "nbaiot"
+    elif dataset is DatasetId.CICIOT2023:
+        package = "ciciot2023"
+    else:
+        raise ValueError(f"unsupported dataset identity: {dataset}")
     return (
         f"fedsira.datasets.{package}.acquisition",
         f"fedsira.datasets.{package}.schema",
@@ -158,28 +188,27 @@ def _try_module_file_path(dotted_name: ModuleName) -> Path | None:
     return Path(spec.origin)
 
 
-def _is_type_checking_test(test: ast.expr) -> bool:
+def _is_type_checking_test(test: ast.expr) -> BooleanValue:
     if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
         return True
     return isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
 
 
-def _type_checking_guarded_node_ids(tree: ast.Module) -> set[int]:
-    guarded: set[int] = set()
+def _type_checking_guarded_nodes(tree: ast.Module) -> set[ast.AST]:
+    guarded: set[ast.AST] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.If) and _is_type_checking_test(node.test):
             for statement in node.body:
-                for descendant in ast.walk(statement):
-                    guarded.add(id(descendant))
+                guarded.update(ast.walk(statement))
     return guarded
 
 
 def _imported_fedsira_modules(tree: ast.Module) -> tuple[set[ModuleName], set[ModuleName]]:
-    guarded_ids = _type_checking_guarded_node_ids(tree)
+    guarded_nodes = _type_checking_guarded_nodes(tree)
     certain: set[ModuleName] = set()
     speculative: set[ModuleName] = set()
     for node in ast.walk(tree):
-        if id(node) in guarded_ids:
+        if node in guarded_nodes:
             continue
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -196,7 +225,7 @@ def _imported_fedsira_modules(tree: ast.Module) -> tuple[set[ModuleName], set[Mo
     return certain, speculative
 
 
-def _has_dynamic_import(tree: ast.Module) -> bool:
+def _has_dynamic_import(tree: ast.Module) -> BooleanValue:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -210,26 +239,28 @@ def _has_dynamic_import(tree: ast.Module) -> bool:
 
 def resolve_producer_import_closure(
     entry_modules: tuple[ModuleName, ...],
-) -> dict[ModuleName, Path]:
-    resolved: dict[ModuleName, Path] = {}
+) -> tuple[ProducerModuleSource, ...]:
+    resolved_names: set[ModuleName] = set()
+    resolved_sources: list[ProducerModuleSource] = []
     frontier = list(entry_modules)
     while frontier:
         dotted = frontier.pop()
-        if dotted in resolved:
+        if dotted in resolved_names:
             continue
         path = _module_file_path(dotted)
-        resolved[dotted] = path
+        resolved_names.add(dotted)
+        resolved_sources.append(ProducerModuleSource(module=dotted, path=path))
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         certain, speculative = _imported_fedsira_modules(tree)
-        frontier.extend(certain - resolved.keys())
-        for candidate in speculative - resolved.keys():
+        frontier.extend(certain - resolved_names)
+        for candidate in speculative - resolved_names:
             candidate_path = _try_module_file_path(candidate)
             if candidate_path is not None:
                 frontier.append(candidate)
-    return resolved
+    return tuple(sorted(resolved_sources, key=lambda source: source.module))
 
 
-def _is_dunder_assignment(node: ast.stmt) -> bool:
+def _is_dunder_assignment(node: ast.stmt) -> BooleanValue:
     if not isinstance(node, ast.Assign):
         return False
     return all(
@@ -237,7 +268,7 @@ def _is_dunder_assignment(node: ast.stmt) -> bool:
     )
 
 
-def _is_module_docstring_expression(node: ast.stmt) -> bool:
+def _is_module_docstring_expression(node: ast.stmt) -> BooleanValue:
     return (
         isinstance(node, ast.Expr)
         and isinstance(node.value, ast.Constant)
@@ -245,7 +276,7 @@ def _is_module_docstring_expression(node: ast.stmt) -> bool:
     )
 
 
-def _is_trivial_init_module(tree: ast.Module) -> bool:
+def _is_trivial_init_module(tree: ast.Module) -> BooleanValue:
     for node in tree.body:
         if isinstance(node, ast.Import | ast.ImportFrom):
             continue
@@ -270,23 +301,29 @@ def _strip_docstrings(tree: ast.Module) -> None:
 
 
 def compute_producer_component_fingerprint(
-    entry_modules: tuple[ModuleName, ...], schema_version: SchemaVersion
+    entry_modules: tuple[ModuleName, ...],
+    schema_version: SchemaVersion,
 ) -> ArtifactDigest:
     closure = resolve_producer_import_closure(entry_modules)
     normalized_pairs: list[tuple[ModuleName, AstDumpText]] = []
-    for dotted, path in sorted(closure.items()):
-        source = path.read_text(encoding="utf-8")
+    for source in closure:
+        source_text = source.path.read_text(encoding="utf-8")
         try:
-            tree = ast.parse(source, filename=str(path))
+            tree = ast.parse(source_text, filename=str(source.path))
         except SyntaxError as error:
-            raise ValueError(f"producer source {dotted} is syntactically invalid") from error
+            raise ValueError(
+                f"producer source {source.module} is syntactically invalid"
+            ) from error
         if _has_dynamic_import(tree):
-            raise ValueError(f"producer source {dotted} uses forbidden dynamic imports")
-        if path.name == "__init__.py" and _is_trivial_init_module(tree):
+            raise ValueError(f"producer source {source.module} uses forbidden dynamic imports")
+        if source.path.name == "__init__.py" and _is_trivial_init_module(tree):
             continue
         _strip_docstrings(tree)
         normalized_pairs.append(
-            (dotted, ast.dump(tree, annotate_fields=True, include_attributes=False))
+            (
+                source.module,
+                ast.dump(tree, annotate_fields=True, include_attributes=False),
+            )
         )
     hasher = hashlib.sha256()
     for dotted, normalized_dump in normalized_pairs:
@@ -322,20 +359,29 @@ def compute_cuda_environment_fingerprint() -> ArtifactDigest:
     ).hexdigest()
 
 
+def _distribution_name(import_name: DependencyImportName) -> DependencyImportName:
+    for binding in DEPENDENCY_DISTRIBUTION_BINDINGS:
+        if binding.import_name == import_name:
+            return binding.distribution_name
+    return import_name
+
+
 def compute_external_dependency_fingerprint(
     entry_modules: tuple[ModuleName, ...],
     relevant_import_names: tuple[DependencyImportName, ...],
 ) -> ArtifactDigest:
     closure = resolve_producer_import_closure(entry_modules)
     imported_packages: set[DependencyImportName] = set()
-    for path in closure.values():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for source in closure:
+        tree = ast.parse(
+            source.path.read_text(encoding="utf-8"),
+            filename=str(source.path),
+        )
         imported_packages |= _imported_top_level_packages(tree)
     actually_relevant = sorted(set(relevant_import_names) & imported_packages)
     hasher = hashlib.sha256()
     for import_name in actually_relevant:
-        distribution_name = IMPORT_NAME_TO_DISTRIBUTION_NAME.get(import_name, import_name)
-        version = importlib.metadata.version(distribution_name)
+        version = importlib.metadata.version(_distribution_name(import_name))
         hasher.update(framed_bytes(import_name, version))
     if "torch" in actually_relevant:
         hasher.update(framed_bytes(compute_cuda_environment_fingerprint()))
