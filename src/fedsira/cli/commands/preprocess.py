@@ -1,8 +1,8 @@
 from fedsira.artifacts.fingerprints import (
-    PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES,
     compute_artifact_dependency_fingerprint,
     compute_external_dependency_fingerprint,
     compute_producer_component_fingerprint,
+    producer_fingerprint_specification,
     raw_schema_exclusion_manifest_entry_modules,
 )
 from fedsira.artifacts.paths import (
@@ -75,15 +75,16 @@ def _publish_or_reuse_dataset_manifest(
     payload: DatasetManifestPayload,
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
+    specification = producer_fingerprint_specification(
+        ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
+    )
     producer_fingerprint = compute_producer_component_fingerprint(
         entry_modules,
         schema_version=DATASET_MANIFEST_SCHEMA_VERSION,
     )
     external_fingerprint = compute_external_dependency_fingerprint(
         entry_modules,
-        PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES[
-            ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
-        ],
+        specification.relevant_external_import_names,
     )
     fingerprint_payload: FingerprintPayload = dataset.value
     identity: ArtifactDigest = compute_artifact_dependency_fingerprint(
