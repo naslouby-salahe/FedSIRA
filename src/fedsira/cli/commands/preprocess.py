@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from fedsira.artifacts.fingerprints import (
     PRODUCER_RELEVANT_EXTERNAL_IMPORT_NAMES,
     compute_artifact_dependency_fingerprint,
@@ -59,9 +57,15 @@ from fedsira.domain.enums import (
 from fedsira.domain.records import (
     ArtifactDigest,
     ArtifactReuseDecision,
+    DatasetClassToken,
     DatasetManifestDigest,
+    FingerprintPayload,
     OverwriteExisting,
+    Probability,
+    SchemaVersion,
 )
+
+DATASET_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
 
 
 def _publish_or_reuse_dataset_manifest(
@@ -73,7 +77,7 @@ def _publish_or_reuse_dataset_manifest(
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
     producer_fingerprint = compute_producer_component_fingerprint(
         entry_modules,
-        schema_version="1",
+        schema_version=DATASET_MANIFEST_SCHEMA_VERSION,
     )
     external_fingerprint = compute_external_dependency_fingerprint(
         entry_modules,
@@ -81,11 +85,12 @@ def _publish_or_reuse_dataset_manifest(
             ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
         ],
     )
+    fingerprint_payload: FingerprintPayload = dataset.value
     identity: ArtifactDigest = compute_artifact_dependency_fingerprint(
-        schema_version="1",
-        scientific_configuration_subset=dataset.value,
+        schema_version=DATASET_MANIFEST_SCHEMA_VERSION,
+        scientific_configuration_subset=fingerprint_payload,
         dataset_split_view_identities=dataset_split_view_identities,
-        semantic_coordinates_and_seed_namespaces=dataset.value,
+        semantic_coordinates_and_seed_namespaces=fingerprint_payload,
         upstream_artifact_identities=(),
         producer_component_fingerprint=producer_fingerprint,
         external_dependency_fingerprint=external_fingerprint,
@@ -97,7 +102,8 @@ def _publish_or_reuse_dataset_manifest(
     if is_artifact_complete_and_valid(published_directory, identity):
         reused_manifest = read_published_manifest(published_directory, identity)
         if reused_manifest is not None:
-            return reused_manifest, True
+            reused: ArtifactReuseDecision = True
+            return reused_manifest, reused
 
     payload_bytes = payload.model_dump_json().encode("utf-8")
     staged_manifest = ArtifactManifest(
@@ -120,7 +126,8 @@ def _publish_or_reuse_dataset_manifest(
         staged_manifest,
         payload_bytes,
     )
-    return published, False
+    reused: ArtifactReuseDecision = False
+    return published, reused
 
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
@@ -144,7 +151,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         ),
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
-    unavailable_classes = tuple(
+    unavailable_classes: tuple[DatasetClassToken, ...] = tuple(
         class_id.value for class_id in classes_structurally_unavailable(discovered)
     )
     reference_file = discovered[0]
@@ -174,9 +181,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         scaler_root,
         overwrite,
     )
-    role_counts: dict[str, int] = {}
-    for view in views:
-        role_counts[view.role.value] = role_counts.get(view.role.value, 0) + view.row_count
     print(
         "N-BaIoT preprocessing complete: "
         f"dataset_file_manifest_hash={manifest_hash}, "
@@ -185,7 +189,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         f"scaler_training_rows={moments.training_row_count}, "
         f"dataset_manifest_reused={reused}"
     )
-    print(f"role row totals: {role_counts}")
 
 
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
@@ -234,14 +237,11 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
             pseudo_domain_count=PSEUDO_DOMAIN_COUNT,
         ),
     )
-    exclusion_rate = (
+    exclusion_rate: Probability = (
         summary.excluded_row_count / summary.raw_row_count
         if summary.raw_row_count
         else 0.0
     )
-    role_counts: dict[str, int] = {}
-    for view in summary.views:
-        role_counts[view.role.value] = role_counts.get(view.role.value, 0) + view.row_count
     print(
         "CICIoT2023 preprocessing complete: "
         f"dataset_file_manifest_hash={summary.dataset_manifest_hash}, "
@@ -256,7 +256,6 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         f"scaler_training_rows={summary.scaler.training_row_count}, "
         f"dataset_manifest_reused={reused}"
     )
-    print(f"role row totals: {role_counts}")
 
 
 def execute(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
