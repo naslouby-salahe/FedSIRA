@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from typing import Self
 
 from pydantic import model_validator
@@ -41,19 +42,27 @@ class FeatureMoments(FrozenDomainModel):
 
 def accumulate_feature_statistics(
     feature_names: tuple[FeatureName, ...],
-    feature_matrix: FeatureMatrix,
+    feature_rows: Iterable[FeatureVector],
     existing: tuple[FeatureStatistic, ...] | None = None,
 ) -> tuple[FeatureStatistic, ...]:
     if existing is not None and len(existing) != len(feature_names):
         raise ValueError("existing statistics must match feature count")
-    counts = [statistic.count for statistic in existing] if existing is not None else [0] * len(feature_names)
-    sums = [statistic.total for statistic in existing] if existing is not None else [0.0] * len(feature_names)
+    counts = (
+        [statistic.count for statistic in existing]
+        if existing is not None
+        else [0] * len(feature_names)
+    )
+    sums = (
+        [statistic.total for statistic in existing]
+        if existing is not None
+        else [0.0] * len(feature_names)
+    )
     sum_of_squares = (
         [statistic.total_squared for statistic in existing]
         if existing is not None
         else [0.0] * len(feature_names)
     )
-    for row in feature_matrix:
+    for row in feature_rows:
         if len(row) != len(feature_names):
             raise ValueError("feature row width does not match feature schema")
         for column_index, numeric_value in enumerate(row):
