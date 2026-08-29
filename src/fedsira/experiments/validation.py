@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from fedsira.analysis.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
@@ -20,8 +19,9 @@ from fedsira.domain.records import (
     BooleanValue,
     ExperimentName,
     FrozenDomainModel,
-    ScientificCellSemanticKey,
+    ScenarioName,
     SchemaVersion,
+    ScientificCellSemanticKey,
     TextValue,
 )
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
@@ -43,50 +43,26 @@ from fedsira.protocol.verification import verifier_is_eligible
 
 SmokeCheckName = TextValue
 SmokeCheckDetail = TextValue
+SmokeRenderText = TextValue
 SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|1"
 
 _DANMINI = NBaiotDomain.DANMINI_DOORBELL
 _ENNIO = NBaiotDomain.ENNIO_DOORBELL
 
 REQUIRED_CELL_PHASES: frozenset[ScientificCellPhase] = frozenset(
-    {
+    (
         ScientificCellPhase.PREPARE,
         ScientificCellPhase.TRAIN,
         ScientificCellPhase.SCORE,
         ScientificCellPhase.PROTOCOL_EVALUATION,
         ScientificCellPhase.METRIC_AGGREGATION,
         ScientificCellPhase.STATISTICAL_ANALYSIS,
-    }
+    )
 )
 
 TERMINAL_CELL_STATES: frozenset[CellPhaseState] = frozenset(
-    {CellPhaseState.COMPLETED, CellPhaseState.FAILED, CellPhaseState.INVALID}
+    (CellPhaseState.COMPLETED, CellPhaseState.FAILED, CellPhaseState.INVALID)
 )
-
-_EPISTEMIC_STRENGTHS: dict[EpistemicFailureType, tuple[str, ...]] = {
-    EpistemicFailureType.SHARED_LABEL_ERROR: ("0.05", "0.10", "0.20"),
-    EpistemicFailureType.SHARED_SPURIOUS_FEATURE: ("0.25", "0.50", "1.00"),
-    EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT: ("0.25", "0.50", "1.00"),
-}
-
-_CONDITION_VOCABULARY: dict[ExperimentName, frozenset[str]] = {
-    "Byzantine-Bound Violation": frozenset(condition.value for condition in BoundCondition),
-    "Shared Epistemic-Failure Boundary": frozenset(
-        f"{failure_type.value}|{strength}"
-        for failure_type in EpistemicFailureType
-        for strength in _EPISTEMIC_STRENGTHS[failure_type]
-    ),
-    "Capability Under-Specification Boundary": frozenset(
-        mixture.value for mixture in RootCauseMixture
-    ),
-}
-
-_METHOD_VOCABULARY: dict[ExperimentName, frozenset[str]] = {
-    "Capability Under-Specification Boundary": frozenset(
-        granularity.value for granularity in CapabilityContractGranularity
-    ),
-    "Mechanism Ablation": frozenset(variant.value for variant in AblationVariant),
-}
 
 
 class SmokeCheckResult(FrozenDomainModel):
@@ -109,13 +85,53 @@ class PersistedSmokeRecord(FrozenDomainModel):
     checks: tuple[SmokeCheckResult, ...]
 
 
+class ExperimentPrerequisiteState(FrozenDomainModel):
+    experiment: ExperimentName
+    lifecycle_state: ExperimentLifecycleState
+
+
+def _epistemic_strengths(
+    failure_type: EpistemicFailureType,
+) -> tuple[ScenarioName, ...]:
+    if failure_type is EpistemicFailureType.SHARED_LABEL_ERROR:
+        return ("0.05", "0.10", "0.20")
+    if failure_type in (
+        EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
+        EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
+    ):
+        return ("0.25", "0.50", "1.00")
+    raise ValueError(f"unsupported epistemic failure type: {failure_type.value}")
+
+
+def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] | None:
+    if experiment == "Byzantine-Bound Violation":
+        return frozenset(condition.value for condition in BoundCondition)
+    if experiment == "Shared Epistemic-Failure Boundary":
+        return frozenset(
+            f"{failure_type.value}|{strength}"
+            for failure_type in EpistemicFailureType
+            for strength in _epistemic_strengths(failure_type)
+        )
+    if experiment == "Capability Under-Specification Boundary":
+        return frozenset(mixture.value for mixture in RootCauseMixture)
+    return None
+
+
+def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
+    if experiment == "Capability Under-Specification Boundary":
+        return frozenset(granularity.value for granularity in CapabilityContractGranularity)
+    if experiment == "Mechanism Ablation":
+        return frozenset(variant.value for variant in AblationVariant)
+    return None
+
+
 def validate_experiment_name_is_registered(experiment: ExperimentName) -> None:
     experiment_by_name(experiment)
 
 
 def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
     for planned in plan.experiments:
-        allowed = _CONDITION_VOCABULARY.get(planned.definition.name)
+        allowed = _allowed_conditions(planned.definition.name)
         if allowed is not None:
             for cell in planned.cells:
                 if cell.condition not in allowed:
@@ -123,7 +139,7 @@ def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
                         f"cell {cell.semantic_key} uses condition {cell.condition!r} "
                         f"outside the fixed {planned.definition.name} vocabulary"
                     )
-        allowed_methods = _METHOD_VOCABULARY.get(planned.definition.name)
+        allowed_methods = _allowed_methods(planned.definition.name)
         if allowed_methods is not None:
             for cell in planned.cells:
                 if cell.method not in allowed_methods:
@@ -135,15 +151,23 @@ def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
 
 def validate_experiment_prerequisites_met(
     experiment: ExperimentName,
-    prerequisite_states: Mapping[ExperimentName, ExperimentLifecycleState],
+    prerequisite_states: tuple[ExperimentPrerequisiteState, ...],
 ) -> None:
     definition = experiment_by_name(experiment)
     for prerequisite in definition.prerequisites:
-        state = prerequisite_states.get(prerequisite)
+        state = next(
+            (
+                entry.lifecycle_state
+                for entry in prerequisite_states
+                if entry.experiment == prerequisite
+            ),
+            None,
+        )
         if state is not ExperimentLifecycleState.COMPLETED:
+            state_text = state.value if state is not None else "unknown"
             raise ValueError(
                 f"experiment {experiment} requires prerequisite {prerequisite} "
-                f"to be Completed, found {state.value if state is not None else 'unknown'}"
+                f"to be Completed, found {state_text}"
             )
 
 
@@ -156,7 +180,7 @@ def validate_no_duplicate_semantic_cells(plan: ExperimentPlan) -> None:
             seen.add(cell.semantic_key)
 
 
-def validate_cell_phase_sequence(phases: Sequence[ScientificCellPhase]) -> None:
+def validate_cell_phase_sequence(phases: tuple[ScientificCellPhase, ...]) -> None:
     if len(phases) != len(set(phases)):
         raise ValueError("a cell phase may appear at most once in its execution sequence")
     for phase in phases:
@@ -199,10 +223,8 @@ def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
         role_intervals=role_intervals,
         sampling_caps_per_domain=sampling_caps,
     )
-    row_to_roles: dict[int, set[Role]] = {}
-    for assignment in supported_assignments:
-        row_to_roles.setdefault(assignment.original_row_index, set()).add(assignment.role)
-    no_overlap = all(len(roles) == 1 for roles in row_to_roles.values())
+    row_indices = tuple(assignment.original_row_index for assignment in supported_assignments)
+    no_overlap = len(row_indices) == len(set(row_indices))
 
     return (
         SmokeCheckResult(name="no target sample in anchor roles", passed=no_target_in_anchor),
@@ -295,7 +317,7 @@ def _persist_smoke_record(result: SmokeSuiteResult, overwrite: BooleanValue) -> 
     record_path.write_text(record.model_dump_json(indent=2))
 
 
-def render_smoke(result: SmokeSuiteResult) -> str:
+def render_smoke(result: SmokeSuiteResult) -> SmokeRenderText:
     lines = ["FedSIRA smoke suite"]
     for check in result.checks:
         marker = "PASS" if check.passed else "FAIL"
