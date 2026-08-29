@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     CollapseDecisionPassed,
@@ -10,7 +8,7 @@ from fedsira.domain.records import (
     FrozenDomainModel,
     MasterSeed,
     MethodName,
-    ProgramBlockName,
+    NonNegativeInt,
     ResolvedCoreComplete,
     ResolvedCoreDependent,
     ScientificCellCount,
@@ -31,7 +29,6 @@ from fedsira.experiments.registry import (
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     AblationVariant,
-    ExperimentClass,
     ExperimentDefinition,
     ablation_scenario_for_variant,
     baseline_validation_fixture_for_method,
@@ -87,6 +84,31 @@ class ExperimentPlan(FrozenDomainModel):
         )
 
 
+class PlanCellCountContract(FrozenDomainModel):
+    data_and_domain_evidence_validation: ScientificCellCount
+    protocol_invariant_validation: ScientificCellCount
+    baseline_implementation_validation: ScientificCellCount
+    proposal_assisted_opening_necessity: ScientificCellCount
+    single_reproduction_necessity: ScientificCellCount
+    source_artifact_exclusion_necessity: ScientificCellCount
+    external_verification_necessity: ScientificCellCount
+    pre_core_subtotal: ScientificCellCount
+    primary_confirmatory_evaluation: ScientificCellCount
+    mechanism_ablation: ScientificCellCount
+    compromised_reproducer_robustness: ScientificCellCount
+    compromised_verifier_robustness: ScientificCellCount
+    byzantine_bound_violation: ScientificCellCount
+    evidence_scarcity_and_dormancy: ScientificCellCount
+    shared_epistemic_failure_boundary: ScientificCellCount
+    capability_under_specification_boundary: ScientificCellCount
+    heterogeneous_reproduction_boundary: ScientificCellCount
+    admission_delay_decomposition: ScientificCellCount
+    efficiency_measurement: ScientificCellCount
+    secondary_dataset_generalization: ScientificCellCount
+    post_core_subtotal: ScientificCellCount
+    complete_scientific_plan: ScientificCellCount
+
+
 PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
     {
         DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
@@ -94,6 +116,31 @@ PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
         BASELINE_IMPLEMENTATION_VALIDATION_NAME,
         *COLLAPSE_EXPERIMENT_NAMES,
     }
+)
+EFFICIENCY_REPETITION_INDICES: tuple[NonNegativeInt, ...] = (1, 2, 3, 4, 5)
+PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
+    data_and_domain_evidence_validation=1,
+    protocol_invariant_validation=1,
+    baseline_implementation_validation=17,
+    proposal_assisted_opening_necessity=80,
+    single_reproduction_necessity=60,
+    source_artifact_exclusion_necessity=60,
+    external_verification_necessity=80,
+    pre_core_subtotal=299,
+    primary_confirmatory_evaluation=420,
+    mechanism_ablation=180,
+    compromised_reproducer_robustness=280,
+    compromised_verifier_robustness=100,
+    byzantine_bound_violation=80,
+    evidence_scarcity_and_dormancy=40,
+    shared_epistemic_failure_boundary=90,
+    capability_under_specification_boundary=60,
+    heterogeneous_reproduction_boundary=160,
+    admission_delay_decomposition=120,
+    efficiency_measurement=60,
+    secondary_dataset_generalization=100,
+    post_core_subtotal=1690,
+    complete_scientific_plan=1989,
 )
 
 
@@ -165,7 +212,7 @@ def _efficiency_cells(
         )
         for method in definition.methods
         for seed in seeds
-        for repetition_index in range(1, 6)
+        for repetition_index in EFFICIENCY_REPETITION_INDICES
     )
 
 
@@ -209,9 +256,22 @@ def _planned_experiment(
     )
 
 
+def _with_lifecycle_state(
+    planned: PlannedExperiment,
+    lifecycle_state: ExperimentLifecycleState,
+) -> PlannedExperiment:
+    return PlannedExperiment(
+        definition=planned.definition,
+        cells=planned.cells,
+        prerequisites=planned.prerequisites,
+        lifecycle_state=lifecycle_state,
+        resolved_core_dependent=planned.resolved_core_dependent,
+    )
+
+
 def _collapse_decision_passed(
     experiment: ExperimentName,
-    states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]],
+    states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...],
 ) -> CollapseDecisionPassed | None:
     for recorded_experiment, passed in states:
         if recorded_experiment == experiment:
@@ -221,7 +281,7 @@ def _collapse_decision_passed(
 
 def build_plan(
     resolved_core_complete: ResolvedCoreComplete = False,
-    collapse_decision_states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]] | None = None,
+    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...] | None = None,
     master_seeds: tuple[MasterSeed, ...] | None = None,
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:
@@ -234,52 +294,23 @@ def build_plan(
     decision_states = tuple(collapse_decision_states or ())
     planned: list[PlannedExperiment] = []
     for definition in EXPERIMENT_REGISTRY:
-        if not isinstance(definition.experiment_class, ExperimentClass):
-            raise ValueError(
-                f"unknown experiment class {definition.experiment_class} for {definition.name}"
-            )
         item = _planned_experiment(definition, master_seeds, smoke_seed)
         if item.resolved_core_dependent and not resolved_core_complete:
-            item = item.model_copy(update={"lifecycle_state": ExperimentLifecycleState.BLOCKED})
+            item = _with_lifecycle_state(item, ExperimentLifecycleState.BLOCKED)
         elif definition.name in COLLAPSE_EXPERIMENT_NAMES:
             passed = _collapse_decision_passed(definition.name, decision_states)
             if passed is False:
-                item = item.model_copy(
-                    update={"lifecycle_state": ExperimentLifecycleState.COMPLETED}
-                )
+                item = _with_lifecycle_state(item, ExperimentLifecycleState.COMPLETED)
         planned.append(item)
     return ExperimentPlan(experiments=tuple(planned))
 
 
-def plan_cell_count_by_program_block() -> dict[ProgramBlockName, ScientificCellCount]:
-    return {
-        "data_and_domain_evidence_validation": 1,
-        "protocol_invariant_validation": 1,
-        "baseline_implementation_validation": 17,
-        "proposal_assisted_opening_necessity": 80,
-        "single_reproduction_necessity": 60,
-        "source_artifact_exclusion_necessity": 60,
-        "external_verification_necessity": 80,
-        "pre_core_subtotal": 299,
-        "primary_confirmatory_evaluation": 420,
-        "mechanism_ablation": 180,
-        "compromised_reproducer_robustness": 280,
-        "compromised_verifier_robustness": 100,
-        "byzantine_bound_violation": 80,
-        "evidence_scarcity_and_dormancy": 40,
-        "shared_epistemic_failure_boundary": 90,
-        "capability_under_specification_boundary": 60,
-        "heterogeneous_reproduction_boundary": 160,
-        "admission_delay_decomposition": 120,
-        "efficiency_measurement": 60,
-        "secondary_dataset_generalization": 100,
-        "post_core_subtotal": 1690,
-        "complete_scientific_plan": 1989,
-    }
+def plan_cell_count_contract() -> PlanCellCountContract:
+    return PLAN_CELL_COUNT_CONTRACT
 
 
 def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
-    nominal = plan_cell_count_by_program_block()
+    nominal = plan_cell_count_contract()
     for planned in plan.experiments:
         observed = len(planned.cells)
         expected = planned.definition.nominal_cell_count
@@ -288,18 +319,18 @@ def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
                 f"experiment {planned.definition.name} plans {observed} cells but "
                 f"its nominal Section 31 count is {expected}"
             )
-    if plan.pre_core_cell_count != nominal["pre_core_subtotal"]:
+    if plan.pre_core_cell_count != nominal.pre_core_subtotal:
         raise ValueError(
             f"pre-core planned cell count {plan.pre_core_cell_count} does not match "
-            f"the Section 31 contract {nominal['pre_core_subtotal']}"
+            f"the Section 31 contract {nominal.pre_core_subtotal}"
         )
-    if plan.post_core_cell_count != nominal["post_core_subtotal"]:
+    if plan.post_core_cell_count != nominal.post_core_subtotal:
         raise ValueError(
             f"post-core planned cell count {plan.post_core_cell_count} does not match "
-            f"the Section 31 contract {nominal['post_core_subtotal']}"
+            f"the Section 31 contract {nominal.post_core_subtotal}"
         )
-    if plan.total_cell_count != nominal["complete_scientific_plan"]:
+    if plan.total_cell_count != nominal.complete_scientific_plan:
         raise ValueError(
             f"total planned cell count {plan.total_cell_count} does not match "
-            f"the Section 31 contract {nominal['complete_scientific_plan']}"
+            f"the Section 31 contract {nominal.complete_scientific_plan}"
         )
