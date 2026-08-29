@@ -31,6 +31,13 @@ RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 )
 
+_COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
+    ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+    ClaimFamily.PLURALITY_NECESSITY,
+    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+)
+
 
 def render_result(result: ExperimentExecutionResult) -> TextValue:
     lines: list[TextValue] = [
@@ -60,20 +67,9 @@ def render_result(result: ExperimentExecutionResult) -> TextValue:
     return "\n".join(lines)
 
 
-def _collapse_family_for_experiment(
-    experiment: ExperimentName,
-    comparison_results: tuple,
-) -> ClaimFamily | None:
-    collapse_families = frozenset(
-        (
-            ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
-            ClaimFamily.PLURALITY_NECESSITY,
-            ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
-            ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
-        )
-    )
+def _collapse_family_for_experiment(experiment: ExperimentName) -> ClaimFamily | None:
     definition = experiment_by_name(experiment)
-    if definition.claim_family not in collapse_families:
+    if definition.claim_family not in _COLLAPSE_FAMILIES:
         return None
     return definition.claim_family
 
@@ -82,9 +78,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    store = ExecutionRecordStore(
-        Path(config.runtime.repository_layout.execution_workspace)
-    )
+    store = ExecutionRecordStore(Path(config.runtime.repository_layout.execution_workspace))
     decisions: list[CollapseDecision] = []
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(collapse_experiment)
@@ -112,7 +106,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
             config,
             store,
         )
-        family = _collapse_family_for_experiment(collapse_experiment, comparison_results)
+        family = _collapse_family_for_experiment(collapse_experiment)
         if family is None:
             return
         evaluation = collapse_evaluation_from_records(
