@@ -1,5 +1,5 @@
 import itertools
-from collections.abc import Sequence
+from typing import Literal, TypeAlias
 
 from fedsira.domain.records import (
     ComparisonMargin,
@@ -9,20 +9,27 @@ from fedsira.domain.records import (
     SignFlipSampleCount,
 )
 
+SignFlipSign: TypeAlias = Literal[-1, 1]
+SignFlipAssignment: TypeAlias = tuple[SignFlipSign, ...]
+NamedPValue: TypeAlias = tuple[ComparisonName, PValue]
+
 
 def enumerate_sign_flip_assignments(
     sample_count: SignFlipSampleCount,
-) -> tuple[tuple[int, ...], ...]:
+) -> tuple[SignFlipAssignment, ...]:
     return tuple(itertools.product((1, -1), repeat=sample_count))
 
 
-def _signed_mean(signs: Sequence[int], differences: Sequence[PairedDifference]) -> PairedDifference:
+def _signed_mean(
+    signs: SignFlipAssignment,
+    differences: tuple[PairedDifference, ...],
+) -> PairedDifference:
     paired = zip(signs, differences, strict=True)
     return sum(sign * difference for sign, difference in paired) / len(differences)
 
 
 def exact_sign_flip_two_sided_p_value(
-    paired_differences: Sequence[PairedDifference],
+    paired_differences: tuple[PairedDifference, ...],
 ) -> PValue:
     sample_count = len(paired_differences)
     observed_absolute_mean = abs(sum(paired_differences) / sample_count)
@@ -36,10 +43,10 @@ def exact_sign_flip_two_sided_p_value(
 
 
 def exact_sign_flip_non_inferiority_p_value(
-    paired_differences: Sequence[PairedDifference],
+    paired_differences: tuple[PairedDifference, ...],
     margin: ComparisonMargin,
 ) -> PValue:
-    shifted_differences = [difference + margin for difference in paired_differences]
+    shifted_differences = tuple(difference + margin for difference in paired_differences)
     sample_count = len(shifted_differences)
     observed_mean = sum(shifted_differences) / sample_count
     assignments = enumerate_sign_flip_assignments(sample_count)
@@ -50,8 +57,8 @@ def exact_sign_flip_non_inferiority_p_value(
 
 
 def holm_adjusted_p_values(
-    named_raw_p_values: Sequence[tuple[ComparisonName, PValue]],
-) -> tuple[tuple[ComparisonName, PValue], ...]:
+    named_raw_p_values: tuple[NamedPValue, ...],
+) -> tuple[NamedPValue, ...]:
     ordered = sorted(named_raw_p_values, key=lambda item: (item[1], item[0]))
     comparison_count = len(ordered)
     adjusted_p_values: list[PValue] = []
