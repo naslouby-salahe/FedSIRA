@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from enum import StrEnum
 
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
@@ -25,15 +24,20 @@ class EvidenceArrivalSchedule(StrEnum):
 
 
 def reproducer_order(
-    eligible_domains: Sequence[NBaiotDomain], reproducer_order_namespace_seed: NamespaceSeed
+    eligible_domains: tuple[NBaiotDomain, ...],
+    reproducer_order_namespace_seed: NamespaceSeed,
 ) -> tuple[NBaiotDomain, ...]:
     return deterministic_domain_order(
-        eligible_domains, REPRODUCER_ORDER_SEPARATOR, reproducer_order_namespace_seed
+        eligible_domains,
+        REPRODUCER_ORDER_SEPARATOR,
+        reproducer_order_namespace_seed,
     )
 
 
 def holder_count_at_cycle(
-    schedule: EvidenceArrivalSchedule, cycle: NonNegativeInt, eligible_domain_count: NonNegativeInt
+    schedule: EvidenceArrivalSchedule,
+    cycle: NonNegativeInt,
+    eligible_domain_count: NonNegativeInt,
 ) -> NonNegativeInt:
     if schedule is EvidenceArrivalSchedule.PERMANENT_SINGLETON:
         return 0
@@ -41,7 +45,7 @@ def holder_count_at_cycle(
         return 0 if cycle < 2 else min(1, eligible_domain_count)
     if schedule is EvidenceArrivalSchedule.IMMEDIATE_QUORUM:
         return eligible_domain_count
-    count = 0
+    count: NonNegativeInt = 0
     for breakpoint_cycle, breakpoint_count in _GRADUAL_TO_QUORUM_BREAKPOINTS:
         if cycle >= breakpoint_cycle:
             count = breakpoint_count
@@ -51,17 +55,17 @@ def holder_count_at_cycle(
 def holders_at_cycle(
     schedule: EvidenceArrivalSchedule,
     cycle: NonNegativeInt,
-    target_capable_reproducer_order: Sequence[NBaiotDomain],
+    target_capable_reproducer_order: tuple[NBaiotDomain, ...],
 ) -> tuple[NBaiotDomain, ...]:
     count = holder_count_at_cycle(schedule, cycle, len(target_capable_reproducer_order))
-    return tuple(target_capable_reproducer_order[:count])
+    return target_capable_reproducer_order[:count]
 
 
 def first_holder_cycle_for_domain(
     schedule: EvidenceArrivalSchedule,
     domain: NBaiotDomain,
-    target_capable_reproducer_order: Sequence[NBaiotDomain],
-    candidate_cycles: Sequence[NonNegativeInt],
+    target_capable_reproducer_order: tuple[NBaiotDomain, ...],
+    candidate_cycles: tuple[NonNegativeInt, ...],
 ) -> NonNegativeInt | None:
     for cycle in sorted(candidate_cycles):
         if domain in holders_at_cycle(schedule, cycle, target_capable_reproducer_order):
@@ -71,19 +75,19 @@ def first_holder_cycle_for_domain(
 
 def _holder_counts_by_cycle(
     schedule: EvidenceArrivalSchedule,
-    target_capable_reproducer_order: Sequence[NBaiotDomain],
-    candidate_cycles: Sequence[NonNegativeInt],
-) -> list[NonNegativeInt]:
-    return [
+    target_capable_reproducer_order: tuple[NBaiotDomain, ...],
+    candidate_cycles: tuple[NonNegativeInt, ...],
+) -> tuple[NonNegativeInt, ...]:
+    return tuple(
         holder_count_at_cycle(schedule, cycle, len(target_capable_reproducer_order))
         for cycle in candidate_cycles
-    ]
+    )
 
 
 def cycle_when_requirement_met(
     schedule: EvidenceArrivalSchedule,
-    target_capable_reproducer_order: Sequence[NBaiotDomain],
-    candidate_cycles: Sequence[NonNegativeInt],
+    target_capable_reproducer_order: tuple[NBaiotDomain, ...],
+    candidate_cycles: tuple[NonNegativeInt, ...],
     requirement_count: PositiveInt,
 ) -> NonNegativeInt | None:
     counts = _holder_counts_by_cycle(schedule, target_capable_reproducer_order, candidate_cycles)
@@ -95,16 +99,22 @@ def cycle_when_requirement_met(
 
 def compute_t_evidence(
     schedule: EvidenceArrivalSchedule,
-    target_capable_reproducer_order: Sequence[NBaiotDomain],
-    candidate_cycles: Sequence[NonNegativeInt],
+    target_capable_reproducer_order: tuple[NBaiotDomain, ...],
+    candidate_cycles: tuple[NonNegativeInt, ...],
     reproduction_row_requirement: PositiveInt,
     final_gate_domain_requirement: PositiveInt,
 ) -> NonNegativeInt | None:
     t_reproduction_evidence = cycle_when_requirement_met(
-        schedule, target_capable_reproducer_order, candidate_cycles, reproduction_row_requirement
+        schedule,
+        target_capable_reproducer_order,
+        candidate_cycles,
+        reproduction_row_requirement,
     )
     t_final_gate = cycle_when_requirement_met(
-        schedule, target_capable_reproducer_order, candidate_cycles, final_gate_domain_requirement
+        schedule,
+        target_capable_reproducer_order,
+        candidate_cycles,
+        final_gate_domain_requirement,
     )
     if t_reproduction_evidence is None or t_final_gate is None:
         return None
