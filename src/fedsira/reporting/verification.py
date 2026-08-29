@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import (
+    BooleanValue,
+    CheckpointIdentity,
+    ExperimentName,
+    FrozenDomainModel,
+    NonNegativeInt,
+    ReportVerificationFailure,
+    ScientificCellCount,
+)
 from fedsira.experiments.execution import is_terminal_experiment_state
 from fedsira.experiments.planning import ExperimentPlan
 
 
-@dataclass(frozen=True)
-class CompletenessVerificationResult:
-    passed: bool
-    failures: tuple[CanonicalToken, ...]
+class CompletenessVerificationResult(FrozenDomainModel):
+    passed: BooleanValue
+    failures: tuple[ReportVerificationFailure, ...]
 
     def __bool__(self) -> bool:
         return self.passed
@@ -20,9 +26,9 @@ class CompletenessVerificationResult:
 
 def verify_planned_cell_count_satisfied(
     plan: ExperimentPlan,
-    terminal_record_counts: Mapping[CanonicalToken, int],
+    terminal_record_counts: Mapping[ExperimentName, ScientificCellCount],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for planned in plan.experiments:
         expected = len(planned.cells)
         observed = terminal_record_counts.get(planned.definition.name, 0)
@@ -35,10 +41,10 @@ def verify_planned_cell_count_satisfied(
 
 
 def verify_experiments_completed(
-    lifecycle_states: Mapping[CanonicalToken, ExperimentLifecycleState],
-    expected_experiments: Sequence[CanonicalToken],
+    lifecycle_states: Mapping[ExperimentName, ExperimentLifecycleState],
+    expected_experiments: Sequence[ExperimentName],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for experiment in expected_experiments:
         state = lifecycle_states.get(experiment)
         if state is not ExperimentLifecycleState.COMPLETED:
@@ -50,10 +56,10 @@ def verify_experiments_completed(
 
 
 def verify_experiments_reached_terminal_state(
-    lifecycle_states: Mapping[CanonicalToken, ExperimentLifecycleState],
-    expected_experiments: Sequence[CanonicalToken],
+    lifecycle_states: Mapping[ExperimentName, ExperimentLifecycleState],
+    expected_experiments: Sequence[ExperimentName],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for experiment in expected_experiments:
         state = lifecycle_states.get(experiment)
         if state is None or not is_terminal_experiment_state(state):
@@ -65,7 +71,7 @@ def verify_experiments_reached_terminal_state(
 
 
 def verify_no_stale_ancestors(
-    stale_ancestor_identities: Sequence[CanonicalToken],
+    stale_ancestor_identities: Sequence[CheckpointIdentity],
 ) -> CompletenessVerificationResult:
     return CompletenessVerificationResult(
         passed=not stale_ancestor_identities,
@@ -74,7 +80,8 @@ def verify_no_stale_ancestors(
 
 
 def verify_claim_states_derivable(
-    claim_state_count: int, expected_claim_count: int
+    claim_state_count: NonNegativeInt,
+    expected_claim_count: NonNegativeInt,
 ) -> CompletenessVerificationResult:
     if claim_state_count != expected_claim_count:
         return CompletenessVerificationResult(
