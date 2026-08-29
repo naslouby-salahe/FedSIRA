@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fedsira.analysis.claims import FinalClaimState, ClaimStateResult
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     BooleanValue,
@@ -10,8 +11,8 @@ from fedsira.domain.records import (
     ReportVerificationFailure,
     ScientificCellCount,
 )
-from fedsira.experiments.execution import TERMINAL_EXPERIMENT_STATES
-from fedsira.experiments.planning import ExperimentPlan
+from fedsira.experiments.execution import PersistedExecutionRecord, TERMINAL_EXPERIMENT_STATES
+from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
 
 
 class ExperimentTerminalCount(FrozenDomainModel):
@@ -27,6 +28,14 @@ class ExperimentLifecycleRecord(FrozenDomainModel):
 class CompletenessVerificationResult(FrozenDomainModel):
     passed: BooleanValue
     failures: tuple[ReportVerificationFailure, ...]
+
+
+def terminal_count_for_planned_experiment(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> ScientificCellCount:
+    planned_keys = frozenset(cell.semantic_key for cell in planned.cells)
+    return sum(record.semantic_key in planned_keys for record in records)
 
 
 def _terminal_count(
@@ -105,14 +114,17 @@ def verify_no_stale_ancestors(
 
 
 def verify_claim_states_derivable(
-    claim_state_count: NonNegativeInt,
+    claim_states: tuple[ClaimStateResult, ...],
     expected_claim_count: NonNegativeInt,
 ) -> CompletenessVerificationResult:
-    if claim_state_count != expected_claim_count:
-        return CompletenessVerificationResult(
-            passed=False,
-            failures=(
-                f"derived {claim_state_count} claim states, expected {expected_claim_count}",
-            ),
+    failures: list[ReportVerificationFailure] = []
+    if len(claim_states) != expected_claim_count:
+        failures.append(
+            f"derived {len(claim_states)} claim states, expected {expected_claim_count}"
         )
-    return CompletenessVerificationResult(passed=True, failures=())
+    unresolved = tuple(
+        claim.claim_id for claim in claim_states if claim.state is FinalClaimState.NOT_TESTED
+    )
+    if unresolved:
+        failures.append(f"claims lack complete verified evidence: {', '.join(unresolved)}")
+    return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
