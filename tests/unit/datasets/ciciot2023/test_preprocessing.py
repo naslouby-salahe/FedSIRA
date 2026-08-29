@@ -49,11 +49,16 @@ def test_resolve_predictor_columns_keeps_identifier_like_predictor_when_not_vali
 
 def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
     raw_rows = (
-        SecondaryRawRow(0, ("1.0", "2.0", "BenignTraffic")),
-        SecondaryRawRow(1, ("bad", "3.0", "Backdoor_Malware")),
-        SecondaryRawRow(2, ("inf", "4.0", "Backdoor_Malware")),
+        SecondaryRawRow(original_row_index=0, values=("1.0", "2.0", "BenignTraffic")),
+        SecondaryRawRow(
+            original_row_index=1,
+            values=("bad", "3.0", "Backdoor_Malware"),
+        ),
+        SecondaryRawRow(
+            original_row_index=2,
+            values=("inf", "4.0", "Backdoor_Malware"),
+        ),
     )
-
     retained, exclusions = parse_complete_case_rows(
         raw_rows,
         header=("feature_a", "feature_b", "Label"),
@@ -64,19 +69,23 @@ def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
         dataset_manifest_hash="b" * 64,
         pseudo_domain_partition_salt=CONFIG.datasets.secondary.pseudo_domain_partition_salt,
     )
-
     assert len(retained) == 1
-    assert retained[0].canonical_label == BENIGN_LABEL
+    assert retained[0].normalized_label == BENIGN_LABEL
     assert retained[0].original_row_index == 0
-    assert [row.original_row_index for row in exclusions] == [1, 2]
-    assert [row.reason for row in exclusions] == [
+    assert tuple(row.original_row_index for row in exclusions) == (1, 2)
+    assert tuple(row.reason for row in exclusions) == (
         DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
         DatasetExclusionReason.NON_FINITE_PREDICTOR,
-    ]
+    )
 
 
 def test_complete_case_parsing_rejects_mismatched_row_width() -> None:
-    raw_rows = (SecondaryRawRow(7, ("1.0", "BenignTraffic")),)
+    raw_rows = (
+        SecondaryRawRow(
+            original_row_index=7,
+            values=("1.0", "BenignTraffic"),
+        ),
+    )
     try:
         parse_complete_case_rows(
             raw_rows,
@@ -122,41 +131,45 @@ def test_order_group_by_stable_row_id_sorts_ascending_by_byte_value() -> None:
 
 
 def test_assign_group_local_roles_uses_target_windows_for_the_target_label() -> None:
-    ids = tuple(f"{i:064d}" for i in range(1000))
+    ids = tuple(f"{index:064d}" for index in range(1000))
     roles = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
-    roles_seen = {role for role in roles if role is not None}
+    roles_seen = frozenset(role for role in roles if role is not None)
     assert roles_seen.issubset(
-        {
-            Role.SOURCE_PROPOSAL,
-            Role.CANDIDATE_SCREEN,
-            Role.REPRODUCTION,
-            Role.ROW_VERIFICATION,
-            Role.FINAL_GATE,
-            Role.REPORT_TEST,
-        }
+        frozenset(
+            (
+                Role.SOURCE_PROPOSAL,
+                Role.CANDIDATE_SCREEN,
+                Role.REPRODUCTION,
+                Role.ROW_VERIFICATION,
+                Role.FINAL_GATE,
+                Role.REPORT_TEST,
+            )
+        )
     )
     assert Role.ANCHOR_TRAIN not in roles_seen
 
 
 def test_assign_group_local_roles_uses_supported_windows_for_other_labels() -> None:
-    ids = tuple(f"{i:064d}" for i in range(1000))
+    ids = tuple(f"{index:064d}" for index in range(1000))
     roles = assign_group_local_roles("DDOS_SYN_FLOOD", ids, ROLE_INTERVALS)
-    roles_seen = {role for role in roles if role is not None}
+    roles_seen = frozenset(role for role in roles if role is not None)
     assert roles_seen.issubset(
-        {
-            Role.ANCHOR_TRAIN,
-            Role.ANCHOR_VALIDATION,
-            Role.POST_REFERENCE_REPLAY,
-            Role.ROW_VERIFICATION,
-            Role.FINAL_GATE,
-            Role.REPORT_TEST,
-        }
+        frozenset(
+            (
+                Role.ANCHOR_TRAIN,
+                Role.ANCHOR_VALIDATION,
+                Role.POST_REFERENCE_REPLAY,
+                Role.ROW_VERIFICATION,
+                Role.FINAL_GATE,
+                Role.REPORT_TEST,
+            )
+        )
     )
     assert Role.SOURCE_PROPOSAL not in roles_seen
 
 
 def test_assign_group_local_roles_has_guard_gap_at_boundary() -> None:
-    ids = tuple(f"{i:064d}" for i in range(1000))
+    ids = tuple(f"{index:064d}" for index in range(1000))
     roles = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     assert roles[145] is None
     assert roles[144] is Role.SOURCE_PROPOSAL
@@ -164,7 +177,7 @@ def test_assign_group_local_roles_has_guard_gap_at_boundary() -> None:
 
 
 def test_assign_group_local_roles_is_deterministic() -> None:
-    ids = tuple(f"{i:064d}" for i in range(200))
+    ids = tuple(f"{index:064d}" for index in range(200))
     first = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     second = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
     assert first == second
@@ -200,7 +213,7 @@ def test_secondary_role_assignment_never_assigns_one_row_to_multiple_roles() -> 
             file_sha256="a" * 64,
             relative_path="part.csv",
             original_row_index=index,
-            canonical_label=TARGET_LABEL,
+            normalized_label=TARGET_LABEL,
             pseudo_domain=CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
             features=(float(index),),
         )
@@ -212,5 +225,5 @@ def test_secondary_role_assignment_never_assigns_one_row_to_multiple_roles() -> 
         CONFIG.datasets.primary.sampling_caps_per_domain,
         "b" * 64,
     )
-    assigned_ids = [assignment.stable_row_id for assignment in assignments]
+    assigned_ids = tuple(assignment.stable_row_id for assignment in assignments)
     assert len(assigned_ids) == len(set(assigned_ids))
