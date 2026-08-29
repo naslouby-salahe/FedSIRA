@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
 from enum import StrEnum
 
 from fedsira.analysis.statistics import (
@@ -184,19 +183,7 @@ class ComparisonTemplate(FrozenDomainModel):
     material_threshold: MaterialThreshold | None = None
 
 
-def complete_paired_seeds(
-    seed_metrics: Mapping[MasterSeed, Mapping[MethodName, MetricDifference | None]],
-    method: MethodName,
-    reference: MethodName,
-) -> tuple[MasterSeed, ...]:
-    return tuple(
-        seed
-        for seed, values in sorted(seed_metrics.items())
-        if values.get(method) is not None and values.get(reference) is not None
-    )
-
-
-def _effect_size(values: Sequence[PairedDifference]) -> EffectSize | None:
+def _effect_size(values: tuple[PairedDifference, ...]) -> EffectSize | None:
     if len(values) < 2:
         return None
     mean = sum(values) / len(values)
@@ -213,14 +200,11 @@ def _effect_size(values: Sequence[PairedDifference]) -> EffectSize | None:
 
 def evaluate_comparison(
     definition: ComparisonDefinition,
-    paired_differences: Sequence[PairedDifference],
-    multiplicity_config: MultiplicityConfig,
+    paired_differences: tuple[PairedDifference, ...],
     bootstrap_config: BootstrapConfig,
     analysis_seed: MasterSeed,
 ) -> ComparisonResult:
-    del multiplicity_config
-    differences = tuple(paired_differences)
-    count = len(differences)
+    count = len(paired_differences)
     if count == 0:
         return ComparisonResult(
             definition=definition,
@@ -235,9 +219,8 @@ def evaluate_comparison(
             materiality_passes=None,
             comparison_state=ComparisonState.UNDEFINED,
         )
-
-    mean = sum(differences) / count
-    ordered = sorted(differences)
+    mean = sum(paired_differences) / count
+    ordered = sorted(paired_differences)
     middle = count // 2
     median = (
         ordered[middle]
@@ -245,30 +228,30 @@ def evaluate_comparison(
         else (ordered[middle - 1] + ordered[middle]) / 2
     )
     interval = bootstrap_percentile_confidence_interval(
-        differences,
+        paired_differences,
         bootstrap_config,
         analysis_seed,
     )
     if definition.test_kind is ComparisonTestKind.SUPERIORITY:
-        raw_p = exact_sign_flip_two_sided_p_value(differences)
+        raw_p_value = exact_sign_flip_two_sided_p_value(paired_differences)
     else:
         if definition.margin is None:
             raise ValueError(
                 f"non-inferiority comparison {definition.comparison_name} requires a margin"
             )
-        raw_p = exact_sign_flip_non_inferiority_p_value(
-            differences,
+        raw_p_value = exact_sign_flip_non_inferiority_p_value(
+            paired_differences,
             definition.margin,
         )
     return ComparisonResult(
         definition=definition,
-        paired_differences=differences,
+        paired_differences=paired_differences,
         complete_seed_count=count,
         mean_paired_difference=mean,
         median_paired_difference=median,
-        paired_standardized_effect=_effect_size(differences),
-        raw_p_value=raw_p,
-        adjusted_p_value=raw_p,
+        paired_standardized_effect=_effect_size(paired_differences),
+        raw_p_value=raw_p_value,
+        adjusted_p_value=raw_p_value,
         confidence_interval=interval,
         materiality_passes=None,
         comparison_state=ComparisonState.PENDING,
@@ -289,6 +272,58 @@ def _materiality_passes(
     return effect >= threshold
 
 
+def _adjusted_p_value(
+    comparison_name: ComparisonName,
+    adjusted_values: tuple[tuple[ComparisonName, PValue], ...],
+) -> PValue:
+    for name, adjusted_value in adjusted_values:
+        if name == comparison_name:
+            return adjusted_value
+    raise KeyError(f"missing Holm-adjusted p-value for {comparison_name}")
+
+
+def _adjusted_result(
+    result: ComparisonResult,
+    adjusted_p_value: PValue,
+    multiplicity_config: MultiplicityConfig,
+) -> ComparisonResult:
+    if result.raw_p_value is None:
+        return ComparisonResult(
+            definition=result.definition,
+            paired_differences=result.paired_differences,
+            complete_seed_count=result.complete_seed_count,
+            mean_paired_difference=result.mean_paired_difference,
+            median_paired_difference=result.median_paired_difference,
+            paired_standardized_effect=result.paired_standardized_effect,
+            raw_p_value=None,
+            adjusted_p_value=adjusted_p_value,
+            confidence_interval=result.confidence_interval,
+            materiality_passes=result.materiality_passes,
+            comparison_state=result.comparison_state,
+        )
+    materiality_passes = _materiality_passes(
+        result.definition,
+        result.mean_paired_difference,
+    )
+    passes = (
+        adjusted_p_value < multiplicity_config.family_wise_alpha
+        and materiality_passes is not False
+    )
+    return ComparisonResult(
+        definition=result.definition,
+        paired_differences=result.paired_differences,
+        complete_seed_count=result.complete_seed_count,
+        mean_paired_difference=result.mean_paired_difference,
+        median_paired_difference=result.median_paired_difference,
+        paired_standardized_effect=result.paired_standardized_effect,
+        raw_p_value=result.raw_p_value,
+        adjusted_p_value=adjusted_p_value,
+        confidence_interval=result.confidence_interval,
+        materiality_passes=materiality_passes,
+        comparison_state=(ComparisonState.PASSED if passes else ComparisonState.FAILED),
+    )
+
+
 def apply_holm_adjustment(
     family_result: ComparisonFamilyResult,
     multiplicity_config: MultiplicityConfig,
@@ -300,37 +335,17 @@ def apply_holm_adjustment(
         )
         for result in family_result.comparisons
     )
-    adjusted = dict(holm_adjusted_p_values(raw_values))
-    results: list[ComparisonResult] = []
-    for result in family_result.comparisons:
-        adjusted_p_value = adjusted[result.definition.comparison_name]
-        if result.raw_p_value is None:
-            results.append(
-                result.model_copy(update={"adjusted_p_value": adjusted_p_value})
-            )
-            continue
-        materiality_passes = _materiality_passes(
-            result.definition,
-            result.mean_paired_difference,
-        )
-        passes = (
-            adjusted_p_value < multiplicity_config.family_wise_alpha
-            and materiality_passes is not False
-        )
-        results.append(
-            result.model_copy(
-                update={
-                    "adjusted_p_value": adjusted_p_value,
-                    "materiality_passes": materiality_passes,
-                    "comparison_state": (
-                        ComparisonState.PASSED if passes else ComparisonState.FAILED
-                    ),
-                }
-            )
-        )
+    adjusted_values = holm_adjusted_p_values(raw_values)
     return ComparisonFamilyResult(
         family=family_result.family,
-        comparisons=tuple(results),
+        comparisons=tuple(
+            _adjusted_result(
+                result,
+                _adjusted_p_value(result.definition.comparison_name, adjusted_values),
+                multiplicity_config,
+            )
+            for result in family_result.comparisons
+        ),
     )
 
 
@@ -444,10 +459,10 @@ def _non_inferiority(
 def _matrix(
     family: ClaimFamily,
     experiment: ExperimentName,
-    scenarios: Sequence[ScenarioName],
+    scenarios: tuple[ScenarioName, ...],
     method: MethodName,
-    references: Sequence[MethodName],
-    templates: Sequence[ComparisonTemplate],
+    references: tuple[MethodName, ...],
+    templates: tuple[ComparisonTemplate, ...],
 ) -> tuple[ComparisonDefinition, ...]:
     return tuple(
         _definition(
@@ -501,7 +516,6 @@ def _proposal_screen_comparisons(
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
     method = OpeningMode.PROPOSAL_ASSISTED.value
     reference = OpeningMode.CANDIDATE_FREE.value
-
     definitions: list[ComparisonDefinition] = []
     for scenario in (
         ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
@@ -660,24 +674,9 @@ def _external_verification_comparisons(
     )
 
 
-PRIMARY_BYZANTINE_TRIGGER_COMPARATORS: frozenset[MethodName] = frozenset(
-    {
-        BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
-        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-        BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
-        BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
-        BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
-        BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-    }
-)
-
-
 def _primary_templates(
     config: ScientificConfig,
     scenario: PrimaryScenario,
-    comparator: MethodName,
 ) -> tuple[ComparisonTemplate, ...]:
     materiality = config.metrics_and_statistics.materiality
     templates: list[ComparisonTemplate] = [
@@ -703,26 +702,18 @@ def _primary_templates(
         ),
     ]
     if scenario is not PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY:
-        templates.append(
-            _superiority(
-                ComparisonMetric.MALICIOUS_ADMISSION,
-                ComparisonOrientation.LOWER_IS_BETTER,
-                materiality.malicious_admission_reduction_minimum,
-            )
-        )
-    trigger_is_defined = (
-        scenario is PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-        or (
-            scenario is PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT
-            and comparator in PRIMARY_BYZANTINE_TRIGGER_COMPARATORS
-        )
-    )
-    if trigger_is_defined:
-        templates.append(
-            _superiority(
-                ComparisonMetric.ATTACK_SUCCESS_RATE,
-                ComparisonOrientation.LOWER_IS_BETTER,
-                materiality.source_exclusion_asr_reduction_minimum,
+        templates.extend(
+            (
+                _superiority(
+                    ComparisonMetric.MALICIOUS_ADMISSION,
+                    ComparisonOrientation.LOWER_IS_BETTER,
+                    materiality.malicious_admission_reduction_minimum,
+                ),
+                _superiority(
+                    ComparisonMetric.ATTACK_SUCCESS_RATE,
+                    ComparisonOrientation.LOWER_IS_BETTER,
+                    materiality.source_exclusion_asr_reduction_minimum,
+                ),
             )
         )
     return tuple(templates)
@@ -742,16 +733,15 @@ def _primary_baseline_comparisons(
         )
         for comparator in PRIMARY_COMPARATORS
         for scenario in PrimaryScenario
-        for template in _primary_templates(config, scenario, comparator)
+        for template in _primary_templates(config, scenario)
     )
 
 
 def _reproducer_attack_templates(
     config: ScientificConfig,
-    condition: ReproducerCondition,
 ) -> tuple[ComparisonTemplate, ...]:
     materiality = config.metrics_and_statistics.materiality
-    templates: list[ComparisonTemplate] = [
+    return (
         _superiority(
             ComparisonMetric.MALICIOUS_ADMISSION,
             ComparisonOrientation.LOWER_IS_BETTER,
@@ -762,21 +752,12 @@ def _reproducer_attack_templates(
             ComparisonOrientation.HIGHER_IS_BETTER,
             materiality.target_f1_gain_minimum,
         ),
-    ]
-    if condition in (
-        ReproducerCondition.ONE_SOURCE_COPY,
-        ReproducerCondition.TWO_SOURCE_COPIES,
-        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
-        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
-    ):
-        templates.append(
-            _superiority(
-                ComparisonMetric.ATTACK_SUCCESS_RATE,
-                ComparisonOrientation.LOWER_IS_BETTER,
-                materiality.source_exclusion_asr_reduction_minimum,
-            )
-        )
-    return tuple(templates)
+        _superiority(
+            ComparisonMetric.ATTACK_SUCCESS_RATE,
+            ComparisonOrientation.LOWER_IS_BETTER,
+            materiality.source_exclusion_asr_reduction_minimum,
+        ),
+    )
 
 
 def _reproducer_robustness_comparisons(
@@ -786,38 +767,30 @@ def _reproducer_robustness_comparisons(
     definitions: list[ComparisonDefinition] = []
     for condition in ReproducerCondition:
         if condition is ReproducerCondition.CLEAN:
-            definitions.extend(
-                _matrix(
-                    ClaimFamily.REPRODUCER_ROBUSTNESS,
-                    COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-                    (condition.value,),
-                    CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-                    REPRODUCER_COMPARATORS,
-                    (
-                        _non_inferiority(
-                            ComparisonMetric.LEGITIMATE_ADMISSION,
-                            ComparisonOrientation.HIGHER_IS_BETTER,
-                            materiality.legitimate_admission_noninferiority_margin,
-                        ),
-                        _non_inferiority(
-                            ComparisonMetric.TARGET_F1,
-                            ComparisonOrientation.HIGHER_IS_BETTER,
-                            materiality.target_f1_gain_minimum,
-                        ),
-                    ),
-                )
+            templates = (
+                _non_inferiority(
+                    ComparisonMetric.LEGITIMATE_ADMISSION,
+                    ComparisonOrientation.HIGHER_IS_BETTER,
+                    materiality.legitimate_admission_noninferiority_margin,
+                ),
+                _non_inferiority(
+                    ComparisonMetric.TARGET_F1,
+                    ComparisonOrientation.HIGHER_IS_BETTER,
+                    materiality.target_f1_noninferiority_margin,
+                ),
             )
         else:
-            definitions.extend(
-                _matrix(
-                    ClaimFamily.REPRODUCER_ROBUSTNESS,
-                    COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-                    (condition.value,),
-                    CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-                    REPRODUCER_COMPARATORS,
-                    _reproducer_attack_templates(config, condition),
-                )
+            templates = _reproducer_attack_templates(config)
+        definitions.extend(
+            _matrix(
+                ClaimFamily.REPRODUCER_ROBUSTNESS,
+                COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+                (condition.value,),
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                REPRODUCER_COMPARATORS,
+                templates,
             )
+        )
     return tuple(definitions)
 
 
@@ -842,9 +815,7 @@ def _verifier_robustness_comparisons(
                         ComparisonMetric.MALICIOUS_ADMISSION,
                         ComparisonOrientation.LOWER_IS_BETTER,
                         materiality.malicious_admission_reduction_minimum,
-                        materiality_direction=(
-                            MaterialityDirection.DETERIORATION_AT_LEAST
-                        ),
+                        materiality_direction=MaterialityDirection.DETERIORATION_AT_LEAST,
                     ),
                     reference_scenario=VerifierCondition.ALL_HONEST.value,
                 )
@@ -875,10 +846,7 @@ def _ablation_metric(
     variant: AblationVariant,
 ) -> tuple[ComparisonMetric, ComparisonOrientation]:
     if variant is AblationVariant.NO_PROPOSAL_SCREEN:
-        return (
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        )
+        return ComparisonMetric.REPRODUCTION_ATTEMPTS, ComparisonOrientation.LOWER_IS_BETTER
     if variant in (
         AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
         AblationVariant.NO_MATCHED_CONTROL,
@@ -895,10 +863,7 @@ def _ablation_metric(
         AblationVariant.ONE_INDEPENDENT_REPRODUCTION,
         AblationVariant.NO_FINAL_SYNTHESIS_GATE,
     ):
-        return (
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        )
+        return ComparisonMetric.WORST_DOMAIN_TARGET_F1, ComparisonOrientation.HIGHER_IS_BETTER
     if variant in (
         AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION,
         AblationVariant.DIRECT_KRUM_OF_RETRAINS,
@@ -912,14 +877,11 @@ def _ablation_metric(
     ):
         return ComparisonMetric.LEGITIMATE_ADMISSION, ComparisonOrientation.HIGHER_IS_BETTER
     if variant is AblationVariant.CANDIDATE_FREE_REPRODUCTION:
-        return (
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        )
+        return ComparisonMetric.POST_EVIDENCE_OVERHEAD, ComparisonOrientation.LOWER_IS_BETTER
     if variant is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
         return (
             ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
-            ComparisonOrientation.HIGHER_IS_BETTER,
+            ComparisonOrientation.LOWER_IS_BETTER,
         )
     raise ValueError(f"ablation variant {variant} has no claim-bearing metric")
 
@@ -981,9 +943,7 @@ def _ablation_comparisons(
                     orientation,
                     _ablation_threshold(config, variant, metric),
                     effect_scale=effect_scale,
-                    materiality_direction=(
-                        MaterialityDirection.DETERIORATION_AT_LEAST
-                    ),
+                    materiality_direction=MaterialityDirection.DETERIORATION_AT_LEAST,
                 ),
             )
         )
