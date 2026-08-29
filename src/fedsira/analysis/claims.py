@@ -39,7 +39,7 @@ class ClaimDefinition(FrozenDomainModel):
     exact_scoped_claim: ClaimScopeText
     evidence_experiments: tuple[ExperimentName, ...]
     primary_metric: MetricName | None
-    required_comparison: ComparisonName | None
+    required_family: ClaimFamily | None = None
 
 
 class ClaimStateResult(FrozenDomainModel):
@@ -49,7 +49,7 @@ class ClaimStateResult(FrozenDomainModel):
     reason: ClaimReason
 
 
-CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
+CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
     ClaimDefinition(
         claim_id="Unsupported Capability Problem",
         exact_scoped_claim=(
@@ -58,7 +58,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Data and Domain Evidence Validation",),
         primary_metric=None,
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Pre-Evidence Information Limit",
@@ -68,7 +67,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Protocol Invariant Validation",),
         primary_metric=None,
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Authority Transition",
@@ -82,7 +80,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "Primary Confirmatory Evaluation",
         ),
         primary_metric="legitimate-admission",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Direct Source Exclusion",
@@ -92,7 +89,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Protocol Invariant Validation",),
         primary_metric=None,
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Conditional Non-Interference",
@@ -103,7 +99,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Protocol Invariant Validation",),
         primary_metric=None,
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Malicious Source Salvage",
@@ -117,7 +112,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "Primary Confirmatory Evaluation",
         ),
         primary_metric="asr",
-        required_comparison="source-exclusion ASR",
+        required_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
     ),
     ClaimDefinition(
         claim_id="Proposal Assistance Value",
@@ -127,7 +122,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Proposal-Assisted Opening Necessity",),
         primary_metric="false-launch",
-        required_comparison="false-launch superiority",
+        required_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
     ),
     ClaimDefinition(
         claim_id="Plurality Necessity",
@@ -137,7 +132,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Single-Reproduction Necessity",),
         primary_metric="malicious-admission",
-        required_comparison="plurality primary effect",
+        required_family=ClaimFamily.PLURALITY_NECESSITY,
     ),
     ClaimDefinition(
         claim_id="External Verification Necessity",
@@ -148,7 +143,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("External Verification Necessity",),
         primary_metric="malicious-admission",
-        required_comparison="external-verification primary effect",
+        required_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
     ),
     ClaimDefinition(
         claim_id="Mechanism Necessity",
@@ -163,7 +158,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "External Verification Necessity",
         ),
         primary_metric=None,
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Byzantine Operating Region",
@@ -177,7 +171,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "Byzantine-Bound Violation",
         ),
         primary_metric="malicious-admission",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Safe Dormancy",
@@ -186,7 +179,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Evidence Scarcity and Dormancy",),
         primary_metric="legitimate-admission",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Reproducibility Is Not Truth",
@@ -196,7 +188,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Shared Epistemic-Failure Boundary",),
         primary_metric="clean-oracle-target-f1-delta",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Capability-Granularity Boundary",
@@ -206,7 +197,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Capability Under-Specification Boundary",),
         primary_metric="false-same-capability-certification-rate",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Heterogeneity Boundary",
@@ -216,7 +206,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Heterogeneous-Reproduction Boundary",),
         primary_metric="legitimate-admission",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Information-Arrival Delay",
@@ -229,7 +218,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "Admission-Delay Decomposition",
         ),
         primary_metric="t_evidence",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Post-Evidence Efficiency",
@@ -239,7 +227,6 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Efficiency Measurement",),
         primary_metric="post-evidence-wall-clock",
-        required_comparison=None,
     ),
     ClaimDefinition(
         claim_id="Secondary Generalization",
@@ -249,7 +236,7 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
         ),
         evidence_experiments=("Secondary-Dataset Generalization",),
         primary_metric="target-f1",
-        required_comparison=ClaimFamily.SECONDARY_GENERALIZATION.value,
+        required_family=ClaimFamily.SECONDARY_GENERALIZATION,
     ),
     ClaimDefinition(
         claim_id="IoT IDS Application",
@@ -262,21 +249,15 @@ CLAIM_REGISTRY: tuple[ClaimDefinition, ...] = (
             "Secondary-Dataset Generalization",
         ),
         primary_metric=None,
-        required_comparison=None,
     ),
 )
 
 
-def claim_by_id(claim_id: ClaimId) -> ClaimDefinition:
-    for definition in CLAIM_REGISTRY:
-        if definition.claim_id == claim_id:
-            return definition
-    raise KeyError(f"unknown claim {claim_id!r}")
-
-
 class ClaimEvidence(FrozenDomainModel):
+    completed_experiments: frozenset[ExperimentName]
     comparison_states: Mapping[ComparisonName, ComparisonState]
     comparison_p_values: Mapping[ComparisonName, PValue | None]
+    mechanism_survival: Mapping[ClaimFamily, ClaimGateDecision]
     malicious_admissions: tuple[AdmissionCount, ...]
     legitimate_admissions: tuple[AdmissionCount, ...]
     permanent_singleton_admissions: AdmissionCount
@@ -287,27 +268,22 @@ class ClaimEvidence(FrozenDomainModel):
     secondary_generalization_passes: ClaimGateDecision | None
 
 
-def _comparison_passed(
-    evidence: ClaimEvidence, comparison: ComparisonName
-) -> ClaimGateDecision | None:
-    state = evidence.comparison_states.get(comparison)
-    if state is None:
-        return None
-    return state == "Passed"
+def claim_by_id(claim_id: ClaimId) -> ClaimDefinition:
+    for definition in CLAIM_DEFINITIONS:
+        if definition.claim_id == claim_id:
+            return definition
+    raise KeyError(f"unknown claim {claim_id!r}")
 
 
-def _required_experiments_complete(
-    definition: ClaimDefinition, evidence: ClaimEvidence
+def _required_evidence_available(
+    definition: ClaimDefinition,
+    evidence: ClaimEvidence,
 ) -> ClaimGateDecision:
-    if definition.required_comparison is None:
-        return True
-    if definition.required_comparison not in evidence.comparison_states:
+    if not set(definition.evidence_experiments).issubset(evidence.completed_experiments):
         return False
-    return any(
-        experiment in comparison
-        for comparison in evidence.comparison_states
-        for experiment in definition.evidence_experiments
-    )
+    if definition.required_family is None:
+        return True
+    return definition.required_family in evidence.mechanism_survival
 
 
 def derive_claim_states(
@@ -318,53 +294,42 @@ def derive_claim_states(
     family_wise_alpha: FamilyWiseAlpha,
 ) -> tuple[ClaimStateResult, ...]:
     states: list[ClaimStateResult] = []
-
-    for definition in CLAIM_REGISTRY:
-        resolved_definition = claim_by_id(definition.claim_id)
-        claim_evidence = evidence.get(resolved_definition.claim_id)
-        if claim_evidence is None:
+    for definition in CLAIM_DEFINITIONS:
+        claim_evidence = evidence.get(definition.claim_id)
+        if claim_evidence is None or not _required_evidence_available(definition, claim_evidence):
             states.append(
                 ClaimStateResult(
-                    claim_id=resolved_definition.claim_id,
+                    claim_id=definition.claim_id,
                     state=FinalClaimState.NOT_TESTED,
-                    scope=resolved_definition.exact_scoped_claim,
-                    reason="required evidence did not execute validly",
-                )
-            )
-            continue
-        required_comparison_state = (
-            None
-            if resolved_definition.required_comparison is None
-            else _comparison_passed(claim_evidence, resolved_definition.required_comparison)
-        )
-        if not _required_experiments_complete(resolved_definition, claim_evidence):
-            states.append(
-                ClaimStateResult(
-                    claim_id=resolved_definition.claim_id,
-                    state=FinalClaimState.NOT_TESTED,
-                    scope=resolved_definition.exact_scoped_claim,
-                    reason="required evidence experiments are incomplete",
+                    scope=definition.exact_scoped_claim,
+                    reason="required verified evidence is incomplete",
                 )
             )
             continue
         state = _derive_claim_state(
-            resolved_definition,
+            definition,
             claim_evidence,
             materiality_config,
             claim_support_thresholds,
             minimum_complete_pairs_for_claim_support,
-            required_comparison_state,
             family_wise_alpha,
         )
         states.append(
             ClaimStateResult(
-                claim_id=resolved_definition.claim_id,
+                claim_id=definition.claim_id,
                 state=state,
-                scope=resolved_definition.exact_scoped_claim,
+                scope=definition.exact_scoped_claim,
                 reason="mechanically derived from verified evidence",
             )
         )
     return tuple(states)
+
+
+def _family_survival(
+    evidence: ClaimEvidence,
+    family: ClaimFamily,
+) -> ClaimGateDecision | None:
+    return evidence.mechanism_survival.get(family)
 
 
 def _derive_claim_state(
@@ -373,90 +338,100 @@ def _derive_claim_state(
     materiality_config: MaterialityConfig,
     claim_support_thresholds: ClaimSupportThresholdsConfig,
     minimum_complete_pairs_for_claim_support: MinimumCompletePairCount,
-    required_comparison_state: ClaimGateDecision | None,
     family_wise_alpha: FamilyWiseAlpha,
 ) -> FinalClaimState:
     del materiality_config
-    if definition.primary_metric is not None and required_comparison_state is False:
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Unsupported Capability Problem":
+    claim_id = definition.claim_id
+    if claim_id in {
+        "Unsupported Capability Problem",
+        "Pre-Evidence Information Limit",
+        "Direct Source Exclusion",
+        "Conditional Non-Interference",
+    }:
         return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Pre-Evidence Information Limit":
-        return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Direct Source Exclusion":
-        return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Conditional Non-Interference":
-        return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Authority Transition":
-        if sum(evidence.legitimate_admissions) >= minimum_complete_pairs_for_claim_support:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Malicious Source Salvage":
-        if evidence.source_exclusion_gate_passed:
-            return FinalClaimState.SUPPORTED
+    if claim_id == "Authority Transition":
+        return (
+            FinalClaimState.SUPPORTED
+            if sum(evidence.legitimate_admissions) >= minimum_complete_pairs_for_claim_support
+            else FinalClaimState.NOT_SUPPORTED
+        )
+    if claim_id == "Malicious Source Salvage":
         if evidence.source_exclusion_gate_passed is None:
             return FinalClaimState.NOT_TESTED
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Proposal Assistance Value":
-        proposal_state = _comparison_passed(evidence, "proposal survival")
-        if proposal_state is None:
+        return (
+            FinalClaimState.SUPPORTED
+            if evidence.source_exclusion_gate_passed
+            else FinalClaimState.NOT_SUPPORTED
+        )
+    if claim_id == "Proposal Assistance Value":
+        survives = _family_survival(evidence, ClaimFamily.PROPOSAL_SCREEN_NECESSITY)
+        if survives is None:
             return FinalClaimState.NOT_TESTED
-        return FinalClaimState.SUPPORTED if proposal_state else FinalClaimState.NULL_RESULT
-    if definition.claim_id == "Plurality Necessity":
-        plurality_state = _comparison_passed(evidence, "plurality survival")
-        if plurality_state is None:
+        return FinalClaimState.SUPPORTED if survives else FinalClaimState.NULL_RESULT
+    if claim_id == "Plurality Necessity":
+        survives = _family_survival(evidence, ClaimFamily.PLURALITY_NECESSITY)
+        if survives is None:
             return FinalClaimState.NOT_TESTED
-        return FinalClaimState.SUPPORTED if plurality_state else FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "External Verification Necessity":
-        external_state = _comparison_passed(evidence, "external-verification survival")
-        if external_state is None:
+        return FinalClaimState.SUPPORTED if survives else FinalClaimState.NOT_SUPPORTED
+    if claim_id == "External Verification Necessity":
+        survives = _family_survival(evidence, ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY)
+        if survives is None:
             return FinalClaimState.NOT_TESTED
-        return FinalClaimState.SUPPORTED if external_state else FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Mechanism Necessity":
-        known = [
-            state
-            for state in (
-                _comparison_passed(evidence, "proposal survival"),
-                _comparison_passed(evidence, "plurality survival"),
-                _comparison_passed(evidence, "external-verification survival"),
-            )
-            if state is not None
-        ]
-        if len(known) < 3:
+        return FinalClaimState.SUPPORTED if survives else FinalClaimState.NOT_SUPPORTED
+    if claim_id == "Mechanism Necessity":
+        families = (
+            ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+            ClaimFamily.PLURALITY_NECESSITY,
+            ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+        )
+        survival = tuple(_family_survival(evidence, family) for family in families)
+        if any(state is None for state in survival):
             return FinalClaimState.NOT_TESTED
-        supported_count = sum(1 for state in known if state)
-        if supported_count == 3:
+        supported_count = sum(state is True for state in survival)
+        if supported_count == len(families):
             return FinalClaimState.SUPPORTED
-        if supported_count in (1, 2):
+        if supported_count > 0:
             return FinalClaimState.PARTIALLY_SUPPORTED
         return FinalClaimState.NULL_RESULT
-    if definition.claim_id == "Byzantine Operating Region":
-        maximum = claim_support_thresholds.byzantine_operating_region.maximum_malicious_admissions_within_bound
-        if sum(evidence.malicious_admissions) <= maximum:
-            return FinalClaimState.CONDITIONAL
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Safe Dormancy":
-        if (
-            evidence.permanent_singleton_admissions
-            <= claim_support_thresholds.safe_dormancy.maximum_permanent_singleton_admissions
-        ):
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
-    if definition.claim_id == "Reproducibility Is Not Truth":
+    if claim_id == "Byzantine Operating Region":
+        maximum = (
+            claim_support_thresholds.byzantine_operating_region
+            .maximum_malicious_admissions_within_bound
+        )
+        return (
+            FinalClaimState.CONDITIONAL
+            if sum(evidence.malicious_admissions) <= maximum
+            else FinalClaimState.NOT_SUPPORTED
+        )
+    if claim_id == "Safe Dormancy":
+        maximum = claim_support_thresholds.safe_dormancy.maximum_permanent_singleton_admissions
+        return (
+            FinalClaimState.SUPPORTED
+            if evidence.permanent_singleton_admissions <= maximum
+            else FinalClaimState.NOT_SUPPORTED
+        )
+    if claim_id == "Reproducibility Is Not Truth":
         return (
             FinalClaimState.SUPPORTED
             if any(evidence.clean_oracle_material_degradations)
             else FinalClaimState.NOT_SUPPORTED
         )
-    if definition.claim_id == "Capability-Granularity Boundary":
+    if claim_id == "Capability-Granularity Boundary":
         if not evidence.false_same_capability_rates:
             return FinalClaimState.NULL_RESULT
         mean_rate = sum(evidence.false_same_capability_rates) / len(
             evidence.false_same_capability_rates
         )
-        minimum = claim_support_thresholds.capability_granularity_boundary.false_same_capability_certification_rate_minimum
-        return FinalClaimState.SUPPORTED if mean_rate >= minimum else FinalClaimState.NULL_RESULT
-    if definition.claim_id == "Heterogeneity Boundary":
+        minimum = (
+            claim_support_thresholds.capability_granularity_boundary
+            .false_same_capability_certification_rate_minimum
+        )
+        return (
+            FinalClaimState.SUPPORTED
+            if mean_rate >= minimum
+            else FinalClaimState.NULL_RESULT
+        )
+    if claim_id == "Heterogeneity Boundary":
         if evidence.heterogeneity_boundary_passes is None:
             return FinalClaimState.NOT_TESTED
         return (
@@ -464,24 +439,22 @@ def _derive_claim_state(
             if evidence.heterogeneity_boundary_passes
             else FinalClaimState.NOT_SUPPORTED
         )
-    if definition.claim_id in ("Information-Arrival Delay", "Post-Evidence Efficiency"):
+    if claim_id in {"Information-Arrival Delay", "Post-Evidence Efficiency"}:
         return FinalClaimState.SUPPORTED
-    if definition.claim_id == "Secondary Generalization":
+    if claim_id == "Secondary Generalization":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.NOT_TESTED
-        applicable_p_values = tuple(
+        p_values = tuple(
             p_value for p_value in evidence.comparison_p_values.values() if p_value is not None
         )
-        if applicable_p_values and any(
-            p_value >= family_wise_alpha for p_value in applicable_p_values
-        ):
+        if p_values and any(p_value >= family_wise_alpha for p_value in p_values):
             return FinalClaimState.NOT_SUPPORTED
         return (
             FinalClaimState.SUPPORTED
             if evidence.secondary_generalization_passes
             else FinalClaimState.NOT_SUPPORTED
         )
-    if definition.claim_id == "IoT IDS Application":
+    if claim_id == "IoT IDS Application":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.PARTIALLY_SUPPORTED
         return FinalClaimState.SUPPORTED
