@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     CollapseDecisionPassed,
     ConditionName,
     ExperimentName,
+    FrozenDomainModel,
     MasterSeed,
     MethodName,
     ProgramBlockName,
@@ -18,28 +18,27 @@ from fedsira.domain.records import (
 )
 from fedsira.experiments.collapse import CollapseDecisionKind
 from fedsira.experiments.registry import (
+    BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
+    DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+    EFFICIENCY_MEASUREMENT_NAME,
     EXPERIMENT_REGISTRY,
+    EXTERNAL_VERIFICATION_NECESSITY_NAME,
+    MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
+    PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    PROTOCOL_INVARIANT_VALIDATION_NAME,
+    SINGLE_REPRODUCTION_NECESSITY_NAME,
+    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationVariant,
     ExperimentClass,
     ExperimentDefinition,
-    experiment_names,
+    ablation_scenario_for_variant,
+    baseline_validation_fixture_for_method,
 )
 
 
-def collapse_decision_kind_for_experiment(
-    experiment: ExperimentName,
-) -> CollapseDecisionKind | None:
-    return {
-        "Proposal-Assisted Opening Necessity": CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-        "Single-Reproduction Necessity": CollapseDecisionKind.PLURALITY,
-        "Source-Artifact Exclusion Necessity": CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-        "External Verification Necessity": CollapseDecisionKind.EXTERNAL_VERIFICATION,
-    }.get(experiment)
-
-
-@dataclass(frozen=True)
-class ScientificCell:
+class ScientificCell(FrozenDomainModel):
     experiment: ExperimentName
     method: MethodName
     condition: ConditionName
@@ -50,18 +49,7 @@ class ScientificCell:
         return "|".join((self.experiment, self.method, self.condition, str(self.master_seed)))
 
 
-PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
-    {
-        "Data and Domain Evidence Validation",
-        "Protocol Invariant Validation",
-        "Baseline Implementation Validation",
-        *COLLAPSE_EXPERIMENT_NAMES,
-    }
-)
-
-
-@dataclass(frozen=True)
-class PlannedExperiment:
+class PlannedExperiment(FrozenDomainModel):
     definition: ExperimentDefinition
     cells: tuple[ScientificCell, ...]
     prerequisites: tuple[ExperimentName, ...]
@@ -69,8 +57,7 @@ class PlannedExperiment:
     resolved_core_dependent: ResolvedCoreDependent
 
 
-@dataclass(frozen=True)
-class ExperimentPlan:
+class ExperimentPlan(FrozenDomainModel):
     experiments: tuple[PlannedExperiment, ...]
 
     def experiment(self, name: ExperimentName) -> PlannedExperiment:
@@ -100,6 +87,30 @@ class ExperimentPlan:
         )
 
 
+PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
+    {
+        DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+        PROTOCOL_INVARIANT_VALIDATION_NAME,
+        BASELINE_IMPLEMENTATION_VALIDATION_NAME,
+        *COLLAPSE_EXPERIMENT_NAMES,
+    }
+)
+
+
+def collapse_decision_kind_for_experiment(
+    experiment: ExperimentName,
+) -> CollapseDecisionKind | None:
+    if experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
+        return CollapseDecisionKind.PROPOSAL_ASSISTANCE
+    if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
+        return CollapseDecisionKind.PLURALITY
+    if experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+        return CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
+    if experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
+        return CollapseDecisionKind.EXTERNAL_VERIFICATION
+    return None
+
+
 def _experiment_seeds(
     definition: ExperimentDefinition,
     master_seeds: tuple[MasterSeed, ...],
@@ -110,54 +121,102 @@ def _experiment_seeds(
     return master_seeds[: definition.seed_count]
 
 
+def _baseline_validation_cells(
+    definition: ExperimentDefinition,
+    smoke_seed: MasterSeed,
+) -> tuple[ScientificCell, ...]:
+    return tuple(
+        ScientificCell(
+            experiment=definition.name,
+            method=method,
+            condition=baseline_validation_fixture_for_method(method),
+            master_seed=smoke_seed,
+        )
+        for method in definition.methods
+    )
+
+
+def _ablation_cells(
+    definition: ExperimentDefinition,
+    seeds: tuple[MasterSeed, ...],
+) -> tuple[ScientificCell, ...]:
+    return tuple(
+        ScientificCell(
+            experiment=definition.name,
+            method=variant.value,
+            condition=ablation_scenario_for_variant(variant),
+            master_seed=seed,
+        )
+        for variant in AblationVariant
+        for seed in seeds
+    )
+
+
+def _efficiency_cells(
+    definition: ExperimentDefinition,
+    seeds: tuple[MasterSeed, ...],
+) -> tuple[ScientificCell, ...]:
+    return tuple(
+        ScientificCell(
+            experiment=definition.name,
+            method=method,
+            condition=f"repetition-{repetition_index}",
+            master_seed=seed,
+        )
+        for method in definition.methods
+        for seed in seeds
+        for repetition_index in range(1, 6)
+    )
+
+
+def _cartesian_cells(
+    definition: ExperimentDefinition,
+    seeds: tuple[MasterSeed, ...],
+) -> tuple[ScientificCell, ...]:
+    return tuple(
+        ScientificCell(
+            experiment=definition.name,
+            method=method,
+            condition=condition,
+            master_seed=seed,
+        )
+        for method in definition.methods
+        for condition in definition.conditions
+        for seed in seeds
+    )
+
+
 def _planned_experiment(
     definition: ExperimentDefinition,
     master_seeds: tuple[MasterSeed, ...],
     smoke_seed: MasterSeed,
 ) -> PlannedExperiment:
     seeds = _experiment_seeds(definition, master_seeds, smoke_seed)
-    if definition.name == "Baseline Implementation Validation":
-        cells = tuple(
-            ScientificCell(
-                experiment=definition.name,
-                method=method,
-                condition="Baseline Validation",
-                master_seed=smoke_seed,
-            )
-            for method in definition.methods
-        )
-    elif definition.name == "Efficiency Measurement":
-        cells = tuple(
-            ScientificCell(
-                experiment=definition.name,
-                method=method,
-                condition=f"repetition-{repetition_index}",
-                master_seed=master_seed,
-            )
-            for method in definition.methods
-            for master_seed in seeds
-            for repetition_index in range(1, 6)
-        )
+    if definition.name == BASELINE_IMPLEMENTATION_VALIDATION_NAME:
+        cells = _baseline_validation_cells(definition, smoke_seed)
+    elif definition.name == MECHANISM_ABLATION_NAME:
+        cells = _ablation_cells(definition, seeds)
+    elif definition.name == EFFICIENCY_MEASUREMENT_NAME:
+        cells = _efficiency_cells(definition, seeds)
     else:
-        cells = tuple(
-            ScientificCell(
-                experiment=definition.name,
-                method=method,
-                condition=condition,
-                master_seed=master_seed,
-            )
-            for method in definition.methods
-            for condition in definition.conditions
-            for master_seed in seeds
-        )
-    resolved_core_dependent = definition.name in POST_CORE_EXPERIMENT_NAMES
+        cells = _cartesian_cells(definition, seeds)
     return PlannedExperiment(
         definition=definition,
         cells=cells,
         prerequisites=definition.prerequisites,
         lifecycle_state=ExperimentLifecycleState.NOT_STARTED,
-        resolved_core_dependent=resolved_core_dependent,
+        resolved_core_dependent=definition.name in POST_CORE_EXPERIMENT_NAMES,
     )
+
+
+def _collapse_decision_passed(
+    experiment: ExperimentName,
+    states: Sequence[tuple[ExperimentName, CollapseDecisionPassed]],
+) -> CollapseDecisionPassed | None:
+    for recorded_experiment, passed in states:
+        if recorded_experiment == experiment:
+            return passed
+    return None
 
 
 def build_plan(
@@ -166,55 +225,29 @@ def build_plan(
     master_seeds: tuple[MasterSeed, ...] | None = None,
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:
-    decisions = dict(collapse_decision_states or ())
     if master_seeds is None or smoke_seed is None:
         from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 
         config = load_scientific_config(PRODUCTION_CONFIG_PATH)
         master_seeds = master_seeds or config.seeds_and_determinism.master_seeds
         smoke_seed = smoke_seed or config.seeds_and_determinism.smoke_seed
+    decision_states = tuple(collapse_decision_states or ())
     planned: list[PlannedExperiment] = []
     for definition in EXPERIMENT_REGISTRY:
-        if definition.name not in experiment_names():
-            raise RuntimeError(
-                f"registry returned name outside experiment_names: {definition.name}"
-            )
-        if definition.experiment_class not in (
-            ExperimentClass.VALIDATION,
-            ExperimentClass.EXPLORATORY,
-            ExperimentClass.CONFIRMATORY,
-            ExperimentClass.ABLATION,
-            ExperimentClass.ROBUSTNESS,
-            ExperimentClass.FAILURE_BOUNDARY,
-            ExperimentClass.DIAGNOSTIC,
-            ExperimentClass.GENERALIZATION,
-        ):
+        if not isinstance(definition.experiment_class, ExperimentClass):
             raise ValueError(
                 f"unknown experiment class {definition.experiment_class} for {definition.name}"
             )
-        planned_experiment = _planned_experiment(definition, master_seeds, smoke_seed)
-        if planned_experiment.resolved_core_dependent and not resolved_core_complete:
-            planned_experiment = PlannedExperiment(
-                definition=definition,
-                cells=planned_experiment.cells,
-                prerequisites=planned_experiment.prerequisites,
-                lifecycle_state=ExperimentLifecycleState.BLOCKED,
-                resolved_core_dependent=True,
-            )
-        elif (
-            definition.name in COLLAPSE_EXPERIMENT_NAMES
-            and collapse_decision_kind_for_experiment(definition.name) is not None
-            and definition.name in decisions
-            and not decisions[definition.name]
-        ):
-            planned_experiment = PlannedExperiment(
-                definition=definition,
-                cells=planned_experiment.cells,
-                prerequisites=planned_experiment.prerequisites,
-                lifecycle_state=ExperimentLifecycleState.COMPLETED,
-                resolved_core_dependent=False,
-            )
-        planned.append(planned_experiment)
+        item = _planned_experiment(definition, master_seeds, smoke_seed)
+        if item.resolved_core_dependent and not resolved_core_complete:
+            item = item.model_copy(update={"lifecycle_state": ExperimentLifecycleState.BLOCKED})
+        elif definition.name in COLLAPSE_EXPERIMENT_NAMES:
+            passed = _collapse_decision_passed(definition.name, decision_states)
+            if passed is False:
+                item = item.model_copy(
+                    update={"lifecycle_state": ExperimentLifecycleState.COMPLETED}
+                )
+        planned.append(item)
     return ExperimentPlan(experiments=tuple(planned))
 
 
@@ -246,29 +279,27 @@ def plan_cell_count_by_program_block() -> dict[ProgramBlockName, ScientificCellC
 
 
 def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
-    nominal_blocks = plan_cell_count_by_program_block()
-    observed_pre_core = plan.pre_core_cell_count
-    observed_post_core = plan.post_core_cell_count
+    nominal = plan_cell_count_by_program_block()
     for planned in plan.experiments:
-        expected_nominal = planned.definition.nominal_cell_count
         observed = len(planned.cells)
-        if observed != expected_nominal:
+        expected = planned.definition.nominal_cell_count
+        if observed != expected:
             raise ValueError(
                 f"experiment {planned.definition.name} plans {observed} cells but "
-                f"its nominal Section 31 count is {expected_nominal}"
+                f"its nominal Section 31 count is {expected}"
             )
-    if observed_pre_core != nominal_blocks["pre_core_subtotal"]:
+    if plan.pre_core_cell_count != nominal["pre_core_subtotal"]:
         raise ValueError(
-            f"pre-core planned cell count {observed_pre_core} does not match "
-            f"the Section 31 contract {nominal_blocks['pre_core_subtotal']}"
+            f"pre-core planned cell count {plan.pre_core_cell_count} does not match "
+            f"the Section 31 contract {nominal['pre_core_subtotal']}"
         )
-    if observed_post_core != nominal_blocks["post_core_subtotal"]:
+    if plan.post_core_cell_count != nominal["post_core_subtotal"]:
         raise ValueError(
-            f"post-core planned cell count {observed_post_core} does not match "
-            f"the Section 31 contract {nominal_blocks['post_core_subtotal']}"
+            f"post-core planned cell count {plan.post_core_cell_count} does not match "
+            f"the Section 31 contract {nominal['post_core_subtotal']}"
         )
-    if plan.total_cell_count != nominal_blocks["complete_scientific_plan"]:
+    if plan.total_cell_count != nominal["complete_scientific_plan"]:
         raise ValueError(
             f"total planned cell count {plan.total_cell_count} does not match "
-            f"the Section 31 contract {nominal_blocks['complete_scientific_plan']}"
+            f"the Section 31 contract {nominal['complete_scientific_plan']}"
         )
