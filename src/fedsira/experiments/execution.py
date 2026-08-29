@@ -194,7 +194,7 @@ def comparison_results_for_experiment(
     seed_metrics: dict[tuple[PairingKey, MethodName], dict[MetricName, MetricValue | None]] = {}
     for outcome in outcomes:
         pairing = PairingKey(
-            dataset=dataset.value,
+            dataset=dataset,
             experiment=experiment,
             scientific_scenario=outcome.cell.condition,
             master_seed=outcome.cell.master_seed,
@@ -269,7 +269,7 @@ def comparison_results_for_experiment(
             )
         families.append(
             apply_holm_adjustment(
-                ComparisonFamilyResult(family, tuple(results)),
+                ComparisonFamilyResult(family=family, results=tuple(results)),
                 config.metrics_and_statistics.multiplicity,
             )
         )
