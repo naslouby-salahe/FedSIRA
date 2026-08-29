@@ -40,7 +40,7 @@ def render_result(result: ExperimentExecutionResult) -> str:
     for outcome in result.outcomes:
         lines.append(
             f"  {outcome.cell.method:<45} {outcome.cell.condition:<40} "
-            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state}"
+            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state.value}"
         )
     if result.comparison_results:
         lines.extend(("", "comparisons:"))
@@ -54,7 +54,7 @@ def render_result(result: ExperimentExecutionResult) -> str:
                 )
                 lines.append(
                     f"    {comparison.definition.comparison_name:<110} "
-                    f"{comparison.comparison_state:<22} {p_value}"
+                    f"{comparison.comparison_state.value:<22} {p_value}"
                 )
     return "\n".join(lines)
 
@@ -65,7 +65,6 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     store = ExecutionRecordStore(Path("outputs"))
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     decisions: list[CollapseDecision] = []
-    alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
     collapse_families = frozenset(
         {
             ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
@@ -113,13 +112,17 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
             collapse_decision_from_comparison_families(
                 matched_family,
                 comparison_results,
-                alpha,
+                evaluation=None,
+                materiality_config=config.metrics_and_statistics.materiality,
             )
         )
-    if len(decisions) == len(COLLAPSE_EXPERIMENT_NAMES):
-        core = materialize_resolved_core(tuple(decisions))
-        publish_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
-        print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
+    if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
+        return
+    if not all(decision.constraint_passes for decision in decisions):
+        return
+    core = materialize_resolved_core(tuple(decisions))
+    publish_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
+    print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 
 def execute(name: ExperimentName, overwrite: OverwriteExisting) -> None:
