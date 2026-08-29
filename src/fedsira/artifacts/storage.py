@@ -64,16 +64,19 @@ def stage_payload(cache_staging_root: Path, payload: bytes) -> Path:
     return staged_path
 
 
-def canonical_artifact_paths(
-    canonical_directory: Path, identity: ArtifactDigest
+def published_artifact_paths(
+    published_directory: Path, identity: ArtifactDigest
 ) -> tuple[Path, Path]:
-    payload_path = canonical_directory / f"{identity}{ARTIFACT_PAYLOAD_SUFFIX}"
-    manifest_path = canonical_directory / f"{identity}{ARTIFACT_MANIFEST_SUFFIX}"
+    payload_path = published_directory / f"{identity}{ARTIFACT_PAYLOAD_SUFFIX}"
+    manifest_path = published_directory / f"{identity}{ARTIFACT_MANIFEST_SUFFIX}"
     return payload_path, manifest_path
 
 
 def publish_artifact_to_disk(
-    staged_path: Path, canonical_directory: Path, staged_manifest: ArtifactManifest, payload: bytes
+    staged_path: Path,
+    published_directory: Path,
+    staged_manifest: ArtifactManifest,
+    payload: bytes,
 ) -> ArtifactManifest:
     if staged_manifest.lifecycle_state is not ArtifactLifecycleState.STAGING:
         raise ValueError("only a staged manifest may be published")
@@ -81,9 +84,9 @@ def publish_artifact_to_disk(
     completed = staged_manifest.model_copy(
         update={"lifecycle_state": ArtifactLifecycleState.COMPLETE}
     )
-    canonical_directory.mkdir(parents=True, exist_ok=True)
-    payload_path, manifest_path = canonical_artifact_paths(
-        canonical_directory, staged_manifest.identity
+    published_directory.mkdir(parents=True, exist_ok=True)
+    payload_path, manifest_path = published_artifact_paths(
+        published_directory, staged_manifest.identity
     )
     os.replace(staged_path, payload_path)
     manifest_path.write_text(completed.model_dump_json())
@@ -91,19 +94,21 @@ def publish_artifact_to_disk(
 
 
 def read_published_manifest(
-    canonical_directory: Path, identity: ArtifactDigest
+    published_directory: Path, identity: ArtifactDigest
 ) -> ArtifactManifest | None:
-    _, manifest_path = canonical_artifact_paths(canonical_directory, identity)
+    _, manifest_path = published_artifact_paths(published_directory, identity)
     if not manifest_path.exists():
         return None
     return ArtifactManifest.model_validate_json(manifest_path.read_text())
 
 
-def is_artifact_complete_and_valid(canonical_directory: Path, identity: ArtifactDigest) -> bool:
-    manifest = read_published_manifest(canonical_directory, identity)
+def is_artifact_complete_and_valid(
+    published_directory: Path, identity: ArtifactDigest
+) -> bool:
+    manifest = read_published_manifest(published_directory, identity)
     if manifest is None or manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
         return False
-    payload_path, _ = canonical_artifact_paths(canonical_directory, identity)
+    payload_path, _ = published_artifact_paths(published_directory, identity)
     if not payload_path.exists():
         return False
     try:
