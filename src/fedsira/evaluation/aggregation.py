@@ -1,23 +1,37 @@
 import math
-from collections.abc import Sequence
 
 import numpy
 
 from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import MasterSeed, PositiveInt, Probability, SampleId
+from fedsira.domain.records import (
+    ConfidenceIntervalBound,
+    MasterSeed,
+    MetricValue,
+    NonNegativeInt,
+    PositiveInt,
+    Probability,
+    SampleId,
+    SeedDerivationLabel,
+)
 from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 
-SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR = "SINGLE_METHOD_MEAN_BOOTSTRAP"
+SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR: SeedDerivationLabel = "SINGLE_METHOD_MEAN_BOOTSTRAP"
 
 
 def minimum_defined_domain_count(
-    expected_domain_count: PositiveInt, generic_defined_domain_fraction_minimum: Probability
+    expected_domain_count: PositiveInt,
+    generic_defined_domain_fraction_minimum: Probability,
 ) -> PositiveInt:
     return math.ceil(expected_domain_count * generic_defined_domain_fraction_minimum)
 
 
-def quantile_type7(sorted_values: Sequence[float], probability: float) -> float:
+def quantile_type7(
+    sorted_values: tuple[MetricValue, ...],
+    probability: Probability,
+) -> MetricValue:
+    if not sorted_values:
+        raise ValueError("quantile requires at least one value")
     sample_count = len(sorted_values)
     if sample_count == 1:
         return sorted_values[0]
@@ -32,13 +46,18 @@ def quantile_type7(sorted_values: Sequence[float], probability: float) -> float:
     )
 
 
-def decile_boundaries(boundary_values: Sequence[float]) -> tuple[float, ...]:
-    sorted_values = sorted(boundary_values)
+def decile_boundaries(
+    boundary_values: tuple[MetricValue, ...],
+) -> tuple[MetricValue, ...]:
+    sorted_values = tuple(sorted(boundary_values))
     return tuple(quantile_type7(sorted_values, decile / 10.0) for decile in range(1, 10))
 
 
-def decile_bin(value: float, boundaries: Sequence[float]) -> int:
-    bin_index = 0
+def decile_bin(
+    value: MetricValue,
+    boundaries: tuple[MetricValue, ...],
+) -> NonNegativeInt:
+    bin_index: NonNegativeInt = 0
     for boundary in boundaries:
         if value <= boundary:
             break
@@ -46,87 +65,114 @@ def decile_bin(value: float, boundaries: Sequence[float]) -> int:
     return bin_index
 
 
+def _candidate_pool(
+    candidates: tuple[tuple[SampleId, MetricValue], ...],
+    boundaries: tuple[MetricValue, ...],
+    target_loss: MetricValue,
+) -> tuple[tuple[SampleId, MetricValue], ...]:
+    target_bin = decile_bin(target_loss, boundaries)
+    return tuple(
+        candidate
+        for candidate in candidates
+        if decile_bin(candidate[1], boundaries) == target_bin
+    )
+
+
 def match_nearest_within_decile(
-    targets: Sequence[tuple[SampleId, float]],
-    candidates: Sequence[tuple[SampleId, float]],
-    boundary_values: Sequence[float],
+    targets: tuple[tuple[SampleId, MetricValue], ...],
+    candidates: tuple[tuple[SampleId, MetricValue], ...],
+    boundary_values: tuple[MetricValue, ...],
 ) -> tuple[tuple[SampleId, SampleId], ...] | None:
     if not boundary_values:
         return None
     boundaries = decile_boundaries(boundary_values)
-    candidates_by_bin: dict[int, list[tuple[SampleId, float]]] = {}
-    for row_id, loss in candidates:
-        candidates_by_bin.setdefault(decile_bin(loss, boundaries), []).append((row_id, loss))
-    for bin_candidates in candidates_by_bin.values():
-        bin_candidates.sort(key=lambda item: item[0])
-
+    remaining = tuple(sorted(candidates, key=lambda item: item[0]))
     matches: list[tuple[SampleId, SampleId]] = []
     for target_id, target_loss in sorted(targets, key=lambda item: item[0]):
-        pool = candidates_by_bin.get(decile_bin(target_loss, boundaries), [])
+        pool = _candidate_pool(remaining, boundaries, target_loss)
         if not pool:
             return None
         best = min(pool, key=lambda item: (abs(item[1] - target_loss), item[0]))
-        pool.remove(best)
+        remaining = tuple(candidate for candidate in remaining if candidate != best)
         matches.append((target_id, best[0]))
     return tuple(matches)
 
 
 def equal_weight_domain_mean(
-    domain_results: Sequence[MetricResult], minimum_defined_domains: PositiveInt
+    domain_results: tuple[MetricResult, ...],
+    minimum_defined_domains: PositiveInt,
 ) -> MetricResult:
-    defined_values = [result.value for result in domain_results if result.value is not None]
+    defined_values = tuple(result.value for result in domain_results if result.value is not None)
     if len(defined_values) < minimum_defined_domains:
-        return MetricResult(None, len(defined_values))
-    return MetricResult(sum(defined_values) / len(defined_values), len(defined_values))
+        return MetricResult(value=None, defined_count=len(defined_values))
+    return MetricResult(
+        value=sum(defined_values) / len(defined_values),
+        defined_count=len(defined_values),
+    )
 
 
-def worst_domain_target_f1(domain_target_f1: Sequence[MetricResult]) -> MetricResult:
-    defined_values = [result.value for result in domain_target_f1 if result.value is not None]
-    if len(defined_values) == 0:
-        return MetricResult(None, 0)
-    return MetricResult(min(defined_values), len(defined_values))
+def worst_domain_target_f1(domain_target_f1: tuple[MetricResult, ...]) -> MetricResult:
+    defined_values = tuple(result.value for result in domain_target_f1 if result.value is not None)
+    if not defined_values:
+        return MetricResult(value=None, defined_count=0)
+    return MetricResult(value=min(defined_values), defined_count=len(defined_values))
 
 
-def percentile_10_domain_target_f1(domain_target_f1: Sequence[MetricResult]) -> MetricResult:
-    defined_values = sorted(result.value for result in domain_target_f1 if result.value is not None)
-    if len(defined_values) == 0:
-        return MetricResult(None, 0)
-    return MetricResult(quantile_type7(defined_values, 0.10), len(defined_values))
+def percentile_10_domain_target_f1(
+    domain_target_f1: tuple[MetricResult, ...],
+) -> MetricResult:
+    defined_values = tuple(
+        sorted(result.value for result in domain_target_f1 if result.value is not None)
+    )
+    if not defined_values:
+        return MetricResult(value=None, defined_count=0)
+    return MetricResult(
+        value=quantile_type7(defined_values, 0.10),
+        defined_count=len(defined_values),
+    )
 
 
-def domain_disparity(domain_target_f1: Sequence[MetricResult]) -> MetricResult:
-    defined_values = [result.value for result in domain_target_f1 if result.value is not None]
-    if len(defined_values) == 0:
-        return MetricResult(None, 0)
-    return MetricResult(max(defined_values) - min(defined_values), len(defined_values))
+def domain_disparity(domain_target_f1: tuple[MetricResult, ...]) -> MetricResult:
+    defined_values = tuple(result.value for result in domain_target_f1 if result.value is not None)
+    if not defined_values:
+        return MetricResult(value=None, defined_count=0)
+    return MetricResult(
+        value=max(defined_values) - min(defined_values),
+        defined_count=len(defined_values),
+    )
 
 
-def interquartile_range(domain_target_f1: Sequence[MetricResult]) -> MetricResult:
-    defined_values = sorted(result.value for result in domain_target_f1 if result.value is not None)
-    if len(defined_values) == 0:
-        return MetricResult(None, 0)
+def interquartile_range(domain_target_f1: tuple[MetricResult, ...]) -> MetricResult:
+    defined_values = tuple(
+        sorted(result.value for result in domain_target_f1 if result.value is not None)
+    )
+    if not defined_values:
+        return MetricResult(value=None, defined_count=0)
     upper_quartile = quantile_type7(defined_values, 0.75)
     lower_quartile = quantile_type7(defined_values, 0.25)
-    return MetricResult(upper_quartile - lower_quartile, len(defined_values))
+    return MetricResult(
+        value=upper_quartile - lower_quartile,
+        defined_count=len(defined_values),
+    )
 
 
-def coefficient_of_variation(values: Sequence[float]) -> MetricResult:
+def coefficient_of_variation(values: tuple[MetricValue, ...]) -> MetricResult:
     if len(values) < 2:
-        return MetricResult(None, len(values))
+        return MetricResult(value=None, defined_count=len(values))
     mean = sum(values) / len(values)
     if mean == 0:
-        return MetricResult(None, len(values))
+        return MetricResult(value=None, defined_count=len(values))
     variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
     standard_deviation = math.sqrt(variance)
-    return MetricResult(standard_deviation / mean, len(values))
+    return MetricResult(value=standard_deviation / mean, defined_count=len(values))
 
 
 def bootstrap_percentile_confidence_interval(
-    seed_level_values: Sequence[float],
+    seed_level_values: tuple[MetricValue, ...],
     bootstrap_config: BootstrapConfig,
     analysis_seed: MasterSeed,
-) -> tuple[float, float] | None:
-    if len(seed_level_values) == 0:
+) -> tuple[ConfidenceIntervalBound, ConfidenceIntervalBound] | None:
+    if not seed_level_values:
         return None
     bootstrap_seed = derive_uint32(SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR, analysis_seed)
     generator = numpy.random.default_rng(bootstrap_seed)
@@ -136,9 +182,10 @@ def bootstrap_percentile_confidence_interval(
     for resample_index in range(bootstrap_config.resamples):
         indices = generator.integers(0, sample_size, size=sample_size)
         resampled_means[resample_index] = values[indices].mean()
-    sorted_means = numpy.sort(resampled_means).tolist()
+    sorted_means = tuple(float(value) for value in numpy.sort(resampled_means))
     lower_probability = (1.0 - bootstrap_config.confidence_level) / 2.0
     upper_probability = 1.0 - lower_probability
-    lower_bound = quantile_type7(sorted_means, lower_probability)
-    upper_bound = quantile_type7(sorted_means, upper_probability)
-    return (lower_bound, upper_bound)
+    return (
+        quantile_type7(sorted_means, lower_probability),
+        quantile_type7(sorted_means, upper_probability),
+    )
