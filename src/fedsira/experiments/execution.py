@@ -180,7 +180,10 @@ class ExecutionRecordStore:
         path = self._record_directory(experiment) / f"{digest}.json"
         if not path.exists():
             return None
-        return PersistedExecutionRecord.model_validate_json(path.read_text())
+        record = PersistedExecutionRecord.model_validate_json(path.read_text())
+        if record.semantic_key != semantic_key or record.experiment != experiment:
+            raise ValueError("persisted execution record identity mismatch")
+        return record
 
     def read_all_outcomes(
         self,
@@ -189,10 +192,14 @@ class ExecutionRecordStore:
         directory = self._record_directory(experiment)
         if not directory.exists():
             return ()
-        return tuple(
+        records = tuple(
             PersistedExecutionRecord.model_validate_json(path.read_text())
             for path in sorted(directory.glob("*.json"))
         )
+        for record in records:
+            if record.experiment != experiment:
+                raise ValueError("persisted execution record experiment mismatch")
+        return records
 
 
 class MetricCellKey(FrozenDomainModel):
@@ -203,20 +210,48 @@ class MetricCellKey(FrozenDomainModel):
     method: MethodName
 
 
-class MetricCellEvidence(FrozenDomainModel):
+class MetricCellRecord(FrozenDomainModel):
     key: MetricCellKey
     metrics: tuple[MetricObservation, ...]
 
 
-MetricIndex = tuple[MetricCellEvidence, ...]
+class ExperimentExecutionDigestInput(FrozenDomainModel):
+    experiment: ExperimentName
+    lifecycle_state: ExperimentLifecycleState
+    semantic_keys: tuple[ScientificCellSemanticKey, ...]
+
+
+def _merge_metric_record(
+    records: tuple[MetricCellRecord, ...],
+    incoming: MetricCellRecord,
+) -> tuple[MetricCellRecord, ...]:
+    retained = tuple(record for record in records if record.key != incoming.key)
+    return (*retained, incoming)
+
+
+def _metric_value(
+    records: tuple[MetricCellRecord, ...],
+    key: MetricCellKey,
+    metric: MetricName,
+) -> MetricValue | None:
+    for record in reversed(records):
+        if record.key != key:
+            continue
+        for metric_name, metric_value in reversed(record.metrics):
+            if metric_name == metric:
+                return metric_value
+    return None
 
 
 def _metric_index_from_outcomes(
     dataset: DatasetId,
     outcomes: tuple[CellExecutionOutcome, ...],
-) -> MetricIndex:
-    return tuple(
-        MetricCellEvidence(
+) -> tuple[MetricCellRecord, ...]:
+    records: tuple[MetricCellRecord, ...] = ()
+    for outcome in outcomes:
+        if outcome.terminal_state is not ExperimentLifecycleState.COMPLETED:
+            continue
+        record = MetricCellRecord(
             key=MetricCellKey(
                 dataset=dataset,
                 experiment=outcome.cell.experiment,
@@ -226,45 +261,33 @@ def _metric_index_from_outcomes(
             ),
             metrics=outcome.metrics,
         )
-        for outcome in outcomes
-        if outcome.terminal_state is ExperimentLifecycleState.COMPLETED
-    )
+        records = _merge_metric_record(records, record)
+    return records
 
 
 def _extend_index_from_records(
-    index: MetricIndex,
+    records: tuple[MetricCellRecord, ...],
     dataset: DatasetId,
-    records: tuple[PersistedExecutionRecord, ...],
-) -> MetricIndex:
-    additions = tuple(
-        MetricCellEvidence(
-            key=MetricCellKey(
-                dataset=dataset,
-                experiment=record.experiment,
-                scientific_scenario=record.condition,
-                master_seed=record.master_seed,
-                method=record.method,
-            ),
-            metrics=record.metrics,
-        )
-        for record in records
-        if record.terminal_state is ExperimentLifecycleState.COMPLETED
-    )
-    return (*index, *additions)
-
-
-def _metric_value(
-    index: MetricIndex,
-    key: MetricCellKey,
-    metric: MetricName,
-) -> MetricValue | None:
-    for evidence in reversed(index):
-        if evidence.key != key:
+    persisted_records: tuple[PersistedExecutionRecord, ...],
+) -> tuple[MetricCellRecord, ...]:
+    merged = records
+    for record in persisted_records:
+        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
             continue
-        for metric_name, metric_value in reversed(evidence.metrics):
-            if metric_name == metric:
-                return metric_value
-    return None
+        merged = _merge_metric_record(
+            merged,
+            MetricCellRecord(
+                key=MetricCellKey(
+                    dataset=dataset,
+                    experiment=record.experiment,
+                    scientific_scenario=record.condition,
+                    master_seed=record.master_seed,
+                    method=record.method,
+                ),
+                metrics=record.metrics,
+            ),
+        )
+    return merged
 
 
 def _benefit_difference(
@@ -273,21 +296,22 @@ def _benefit_difference(
     method_value: MetricValue,
     reference_value: MetricValue,
 ) -> PairedDifference | None:
-    if effect_scale is ComparisonEffectScale.RELATIVE_REFERENCE_REDUCTION:
-        if orientation is not ComparisonOrientation.LOWER_IS_BETTER:
-            raise ValueError("relative reduction is defined only for lower-is-better metrics")
-        if reference_value == 0.0:
-            return None
-        return (reference_value - method_value) / reference_value
-    if orientation is ComparisonOrientation.HIGHER_IS_BETTER:
-        return method_value - reference_value
-    return reference_value - method_value
+    absolute_difference = (
+        method_value - reference_value
+        if orientation is ComparisonOrientation.HIGHER_IS_BETTER
+        else reference_value - method_value
+    )
+    if effect_scale is ComparisonEffectScale.ABSOLUTE:
+        return absolute_difference
+    if reference_value == 0.0:
+        return None
+    return absolute_difference / abs(reference_value)
 
 
 def _comparison_pairs(
     definition: ComparisonDefinition,
     dataset: DatasetId,
-    metric_index: MetricIndex,
+    metric_index: tuple[MetricCellRecord, ...],
     master_seeds: tuple[MasterSeed, ...],
 ) -> tuple[PairedDifference, ...]:
     paired: list[PairedDifference] = []
@@ -344,7 +368,6 @@ def comparison_results_for_experiment(
     )
     if not definitions:
         return ()
-
     execution_store = store or ExecutionRecordStore(
         Path(config.runtime.repository_layout.execution_workspace)
     )
@@ -367,7 +390,6 @@ def comparison_results_for_experiment(
             dataset,
             execution_store.read_all_outcomes(reference_experiment),
         )
-
     minimum_complete_pairs = (
         config.metrics_and_statistics.technical_completion
         .minimum_complete_pairs_for_claim_support
@@ -381,13 +403,6 @@ def comparison_results_for_experiment(
             continue
         results: list[ComparisonResult] = []
         for definition in family_definitions:
-            if definition.test_kind not in (
-                ComparisonTestKind.SUPERIORITY,
-                ComparisonTestKind.NON_INFERIORITY,
-            ):
-                raise ValueError(
-                    f"unsupported comparison test kind {definition.test_kind}"
-                )
             paired = _comparison_pairs(
                 definition,
                 dataset,
@@ -421,7 +436,6 @@ def comparison_results_for_experiment(
                 evaluate_comparison(
                     definition,
                     paired,
-                    config.metrics_and_statistics.multiplicity,
                     config.metrics_and_statistics.bootstrap,
                     config.seeds_and_determinism.analysis_seed,
                 )
@@ -521,276 +535,279 @@ def _maximum_constraint(
     return None if values is None else max(values)
 
 
-def collapse_evaluation_from_store(
-    store: ExecutionRecordStore,
+def collapse_evaluation_from_records(
+    experiment: ExperimentName,
+    records: tuple[PersistedExecutionRecord, ...],
     config: ScientificConfig,
-) -> CollapseEvaluationInput:
-    minimum = (
+) -> CollapseEvaluationInput | None:
+    minimum_pairs = (
         config.metrics_and_statistics.technical_completion
         .minimum_complete_pairs_for_claim_support
     )
+    if experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
+        legitimate = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                OpeningMode.PROPOSAL_ASSISTED.value,
+                OpeningMode.CANDIDATE_FREE.value,
+                (ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,),
+                ComparisonMetric.LEGITIMATE_ADMISSION.value,
+                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        malicious = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                OpeningMode.PROPOSAL_ASSISTED.value,
+                OpeningMode.CANDIDATE_FREE.value,
+                (ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
+                ComparisonMetric.MALICIOUS_ADMISSION.value,
+                orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        return CollapseEvaluationInput(
+            proposal_legitimate_admission_degradation=legitimate,
+            proposal_malicious_admission_worsening=malicious,
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
+        conditions = tuple(condition.value for condition in PluralityCondition)
+        legitimate = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                "Full Plurality Path",
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                conditions,
+                ComparisonMetric.LEGITIMATE_ADMISSION.value,
+                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        supported = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                "Full Plurality Path",
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                conditions,
+                ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value,
+                orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        return CollapseEvaluationInput(
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            plurality_legitimate_admission_degradation=legitimate,
+            plurality_supported_harm=supported,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+        conditions = (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,)
+        method = SourceExclusionMethod.FULL_FEDSIRA.value
+        reference = BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value
+        target = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                method,
+                reference,
+                conditions,
+                ComparisonMetric.TARGET_F1.value,
+                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        supported = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                method,
+                reference,
+                conditions,
+                ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value,
+                orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        benign = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                method,
+                reference,
+                conditions,
+                ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE.value,
+                orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        return CollapseEvaluationInput(
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            source_exclusion_target_f1_drop=target,
+            source_exclusion_supported_harm=supported,
+            source_exclusion_benign_far_increase=benign,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
+        legitimate = _maximum_constraint(
+            _paired_constraint_means(
+                records,
+                SourceExclusionMethod.FULL_FEDSIRA.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                (ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY.value,),
+                ComparisonMetric.LEGITIMATE_ADMISSION.value,
+                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                minimum_complete_pairs=minimum_pairs,
+            )
+        )
+        return CollapseEvaluationInput(
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+            external_verification_legitimate_admission_degradation=legitimate,
+        )
+    return None
 
-    proposal_records = store.read_all_outcomes(
-        PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
-    )
-    proposal_lar = _maximum_constraint(
-        _paired_constraint_means(
-            proposal_records,
-            OpeningMode.PROPOSAL_ASSISTED.value,
-            OpeningMode.CANDIDATE_FREE.value,
-            (ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,),
-            "legitimate-admission",
-            orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-    proposal_mar = _maximum_constraint(
-        _paired_constraint_means(
-            proposal_records,
-            OpeningMode.PROPOSAL_ASSISTED.value,
-            OpeningMode.CANDIDATE_FREE.value,
-            (ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
-            "malicious-admission",
-            orientation=ComparisonOrientation.LOWER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
 
-    plurality_records = store.read_all_outcomes(SINGLE_REPRODUCTION_NECESSITY_NAME)
-    plurality_conditions = tuple(condition.value for condition in PluralityCondition)
-    plurality_lar = _maximum_constraint(
-        _paired_constraint_means(
-            plurality_records,
-            "Full Plurality Path",
-            "One Independent Retrain",
-            plurality_conditions,
-            "legitimate-admission",
-            orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
+def _digest_execution_result(
+    experiment: ExperimentName,
+    lifecycle_state: ExperimentLifecycleState,
+    outcomes: tuple[CellExecutionOutcome, ...],
+) -> ArtifactDigest:
+    payload = ExperimentExecutionDigestInput(
+        experiment=experiment,
+        lifecycle_state=lifecycle_state,
+        semantic_keys=tuple(outcome.cell.semantic_key for outcome in outcomes),
     )
-    plurality_supported = _maximum_constraint(
-        _paired_constraint_means(
-            plurality_records,
-            "Full Plurality Path",
-            "One Independent Retrain",
-            plurality_conditions,
-            "supported-macro-f1-harm",
-            orientation=ComparisonOrientation.LOWER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-
-    source_records = store.read_all_outcomes(
-        SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
-    )
-    source_condition = (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,)
-    source_target = _maximum_constraint(
-        _paired_constraint_means(
-            source_records,
-            SourceExclusionMethod.FULL_FEDSIRA.value,
-            SourceExclusionMethod.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-            source_condition,
-            "target-f1",
-            orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-    source_supported = _maximum_constraint(
-        _paired_constraint_means(
-            source_records,
-            SourceExclusionMethod.FULL_FEDSIRA.value,
-            SourceExclusionMethod.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-            source_condition,
-            "supported-macro-f1-harm",
-            orientation=ComparisonOrientation.LOWER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-    source_far = _maximum_constraint(
-        _paired_constraint_means(
-            source_records,
-            SourceExclusionMethod.FULL_FEDSIRA.value,
-            SourceExclusionMethod.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-            source_condition,
-            "benign-far-increase",
-            orientation=ComparisonOrientation.LOWER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-
-    verification_records = store.read_all_outcomes(
-        EXTERNAL_VERIFICATION_NECESSITY_NAME
-    )
-    verification_lar = _maximum_constraint(
-        _paired_constraint_means(
-            verification_records,
-            SourceExclusionMethod.FULL_FEDSIRA.value,
-            "Multiple Retrains with Direct Krum",
-            (ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY.value,),
-            "legitimate-admission",
-            orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-            minimum_complete_pairs=minimum,
-        )
-    )
-
-    return CollapseEvaluationInput(
-        proposal_legitimate_admission_degradation=proposal_lar,
-        proposal_malicious_admission_worsening=proposal_mar,
-        plurality_legitimate_admission_degradation=plurality_lar,
-        plurality_supported_harm=plurality_supported,
-        source_exclusion_target_f1_drop=source_target,
-        source_exclusion_supported_harm=source_supported,
-        source_exclusion_benign_far_increase=source_far,
-        external_verification_legitimate_admission_degradation=verification_lar,
-    )
+    return hashlib.sha256(payload.model_dump_json().encode("utf-8")).hexdigest()
 
 
-def run_experiment(
+def _execute_cell_with_retry(
+    cell: ScientificCell,
+    config: ScientificConfig,
+    executor: CellExecutor,
+) -> CellExecutionOutcome:
+    attempts = config.runtime.automatic_infrastructure_retries_per_cell_phase + 1
+    last_outcome: CellExecutionOutcome | None = None
+    for _attempt in range(attempts):
+        outcome = executor.execute_cell(cell, config)
+        validate_cell_terminal_record(outcome.terminal_state, outcome.failure)
+        if outcome.terminal_state is not ExperimentLifecycleState.FAILED:
+            return outcome
+        last_outcome = outcome
+    if last_outcome is None:
+        raise RuntimeError("cell retry loop produced no outcome")
+    return last_outcome
+
+
+def execute_experiment(
     experiment: ExperimentName,
     executor: CellExecutor,
+    *,
+    config: ScientificConfig | None = None,
     overwrite: OverwriteExisting = False,
-    config_path: Path = PRODUCTION_CONFIG_PATH,
-    resolved_core_complete: ResolvedCoreComplete = False,
-    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...]
-    | None = None,
+    prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
 ) -> ExperimentExecutionResult:
+    resolved_config = config or load_scientific_config(PRODUCTION_CONFIG_PATH)
+    definition = experiment_by_name(experiment)
     validate_experiment_name_is_registered(experiment)
-    config = load_scientific_config(config_path)
-    plan = build_plan(
-        resolved_core_complete=resolved_core_complete,
-        collapse_decision_states=collapse_decision_states,
-    )
-    validate_no_duplicate_semantic_cells(plan)
-    validate_condition_vocabulary(plan)
-    planned = plan.experiment(experiment)
-    if planned.resolved_core_dependent and not resolved_core_complete:
-        return ExperimentExecutionResult(
-            experiment=experiment,
-            lifecycle_state=ExperimentLifecycleState.BLOCKED,
-            outcomes=(),
-        )
-
-    store = ExecutionRecordStore(
-        Path(config.runtime.repository_layout.execution_workspace)
-    )
-    prerequisite_states = tuple(
+    validate_condition_vocabulary(experiment, definition.conditions)
+    states = prerequisite_states or tuple(
         ExperimentPrerequisiteState(
             experiment=prerequisite,
-            lifecycle_state=(
-                ExperimentLifecycleState.COMPLETED
-                if (
-                    (prerequisite_outcomes := store.read_all_outcomes(prerequisite))
-                    and all(
-                        outcome.terminal_state is ExperimentLifecycleState.COMPLETED
-                        for outcome in prerequisite_outcomes
-                    )
-                )
-                else ExperimentLifecycleState.NOT_STARTED
-            ),
+            state=ExperimentLifecycleState.COMPLETED,
         )
-        for prerequisite in planned.prerequisites
+        for prerequisite in definition.prerequisites
     )
-    validate_experiment_prerequisites_met(experiment, prerequisite_states)
-
+    validate_experiment_prerequisites_met(definition.prerequisites, states)
+    plan = build_plan(experiment, resolved_config)
+    validate_no_duplicate_semantic_cells(plan.cells)
+    store = ExecutionRecordStore(
+        Path(resolved_config.runtime.repository_layout.execution_workspace)
+    )
     outcomes: list[CellExecutionOutcome] = []
-    for cell in planned.cells:
+    for cell in plan.cells:
         existing = store.read_outcome(experiment, cell.semantic_key)
         if existing is not None and not overwrite:
             outcomes.append(
                 CellExecutionOutcome(
                     cell=cell,
                     terminal_state=existing.terminal_state,
-                    failure=_to_failure_detail(existing.failure),
+                    failure=(
+                        None
+                        if existing.failure is None
+                        else FailureDetail(
+                            failure_class=existing.failure.failure_class,
+                            message=existing.failure.message,
+                            cell_phase=existing.failure.cell_phase,
+                        )
+                    ),
                     metrics=existing.metrics,
                 )
             )
             continue
-        outcome = executor.execute_cell(cell, config)
-        validate_cell_phase_sequence(
-            (
-                ScientificCellPhase.PREPARE,
-                ScientificCellPhase.PROTOCOL_EVALUATION,
-                ScientificCellPhase.METRIC_AGGREGATION,
-            )
-        )
-        terminal_phase = (
-            CellPhaseState.COMPLETED
-            if outcome.terminal_state is ExperimentLifecycleState.COMPLETED
-            else CellPhaseState.FAILED
-        )
-        validate_cell_terminal_record(cell, terminal_phase)
+        outcome = _execute_cell_with_retry(cell, resolved_config, executor)
         store.write_outcome(outcome)
         outcomes.append(outcome)
-
-    completed_outcomes = tuple(outcomes)
+    outcome_tuple = tuple(outcomes)
+    lifecycle_state = (
+        ExperimentLifecycleState.COMPLETED
+        if all(outcome.completed for outcome in outcome_tuple)
+        else ExperimentLifecycleState.FAILED
+    )
     comparison_results = comparison_results_for_experiment(
         experiment,
-        planned.definition.dataset,
-        completed_outcomes,
-        config,
+        definition.dataset,
+        outcome_tuple,
+        resolved_config,
         store,
     )
-    lifecycle_state = derive_lifecycle_state(
-        tuple(outcome.terminal_state for outcome in completed_outcomes)
-    )
-    completed_digest = execution_record_digest(completed_outcomes)
     return ExperimentExecutionResult(
         experiment=experiment,
         lifecycle_state=lifecycle_state,
-        outcomes=completed_outcomes,
+        outcomes=outcome_tuple,
         comparison_results=comparison_results,
-        execution_digest=completed_digest,
+        execution_digest=_digest_execution_result(
+            experiment,
+            lifecycle_state,
+            outcome_tuple,
+        ),
     )
 
 
-def derive_lifecycle_state(
-    terminal_states: tuple[ExperimentLifecycleState, ...],
-) -> ExperimentLifecycleState:
-    if not terminal_states:
-        return ExperimentLifecycleState.NOT_STARTED
-    terminal_state_set = set(terminal_states)
-    invalid_state = ExperimentLifecycleState.INVALID
-    failed_state = ExperimentLifecycleState.FAILED
-    if terminal_state_set & {invalid_state, failed_state}:
-        return (
-            ExperimentLifecycleState.INVALID
-            if invalid_state in terminal_state_set
-            else ExperimentLifecycleState.FAILED
-        )
-    completed_state = ExperimentLifecycleState.COMPLETED
-    if all(state == completed_state for state in terminal_states):
-        return ExperimentLifecycleState.COMPLETED
-    return ExperimentLifecycleState.RUNNING
-
-
-def is_terminal_experiment_state(
-    state: ExperimentLifecycleState,
+def execution_completed(
+    result: ExperimentExecutionResult,
 ) -> TerminalExperimentState:
-    return state in TERMINAL_EXPERIMENT_STATES
+    return result.lifecycle_state in TERMINAL_EXPERIMENT_STATES
 
 
-def _to_failure_detail(
-    failure: PersistedFailureDetail | None,
-) -> FailureDetail | None:
-    if failure is None:
-        return None
-    return FailureDetail(
-        failure_class=failure.failure_class,
-        message=failure.message,
-        cell_phase=failure.cell_phase,
-    )
+def collapse_decision_passed(
+    result: ExperimentExecutionResult,
+) -> CollapseDecisionPassed:
+    return result.lifecycle_state is ExperimentLifecycleState.COMPLETED
 
 
-def execution_record_digest(
-    outcomes: tuple[CellExecutionOutcome, ...],
-) -> ArtifactDigest:
-    hasher = hashlib.sha256()
-    for outcome in outcomes:
-        hasher.update(
-            framed_bytes(
-                outcome.cell.semantic_key,
-                outcome.terminal_state.value,
-            )
-        )
-    return hasher.hexdigest()
+def resolved_core_complete(
+    result: ExperimentExecutionResult,
+) -> ResolvedCoreComplete:
+    return result.lifecycle_state is ExperimentLifecycleState.COMPLETED
+
+
+def execution_phase_sequence_is_valid(
+    phases: tuple[CellPhaseState, ...],
+) -> CellCompletionStatus:
+    return validate_cell_phase_sequence(phases)
