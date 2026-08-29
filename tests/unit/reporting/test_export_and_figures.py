@@ -8,7 +8,10 @@ from fedsira.domain.enums import ClaimOpeningMode, ExperimentLifecycleState
 from fedsira.experiments.collapse import (
     CollapseDecision,
     CollapseDecisionKind,
+    ProductionUpdateRule,
+    ReproductionRowRequirement,
     ResolvedCore,
+    RowVerificationMode,
 )
 from fedsira.experiments.planning import build_plan
 from fedsira.reporting.export import (
@@ -28,7 +31,10 @@ from fedsira.reporting.tables import (
     render_claim_support_table,
     render_experiment_plan_table,
 )
-from fedsira.reporting.verification import CompletenessVerificationResult
+from fedsira.reporting.verification import (
+    CompletenessVerificationResult,
+    ExperimentLifecycleRecord,
+)
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
@@ -47,30 +53,36 @@ def test_format_p_value_floor_and_rounding() -> None:
     assert format_p_value(value, rounding) == f"{value:.{rounding.p_value_significant_digits}g}"
 
 
-def test_render_experiment_plan_table_is_markdown() -> None:
+def test_render_experiment_plan_table_is_csv() -> None:
     plan = build_plan()
     table = render_experiment_plan_table(plan)
-    lines = table.splitlines()
-    assert lines[0].startswith("| experiment |")
-    assert "| --- |" in lines[1]
-    assert len(lines) - 2 == len(plan.experiments)
+    lines = table.csv_text.splitlines()
+    assert table.name == "Experiment Plan"
+    assert lines[0] == "experiment,class,methods,conditions,seeds,nominal_run_count,claim_family"
+    assert len(lines) - 1 == len(plan.experiments)
 
 
-def test_render_claim_support_table_rejects_unknown_state() -> None:
+def test_render_claim_support_table_uses_typed_state() -> None:
     states = (
-        ClaimStateResult(claim_id="x", state=FinalClaimState.SUPPORTED, scope="s", reason="r"),
+        ClaimStateResult(
+            claim_id="x",
+            state=FinalClaimState.SUPPORTED,
+            scope="s",
+            reason="r",
+        ),
     )
     table = render_claim_support_table(states)
-    assert "| x | s | Supported |" in table
+    assert table.name == "Claim Support"
+    assert "x,s,Supported" in table.csv_text
 
 
 def test_derive_claim_states_for_export_no_evidence_is_not_tested() -> None:
-    states = derive_claim_states_for_export({}, PRODUCTION_CONFIG_PATH)
+    states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
     assert all(state.state is FinalClaimState.NOT_TESTED for state in states)
 
 
-def _collapse_decisions() -> list[CollapseDecision]:
-    return [
+def _collapse_decisions() -> tuple[CollapseDecision, ...]:
+    return (
         CollapseDecision(
             kind=CollapseDecisionKind.PROPOSAL_ASSISTANCE,
             survives=True,
@@ -103,68 +115,76 @@ def _collapse_decisions() -> list[CollapseDecision]:
             constraint_passes=True,
             reason="mechanical collapse rule",
         ),
-    ]
+    )
+
+
+def _lifecycle_records() -> tuple[ExperimentLifecycleRecord, ...]:
+    plan = build_plan(resolved_core_complete=True)
+    return tuple(
+        ExperimentLifecycleRecord(
+            experiment=planned.definition.name,
+            state=ExperimentLifecycleState.COMPLETED,
+        )
+        for planned in plan.experiments
+    )
 
 
 def _override_results_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("fedsira.reporting.export._results_root", lambda: tmp_path)
 
 
-def test_export_project_summary_materializes_tables_and_figures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_export_project_summary_records_missing_mandatory_material(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    plan = build_plan()
-    lifecycle = {
-        planned.definition.name: ExperimentLifecycleState.COMPLETED for planned in plan.experiments
-    }
+    plan = build_plan(resolved_core_complete=True)
     verification = CompletenessVerificationResult(passed=True, failures=())
-    claim_states = derive_claim_states_for_export({}, PRODUCTION_CONFIG_PATH)
-
+    claim_states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
     _override_results_root(tmp_path, monkeypatch)
     result = export_project_summary(
         plan,
         claim_states,
-        lifecycle,
+        _lifecycle_records(),
         PRODUCTION_CONFIG_PATH,
         verification,
     )
     assert isinstance(result, ReportExportResult)
-    exported_paths = tuple(result.exported_paths)
-    assert exported_paths
-    for path in exported_paths:
-        assert path.exists()
+    assert result.exported_paths
+    assert not result.verification.passed
+    assert any("mandatory" in failure for failure in result.verification.failures)
+    for exported_path in result.exported_paths:
+        assert Path(exported_path).exists()
 
 
-def test_export_project_summary_with_decisions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_export_project_summary_with_collapse_decisions_records_typed_core(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    plan = build_plan()
-    lifecycle = {
-        planned.definition.name: ExperimentLifecycleState.COMPLETED for planned in plan.experiments
-    }
+    plan = build_plan(resolved_core_complete=True)
     verification = CompletenessVerificationResult(passed=True, failures=())
-    claim_states = derive_claim_states_for_export({}, PRODUCTION_CONFIG_PATH)
+    claim_states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
     resolved_core = ResolvedCore(
         proposal_assistance_survives=True,
         plurality_survives=True,
         direct_source_exclusion_survives=True,
         external_verification_survives=True,
         opening_mode=ClaimOpeningMode.PROPOSAL_ASSISTED,
-        reproduction_row_requirement="three",
-        row_verification_mode="committee",
-        production_update_rule="krum",
+        reproduction_row_requirement=ReproductionRowRequirement.FIVE_CERTIFIED_NON_SOURCE_ROWS,
+        row_verification_mode=RowVerificationMode.THREE_VERIFIER_TWO_OF_THREE,
+        production_update_rule=ProductionUpdateRule.KRUM_CERTIFIED_ROWS,
     )
     _override_results_root(tmp_path, monkeypatch)
     result = export_project_summary(
         plan,
         claim_states,
-        lifecycle,
+        _lifecycle_records(),
         PRODUCTION_CONFIG_PATH,
         verification,
         collapse_decisions=_collapse_decisions(),
         resolved_core=resolved_core,
     )
     assert result.exported_paths
+    assert not result.verification.passed
 
 
 def test_render_security_utility_tradeoff_empty_is_no_evidence(tmp_path: Path) -> None:
