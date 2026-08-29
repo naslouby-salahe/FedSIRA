@@ -15,6 +15,7 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    collapse_evaluation_from_store,
     comparison_results_for_experiment,
     run_experiment,
 )
@@ -62,8 +63,11 @@ def render_result(result: ExperimentExecutionResult) -> str:
 def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
-    store = ExecutionRecordStore(Path("outputs"))
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    store = ExecutionRecordStore(
+        Path(config.runtime.repository_layout.execution_workspace)
+    )
+    evaluation = collapse_evaluation_from_store(store, config)
     decisions: list[CollapseDecision] = []
     collapse_families = frozenset(
         {
@@ -97,6 +101,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
             definition.dataset,
             outcomes,
             config,
+            store,
         )
         matched_family = next(
             (
@@ -112,13 +117,11 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
             collapse_decision_from_comparison_families(
                 matched_family,
                 comparison_results,
-                evaluation=None,
+                evaluation=evaluation,
                 materiality_config=config.metrics_and_statistics.materiality,
             )
         )
     if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
-        return
-    if not all(decision.constraint_passes for decision in decisions):
         return
     core = materialize_resolved_core(tuple(decisions))
     publish_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
