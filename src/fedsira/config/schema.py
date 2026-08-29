@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from fedsira.domain.enums import (
     ByteUnit,
@@ -95,27 +95,6 @@ from fedsira.domain.records import (
     WorkerCount,
 )
 
-SUPPORTED_ROLES: frozenset[Role] = frozenset(
-    {
-        Role.ANCHOR_TRAIN,
-        Role.ANCHOR_VALIDATION,
-        Role.POST_REFERENCE_REPLAY,
-        Role.ROW_VERIFICATION,
-        Role.FINAL_GATE,
-        Role.REPORT_TEST,
-    }
-)
-TARGET_ROLES: frozenset[Role] = frozenset(
-    {
-        Role.SOURCE_PROPOSAL,
-        Role.CANDIDATE_SCREEN,
-        Role.REPRODUCTION,
-        Role.ROW_VERIFICATION,
-        Role.FINAL_GATE,
-        Role.REPORT_TEST,
-    }
-)
-
 
 class FrozenConfigModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", protected_namespaces=())
@@ -135,23 +114,57 @@ RoleInterval = Annotated[
 ]
 
 
-class RoleIntervals(FrozenConfigModel):
-    supported: dict[Role, RoleInterval]
-    target: dict[Role, RoleInterval]
+class SupportedRoleIntervals(FrozenConfigModel):
+    anchor_train: RoleInterval = Field(alias=Role.ANCHOR_TRAIN.value)
+    anchor_validation: RoleInterval = Field(alias=Role.ANCHOR_VALIDATION.value)
+    post_reference_replay: RoleInterval = Field(alias=Role.POST_REFERENCE_REPLAY.value)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
 
-    @model_validator(mode="after")
-    def _require_exact_role_sets(self) -> Self:
-        supported = frozenset(self.supported)
-        target = frozenset(self.target)
-        if supported != SUPPORTED_ROLES:
-            missing = sorted(role.value for role in SUPPORTED_ROLES - supported)
-            extra = sorted(role.value for role in supported - SUPPORTED_ROLES)
-            raise ValueError(f"supported role intervals mismatch: missing={missing}, extra={extra}")
-        if target != TARGET_ROLES:
-            missing = sorted(role.value for role in TARGET_ROLES - target)
-            extra = sorted(role.value for role in target - TARGET_ROLES)
-            raise ValueError(f"target role intervals mismatch: missing={missing}, extra={extra}")
-        return self
+    def interval_for(self, role: Role) -> RoleInterval:
+        if role is Role.ANCHOR_TRAIN:
+            return self.anchor_train
+        if role is Role.ANCHOR_VALIDATION:
+            return self.anchor_validation
+        if role is Role.POST_REFERENCE_REPLAY:
+            return self.post_reference_replay
+        if role is Role.ROW_VERIFICATION:
+            return self.row_verification
+        if role is Role.FINAL_GATE:
+            return self.final_gate
+        if role is Role.REPORT_TEST:
+            return self.report_test
+        raise ValueError(f"unsupported supported-data role: {role.value}")
+
+
+class TargetRoleIntervals(FrozenConfigModel):
+    source_proposal: RoleInterval = Field(alias=Role.SOURCE_PROPOSAL.value)
+    candidate_screen: RoleInterval = Field(alias=Role.CANDIDATE_SCREEN.value)
+    reproduction: RoleInterval = Field(alias=Role.REPRODUCTION.value)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
+
+    def interval_for(self, role: Role) -> RoleInterval:
+        if role is Role.SOURCE_PROPOSAL:
+            return self.source_proposal
+        if role is Role.CANDIDATE_SCREEN:
+            return self.candidate_screen
+        if role is Role.REPRODUCTION:
+            return self.reproduction
+        if role is Role.ROW_VERIFICATION:
+            return self.row_verification
+        if role is Role.FINAL_GATE:
+            return self.final_gate
+        if role is Role.REPORT_TEST:
+            return self.report_test
+        raise ValueError(f"unsupported target-data role: {role.value}")
+
+
+class RoleIntervals(FrozenConfigModel):
+    supported: SupportedRoleIntervals
+    target: TargetRoleIntervals
 
 
 class SamplingCapsPerDomain(FrozenConfigModel):
@@ -568,6 +581,7 @@ class BootstrapConfig(FrozenConfigModel):
 
 class MaterialityConfig(FrozenConfigModel):
     target_f1_gain_minimum: TargetF1Gain
+    target_f1_noninferiority_margin: TargetF1
     supported_macro_f1_noninferiority_margin: SupportedMacroF1Drop
     benign_false_alarm_rate_noninferiority_margin: BenignFalseAlarmRateIncrease
     source_exclusion_asr_reduction_minimum: RateReduction
