@@ -3,6 +3,7 @@ from fedsira.boundaries.heterogeneity import (
     exclude_source_from_quantity_skew,
     feature_shift_sign,
     quantity_skew_multiplier_by_domain,
+    quantity_skew_multiplier_for_domain,
     select_heterogeneity_shift_features,
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -16,19 +17,25 @@ def test_quantity_skew_multiplier_by_domain_is_deterministic_and_uses_all_multip
     first = quantity_skew_multiplier_by_domain(42, HETEROGENEITY_CONFIG.quantity_skew_multipliers)
     second = quantity_skew_multiplier_by_domain(42, HETEROGENEITY_CONFIG.quantity_skew_multipliers)
     assert first == second
-    assert set(first.keys()) == set(NBAIOT_DOMAIN_ORDER)
-    assert set(first.values()) == set(HETEROGENEITY_CONFIG.quantity_skew_multipliers)
+    assert {assignment.domain for assignment in first} == set(NBAIOT_DOMAIN_ORDER)
+    assert {assignment.multiplier for assignment in first} == set(
+        HETEROGENEITY_CONFIG.quantity_skew_multipliers
+    )
 
 
 def test_exclude_source_from_quantity_skew_removes_only_the_source() -> None:
-    mapping = quantity_skew_multiplier_by_domain(42, HETEROGENEITY_CONFIG.quantity_skew_multipliers)
+    assignments = quantity_skew_multiplier_by_domain(
+        42,
+        HETEROGENEITY_CONFIG.quantity_skew_multipliers,
+    )
     source_domain = NBAIOT_DOMAIN_ORDER[0]
-    excluded = exclude_source_from_quantity_skew(mapping, source_domain)
-    assert source_domain not in excluded
-    assert len(excluded) == len(mapping) - 1
-    for domain, multiplier in mapping.items():
-        if domain != source_domain:
-            assert excluded[domain] == multiplier
+    excluded = exclude_source_from_quantity_skew(assignments, source_domain)
+    assert all(assignment.domain is not source_domain for assignment in excluded)
+    assert len(excluded) == len(assignments) - 1
+    for assignment in excluded:
+        assert quantity_skew_multiplier_for_domain(assignments, assignment.domain) == (
+            assignment.multiplier
+        )
 
 
 def test_apply_quantity_skew_to_cap_floors() -> None:
@@ -38,12 +45,16 @@ def test_apply_quantity_skew_to_cap_floors() -> None:
 
 
 def test_select_heterogeneity_shift_features_is_deterministic_and_bounded() -> None:
-    features = [f"feature-{i}" for i in range(30)]
+    features = tuple(f"feature-{index}" for index in range(30))
     first = select_heterogeneity_shift_features(
-        features, 42, HETEROGENEITY_CONFIG.feature_shift_selected_feature_count
+        features,
+        42,
+        HETEROGENEITY_CONFIG.feature_shift_selected_feature_count,
     )
     second = select_heterogeneity_shift_features(
-        features, 42, HETEROGENEITY_CONFIG.feature_shift_selected_feature_count
+        features,
+        42,
+        HETEROGENEITY_CONFIG.feature_shift_selected_feature_count,
     )
     assert first == second
     assert len(first) == HETEROGENEITY_CONFIG.feature_shift_selected_feature_count
@@ -55,4 +66,4 @@ def test_feature_shift_sign_is_deterministic_and_plus_or_minus_one() -> None:
     first = feature_shift_sign(domain, "feature-1", 42)
     second = feature_shift_sign(domain, "feature-1", 42)
     assert first == second
-    assert first in (1.0, -1.0)
+    assert first in (1, -1)
