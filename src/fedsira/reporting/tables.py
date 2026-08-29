@@ -126,11 +126,15 @@ def render_statistical_summary_table(
                 "pass" if comparison.comparison_state.value == "Passed" else "fail"
             )
             materiality_pass = "pass" if comparison.materiality_passes is not False else "fail"
+            comparison_identity = (
+                f"{definition.method} vs {definition.reference} | "
+                f"{definition.scientific_scenario} | {definition.metric.value}"
+            )
             rows.append(
                 (
                     family.family.value,
-                    definition.comparison_identity,
-                    definition.metric,
+                    comparison_identity,
+                    definition.metric.value,
                     definition.orientation.value,
                     margin,
                     str(comparison.complete_seed_count),
@@ -219,10 +223,19 @@ def render_collapse_decisions_table(
     source_influence = (
         "source-excluded" if resolved_core.direct_source_exclusion_survives else "source-influenced"
     )
+    resolved_core_identity = "|".join(
+        (
+            "proposal-assisted" if resolved_core.proposal_assistance_survives else "candidate-free",
+            "plurality" if resolved_core.plurality_survives else "single-reproduction",
+            "externally-verified"
+            if resolved_core.external_verification_survives
+            else "unverified-row",
+        )
+    )
     rows.append(
         (
             "resolved core",
-            resolved_core.resolved_core_identity,
+            resolved_core_identity,
             "NA",
             source_influence,
             "mapping",
