@@ -23,7 +23,12 @@ def test_sampling_cap_selection_digest_changes_with_row_index() -> None:
 
 def test_apply_sampling_cap_returns_all_rows_when_under_the_cap() -> None:
     selected = apply_sampling_cap(
-        "a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "SOURCE_PROPOSAL", [0, 1, 2], cap=10
+        "a" * 64,
+        "DANMINI_DOORBELL",
+        "GAFGYT_COMBO",
+        "SOURCE_PROPOSAL",
+        (0, 1, 2),
+        cap=10,
     )
     assert set(selected) == {0, 1, 2}
 
@@ -34,7 +39,7 @@ def test_apply_sampling_cap_selects_exactly_the_cap_when_over() -> None:
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
         "SOURCE_PROPOSAL",
-        list(range(100)),
+        tuple(range(100)),
         cap=10,
     )
     assert len(selected) == 10
@@ -43,18 +48,34 @@ def test_apply_sampling_cap_selects_exactly_the_cap_when_over() -> None:
 
 
 def test_apply_sampling_cap_is_deterministic_across_runs() -> None:
-    args = ("a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "SOURCE_PROPOSAL", list(range(50)))
+    args = (
+        "a" * 64,
+        "DANMINI_DOORBELL",
+        "GAFGYT_COMBO",
+        "SOURCE_PROPOSAL",
+        tuple(range(50)),
+    )
     first = apply_sampling_cap(*args, cap=5)
     second = apply_sampling_cap(*args, cap=5)
     assert first == second
 
 
 def test_apply_sampling_cap_selection_differs_by_role_and_class() -> None:
-    rows = list(range(50))
+    rows = tuple(range(50))
     source_proposal = apply_sampling_cap(
-        "a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "SOURCE_PROPOSAL", rows, cap=5
+        "a" * 64,
+        "DANMINI_DOORBELL",
+        "GAFGYT_COMBO",
+        "SOURCE_PROPOSAL",
+        rows,
+        cap=5,
     )
     candidate_screen = apply_sampling_cap(
-        "a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "CANDIDATE_SCREEN", rows, cap=5
+        "a" * 64,
+        "DANMINI_DOORBELL",
+        "GAFGYT_COMBO",
+        "CANDIDATE_SCREEN",
+        rows,
+        cap=5,
     )
     assert set(source_proposal) != set(candidate_screen)
