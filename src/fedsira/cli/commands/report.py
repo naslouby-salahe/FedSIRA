@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from fedsira.analysis.claims import CLAIM_DEFINITIONS
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import ExperimentName, OverwriteExisting, ScientificCellCount
@@ -77,7 +78,10 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
         lifecycle_states, experiment_names
     )
     claim_states = derive_claim_states_for_export()
-    claim_verification = verify_claim_states_derivable(len(claim_states), len(claim_states))
+    claim_verification = verify_claim_states_derivable(
+        len(claim_states),
+        len(CLAIM_DEFINITIONS),
+    )
     stale_ancestor_verification = verify_no_stale_ancestors(())
     failures = (
         *count_verification.failures,
