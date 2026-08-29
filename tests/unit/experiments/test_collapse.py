@@ -1,254 +1,257 @@
 from pathlib import Path
 
+from fedsira.analysis.comparisons import (
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonResult,
+    ComparisonState,
+    build_comparison_registry,
+)
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.config.schema import MaterialityConfig, MultiplicityConfig
 from fedsira.domain.enums import ClaimOpeningMode
 from fedsira.experiments.collapse import (
     CollapseDecision,
     CollapseDecisionKind,
     CollapseEvaluationInput,
-    evaluate_external_verification_survival,
-    evaluate_plurality_survival,
-    evaluate_proposal_survival,
-    evaluate_source_exclusion_survival,
+    ProductionUpdateRule,
+    ReproductionRowRequirement,
+    RowVerificationMode,
+    collapse_decision_from_comparison_families,
     materialize_resolved_core,
     publish_resolved_core,
     read_resolved_core,
     resolve_all_eight_cases,
     resolve_core_mapping,
 )
+from fedsira.experiments.registry import ClaimFamily
+
+CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+MATERIALITY = CONFIG.metrics_and_statistics.materiality
 
 
-def _config() -> tuple[MaterialityConfig, MultiplicityConfig]:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    return config.metrics_and_statistics.materiality, config.metrics_and_statistics.multiplicity
+def _definition(family: ClaimFamily, metric: ComparisonMetric):
+    return next(
+        definition
+        for definition in build_comparison_registry(CONFIG)
+        if definition.family is family and definition.metric is metric
+    )
+
+
+def _passed_family(
+    family: ClaimFamily,
+    metric: ComparisonMetric,
+) -> tuple[ComparisonFamilyResult, ...]:
+    definition = _definition(family, metric)
+    result = ComparisonResult(
+        definition=definition,
+        paired_differences=(0.2,) * 10,
+        complete_seed_count=10,
+        mean_paired_difference=0.2,
+        median_paired_difference=0.2,
+        paired_standardized_effect=1.0,
+        raw_p_value=0.001,
+        adjusted_p_value=0.001,
+        confidence_interval=(0.1, 0.3),
+        materiality_passes=True,
+        comparison_state=ComparisonState.PASSED,
+    )
+    return (ComparisonFamilyResult(family=family, comparisons=(result,)),)
+
+
+def _failed_family(
+    family: ClaimFamily,
+    metric: ComparisonMetric,
+) -> tuple[ComparisonFamilyResult, ...]:
+    definition = _definition(family, metric)
+    result = ComparisonResult(
+        definition=definition,
+        paired_differences=(0.0,) * 10,
+        complete_seed_count=10,
+        mean_paired_difference=0.0,
+        median_paired_difference=0.0,
+        paired_standardized_effect=0.0,
+        raw_p_value=1.0,
+        adjusted_p_value=1.0,
+        confidence_interval=(0.0, 0.0),
+        materiality_passes=False,
+        comparison_state=ComparisonState.FAILED,
+    )
+    return (ComparisonFamilyResult(family=family, comparisons=(result,)),)
+
+
+def _evaluation(
+    *,
+    proposal_legitimate: float | None = None,
+    proposal_malicious: float | None = None,
+    plurality_legitimate: float | None = None,
+    plurality_supported: float | None = None,
+    source_target: float | None = None,
+    source_supported: float | None = None,
+    source_far: float | None = None,
+    external_legitimate: float | None = None,
+) -> CollapseEvaluationInput:
+    return CollapseEvaluationInput(
+        proposal_legitimate_admission_degradation=proposal_legitimate,
+        proposal_malicious_admission_worsening=proposal_malicious,
+        plurality_legitimate_admission_degradation=plurality_legitimate,
+        plurality_supported_harm=plurality_supported,
+        source_exclusion_target_f1_drop=source_target,
+        source_exclusion_supported_harm=source_supported,
+        source_exclusion_benign_far_increase=source_far,
+        external_verification_legitimate_admission_degradation=external_legitimate,
+    )
+
+
+def _case(proposal: bool, plurality: bool, verification: bool):
+    return next(
+        case.core
+        for case in resolve_all_eight_cases()
+        if case.proposal_survives is proposal
+        and case.plurality_survives is plurality
+        and case.external_verification_survives is verification
+    )
 
 
 def test_all_eight_cases_have_exact_section_18_7_mapping() -> None:
     cases = resolve_all_eight_cases()
-    assert set(cases) == {
-        (True, True, True),
-        (False, True, True),
-        (True, True, False),
-        (False, True, False),
-        (True, False, True),
-        (False, False, True),
-        (True, False, False),
-        (False, False, False),
-    }
-    assert cases[(True, True, True)].opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED
+    coordinates = frozenset(
+        (
+            case.proposal_survives,
+            case.plurality_survives,
+            case.external_verification_survives,
+        )
+        for case in cases
+    )
+    assert len(cases) == 8
+    assert len(coordinates) == 8
+    full = _case(True, True, True)
+    assert full.opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED
+    assert full.reproduction_row_requirement is ReproductionRowRequirement.FIVE_CERTIFIED_NON_SOURCE_ROWS
+    assert full.row_verification_mode is RowVerificationMode.THREE_VERIFIER_TWO_OF_THREE
+    assert full.production_update_rule is ProductionUpdateRule.KRUM_CERTIFIED_ROWS
+    assert _case(False, True, True).opening_mode is ClaimOpeningMode.CANDIDATE_FREE
+    assert _case(True, True, False).row_verification_mode is RowVerificationMode.NONE
+    assert _case(True, True, False).production_update_rule is ProductionUpdateRule.KRUM_COMMITTED_ROWS
     assert (
-        cases[(True, True, True)].reproduction_row_requirement
-        == "first 5 certified non-source rows"
+        _case(True, False, True).reproduction_row_requirement
+        is ReproductionRowRequirement.FIRST_FRESH_VERIFIED_NON_SOURCE_ROW
     )
     assert (
-        cases[(True, True, True)].row_verification_mode
-        == "ordinary 3-verifier 2-of-3 certification for each row"
+        _case(True, False, False).production_update_rule
+        is ProductionUpdateRule.DIRECT_REPRODUCTION_UPDATE
     )
-    assert cases[(True, True, True)].production_update_rule == "Krum over first 5 certified rows"
-    assert cases[(False, True, True)].opening_mode is ClaimOpeningMode.CANDIDATE_FREE
-    assert cases[(True, True, False)].row_verification_mode == "none"
-    assert cases[(True, True, False)].production_update_rule == "Krum over first 5 committed rows"
-    assert (
-        cases[(True, False, True)].reproduction_row_requirement
-        == "first adequate non-source row that passes one fresh verifier"
+    assert all(case.core.final_gate_required for case in cases)
+    assert all(case.core.source_excluded for case in cases)
+
+
+def test_resolved_core_decision_identity_is_descriptive() -> None:
+    assert resolve_core_mapping(True, True, True).decision_identity == (
+        "proposal-assisted|plurality|externally-verified"
     )
-    assert cases[(True, False, False)].production_update_rule == "that reproduction update directly"
-    assert all(core.final_gate_required for core in cases.values())
-    assert all(core.source_excluded for core in cases.values())
-
-
-def test_resolve_core_mapping_identity_token_matches_prv() -> None:
-    assert resolve_core_mapping(True, True, True).identity_token == "P|R|V"
-    assert resolve_core_mapping(False, True, True).identity_token == "p|R|V"
-    assert resolve_core_mapping(True, True, False).identity_token == "P|R|v"
-    assert resolve_core_mapping(False, False, False).identity_token == "p|r|v"
-
-
-def test_proposal_survival_passes_with_material_effect_and_constraints() -> None:
-    materiality, multiplicity = _config()
-    evaluation = CollapseEvaluationInput(
-        false_launch_reduction=0.20,
-        reproduction_attempt_reduction=None,
-        post_evidence_overhead_reduction=None,
-        proposal_legitimate_admission_degradation=0.01,
-        proposal_malicious_admission_worsening=0.0,
-        plurality_malicious_admission_reduction=None,
-        plurality_worst_domain_target_f1_gain=None,
-        plurality_legitimate_admission_degradation=None,
-        plurality_supported_harm=None,
-        source_exclusion_asr_reduction=None,
-        source_exclusion_target_f1_drop=None,
-        source_exclusion_supported_harm=None,
-        source_exclusion_benign_far_increase=None,
-        external_verification_malicious_admission_reduction=None,
-        external_verification_worst_domain_target_f1_gain=None,
-        external_verification_legitimate_admission_degradation=None,
+    assert resolve_core_mapping(False, False, False).decision_identity == (
+        "candidate-free|single-reproduction|unverified-row"
     )
-    decision = evaluate_proposal_survival(
-        evaluation,
-        materiality,
-        multiplicity,
-        (("false-launch superiority", 0.001),),
+
+
+def test_proposal_survival_requires_passed_effect_and_constraints() -> None:
+    family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _passed_family(family, ComparisonMetric.FALSE_LAUNCH),
+        evaluation=_evaluation(proposal_legitimate=0.01, proposal_malicious=0.0),
+        materiality_config=MATERIALITY,
     )
     assert decision.survives
     assert decision.kind is CollapseDecisionKind.PROPOSAL_ASSISTANCE
 
 
-def test_proposal_survival_fails_without_material_effect() -> None:
-    materiality, multiplicity = _config()
-    evaluation = CollapseEvaluationInput(
-        false_launch_reduction=0.01,
-        reproduction_attempt_reduction=None,
-        post_evidence_overhead_reduction=None,
-        proposal_legitimate_admission_degradation=0.01,
-        proposal_malicious_admission_worsening=0.0,
-        plurality_malicious_admission_reduction=None,
-        plurality_worst_domain_target_f1_gain=None,
-        plurality_legitimate_admission_degradation=None,
-        plurality_supported_harm=None,
-        source_exclusion_asr_reduction=None,
-        source_exclusion_target_f1_drop=None,
-        source_exclusion_supported_harm=None,
-        source_exclusion_benign_far_increase=None,
-        external_verification_malicious_admission_reduction=None,
-        external_verification_worst_domain_target_f1_gain=None,
-        external_verification_legitimate_admission_degradation=None,
-    )
-    decision = evaluate_proposal_survival(
-        evaluation,
-        materiality,
-        multiplicity,
-        (("false-launch superiority", 0.9),),
+def test_proposal_survival_fails_when_positive_comparison_failed() -> None:
+    family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _failed_family(family, ComparisonMetric.FALSE_LAUNCH),
+        evaluation=_evaluation(proposal_legitimate=0.01, proposal_malicious=0.0),
+        materiality_config=MATERIALITY,
     )
     assert not decision.survives
 
 
-def test_plurality_survival_requires_mar_or_worst_domain_gain() -> None:
-    materiality, multiplicity = _config()
-    evaluation = CollapseEvaluationInput(
-        false_launch_reduction=None,
-        reproduction_attempt_reduction=None,
-        post_evidence_overhead_reduction=None,
-        proposal_legitimate_admission_degradation=None,
-        proposal_malicious_admission_worsening=None,
-        plurality_malicious_admission_reduction=0.20,
-        plurality_worst_domain_target_f1_gain=None,
-        plurality_legitimate_admission_degradation=0.02,
-        plurality_supported_harm=0.01,
-        source_exclusion_asr_reduction=None,
-        source_exclusion_target_f1_drop=None,
-        source_exclusion_supported_harm=None,
-        source_exclusion_benign_far_increase=None,
-        external_verification_malicious_admission_reduction=None,
-        external_verification_worst_domain_target_f1_gain=None,
-        external_verification_legitimate_admission_degradation=None,
-    )
-    decision = evaluate_plurality_survival(
-        evaluation,
-        materiality,
-        multiplicity,
-        (("plurality primary effect", 0.001),),
+def test_plurality_survival_requires_mar_or_worst_domain_gain_and_constraints() -> None:
+    family = ClaimFamily.PLURALITY_NECESSITY
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _passed_family(family, ComparisonMetric.MALICIOUS_ADMISSION),
+        evaluation=_evaluation(plurality_legitimate=0.02, plurality_supported=0.01),
+        materiality_config=MATERIALITY,
     )
     assert decision.survives
 
 
-def test_source_exclusion_survival_requires_asr_reduction_and_constraints() -> None:
-    materiality, multiplicity = _config()
-    evaluation = CollapseEvaluationInput(
-        false_launch_reduction=None,
-        reproduction_attempt_reduction=None,
-        post_evidence_overhead_reduction=None,
-        proposal_legitimate_admission_degradation=None,
-        proposal_malicious_admission_worsening=None,
-        plurality_malicious_admission_reduction=None,
-        plurality_worst_domain_target_f1_gain=None,
-        plurality_legitimate_admission_degradation=None,
-        plurality_supported_harm=None,
-        source_exclusion_asr_reduction=0.30,
-        source_exclusion_target_f1_drop=0.01,
-        source_exclusion_supported_harm=0.01,
-        source_exclusion_benign_far_increase=0.005,
-        external_verification_malicious_admission_reduction=None,
-        external_verification_worst_domain_target_f1_gain=None,
-        external_verification_legitimate_admission_degradation=None,
-    )
-    decision = evaluate_source_exclusion_survival(
-        evaluation,
-        materiality,
-        multiplicity,
-        (("source-exclusion ASR", 0.001),),
+def test_source_exclusion_survival_requires_asr_and_all_constraints() -> None:
+    family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _passed_family(family, ComparisonMetric.ATTACK_SUCCESS_RATE),
+        evaluation=_evaluation(source_target=0.01, source_supported=0.01, source_far=0.005),
+        materiality_config=MATERIALITY,
     )
     assert decision.survives
 
 
-def test_external_verification_survival_requires_material_reduction() -> None:
-    materiality, multiplicity = _config()
-    evaluation = CollapseEvaluationInput(
-        false_launch_reduction=None,
-        reproduction_attempt_reduction=None,
-        post_evidence_overhead_reduction=None,
-        proposal_legitimate_admission_degradation=None,
-        proposal_malicious_admission_worsening=None,
-        plurality_malicious_admission_reduction=None,
-        plurality_worst_domain_target_f1_gain=None,
-        plurality_legitimate_admission_degradation=None,
-        plurality_supported_harm=None,
-        source_exclusion_asr_reduction=None,
-        source_exclusion_target_f1_drop=None,
-        source_exclusion_supported_harm=None,
-        source_exclusion_benign_far_increase=None,
-        external_verification_malicious_admission_reduction=0.15,
-        external_verification_worst_domain_target_f1_gain=None,
-        external_verification_legitimate_admission_degradation=0.02,
+def test_source_exclusion_survival_fails_when_a_constraint_is_missing() -> None:
+    family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _passed_family(family, ComparisonMetric.ATTACK_SUCCESS_RATE),
+        evaluation=_evaluation(source_target=0.01, source_supported=0.01),
+        materiality_config=MATERIALITY,
     )
-    decision = evaluate_external_verification_survival(
-        evaluation,
-        materiality,
-        multiplicity,
-        (("external-verification primary effect", 0.001),),
+    assert not decision.survives
+
+
+def test_external_verification_survival_requires_effect_and_liveness_constraint() -> None:
+    family = ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY
+    decision = collapse_decision_from_comparison_families(
+        family,
+        _passed_family(family, ComparisonMetric.MALICIOUS_ADMISSION),
+        evaluation=_evaluation(external_legitimate=0.02),
+        materiality_config=MATERIALITY,
     )
     assert decision.survives
+
+
+def _decision(kind: CollapseDecisionKind, survives: bool) -> CollapseDecision:
+    return CollapseDecision(
+        kind=kind,
+        survives=survives,
+        primary_material_effect="malicious-admission" if survives else None,
+        adjusted_p_value=0.001 if survives else None,
+        constraint_passes=survives,
+        reason="test fixture",
+    )
 
 
 def test_materialize_resolved_core_uses_decision_states() -> None:
     decisions = (
-        CollapseDecision(
-            kind=CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-            survives=True,
-            primary_material_effect="false-launch",
-            adjusted_p_value=0.001,
-            constraint_passes=True,
-            reason="passed",
-        ),
-        CollapseDecision(
-            kind=CollapseDecisionKind.PLURALITY,
-            survives=True,
-            primary_material_effect="malicious-admission",
-            adjusted_p_value=0.001,
-            constraint_passes=True,
-            reason="passed",
-        ),
-        CollapseDecision(
-            kind=CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-            survives=True,
-            primary_material_effect="asr",
-            adjusted_p_value=0.001,
-            constraint_passes=True,
-            reason="passed",
-        ),
-        CollapseDecision(
-            kind=CollapseDecisionKind.EXTERNAL_VERIFICATION,
-            survives=True,
-            primary_material_effect="malicious-admission",
-            adjusted_p_value=0.001,
-            constraint_passes=True,
-            reason="passed",
-        ),
+        _decision(CollapseDecisionKind.PROPOSAL_ASSISTANCE, True),
+        _decision(CollapseDecisionKind.PLURALITY, True),
+        _decision(CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION, True),
+        _decision(CollapseDecisionKind.EXTERNAL_VERIFICATION, True),
     )
     core = materialize_resolved_core(decisions)
-    assert core.identity_token == "P|R|V"
+    assert core.decision_identity == "proposal-assisted|plurality|externally-verified"
     assert core.direct_source_exclusion_survives
+
+
+def test_materialize_resolved_core_preserves_source_exclusion_decision() -> None:
+    decisions = (
+        _decision(CollapseDecisionKind.PROPOSAL_ASSISTANCE, True),
+        _decision(CollapseDecisionKind.PLURALITY, True),
+        _decision(CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION, False),
+        _decision(CollapseDecisionKind.EXTERNAL_VERIFICATION, True),
+    )
+    core = materialize_resolved_core(decisions)
+    assert not core.direct_source_exclusion_survives
 
 
 def test_publish_and_read_resolved_core_round_trips(tmp_path: Path) -> None:
@@ -256,11 +259,11 @@ def test_publish_and_read_resolved_core_round_trips(tmp_path: Path) -> None:
     publish_resolved_core(tmp_path, core)
     reloaded = read_resolved_core(tmp_path)
     assert reloaded is not None
-    assert reloaded.identity_token == core.identity_token
+    assert reloaded.decision_identity == core.decision_identity
     assert reloaded.opening_mode is core.opening_mode
-    assert reloaded.reproduction_row_requirement == core.reproduction_row_requirement
-    assert reloaded.row_verification_mode == core.row_verification_mode
-    assert reloaded.production_update_rule == core.production_update_rule
+    assert reloaded.reproduction_row_requirement is core.reproduction_row_requirement
+    assert reloaded.row_verification_mode is core.row_verification_mode
+    assert reloaded.production_update_rule is core.production_update_rule
 
 
 def test_read_resolved_core_returns_none_without_a_published_artifact(tmp_path: Path) -> None:
@@ -272,4 +275,4 @@ def test_publish_resolved_core_overwrites_a_prior_publish(tmp_path: Path) -> Non
     publish_resolved_core(tmp_path, resolve_core_mapping(False, False, False))
     reloaded = read_resolved_core(tmp_path)
     assert reloaded is not None
-    assert reloaded.identity_token == "p|r|v"
+    assert reloaded.decision_identity == "candidate-free|single-reproduction|unverified-row"
