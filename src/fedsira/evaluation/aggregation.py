@@ -104,18 +104,18 @@ def equal_weight_domain_mean(
 ) -> MetricResult:
     defined_values = tuple(result.value for result in domain_results if result.value is not None)
     if len(defined_values) < minimum_defined_domains:
-        return MetricResult(value=None, defined_count=len(defined_values))
+        return MetricResult(value=None, denominator=len(defined_values))
     return MetricResult(
         value=sum(defined_values) / len(defined_values),
-        defined_count=len(defined_values),
+        denominator=len(defined_values),
     )
 
 
 def worst_domain_target_f1(domain_target_f1: tuple[MetricResult, ...]) -> MetricResult:
     defined_values = tuple(result.value for result in domain_target_f1 if result.value is not None)
     if not defined_values:
-        return MetricResult(value=None, defined_count=0)
-    return MetricResult(value=min(defined_values), defined_count=len(defined_values))
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=min(defined_values), denominator=len(defined_values))
 
 
 def percentile_10_domain_target_f1(
@@ -125,20 +125,20 @@ def percentile_10_domain_target_f1(
         sorted(result.value for result in domain_target_f1 if result.value is not None)
     )
     if not defined_values:
-        return MetricResult(value=None, defined_count=0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
         value=quantile_type7(defined_values, 0.10),
-        defined_count=len(defined_values),
+        denominator=len(defined_values),
     )
 
 
 def domain_disparity(domain_target_f1: tuple[MetricResult, ...]) -> MetricResult:
     defined_values = tuple(result.value for result in domain_target_f1 if result.value is not None)
     if not defined_values:
-        return MetricResult(value=None, defined_count=0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
         value=max(defined_values) - min(defined_values),
-        defined_count=len(defined_values),
+        denominator=len(defined_values),
     )
 
 
@@ -147,24 +147,24 @@ def interquartile_range(domain_target_f1: tuple[MetricResult, ...]) -> MetricRes
         sorted(result.value for result in domain_target_f1 if result.value is not None)
     )
     if not defined_values:
-        return MetricResult(value=None, defined_count=0)
+        return MetricResult(value=None, denominator=0)
     upper_quartile = quantile_type7(defined_values, 0.75)
     lower_quartile = quantile_type7(defined_values, 0.25)
     return MetricResult(
         value=upper_quartile - lower_quartile,
-        defined_count=len(defined_values),
+        denominator=len(defined_values),
     )
 
 
 def coefficient_of_variation(values: tuple[MetricValue, ...]) -> MetricResult:
     if len(values) < 2:
-        return MetricResult(value=None, defined_count=len(values))
+        return MetricResult(value=None, denominator=len(values))
     mean = sum(values) / len(values)
     if mean == 0:
-        return MetricResult(value=None, defined_count=len(values))
+        return MetricResult(value=None, denominator=len(values))
     variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
     standard_deviation = math.sqrt(variance)
-    return MetricResult(value=standard_deviation / mean, defined_count=len(values))
+    return MetricResult(value=standard_deviation / mean, denominator=len(values))
 
 
 def bootstrap_percentile_confidence_interval(
