@@ -158,7 +158,10 @@ class ExecutionRecordStore:
             failure=failure,
         )
         digest = hashlib.sha256(framed_bytes(outcome.cell.semantic_key)).hexdigest()
-        (directory / f"{digest}.json").write_text(record.model_dump_json(indent=2))
+        (directory / f"{digest}.json").write_text(
+            record.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
 
     def read_outcome(
         self,
@@ -169,7 +172,7 @@ class ExecutionRecordStore:
         path = self._record_directory(experiment) / f"{digest}.json"
         if not path.exists():
             return None
-        record = PersistedExecutionRecord.model_validate_json(path.read_text())
+        record = PersistedExecutionRecord.model_validate_json(path.read_text(encoding="utf-8"))
         if record.semantic_key != semantic_key or record.experiment != experiment:
             raise ValueError("persisted execution record identity mismatch")
         return record
@@ -182,13 +185,19 @@ class ExecutionRecordStore:
         if not directory.exists():
             return ()
         records = tuple(
-            PersistedExecutionRecord.model_validate_json(path.read_text())
+            PersistedExecutionRecord.model_validate_json(path.read_text(encoding="utf-8"))
             for path in sorted(directory.glob("*.json"))
         )
         for record in records:
             if record.experiment != experiment:
                 raise ValueError("persisted execution record experiment mismatch")
         return records
+
+    def read_planned_outcomes(
+        self,
+        planned: PlannedExperiment,
+    ) -> tuple[PersistedExecutionRecord, ...]:
+        return planned_execution_records(planned, self.read_all_outcomes(planned.name))
 
 
 class MetricCellKey(FrozenDomainModel):
@@ -705,6 +714,18 @@ def _execute_cell_with_retry(
     return last_outcome
 
 
+def _planned_semantic_keys(planned: PlannedExperiment) -> frozenset[ScientificCellSemanticKey]:
+    return frozenset(cell.semantic_key for cell in planned.cells)
+
+
+def planned_execution_records(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> tuple[PersistedExecutionRecord, ...]:
+    planned_keys = _planned_semantic_keys(planned)
+    return tuple(record for record in records if record.semantic_key in planned_keys)
+
+
 def _record_for_cell(
     records: tuple[PersistedExecutionRecord, ...],
     cell: ScientificCell,
@@ -721,22 +742,15 @@ def derive_experiment_lifecycle(
 ) -> ExperimentLifecycleState:
     if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
         return ExperimentLifecycleState.BLOCKED
-    if not records:
+    relevant = planned_execution_records(planned, records)
+    if not relevant:
         return ExperimentLifecycleState.READY
-    relevant = tuple(
-        record for record in records if _record_for_cell(records, ScientificCell(
-            experiment=record.experiment,
-            method=record.method,
-            condition=record.condition,
-            master_seed=record.master_seed,
-        )) is not None
-    )
     if any(record.terminal_state is ExperimentLifecycleState.INVALID for record in relevant):
         return ExperimentLifecycleState.INVALID
     if any(record.terminal_state is ExperimentLifecycleState.FAILED for record in relevant):
         return ExperimentLifecycleState.FAILED
     complete = all(
-        (record := _record_for_cell(records, cell)) is not None
+        (record := _record_for_cell(relevant, cell)) is not None
         and record.terminal_state is ExperimentLifecycleState.COMPLETED
         for cell in planned.cells
     )
@@ -754,7 +768,7 @@ def _prerequisite_states_from_store(
             experiment=prerequisite,
             lifecycle_state=derive_experiment_lifecycle(
                 plan.experiment(prerequisite),
-                store.read_all_outcomes(prerequisite),
+                store.read_planned_outcomes(plan.experiment(prerequisite)),
             ),
         )
         for prerequisite in definition.prerequisites
@@ -772,10 +786,8 @@ def experiment_lifecycle_from_store(
         master_seeds=config.seeds_and_determinism.master_seeds,
         smoke_seed=config.seeds_and_determinism.smoke_seed,
     )
-    return derive_experiment_lifecycle(
-        plan.experiment(experiment),
-        store.read_all_outcomes(experiment),
-    )
+    planned = plan.experiment(experiment)
+    return derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
 
 
 def execute_experiment(
@@ -833,10 +845,8 @@ def execute_experiment(
         store.write_outcome(outcome)
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
-    lifecycle_state = derive_experiment_lifecycle(
-        planned,
-        store.read_all_outcomes(experiment),
-    )
+    persisted = store.read_planned_outcomes(planned)
+    lifecycle_state = derive_experiment_lifecycle(planned, persisted)
     comparison_results = comparison_results_for_experiment(
         experiment,
         definition.dataset,
