@@ -8,19 +8,20 @@ from fedsira.analysis.comparisons import (
     ComparisonDefinition,
     ComparisonEffectScale,
     ComparisonFamilyResult,
+    ComparisonMetric,
     ComparisonOrientation,
     ComparisonReferenceKind,
     ComparisonResult,
     ComparisonState,
-    ComparisonTestKind,
+    CoreMethodIdentity,
     apply_holm_adjustment,
     build_comparison_registry,
     evaluate_comparison,
 )
+from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
 from fedsira.domain.enums import (
-    CellPhaseState,
     DatasetId,
     ExperimentLifecycleState,
     FailureClass,
@@ -29,7 +30,6 @@ from fedsira.domain.enums import (
 from fedsira.domain.records import (
     ArtifactDigest,
     CellCompletionStatus,
-    CollapseDecisionPassed,
     CompleteSeedCount,
     ExecutionSchemaVersion,
     ExperimentName,
@@ -48,10 +48,9 @@ from fedsira.domain.records import (
     ScenarioName,
     ScientificCellCount,
     ScientificCellSemanticKey,
-    TerminalExperimentState,
 )
 from fedsira.experiments.collapse import CollapseEvaluationInput
-from fedsira.experiments.planning import ScientificCell, build_plan
+from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment, ScientificCell, build_plan
 from fedsira.experiments.registry import (
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
@@ -68,10 +67,8 @@ from fedsira.experiments.registry import (
 )
 from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
-    validate_cell_phase_sequence,
     validate_cell_terminal_record,
     validate_condition_vocabulary,
-    validate_experiment_name_is_registered,
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
 )
@@ -79,14 +76,6 @@ from fedsira.runtime.determinism import framed_bytes
 from fedsira.runtime.state import FailureDetail
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
-
-TERMINAL_EXPERIMENT_STATES = frozenset(
-    (
-        ExperimentLifecycleState.COMPLETED,
-        ExperimentLifecycleState.FAILED,
-        ExperimentLifecycleState.INVALID,
-    )
-)
 
 
 class PersistedFailureDetail(FrozenDomainModel):
@@ -251,17 +240,19 @@ def _metric_index_from_outcomes(
     for outcome in outcomes:
         if outcome.terminal_state is not ExperimentLifecycleState.COMPLETED:
             continue
-        record = MetricCellRecord(
-            key=MetricCellKey(
-                dataset=dataset,
-                experiment=outcome.cell.experiment,
-                scientific_scenario=outcome.cell.condition,
-                master_seed=outcome.cell.master_seed,
-                method=outcome.cell.method,
+        records = _merge_metric_record(
+            records,
+            MetricCellRecord(
+                key=MetricCellKey(
+                    dataset=dataset,
+                    experiment=outcome.cell.experiment,
+                    scientific_scenario=outcome.cell.condition,
+                    master_seed=outcome.cell.master_seed,
+                    method=outcome.cell.method,
+                ),
+                metrics=outcome.metrics,
             ),
-            metrics=outcome.metrics,
         )
-        records = _merge_metric_record(records, record)
     return records
 
 
@@ -582,7 +573,7 @@ def collapse_evaluation_from_records(
         legitimate = _maximum_constraint(
             _paired_constraint_means(
                 records,
-                "Full Plurality Path",
+                CoreMethodIdentity.FULL_PLURALITY_PATH.value,
                 BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
                 conditions,
                 ComparisonMetric.LEGITIMATE_ADMISSION.value,
@@ -593,7 +584,7 @@ def collapse_evaluation_from_records(
         supported = _maximum_constraint(
             _paired_constraint_means(
                 records,
-                "Full Plurality Path",
+                CoreMethodIdentity.FULL_PLURALITY_PATH.value,
                 BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
                 conditions,
                 ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value,
@@ -705,7 +696,7 @@ def _execute_cell_with_retry(
     last_outcome: CellExecutionOutcome | None = None
     for _attempt in range(attempts):
         outcome = executor.execute_cell(cell, config)
-        validate_cell_terminal_record(outcome.terminal_state, outcome.failure)
+        validate_cell_terminal_record(cell, outcome.terminal_state)
         if outcome.terminal_state is not ExperimentLifecycleState.FAILED:
             return outcome
         last_outcome = outcome
@@ -714,33 +705,111 @@ def _execute_cell_with_retry(
     return last_outcome
 
 
+def _record_for_cell(
+    records: tuple[PersistedExecutionRecord, ...],
+    cell: ScientificCell,
+) -> PersistedExecutionRecord | None:
+    for record in records:
+        if record.semantic_key == cell.semantic_key:
+            return record
+    return None
+
+
+def derive_experiment_lifecycle(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> ExperimentLifecycleState:
+    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
+        return ExperimentLifecycleState.BLOCKED
+    if not records:
+        return ExperimentLifecycleState.READY
+    relevant = tuple(
+        record for record in records if _record_for_cell(records, ScientificCell(
+            experiment=record.experiment,
+            method=record.method,
+            condition=record.condition,
+            master_seed=record.master_seed,
+        )) is not None
+    )
+    if any(record.terminal_state is ExperimentLifecycleState.INVALID for record in relevant):
+        return ExperimentLifecycleState.INVALID
+    if any(record.terminal_state is ExperimentLifecycleState.FAILED for record in relevant):
+        return ExperimentLifecycleState.FAILED
+    complete = all(
+        (record := _record_for_cell(records, cell)) is not None
+        and record.terminal_state is ExperimentLifecycleState.COMPLETED
+        for cell in planned.cells
+    )
+    return ExperimentLifecycleState.COMPLETED if complete else ExperimentLifecycleState.RUNNING
+
+
+def _prerequisite_states_from_store(
+    plan: ExperimentPlan,
+    experiment: ExperimentName,
+    store: ExecutionRecordStore,
+) -> tuple[ExperimentPrerequisiteState, ...]:
+    definition = experiment_by_name(experiment)
+    return tuple(
+        ExperimentPrerequisiteState(
+            experiment=prerequisite,
+            lifecycle_state=derive_experiment_lifecycle(
+                plan.experiment(prerequisite),
+                store.read_all_outcomes(prerequisite),
+            ),
+        )
+        for prerequisite in definition.prerequisites
+    )
+
+
+def experiment_lifecycle_from_store(
+    experiment: ExperimentName,
+    store: ExecutionRecordStore,
+    config: ScientificConfig,
+    resolved_core_complete: ResolvedCoreComplete,
+) -> ExperimentLifecycleState:
+    plan = build_plan(
+        resolved_core_complete=resolved_core_complete,
+        master_seeds=config.seeds_and_determinism.master_seeds,
+        smoke_seed=config.seeds_and_determinism.smoke_seed,
+    )
+    return derive_experiment_lifecycle(
+        plan.experiment(experiment),
+        store.read_all_outcomes(experiment),
+    )
+
+
 def execute_experiment(
     experiment: ExperimentName,
     executor: CellExecutor,
     *,
     config: ScientificConfig | None = None,
     overwrite: OverwriteExisting = False,
+    resolved_core_complete: ResolvedCoreComplete = False,
     prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
 ) -> ExperimentExecutionResult:
     resolved_config = config or load_scientific_config(PRODUCTION_CONFIG_PATH)
     definition = experiment_by_name(experiment)
-    validate_experiment_name_is_registered(experiment)
-    validate_condition_vocabulary(experiment, definition.conditions)
-    states = prerequisite_states or tuple(
-        ExperimentPrerequisiteState(
-            experiment=prerequisite,
-            state=ExperimentLifecycleState.COMPLETED,
-        )
-        for prerequisite in definition.prerequisites
+    plan = build_plan(
+        resolved_core_complete=resolved_core_complete,
+        master_seeds=resolved_config.seeds_and_determinism.master_seeds,
+        smoke_seed=resolved_config.seeds_and_determinism.smoke_seed,
     )
-    validate_experiment_prerequisites_met(definition.prerequisites, states)
-    plan = build_plan(experiment, resolved_config)
-    validate_no_duplicate_semantic_cells(plan.cells)
+    validate_condition_vocabulary(plan)
+    validate_no_duplicate_semantic_cells(plan)
+    planned = plan.experiment(experiment)
+    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
+        return ExperimentExecutionResult(
+            experiment=experiment,
+            lifecycle_state=ExperimentLifecycleState.BLOCKED,
+            outcomes=(),
+        )
     store = ExecutionRecordStore(
         Path(resolved_config.runtime.repository_layout.execution_workspace)
     )
+    states = prerequisite_states or _prerequisite_states_from_store(plan, experiment, store)
+    validate_experiment_prerequisites_met(experiment, states)
     outcomes: list[CellExecutionOutcome] = []
-    for cell in plan.cells:
+    for cell in planned.cells:
         existing = store.read_outcome(experiment, cell.semantic_key)
         if existing is not None and not overwrite:
             outcomes.append(
@@ -764,10 +833,9 @@ def execute_experiment(
         store.write_outcome(outcome)
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
-    lifecycle_state = (
-        ExperimentLifecycleState.COMPLETED
-        if all(outcome.completed for outcome in outcome_tuple)
-        else ExperimentLifecycleState.FAILED
+    lifecycle_state = derive_experiment_lifecycle(
+        planned,
+        store.read_all_outcomes(experiment),
     )
     comparison_results = comparison_results_for_experiment(
         experiment,
@@ -787,27 +855,3 @@ def execute_experiment(
             outcome_tuple,
         ),
     )
-
-
-def execution_completed(
-    result: ExperimentExecutionResult,
-) -> TerminalExperimentState:
-    return result.lifecycle_state in TERMINAL_EXPERIMENT_STATES
-
-
-def collapse_decision_passed(
-    result: ExperimentExecutionResult,
-) -> CollapseDecisionPassed:
-    return result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-
-
-def resolved_core_complete(
-    result: ExperimentExecutionResult,
-) -> ResolvedCoreComplete:
-    return result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-
-
-def execution_phase_sequence_is_valid(
-    phases: tuple[CellPhaseState, ...],
-) -> CellCompletionStatus:
-    return validate_cell_phase_sequence(phases)
