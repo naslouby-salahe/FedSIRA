@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -17,7 +16,14 @@ from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CellPhaseState, ExperimentLifecycleState, ScientificCellPhase
-from fedsira.domain.records import BooleanFlag, CanonicalToken, FrozenDomainModel
+from fedsira.domain.records import (
+    BooleanValue,
+    ExperimentName,
+    FrozenDomainModel,
+    ScientificCellSemanticKey,
+    SchemaVersion,
+    TextValue,
+)
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
 from fedsira.experiments.registry import (
     AblationVariant,
@@ -35,7 +41,9 @@ from fedsira.protocol.theory import (
 )
 from fedsira.protocol.verification import verifier_is_eligible
 
-SMOKE_RECORD_SCHEMA_VERSION: CanonicalToken = "fedsira|smoke_record|1"
+SmokeCheckName = TextValue
+SmokeCheckDetail = TextValue
+SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|1"
 
 _DANMINI = NBaiotDomain.DANMINI_DOORBELL
 _ENNIO = NBaiotDomain.ENNIO_DOORBELL
@@ -61,7 +69,7 @@ _EPISTEMIC_STRENGTHS: dict[EpistemicFailureType, tuple[str, ...]] = {
     EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT: ("0.25", "0.50", "1.00"),
 }
 
-_CONDITION_VOCABULARY: dict[CanonicalToken, frozenset[str]] = {
+_CONDITION_VOCABULARY: dict[ExperimentName, frozenset[str]] = {
     "Byzantine-Bound Violation": frozenset(condition.value for condition in BoundCondition),
     "Shared Epistemic-Failure Boundary": frozenset(
         f"{failure_type.value}|{strength}"
@@ -73,7 +81,7 @@ _CONDITION_VOCABULARY: dict[CanonicalToken, frozenset[str]] = {
     ),
 }
 
-_METHOD_VOCABULARY: dict[CanonicalToken, frozenset[str]] = {
+_METHOD_VOCABULARY: dict[ExperimentName, frozenset[str]] = {
     "Capability Under-Specification Boundary": frozenset(
         granularity.value for granularity in CapabilityContractGranularity
     ),
@@ -82,20 +90,26 @@ _METHOD_VOCABULARY: dict[CanonicalToken, frozenset[str]] = {
 
 
 class SmokeCheckResult(FrozenDomainModel):
-    name: CanonicalToken
-    passed: BooleanFlag
-    detail: CanonicalToken | None = None
+    name: SmokeCheckName
+    passed: BooleanValue
+    detail: SmokeCheckDetail | None = None
 
 
 class SmokeSuiteResult(FrozenDomainModel):
     checks: tuple[SmokeCheckResult, ...]
 
     @property
-    def passed(self) -> BooleanFlag:
+    def passed(self) -> BooleanValue:
         return all(check.passed for check in self.checks)
 
 
-def validate_experiment_name_is_registered(experiment: CanonicalToken) -> None:
+class PersistedSmokeRecord(FrozenDomainModel):
+    schema_version: SchemaVersion
+    passed: BooleanValue
+    checks: tuple[SmokeCheckResult, ...]
+
+
+def validate_experiment_name_is_registered(experiment: ExperimentName) -> None:
     experiment_by_name(experiment)
 
 
@@ -120,8 +134,8 @@ def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
 
 
 def validate_experiment_prerequisites_met(
-    experiment: CanonicalToken,
-    prerequisite_states: Mapping[CanonicalToken, ExperimentLifecycleState],
+    experiment: ExperimentName,
+    prerequisite_states: Mapping[ExperimentName, ExperimentLifecycleState],
 ) -> None:
     definition = experiment_by_name(experiment)
     for prerequisite in definition.prerequisites:
@@ -134,7 +148,7 @@ def validate_experiment_prerequisites_met(
 
 
 def validate_no_duplicate_semantic_cells(plan: ExperimentPlan) -> None:
-    seen: set[CanonicalToken] = set()
+    seen: set[ScientificCellSemanticKey] = set()
     for planned in plan.experiments:
         for cell in planned.cells:
             if cell.semantic_key in seen:
@@ -254,7 +268,7 @@ def _mathematical_invariants(
 
 def run_smoke_suite(
     config_path: Path = PRODUCTION_CONFIG_PATH,
-    overwrite: BooleanFlag = False,
+    overwrite: BooleanValue = False,
 ) -> SmokeSuiteResult:
     config = load_scientific_config(config_path)
     fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
@@ -268,20 +282,17 @@ def run_smoke_suite(
     return result
 
 
-def _persist_smoke_record(result: SmokeSuiteResult, overwrite: BooleanFlag) -> None:
+def _persist_smoke_record(result: SmokeSuiteResult, overwrite: BooleanValue) -> None:
     record_path = smoke_record_path()
     if record_path.exists() and not overwrite:
         return
     record_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": SMOKE_RECORD_SCHEMA_VERSION,
-        "passed": result.passed,
-        "checks": [
-            {"name": check.name, "passed": check.passed, "detail": check.detail}
-            for check in result.checks
-        ],
-    }
-    record_path.write_text(json.dumps(payload, sort_keys=True, indent=2))
+    record = PersistedSmokeRecord(
+        schema_version=SMOKE_RECORD_SCHEMA_VERSION,
+        passed=result.passed,
+        checks=result.checks,
+    )
+    record_path.write_text(record.model_dump_json(indent=2))
 
 
 def render_smoke(result: SmokeSuiteResult) -> str:
