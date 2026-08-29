@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -69,6 +67,7 @@ from fedsira.experiments.registry import (
     experiment_by_name,
 )
 from fedsira.experiments.validation import (
+    ExperimentPrerequisiteState,
     validate_cell_phase_sequence,
     validate_cell_terminal_record,
     validate_condition_vocabulary,
@@ -82,11 +81,11 @@ from fedsira.runtime.state import FailureDetail
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 
 TERMINAL_EXPERIMENT_STATES = frozenset(
-    {
+    (
         ExperimentLifecycleState.COMPLETED,
         ExperimentLifecycleState.FAILED,
         ExperimentLifecycleState.INVALID,
-    }
+    )
 )
 
 
@@ -108,8 +107,7 @@ class PersistedExecutionRecord(FrozenDomainModel):
     failure: PersistedFailureDetail | None
 
 
-@dataclass(frozen=True)
-class CellExecutionOutcome:
+class CellExecutionOutcome(FrozenDomainModel):
     cell: ScientificCell
     terminal_state: ExperimentLifecycleState
     failure: FailureDetail | None
@@ -120,8 +118,7 @@ class CellExecutionOutcome:
         return self.terminal_state is ExperimentLifecycleState.COMPLETED
 
 
-@dataclass(frozen=True)
-class ExperimentExecutionResult:
+class ExperimentExecutionResult(FrozenDomainModel):
     experiment: ExperimentName
     lifecycle_state: ExperimentLifecycleState
     outcomes: tuple[CellExecutionOutcome, ...]
@@ -135,7 +132,9 @@ class ExperimentExecutionResult:
 
 class CellExecutor(Protocol):
     def execute_cell(
-        self, cell: ScientificCell, config: ScientificConfig
+        self,
+        cell: ScientificCell,
+        config: ScientificConfig,
     ) -> CellExecutionOutcome: ...
 
 
@@ -173,7 +172,9 @@ class ExecutionRecordStore:
         (directory / f"{digest}.json").write_text(record.model_dump_json(indent=2))
 
     def read_outcome(
-        self, experiment: ExperimentName, semantic_key: ScientificCellSemanticKey
+        self,
+        experiment: ExperimentName,
+        semantic_key: ScientificCellSemanticKey,
     ) -> PersistedExecutionRecord | None:
         digest = hashlib.sha256(framed_bytes(semantic_key)).hexdigest()
         path = self._record_directory(experiment) / f"{digest}.json"
@@ -182,7 +183,8 @@ class ExecutionRecordStore:
         return PersistedExecutionRecord.model_validate_json(path.read_text())
 
     def read_all_outcomes(
-        self, experiment: ExperimentName
+        self,
+        experiment: ExperimentName,
     ) -> tuple[PersistedExecutionRecord, ...]:
         directory = self._record_directory(experiment)
         if not directory.exists():
@@ -201,51 +203,68 @@ class MetricCellKey(FrozenDomainModel):
     method: MethodName
 
 
-MetricIndex = dict[MetricCellKey, dict[MetricName, MetricValue | None]]
+class MetricCellEvidence(FrozenDomainModel):
+    key: MetricCellKey
+    metrics: tuple[MetricObservation, ...]
+
+
+MetricIndex = tuple[MetricCellEvidence, ...]
 
 
 def _metric_index_from_outcomes(
     dataset: DatasetId,
-    outcomes: Sequence[CellExecutionOutcome],
+    outcomes: tuple[CellExecutionOutcome, ...],
 ) -> MetricIndex:
-    index: MetricIndex = {}
-    for outcome in outcomes:
-        key = MetricCellKey(
-            dataset=dataset,
-            experiment=outcome.cell.experiment,
-            scientific_scenario=outcome.cell.condition,
-            master_seed=outcome.cell.master_seed,
-            method=outcome.cell.method,
+    return tuple(
+        MetricCellEvidence(
+            key=MetricCellKey(
+                dataset=dataset,
+                experiment=outcome.cell.experiment,
+                scientific_scenario=outcome.cell.condition,
+                master_seed=outcome.cell.master_seed,
+                method=outcome.cell.method,
+            ),
+            metrics=outcome.metrics,
         )
-        index.setdefault(key, {}).update(dict(outcome.metrics))
-    return index
+        for outcome in outcomes
+        if outcome.terminal_state is ExperimentLifecycleState.COMPLETED
+    )
 
 
 def _extend_index_from_records(
     index: MetricIndex,
     dataset: DatasetId,
-    records: Sequence[PersistedExecutionRecord],
-) -> None:
-    for record in records:
-        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
-            continue
-        key = MetricCellKey(
-            dataset=dataset,
-            experiment=record.experiment,
-            scientific_scenario=record.condition,
-            master_seed=record.master_seed,
-            method=record.method,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> MetricIndex:
+    additions = tuple(
+        MetricCellEvidence(
+            key=MetricCellKey(
+                dataset=dataset,
+                experiment=record.experiment,
+                scientific_scenario=record.condition,
+                master_seed=record.master_seed,
+                method=record.method,
+            ),
+            metrics=record.metrics,
         )
-        index.setdefault(key, {}).update(dict(record.metrics))
+        for record in records
+        if record.terminal_state is ExperimentLifecycleState.COMPLETED
+    )
+    return (*index, *additions)
 
 
 def _metric_value(
-    index: Mapping[MetricCellKey, Mapping[MetricName, MetricValue | None]],
+    index: MetricIndex,
     key: MetricCellKey,
     metric: MetricName,
 ) -> MetricValue | None:
-    values = index.get(key)
-    return None if values is None else values.get(metric)
+    for evidence in reversed(index):
+        if evidence.key != key:
+            continue
+        for metric_name, metric_value in reversed(evidence.metrics):
+            if metric_name == metric:
+                return metric_value
+    return None
 
 
 def _benefit_difference(
@@ -268,8 +287,8 @@ def _benefit_difference(
 def _comparison_pairs(
     definition: ComparisonDefinition,
     dataset: DatasetId,
-    metric_index: Mapping[MetricCellKey, Mapping[MetricName, MetricValue | None]],
-    master_seeds: Sequence[MasterSeed],
+    metric_index: MetricIndex,
+    master_seeds: tuple[MasterSeed, ...],
 ) -> tuple[PairedDifference, ...]:
     paired: list[PairedDifference] = []
     for seed in master_seeds:
@@ -314,7 +333,7 @@ def _comparison_pairs(
 def comparison_results_for_experiment(
     experiment: ExperimentName,
     dataset: DatasetId,
-    outcomes: Sequence[CellExecutionOutcome],
+    outcomes: tuple[CellExecutionOutcome, ...],
     config: ScientificConfig,
     store: ExecutionRecordStore | None = None,
 ) -> tuple[ComparisonFamilyResult, ...]:
@@ -330,12 +349,12 @@ def comparison_results_for_experiment(
         Path(config.runtime.repository_layout.execution_workspace)
     )
     metric_index = _metric_index_from_outcomes(dataset, outcomes)
-    reference_experiments = {
+    reference_experiments = frozenset(
         definition.reference_experiment
         for definition in definitions
         if definition.reference_kind is ComparisonReferenceKind.SCIENTIFIC_CELL
         and definition.reference_experiment != experiment
-    }
+    )
     for reference_experiment in sorted(reference_experiments):
         reference_definition = experiment_by_name(reference_experiment)
         if reference_definition.dataset is not dataset:
@@ -343,7 +362,7 @@ def comparison_results_for_experiment(
                 f"comparison reference {reference_experiment} uses "
                 f"{reference_definition.dataset.value}, expected {dataset.value}"
             )
-        _extend_index_from_records(
+        metric_index = _extend_index_from_records(
             metric_index,
             dataset,
             execution_store.read_all_outcomes(reference_experiment),
@@ -420,14 +439,35 @@ def _record_metric(
     record: PersistedExecutionRecord,
     metric: MetricName,
 ) -> MetricValue | None:
-    return dict(record.metrics).get(metric)
+    for metric_name, metric_value in reversed(record.metrics):
+        if metric_name == metric:
+            return metric_value
+    return None
+
+
+def _record_metric_for_seed_and_method(
+    records: tuple[PersistedExecutionRecord, ...],
+    condition: ScenarioName,
+    master_seed: MasterSeed,
+    method: MethodName,
+    metric: MetricName,
+) -> MetricValue | None:
+    for record in reversed(records):
+        if (
+            record.terminal_state is ExperimentLifecycleState.COMPLETED
+            and record.condition == condition
+            and record.master_seed == master_seed
+            and record.method == method
+        ):
+            return _record_metric(record, metric)
+    return None
 
 
 def _paired_constraint_means(
-    records: Sequence[PersistedExecutionRecord],
+    records: tuple[PersistedExecutionRecord, ...],
     method: MethodName,
     reference: MethodName,
-    conditions: Sequence[ScenarioName],
+    conditions: tuple[ScenarioName, ...],
     metric: MetricName,
     *,
     orientation: ComparisonOrientation,
@@ -435,21 +475,33 @@ def _paired_constraint_means(
 ) -> tuple[MetricDifference, ...] | None:
     means: list[MetricDifference] = []
     for condition in conditions:
-        by_seed: dict[MasterSeed, dict[MethodName, MetricValue | None]] = {}
-        for record in records:
-            if (
-                record.terminal_state is ExperimentLifecycleState.COMPLETED
-                and record.condition == condition
-                and record.method in (method, reference)
-            ):
-                by_seed.setdefault(record.master_seed, {})[record.method] = _record_metric(
-                    record,
-                    metric,
+        seeds = tuple(
+            sorted(
+                frozenset(
+                    record.master_seed
+                    for record in records
+                    if record.terminal_state is ExperimentLifecycleState.COMPLETED
+                    and record.condition == condition
+                    and record.method in (method, reference)
                 )
+            )
+        )
         differences: list[MetricDifference] = []
-        for values in by_seed.values():
-            method_value = values.get(method)
-            reference_value = values.get(reference)
+        for seed in seeds:
+            method_value = _record_metric_for_seed_and_method(
+                records,
+                condition,
+                seed,
+                method,
+                metric,
+            )
+            reference_value = _record_metric_for_seed_and_method(
+                records,
+                condition,
+                seed,
+                reference,
+                metric,
+            )
             if method_value is None or reference_value is None:
                 continue
             differences.append(
@@ -532,9 +584,7 @@ def collapse_evaluation_from_store(
     source_records = store.read_all_outcomes(
         SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
     )
-    source_condition = (
-        PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
-    )
+    source_condition = (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,)
     source_target = _maximum_constraint(
         _paired_constraint_means(
             source_records,
@@ -577,9 +627,7 @@ def collapse_evaluation_from_store(
             verification_records,
             SourceExclusionMethod.FULL_FEDSIRA.value,
             "Multiple Retrains with Direct Krum",
-            (
-                ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY.value,
-            ),
+            (ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY.value,),
             "legitimate-admission",
             orientation=ComparisonOrientation.HIGHER_IS_BETTER,
             minimum_complete_pairs=minimum,
@@ -604,9 +652,7 @@ def run_experiment(
     overwrite: OverwriteExisting = False,
     config_path: Path = PRODUCTION_CONFIG_PATH,
     resolved_core_complete: ResolvedCoreComplete = False,
-    collapse_decision_states: Sequence[
-        tuple[ExperimentName, CollapseDecisionPassed]
-    ]
+    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...]
     | None = None,
 ) -> ExperimentExecutionResult:
     validate_experiment_name_is_registered(experiment)
@@ -628,16 +674,23 @@ def run_experiment(
     store = ExecutionRecordStore(
         Path(config.runtime.repository_layout.execution_workspace)
     )
-    prerequisite_states: dict[ExperimentName, ExperimentLifecycleState] = {}
-    for prerequisite in planned.prerequisites:
-        prerequisite_outcomes = store.read_all_outcomes(prerequisite)
-        if prerequisite_outcomes and all(
-            outcome.terminal_state is ExperimentLifecycleState.COMPLETED
-            for outcome in prerequisite_outcomes
-        ):
-            prerequisite_states[prerequisite] = ExperimentLifecycleState.COMPLETED
-        else:
-            prerequisite_states[prerequisite] = ExperimentLifecycleState.NOT_STARTED
+    prerequisite_states = tuple(
+        ExperimentPrerequisiteState(
+            experiment=prerequisite,
+            lifecycle_state=(
+                ExperimentLifecycleState.COMPLETED
+                if (
+                    (prerequisite_outcomes := store.read_all_outcomes(prerequisite))
+                    and all(
+                        outcome.terminal_state is ExperimentLifecycleState.COMPLETED
+                        for outcome in prerequisite_outcomes
+                    )
+                )
+                else ExperimentLifecycleState.NOT_STARTED
+            ),
+        )
+        for prerequisite in planned.prerequisites
+    )
     validate_experiment_prerequisites_met(experiment, prerequisite_states)
 
     outcomes: list[CellExecutionOutcome] = []
@@ -670,28 +723,29 @@ def run_experiment(
         store.write_outcome(outcome)
         outcomes.append(outcome)
 
+    completed_outcomes = tuple(outcomes)
     comparison_results = comparison_results_for_experiment(
         experiment,
         planned.definition.dataset,
-        outcomes,
+        completed_outcomes,
         config,
         store,
     )
     lifecycle_state = derive_lifecycle_state(
-        tuple(outcome.terminal_state for outcome in outcomes)
+        tuple(outcome.terminal_state for outcome in completed_outcomes)
     )
-    completed_digest = execution_record_digest(outcomes)
+    completed_digest = execution_record_digest(completed_outcomes)
     return ExperimentExecutionResult(
         experiment=experiment,
         lifecycle_state=lifecycle_state,
-        outcomes=tuple(outcomes),
+        outcomes=completed_outcomes,
         comparison_results=comparison_results,
         execution_digest=completed_digest,
     )
 
 
 def derive_lifecycle_state(
-    terminal_states: Sequence[ExperimentLifecycleState],
+    terminal_states: tuple[ExperimentLifecycleState, ...],
 ) -> ExperimentLifecycleState:
     if not terminal_states:
         return ExperimentLifecycleState.NOT_STARTED
@@ -729,7 +783,7 @@ def _to_failure_detail(
 
 
 def execution_record_digest(
-    outcomes: Sequence[CellExecutionOutcome],
+    outcomes: tuple[CellExecutionOutcome, ...],
 ) -> ArtifactDigest:
     hasher = hashlib.sha256()
     for outcome in outcomes:
