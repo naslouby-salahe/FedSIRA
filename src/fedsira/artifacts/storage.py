@@ -5,8 +5,8 @@ from pathlib import Path
 
 from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
-from fedsira.domain.enums import ArtifactLifecycleState
-from fedsira.domain.records import ArtifactDigest, BooleanValue
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
+from fedsira.domain.records import ArtifactDigest, ArtifactReuseDecision, BooleanValue
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
@@ -89,7 +89,7 @@ def publish_artifact_to_disk(
         staged_manifest.identity,
     )
     os.replace(staged_path, payload_path)
-    manifest_path.write_text(completed.model_dump_json())
+    manifest_path.write_text(completed.model_dump_json(), encoding="utf-8")
     return completed
 
 
@@ -100,7 +100,7 @@ def read_published_manifest(
     _, manifest_path = published_artifact_paths(published_directory, identity)
     if not manifest_path.exists():
         return None
-    return ArtifactManifest.model_validate_json(manifest_path.read_text())
+    return ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
 
 
 def is_artifact_complete_and_valid(
@@ -118,3 +118,36 @@ def is_artifact_complete_and_valid(
     except ValueError:
         return False
     return True
+
+
+def publish_or_reuse_artifact_payload(
+    *,
+    family: ArtifactFamily,
+    identity: ArtifactDigest,
+    payload: ArtifactPayloadBytes,
+    published_directory: Path,
+    staging_root: Path,
+    upstream_identities: tuple[ArtifactDigest, ...] = (),
+) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
+    if is_artifact_complete_and_valid(published_directory, identity):
+        existing = read_published_manifest(published_directory, identity)
+        if existing is not None:
+            return existing, True
+
+    staged_manifest = ArtifactManifest(
+        family=family,
+        identity=identity,
+        checksum=compute_checksum(payload),
+        lifecycle_state=ArtifactLifecycleState.STAGING,
+        upstream_identities=upstream_identities,
+    )
+    staged_path = stage_payload(staging_root, payload)
+    return (
+        publish_artifact_to_disk(
+            staged_path,
+            published_directory,
+            staged_manifest,
+            payload,
+        ),
+        False,
+    )
