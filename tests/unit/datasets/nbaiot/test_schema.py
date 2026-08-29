@@ -1,10 +1,10 @@
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
-    NBAIOT_DOMAIN_HASH_TOKEN,
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TARGET_CLASS,
     NBaiotClass,
     NBaiotDomain,
+    nbaiot_domain_hash_token,
     normalize_path_token,
     resolve_attack_class,
     resolve_domain,
@@ -19,8 +19,9 @@ def test_nine_domain_proxies_in_fixed_order() -> None:
 
 
 def test_every_domain_has_a_fixed_hash_token() -> None:
-    assert set(NBAIOT_DOMAIN_HASH_TOKEN.keys()) == set(NBaiotDomain)
-    assert NBAIOT_DOMAIN_HASH_TOKEN[NBaiotDomain.PROVISION_PT737E_CAMERA] == (
+    tokens = tuple(nbaiot_domain_hash_token(domain) for domain in NBaiotDomain)
+    assert len(set(tokens)) == len(NBaiotDomain)
+    assert nbaiot_domain_hash_token(NBaiotDomain.PROVISION_PT737E_CAMERA) == (
         "PROVISION_PT737E_CAMERA"
     )
 
