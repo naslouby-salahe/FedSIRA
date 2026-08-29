@@ -1,5 +1,7 @@
 import hashlib
-from collections.abc import Sequence
+from typing import Annotated
+
+from pydantic import Field
 
 from fedsira.domain.records import (
     UINT32_MODULUS,
@@ -12,6 +14,8 @@ from fedsira.domain.records import (
     SourceRowIndex,
 )
 from fedsira.runtime.determinism import framed_bytes
+
+SamplingSelectionDigest = Annotated[bytes, Field(min_length=32, max_length=32)]
 
 PREPROCESSING_SAMPLE_ORDER_SEED: DerivedSeed = (
     int.from_bytes(
@@ -27,7 +31,7 @@ def sampling_cap_selection_digest(
     class_id: ClassLabel,
     role_hash_token: RoleToken,
     original_row_index: SourceRowIndex,
-) -> bytes:
+) -> SamplingSelectionDigest:
     return hashlib.sha256(
         framed_bytes(
             dataset_file_sha256,
@@ -45,13 +49,15 @@ def apply_sampling_cap(
     domain_hash_token: DomainId,
     class_id: ClassLabel,
     role_hash_token: RoleToken,
-    original_row_indices: Sequence[SourceRowIndex],
+    original_row_indices: tuple[SourceRowIndex, ...],
     cap: SamplingCap,
 ) -> tuple[SourceRowIndex, ...]:
     if len(original_row_indices) <= cap:
-        return tuple(original_row_indices)
+        return original_row_indices
 
-    def sort_key(original_row_index: SourceRowIndex) -> tuple[bytes, SourceRowIndex]:
+    def sort_key(
+        original_row_index: SourceRowIndex,
+    ) -> tuple[SamplingSelectionDigest, SourceRowIndex]:
         digest = sampling_cap_selection_digest(
             dataset_file_sha256,
             domain_hash_token,
