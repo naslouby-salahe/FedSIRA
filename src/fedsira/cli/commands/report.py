@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.records import ExperimentName, OverwriteExisting, ScientificCellCount
 from fedsira.experiments.collapse import (
     CollapseDecision,
     ResolvedCore,
@@ -33,9 +34,7 @@ from fedsira.reporting.export import (
     export_project_summary,
 )
 from fedsira.reporting.verification import (
-    CompletenessVerificationResult as _CompletenessResult,
-)
-from fedsira.reporting.verification import (
+    CompletenessVerificationResult,
     verify_claim_states_derivable,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
@@ -45,7 +44,8 @@ from fedsira.reporting.verification import (
 from fedsira.runtime.state import FailureDetail
 
 
-def execute(name: str | None, overwrite: bool) -> None:
+def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
+    del overwrite
     store = ExecutionRecordStore(Path("outputs"))
     if name is not None:
         result = _load_experiment_result(name, store)
@@ -53,42 +53,40 @@ def execute(name: str | None, overwrite: bool) -> None:
         export = export_experiment_report(result, PRODUCTION_CONFIG_PATH, experiment_root)
         for path in export.exported_paths:
             print(f"exported {path}")
+        if not export.verification.passed:
+            raise SystemExit(1)
         return
 
     plan = build_plan(resolved_core_complete=True)
     validate_planned_cell_count_invariant(plan)
-    terminal_counts: dict[str, int] = {}
-    lifecycle_states: dict[str, ExperimentLifecycleState] = {}
+    terminal_counts: dict[ExperimentName, ScientificCellCount] = {}
+    lifecycle_states: dict[ExperimentName, ExperimentLifecycleState] = {}
+    experiment_names = tuple(definition.name for definition in EXPERIMENT_REGISTRY)
     for definition in EXPERIMENT_REGISTRY:
         outcomes = store.read_all_outcomes(definition.name)
         terminal_counts[definition.name] = len(outcomes)
-        if not outcomes:
-            lifecycle_states[definition.name] = ExperimentLifecycleState.NOT_STARTED
-            continue
-        lifecycle_states[definition.name] = derive_lifecycle_state(
-            tuple(outcome.terminal_state for outcome in outcomes)
+        lifecycle_states[definition.name] = (
+            derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
+            if outcomes
+            else ExperimentLifecycleState.NOT_STARTED
         )
 
     count_verification = verify_planned_cell_count_satisfied(plan, terminal_counts)
-    completion_verification = verify_experiments_completed(
-        lifecycle_states, tuple(d.name for d in EXPERIMENT_REGISTRY)
-    )
+    completion_verification = verify_experiments_completed(lifecycle_states, experiment_names)
     terminal_verification = verify_experiments_reached_terminal_state(
-        lifecycle_states, tuple(d.name for d in EXPERIMENT_REGISTRY)
+        lifecycle_states, experiment_names
     )
     claim_states = derive_claim_states_for_export()
     claim_verification = verify_claim_states_derivable(len(claim_states), len(claim_states))
     stale_ancestor_verification = verify_no_stale_ancestors(())
-
-    combined_failures = (
+    failures = (
         *count_verification.failures,
         *completion_verification.failures,
         *terminal_verification.failures,
         *claim_verification.failures,
         *stale_ancestor_verification.failures,
     )
-    verification = _CompletenessResult(passed=not combined_failures, failures=combined_failures)
-
+    verification = CompletenessVerificationResult(passed=not failures, failures=failures)
     export = export_project_summary(
         plan,
         claim_states,
@@ -107,41 +105,39 @@ def execute(name: str | None, overwrite: bool) -> None:
         raise SystemExit(1)
 
 
-def _load_experiment_result(name: str, store: ExecutionRecordStore) -> ExperimentExecutionResult:
+def _load_experiment_result(
+    name: ExperimentName,
+    store: ExecutionRecordStore,
+) -> ExperimentExecutionResult:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     definition = experiment_by_name(name)
-    outcomes_records = store.read_all_outcomes(name)
-    outcomes: list[CellExecutionOutcome] = []
-    for record in outcomes_records:
-        cell = ScientificCell(
-            experiment=record.experiment,
-            method=record.method,
-            condition=record.condition,
-            master_seed=record.master_seed,
+    records = store.read_all_outcomes(name)
+    outcomes = tuple(
+        CellExecutionOutcome(
+            cell=ScientificCell(
+                experiment=record.experiment,
+                method=record.method,
+                condition=record.condition,
+                master_seed=record.master_seed,
+            ),
+            terminal_state=record.terminal_state,
+            failure=_to_failure_detail(record.failure),
+            metrics=record.metrics,
         )
-        outcomes.append(
-            CellExecutionOutcome(
-                cell=cell,
-                terminal_state=record.terminal_state,
-                failure=_to_failure_detail(record.failure),
-                metrics=record.metrics,
-            )
-        )
-    comparison_results = comparison_results_for_experiment(
+        for record in records
+    )
+    comparisons = comparison_results_for_experiment(
         name,
         definition.dataset,
         outcomes,
         config,
     )
-    if not outcomes:
-        lifecycle = ExperimentLifecycleState.NOT_STARTED
-    else:
-        lifecycle = derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
+    lifecycle = derive_lifecycle_state(tuple(outcome.terminal_state for outcome in outcomes))
     return ExperimentExecutionResult(
         experiment=name,
         lifecycle_state=lifecycle,
-        outcomes=tuple(outcomes),
-        comparison_results=comparison_results,
+        outcomes=outcomes,
+        comparison_results=comparisons,
     )
 
 
@@ -155,14 +151,18 @@ def _to_failure_detail(failure: PersistedFailureDetail | None) -> FailureDetail 
     )
 
 
-def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecision, ...] | None:
+def _load_collapse_decisions(
+    store: ExecutionRecordStore,
+) -> tuple[CollapseDecision, ...] | None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
-    collapse_family_names = (
-        ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
-        ClaimFamily.PLURALITY_NECESSITY.value,
-        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
-        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
+    collapse_families = frozenset(
+        {
+            ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+            ClaimFamily.PLURALITY_NECESSITY,
+            ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+            ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+        }
     )
     decisions: list[CollapseDecision] = []
     for experiment in COLLAPSE_EXPERIMENT_NAMES:
@@ -190,23 +190,26 @@ def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecis
             outcomes,
             config,
         )
-        family_names = {family.family.value for family in comparison_results}
         matched_family = next(
-            (family for family in family_names if family in collapse_family_names),
+            (
+                result.family
+                for result in comparison_results
+                if result.family in collapse_families
+            ),
             None,
         )
         if matched_family is None:
             return None
         decisions.append(
-            collapse_decision_from_comparison_families(matched_family, comparison_results, alpha)
+            collapse_decision_from_comparison_families(
+                matched_family,
+                comparison_results,
+                alpha,
+            )
         )
-    if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
-        return None
-    return tuple(decisions)
+    return tuple(decisions) if len(decisions) == len(COLLAPSE_EXPERIMENT_NAMES) else None
 
 
 def _load_resolved_core(store: ExecutionRecordStore) -> ResolvedCore | None:
     decisions = _load_collapse_decisions(store)
-    if decisions is None:
-        return None
-    return materialize_resolved_core(decisions)
+    return None if decisions is None else materialize_resolved_core(decisions)
