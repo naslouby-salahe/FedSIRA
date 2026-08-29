@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from fedsira.analysis.claims import ClaimEvidence, ClaimStateResult, derive_claim_states
+from fedsira.analysis.claims import (
+    CLAIM_DEFINITIONS,
+    ClaimEvidence,
+    ClaimStateResult,
+    derive_claim_states,
+)
 from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ClaimState, ExperimentLifecycleState
@@ -17,6 +22,7 @@ from fedsira.domain.records import (
     MetricValue,
     RepositoryPath,
     SchemaVersion,
+    ScientificCellCount,
     TableName,
 )
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
@@ -40,8 +46,8 @@ class ExperimentReportSummary(FrozenDomainModel):
     schema_version: SchemaVersion
     experiment: ExperimentName
     lifecycle_state: ExperimentLifecycleState
-    completed_cell_count: int
-    planned_cell_count: int
+    completed_cell_count: ScientificCellCount
+    planned_cell_count: ScientificCellCount
 
 
 class ProjectReproducibilitySummary(FrozenDomainModel):
@@ -59,6 +65,10 @@ class ReportExportResult(FrozenDomainModel):
     experiment: ExperimentName | None
     exported_paths: tuple[RepositoryPath, ...]
     verification: CompletenessVerificationResult
+
+
+def claim_definition_count() -> ScientificCellCount:
+    return len(CLAIM_DEFINITIONS)
 
 
 def _results_root() -> Path:
@@ -111,7 +121,8 @@ def export_experiment_report(
     exported: list[Path] = []
     if result.comparison_results:
         statistical_table = table_renderers.render_statistical_summary_table(
-            result.comparison_results, rounding
+            result.comparison_results,
+            rounding,
         )
         exported.append(_write_table(tables_root, statistical_table))
 
@@ -171,14 +182,17 @@ def export_project_summary(
 
     if collapse_decisions is not None and resolved_core is not None:
         collapse_table = table_renderers.render_collapse_decisions_table(
-            collapse_decisions, resolved_core, rounding
+            collapse_decisions,
+            resolved_core,
+            rounding,
         )
         exported.append(_write_table(tables_root, collapse_table))
         materialized_tables.append(collapse_table.name)
 
     if comparison_results:
         statistics_table = table_renderers.render_statistical_summary_table(
-            comparison_results, rounding
+            comparison_results,
+            rounding,
         )
         exported.append(_write_table(tables_root, statistics_table))
         materialized_tables.append(statistics_table.name)
@@ -198,14 +212,17 @@ def export_project_summary(
     if evidence_trajectory is not None:
         evidence_trajectory_path = figures_root / "Evidence-Arrival State Trajectory.png"
         figure_renderers.render_evidence_arrival_trajectory(
-            evidence_trajectory, evidence_trajectory_path
+            evidence_trajectory,
+            evidence_trajectory_path,
         )
         exported.append(evidence_trajectory_path)
 
     if telemetry is not None:
         efficiency_path = figures_root / "Efficiency Profile.png"
         figure_renderers.render_efficiency_profile(
-            telemetry, "elapsed-seconds-per-cell", efficiency_path
+            telemetry,
+            "elapsed-seconds-per-cell",
+            efficiency_path,
         )
         exported.append(efficiency_path)
 
