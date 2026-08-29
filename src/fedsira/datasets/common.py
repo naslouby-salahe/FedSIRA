@@ -7,6 +7,7 @@ from pydantic import model_validator
 from fedsira.domain.enums import Role
 from fedsira.domain.records import (
     ArtifactDigest,
+    BooleanValue,
     FrozenDomainModel,
     NonNegativeInt,
     RelativePathText,
@@ -16,18 +17,6 @@ from fedsira.domain.records import (
     SampleIdPrefix,
 )
 from fedsira.runtime.determinism import framed_bytes
-
-ROLE_HASH_TOKEN: dict[Role, RoleToken] = {
-    Role.ANCHOR_TRAIN: "ANCHOR_TRAIN",
-    Role.ANCHOR_VALIDATION: "ANCHOR_VALIDATION",
-    Role.POST_REFERENCE_REPLAY: "POST_REFERENCE_REPLAY",
-    Role.ROW_VERIFICATION: "ROW_VERIFICATION",
-    Role.FINAL_GATE: "FINAL_GATE",
-    Role.REPORT_TEST: "REPORT_TEST",
-    Role.SOURCE_PROPOSAL: "SOURCE_PROPOSAL",
-    Role.CANDIDATE_SCREEN: "CANDIDATE_SCREEN",
-    Role.REPRODUCTION: "REPRODUCTION",
-}
 
 SUPPORTED_ROLE_ORDER: tuple[Role, ...] = (
     Role.ANCHOR_TRAIN,
@@ -48,18 +37,18 @@ TARGET_ROLE_ORDER: tuple[Role, ...] = (
 )
 
 TRAINING_AND_SCREENING_ROLES: frozenset[Role] = frozenset(
-    {
+    (
         Role.ANCHOR_TRAIN,
         Role.ANCHOR_VALIDATION,
         Role.POST_REFERENCE_REPLAY,
         Role.SOURCE_PROPOSAL,
         Role.CANDIDATE_SCREEN,
         Role.REPRODUCTION,
-    }
+    )
 )
 
 EVIDENCE_ROLES: frozenset[Role] = frozenset(
-    {Role.ROW_VERIFICATION, Role.FINAL_GATE, Role.REPORT_TEST}
+    (Role.ROW_VERIFICATION, Role.FINAL_GATE, Role.REPORT_TEST)
 )
 
 
@@ -82,12 +71,35 @@ class RoleWindow(FrozenDomainModel):
             )
         return self
 
-    def contains(self, normalized_position: RolePosition) -> bool:
+    def contains(self, normalized_position: RolePosition) -> BooleanValue:
         return self.lower_inclusive <= normalized_position < self.upper_exclusive
 
 
+def role_hash_token(role: Role) -> RoleToken:
+    if role is Role.ANCHOR_TRAIN:
+        return "ANCHOR_TRAIN"
+    if role is Role.ANCHOR_VALIDATION:
+        return "ANCHOR_VALIDATION"
+    if role is Role.POST_REFERENCE_REPLAY:
+        return "POST_REFERENCE_REPLAY"
+    if role is Role.ROW_VERIFICATION:
+        return "ROW_VERIFICATION"
+    if role is Role.FINAL_GATE:
+        return "FINAL_GATE"
+    if role is Role.REPORT_TEST:
+        return "REPORT_TEST"
+    if role is Role.SOURCE_PROPOSAL:
+        return "SOURCE_PROPOSAL"
+    if role is Role.CANDIDATE_SCREEN:
+        return "CANDIDATE_SCREEN"
+    if role is Role.REPRODUCTION:
+        return "REPRODUCTION"
+    raise ValueError(f"unsupported role: {role.value}")
+
+
 def role_for_normalized_position(
-    normalized_position: RolePosition, windows: tuple[RoleWindow, ...]
+    normalized_position: RolePosition,
+    windows: tuple[RoleWindow, ...],
 ) -> Role | None:
     for window in windows:
         if window.contains(normalized_position):
