@@ -269,7 +269,7 @@ def comparison_results_for_experiment(
             )
         families.append(
             apply_holm_adjustment(
-                ComparisonFamilyResult(family=family, results=tuple(results)),
+                ComparisonFamilyResult(family=family, comparisons=tuple(results)),
                 config.metrics_and_statistics.multiplicity,
             )
         )
