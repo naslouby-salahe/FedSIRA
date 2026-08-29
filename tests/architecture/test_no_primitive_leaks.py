@@ -1,5 +1,6 @@
 import ast
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
@@ -20,6 +21,8 @@ SCALAR_FOUNDATIONS = {
 }
 CONFIG_SCHEMA_FILE = SRC_ROOT / "config" / "schema.py"
 MODEL_BASES = {"BaseModel", "FrozenConfigModel", "FrozenDomainModel", "TensorDomainModel"}
+
+ViolationDetector = Callable[[ast.Module], list[str]]
 
 
 def _names(annotation: ast.expr) -> set[str]:
@@ -115,9 +118,7 @@ def domain_identifier_violations(tree: ast.Module) -> list[str]:
     return found
 
 
-def _all_violations(detector: object) -> list[str]:
-    if not callable(detector):
-        raise TypeError("detector must be callable")
+def _all_violations(detector: ViolationDetector) -> list[str]:
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
         for violation in detector(parse(path)):
