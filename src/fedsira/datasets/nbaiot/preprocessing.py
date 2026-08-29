@@ -1,33 +1,35 @@
 from __future__ import annotations
 
-import json
+import csv
 import math
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 
 import pandas
-from pandas.io.parsers import TextFileReader
 
 from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain, ScientificConfig
 from fedsira.datasets.common import (
-    ROLE_HASH_TOKEN,
+    SUPPORTED_ROLE_ORDER,
+    TARGET_ROLE_ORDER,
     DatasetExclusionReason,
     Role,
     compute_sample_id,
     role_for_normalized_position,
+    role_hash_token,
 )
 from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.schema import (
-    NBAIOT_DOMAIN_HASH_TOKEN,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
+    nbaiot_domain_hash_token,
 )
 from fedsira.datasets.roles import supported_role_windows, target_role_windows
 from fedsira.datasets.sampling import apply_sampling_cap
 from fedsira.datasets.scaling import (
+    FeatureMatrix,
     FeatureMoments,
+    FeatureStatistic,
+    FeatureVector,
     accumulate_feature_statistics,
     fit_feature_moments,
     standardize_row,
@@ -36,13 +38,65 @@ from fedsira.domain.records import (
     ArtifactDigest,
     DatasetClassToken,
     DatasetColumnName,
+    DomainId,
+    FiniteFloat,
+    FrozenDomainModel,
     NonNegativeInt,
+    OverwriteExisting,
+    PredictorCount,
+    PreparedViewKey,
+    RelativePathText,
+    RolePosition,
+    RowCount,
+    SampleIdPrefix,
+    SamplingCap,
+    SchemaVersion,
 )
 
-NBAIOT_PRIMARY_PREDICTOR_COUNT = 115
-NBAIOT_SAMPLE_ID_PREFIX = "NBAIOT_SAMPLE_ID_V1"
-PREPARED_VIEW_SCHEMA_VERSION = "fedsira|nbaiot_prepared_view|1"
-SCALER_SCHEMA_VERSION = "fedsira|nbaiot_scaler|1"
+NBAIOT_PRIMARY_PREDICTOR_COUNT: PredictorCount = 115
+NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"
+PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|1"
+SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"
+
+
+class RoleSamplingCap(FrozenDomainModel):
+    role: Role
+    cap: SamplingCap | None
+
+
+class RoleAssignment(FrozenDomainModel):
+    sample_id: ArtifactDigest
+    role: Role
+    original_row_index: NonNegativeInt
+
+
+class PreparedView(FrozenDomainModel):
+    domain: NBaiotDomain
+    class_id: NBaiotClass
+    role: Role
+    sample_ids: tuple[ArtifactDigest, ...]
+    features: FeatureMatrix
+    labels: tuple[DatasetClassToken, ...]
+
+    @property
+    def row_count(self) -> RowCount:
+        return len(self.sample_ids)
+
+
+class PreparedViewMetadata(FrozenDomainModel):
+    schema_version: SchemaVersion
+    domain: NBaiotDomain
+    class_id: NBaiotClass
+    role: Role
+    row_count: RowCount
+
+
+class ScalerMetadata(FrozenDomainModel):
+    schema_version: SchemaVersion
+    feature_names: tuple[DatasetColumnName, ...]
+    means: tuple[FiniteFloat, ...]
+    standard_deviations: tuple[FiniteFloat, ...]
+    training_row_count: RowCount
 
 
 def validate_predictor_schema(ordered_header: tuple[DatasetColumnName, ...]) -> None:
@@ -53,24 +107,25 @@ def validate_predictor_schema(ordered_header: tuple[DatasetColumnName, ...]) -> 
             f"primary predictor header has {len(ordered_header)} columns, expected exactly "
             f"{NBAIOT_PRIMARY_PREDICTOR_COUNT}"
         )
-    missing_trigger_features = [
+    missing_trigger_features = tuple(
         feature for feature in NBAIOT_TRIGGER_FEATURES if feature not in ordered_header
-    ]
+    )
     if missing_trigger_features:
         raise ValueError(
-            f"primary predictor header is missing required trigger features: "
+            "primary predictor header is missing required trigger features: "
             f"{missing_trigger_features}"
         )
 
 
 def validate_consistent_predictor_schema(
-    reference_header: tuple[DatasetColumnName, ...], observed_header: tuple[DatasetColumnName, ...]
+    reference_header: tuple[DatasetColumnName, ...],
+    observed_header: tuple[DatasetColumnName, ...],
 ) -> None:
     if observed_header != reference_header:
-        raise ValueError("primary predictor header does not match the canonical reference schema")
+        raise ValueError("primary predictor header does not match the fixed reference schema")
 
 
-def classify_row_finiteness(values: Sequence[float]) -> DatasetExclusionReason | None:
+def classify_row_finiteness(values: FeatureVector) -> DatasetExclusionReason | None:
     for value in values:
         if math.isnan(value) or math.isinf(value):
             return DatasetExclusionReason.NON_FINITE_PREDICTOR
@@ -78,96 +133,123 @@ def classify_row_finiteness(values: Sequence[float]) -> DatasetExclusionReason |
 
 
 def read_predictor_header(path: Path) -> tuple[DatasetColumnName, ...]:
-    header_frame: pandas.DataFrame = pandas.read_csv(path, nrows=0)
-    return tuple(str(name).strip() for name in header_frame.columns)
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        try:
+            header = next(reader)
+        except StopIteration as error:
+            raise ValueError(f"primary CSV is empty: {path}") from error
+    return tuple(name.strip() for name in header)
 
 
-def count_csv_data_rows(path: Path) -> NonNegativeInt:
-    with path.open("rb") as handle:
-        return sum(1 for _ in handle) - 1
+def count_csv_data_rows(path: Path) -> RowCount:
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        try:
+            next(reader)
+        except StopIteration:
+            return 0
+        return sum(1 for _ in reader)
 
 
-def validate_all_predictors_finite(
-    path: Path, ordered_header: tuple[DatasetColumnName, ...]
-) -> None:
-    reader: TextFileReader = pandas.read_csv(path, usecols=list(ordered_header), chunksize=100_000)
-    chunk_frame: pandas.DataFrame
-    for chunk_frame in reader:
-        nonnumeric_columns: list[DatasetColumnName] = [
-            str(column)
-            for column in chunk_frame.columns
-            if not pandas.api.types.is_numeric_dtype(chunk_frame[column])
-        ]
-        if nonnumeric_columns:
-            raise ValueError(
-                f"{DatasetExclusionReason.UNPARSEABLE_PREDICTOR.value} in {path}: "
-                f"non-numeric predictor columns {nonnumeric_columns}"
-            )
-        for row_index, row in enumerate(chunk_frame.itertuples(index=False, name=None)):
-            reason = classify_row_finiteness(row)
+def _read_feature_matrix(
+    path: Path,
+    ordered_header: tuple[DatasetColumnName, ...],
+) -> FeatureMatrix:
+    rows: list[FeatureVector] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        try:
+            observed_header = tuple(name.strip() for name in next(reader))
+        except StopIteration as error:
+            raise ValueError(f"primary CSV is empty: {path}") from error
+        validate_consistent_predictor_schema(ordered_header, observed_header)
+        for row_index, row in enumerate(reader):
+            if len(row) != len(ordered_header):
+                raise ValueError(
+                    f"primary predictor row width mismatch in {path} at row {row_index}"
+                )
+            try:
+                numeric_row: FeatureVector = tuple(float(value) for value in row)
+            except ValueError as error:
+                raise ValueError(
+                    f"{DatasetExclusionReason.UNPARSEABLE_PREDICTOR.value} in {path} "
+                    f"at row {row_index}"
+                ) from error
+            reason = classify_row_finiteness(numeric_row)
             if reason is not None:
                 raise ValueError(
                     f"non-finite primary predictor value in {path} at row {row_index}: "
                     f"{reason.value}"
                 )
+            rows.append(numeric_row)
+    return tuple(rows)
+
+
+def validate_all_predictors_finite(
+    path: Path,
+    ordered_header: tuple[DatasetColumnName, ...],
+) -> None:
+    _read_feature_matrix(path, ordered_header)
 
 
 def supported_class_sampling_caps(
-    caps: SamplingCapsPerDomain, class_id: NBaiotClass
-) -> dict[Role, NonNegativeInt | None]:
+    caps: SamplingCapsPerDomain,
+    class_id: NBaiotClass,
+) -> tuple[RoleSamplingCap, ...]:
     report_test_cap = (
         caps.report_test_benign
         if class_id is NBaiotClass.BENIGN
         else caps.report_test_other_supported_per_class
     )
-    return {
-        Role.ANCHOR_TRAIN: caps.anchor_train_per_supported_class,
-        Role.ANCHOR_VALIDATION: caps.anchor_validation_per_supported_class,
-        Role.POST_REFERENCE_REPLAY: None,
-        Role.ROW_VERIFICATION: caps.row_verification_supported_per_supported_class,
-        Role.FINAL_GATE: caps.final_gate_supported_per_supported_class,
-        Role.REPORT_TEST: report_test_cap,
-    }
+    return (
+        RoleSamplingCap(role=Role.ANCHOR_TRAIN, cap=caps.anchor_train_per_supported_class),
+        RoleSamplingCap(
+            role=Role.ANCHOR_VALIDATION,
+            cap=caps.anchor_validation_per_supported_class,
+        ),
+        RoleSamplingCap(role=Role.POST_REFERENCE_REPLAY, cap=None),
+        RoleSamplingCap(
+            role=Role.ROW_VERIFICATION,
+            cap=caps.row_verification_supported_per_supported_class,
+        ),
+        RoleSamplingCap(
+            role=Role.FINAL_GATE,
+            cap=caps.final_gate_supported_per_supported_class,
+        ),
+        RoleSamplingCap(role=Role.REPORT_TEST, cap=report_test_cap),
+    )
 
 
-def target_class_sampling_caps(caps: SamplingCapsPerDomain) -> dict[Role, NonNegativeInt | None]:
-    return {
-        Role.SOURCE_PROPOSAL: caps.source_proposal_target,
-        Role.CANDIDATE_SCREEN: caps.candidate_screen_target,
-        Role.REPRODUCTION: caps.reproduction_target,
-        Role.ROW_VERIFICATION: caps.row_verification_target,
-        Role.FINAL_GATE: caps.final_gate_target,
-        Role.REPORT_TEST: caps.report_test_target,
-    }
+def target_class_sampling_caps(
+    caps: SamplingCapsPerDomain,
+) -> tuple[RoleSamplingCap, ...]:
+    return (
+        RoleSamplingCap(role=Role.SOURCE_PROPOSAL, cap=caps.source_proposal_target),
+        RoleSamplingCap(role=Role.CANDIDATE_SCREEN, cap=caps.candidate_screen_target),
+        RoleSamplingCap(role=Role.REPRODUCTION, cap=caps.reproduction_target),
+        RoleSamplingCap(role=Role.ROW_VERIFICATION, cap=caps.row_verification_target),
+        RoleSamplingCap(role=Role.FINAL_GATE, cap=caps.final_gate_target),
+        RoleSamplingCap(role=Role.REPORT_TEST, cap=caps.report_test_target),
+    )
 
 
-@dataclass(frozen=True)
-class RoleAssignment:
-    sample_id: ArtifactDigest
-    role: Role
-    original_row_index: NonNegativeInt
-
-
-@dataclass(frozen=True)
-class PreparedView:
-    domain: NBaiotDomain
-    class_id: NBaiotClass
-    role: Role
-    sample_ids: tuple[ArtifactDigest, ...]
-    features: tuple[tuple[float, ...], ...]
-    labels: tuple[DatasetColumnName, ...]
-
-    @property
-    def row_count(self) -> int:
-        return len(self.sample_ids)
+def _sampling_cap_for_role(
+    sampling_caps: tuple[RoleSamplingCap, ...],
+    role: Role,
+) -> SamplingCap | None:
+    for role_cap in sampling_caps:
+        if role_cap.role is role:
+            return role_cap.cap
+    raise ValueError(f"sampling cap missing for role {role.value}")
 
 
 def assign_stream_roles_and_sample_ids(
     dataset_file_sha256: ArtifactDigest,
-    domain_hash_token: DatasetColumnName,
+    domain_hash_token: DomainId,
     class_id: NBaiotClass,
-    normalized_relative_csv_path: DatasetColumnName,
-    stream_row_count: NonNegativeInt,
+    normalized_relative_csv_path: RelativePathText,
+    stream_row_count: RowCount,
     role_intervals: RoleIntervals,
     sampling_caps_per_domain: SamplingCapsPerDomain,
 ) -> tuple[RoleAssignment, ...]:
@@ -175,194 +257,104 @@ def assign_stream_roles_and_sample_ids(
     windows = (
         target_role_windows(role_intervals) if is_target else supported_role_windows(role_intervals)
     )
+    ordered_roles = TARGET_ROLE_ORDER if is_target else SUPPORTED_ROLE_ORDER
     sampling_caps = (
         target_class_sampling_caps(sampling_caps_per_domain)
         if is_target
         else supported_class_sampling_caps(sampling_caps_per_domain, class_id)
     )
-
-    rows_by_role: dict[Role, list[NonNegativeInt]] = {}
-    for original_row_index in range(stream_row_count):
-        normalized_position = original_row_index / stream_row_count
-        role = role_for_normalized_position(normalized_position, windows)
-        if role is None:
-            continue
-        rows_by_role.setdefault(role, []).append(original_row_index)
-
+    assigned_rows = tuple(
+        (
+            original_row_index,
+            role_for_normalized_position(
+                RolePosition(original_row_index / stream_row_count),
+                windows,
+            ),
+        )
+        for original_row_index in range(stream_row_count)
+    ) if stream_row_count else ()
     assignments: list[RoleAssignment] = []
-    for role, original_row_indices in rows_by_role.items():
-        cap = sampling_caps.get(role)
+    for role in ordered_roles:
+        original_row_indices = tuple(
+            original_row_index
+            for original_row_index, assigned_role in assigned_rows
+            if assigned_role is role
+        )
+        cap = _sampling_cap_for_role(sampling_caps, role)
         selected_row_indices = (
             apply_sampling_cap(
                 dataset_file_sha256,
                 domain_hash_token,
                 class_id.value,
-                ROLE_HASH_TOKEN[role],
+                role_hash_token(role),
                 original_row_indices,
                 cap,
             )
             if cap is not None
-            else tuple(original_row_indices)
+            else original_row_indices
         )
-        for original_row_index in selected_row_indices:
-            sample_id = compute_sample_id(
-                NBAIOT_SAMPLE_ID_PREFIX,
-                normalized_relative_csv_path,
-                dataset_file_sha256,
-                original_row_index,
+        assignments.extend(
+            RoleAssignment(
+                sample_id=compute_sample_id(
+                    NBAIOT_SAMPLE_ID_PREFIX,
+                    normalized_relative_csv_path,
+                    dataset_file_sha256,
+                    original_row_index,
+                ),
+                role=role,
+                original_row_index=original_row_index,
             )
-            assignments.append(
-                RoleAssignment(
-                    sample_id=sample_id,
-                    role=role,
-                    original_row_index=original_row_index,
-                )
-            )
+            for original_row_index in selected_row_indices
+        )
     return tuple(assignments)
 
 
-def materialize_nbaiot_prepared_views(
-    discovered: Sequence[DiscoveredCsvFile],
-    config: ScientificConfig,
-    prepared_root: Path,
-    scaler_root: Path,
-    overwrite: bool = False,
-) -> tuple[tuple[PreparedView, ...], FeatureMoments]:
-    del overwrite
-    role_intervals = config.datasets.primary.role_intervals
-    sampling_caps = config.datasets.primary.sampling_caps_per_domain
-    scaling_config = config.datasets.primary.scaling
-
-    anchor_train_statistics: dict[DatasetColumnName, tuple[tuple[float, float, float], ...]] = {}
-    feature_names = read_predictor_header(discovered[0].absolute_path)
-
-    for item in discovered:
-        if item.class_id is not NBaiotClass.GAFGYT_COMBO:
-            stream_statistics = _accumulate_anchor_train_statistics(
-                item, config, anchor_train_statistics
-            )
-            anchor_train_statistics.setdefault(item.class_id.value, stream_statistics)
-
-    pooled_statistics: list[tuple[float, float, float]] = []
-    for feature_index in range(len(feature_names)):
-        count = 0.0
-        total = 0.0
-        total_squared = 0.0
-        for class_statistics in anchor_train_statistics.values():
-            count += class_statistics[feature_index][0]
-            total += class_statistics[feature_index][1]
-            total_squared += class_statistics[feature_index][2]
-        pooled_statistics.append((count, total, total_squared))
-
-    moments = fit_feature_moments(feature_names, tuple(pooled_statistics), scaling_config)
-
-    views: list[PreparedView] = []
-    for item in discovered:
-        row_count = count_csv_data_rows(item.absolute_path)
-        assignments = assign_stream_roles_and_sample_ids(
-            dataset_file_sha256=item.file_sha256,
-            domain_hash_token=NBAIOT_DOMAIN_HASH_TOKEN[item.domain],
-            class_id=item.class_id,
-            normalized_relative_csv_path=f"{item.domain.value}/{item.relative_path}",
-            stream_row_count=row_count,
-            role_intervals=role_intervals,
-            sampling_caps_per_domain=sampling_caps,
-        )
-        selected_rows_by_role: dict[Role, list[int]] = {}
-        sample_id_by_row: dict[int, ArtifactDigest] = {}
-        for assignment in assignments:
-            selected_rows_by_role.setdefault(assignment.role, []).append(
-                assignment.original_row_index
-            )
-            sample_id_by_row[assignment.original_row_index] = assignment.sample_id
-
-        frame: pandas.DataFrame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
-        raw_rows = tuple(frame[list(feature_names)].itertuples(index=False, name=None))
-        for role, selected_rows in selected_rows_by_role.items():
-            if not selected_rows:
-                continue
-            features: list[tuple[float, ...]] = []
-            labels: list[DatasetClassToken] = []
-            sample_ids: list[ArtifactDigest] = []
-            for original_row_index in selected_rows:
-                raw_row = raw_rows[original_row_index]
-                standardized_row = standardize_row(raw_row, moments, scaling_config)
-                features.append(standardized_row)
-                labels.append(item.class_id.value)
-                sample_ids.append(sample_id_by_row[original_row_index])
-            views.append(
-                PreparedView(
-                    domain=item.domain,
-                    class_id=item.class_id,
-                    role=role,
-                    sample_ids=tuple(sample_ids),
-                    features=tuple(features),
-                    labels=tuple(labels),
-                )
-            )
-
-    prepared_root.mkdir(parents=True, exist_ok=True)
-    scaler_root.mkdir(parents=True, exist_ok=True)
-    for view in views:
-        payload = {
-            "schema_version": PREPARED_VIEW_SCHEMA_VERSION,
-            "domain": view.domain.value,
-            "class_id": view.class_id.value,
-            "role": view.role.value,
-            "row_count": view.row_count,
-        }
-        (prepared_root / _view_key(view)).with_suffix(".json").write_text(
-            _stable_json(payload), encoding="utf-8"
-        )
-        _write_prepared_view_parquet(prepared_root, view, tuple(moments.feature_names))
-    scaler_payload = {
-        "schema_version": SCALER_SCHEMA_VERSION,
-        "feature_names": list(moments.feature_names),
-        "means": list(moments.means),
-        "standard_deviations": list(moments.standard_deviations),
-        "training_row_count": moments.training_row_count,
-    }
-    (scaler_root / "nbaiot_scaler.json").write_text(_stable_json(scaler_payload), encoding="utf-8")
-    return tuple(views), moments
+def _sample_id_for_row(
+    assignments: tuple[RoleAssignment, ...],
+    original_row_index: NonNegativeInt,
+) -> ArtifactDigest:
+    for assignment in assignments:
+        if assignment.original_row_index == original_row_index:
+            return assignment.sample_id
+    raise ValueError(f"sample identity missing for row {original_row_index}")
 
 
 def _accumulate_anchor_train_statistics(
     item: DiscoveredCsvFile,
     config: ScientificConfig,
-    existing: dict[DatasetColumnName, tuple[tuple[float, float, float], ...]],
-) -> tuple[tuple[float, float, float], ...]:
-    role_intervals = config.datasets.primary.role_intervals
-    sampling_caps = config.datasets.primary.sampling_caps_per_domain
-    feature_names = read_predictor_header(item.absolute_path)
+    feature_names: tuple[DatasetColumnName, ...],
+    existing: tuple[FeatureStatistic, ...] | None,
+) -> tuple[FeatureStatistic, ...]:
     row_count = count_csv_data_rows(item.absolute_path)
     assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256=item.file_sha256,
-        domain_hash_token=NBAIOT_DOMAIN_HASH_TOKEN[item.domain],
+        domain_hash_token=nbaiot_domain_hash_token(item.domain),
         class_id=item.class_id,
         normalized_relative_csv_path=f"{item.domain.value}/{item.relative_path}",
         stream_row_count=row_count,
-        role_intervals=role_intervals,
-        sampling_caps_per_domain=sampling_caps,
+        role_intervals=config.datasets.primary.role_intervals,
+        sampling_caps_per_domain=config.datasets.primary.sampling_caps_per_domain,
     )
-    anchor_train_rows = {
+    anchor_train_rows = frozenset(
         assignment.original_row_index
         for assignment in assignments
         if assignment.role is Role.ANCHOR_TRAIN
-    }
-    frame: pandas.DataFrame = pandas.read_csv(item.absolute_path, usecols=list(feature_names))
-    selected_frame = frame.iloc[sorted(anchor_train_rows)]
-    statistics = existing.get(item.class_id.value)
-    return accumulate_feature_statistics(
-        feature_names, selected_frame.itertuples(index=False, name=None), statistics
+    )
+    feature_matrix = _read_feature_matrix(item.absolute_path, feature_names)
+    selected_matrix: FeatureMatrix = tuple(
+        row for row_index, row in enumerate(feature_matrix) if row_index in anchor_train_rows
+    )
+    return accumulate_feature_statistics(feature_names, selected_matrix, existing)
+
+
+def _view_key(view: PreparedView) -> PreparedViewKey:
+    return (
+        f"{nbaiot_domain_hash_token(view.domain)}_{view.class_id.value}_"
+        f"{role_hash_token(view.role)}"
     )
 
 
-def _view_key(view: PreparedView) -> str:
-    domain_token = NBAIOT_DOMAIN_HASH_TOKEN[view.domain]
-    return f"{domain_token}_{view.class_id.value}_{ROLE_HASH_TOKEN[view.role]}"
-
-
-def view_parquet_path(prepared_root: Path, view_key: DatasetColumnName) -> Path:
+def view_parquet_path(prepared_root: Path, view_key: PreparedViewKey) -> Path:
     return prepared_root / f"{view_key}.parquet"
 
 
@@ -370,18 +362,136 @@ def _write_prepared_view_parquet(
     prepared_root: Path,
     view: PreparedView,
     feature_names: tuple[DatasetColumnName, ...],
+    overwrite: OverwriteExisting,
 ) -> None:
-    columns: dict[str, list[ArtifactDigest] | list[DatasetClassToken] | list[float]] = {
-        "sample_id": list(view.sample_ids),
-        "label": list(view.labels),
-    }
-    for feature_index, feature_name in enumerate(feature_names):
-        columns[feature_name] = [row[feature_index] for row in view.features]
-    frame = pandas.DataFrame(columns)
-    frame.to_parquet(view_parquet_path(prepared_root, _view_key(view)), index=False)
+    path = view_parquet_path(prepared_root, _view_key(view))
+    if path.exists() and not overwrite:
+        return
+    rows = tuple(
+        (sample_id, label, *features)
+        for sample_id, label, features in zip(
+            view.sample_ids,
+            view.labels,
+            view.features,
+            strict=True,
+        )
+    )
+    columns = ("sample_id", "label", *feature_names)
+    frame = pandas.DataFrame(rows, columns=columns)
+    frame.to_parquet(path, index=False)
 
 
-def _stable_json(
-    payload: Mapping[str, str | int | float | Sequence[str] | Sequence[float]],
-) -> str:
-    return json.dumps(payload, sort_keys=True, indent=2)
+def _write_metadata(
+    path: Path,
+    payload: PreparedViewMetadata | ScalerMetadata,
+    overwrite: OverwriteExisting,
+) -> None:
+    if path.exists() and not overwrite:
+        return
+    path.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
+
+
+def materialize_nbaiot_prepared_views(
+    discovered: tuple[DiscoveredCsvFile, ...],
+    config: ScientificConfig,
+    prepared_root: Path,
+    scaler_root: Path,
+    overwrite: OverwriteExisting = False,
+) -> tuple[tuple[PreparedView, ...], FeatureMoments]:
+    if not discovered:
+        raise ValueError("N-BaIoT discovery produced no CSV files")
+    feature_names = read_predictor_header(discovered[0].absolute_path)
+    validate_predictor_schema(feature_names)
+    pooled_statistics: tuple[FeatureStatistic, ...] | None = None
+    for item in discovered:
+        observed_header = read_predictor_header(item.absolute_path)
+        validate_consistent_predictor_schema(feature_names, observed_header)
+        if item.class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        pooled_statistics = _accumulate_anchor_train_statistics(
+            item,
+            config,
+            feature_names,
+            pooled_statistics,
+        )
+    if pooled_statistics is None:
+        raise ValueError("N-BaIoT has no supported Anchor-Train rows for scaler fitting")
+    moments = fit_feature_moments(
+        feature_names,
+        pooled_statistics,
+        config.datasets.primary.scaling,
+    )
+    views: list[PreparedView] = []
+    for item in discovered:
+        row_count = count_csv_data_rows(item.absolute_path)
+        assignments = assign_stream_roles_and_sample_ids(
+            dataset_file_sha256=item.file_sha256,
+            domain_hash_token=nbaiot_domain_hash_token(item.domain),
+            class_id=item.class_id,
+            normalized_relative_csv_path=f"{item.domain.value}/{item.relative_path}",
+            stream_row_count=row_count,
+            role_intervals=config.datasets.primary.role_intervals,
+            sampling_caps_per_domain=config.datasets.primary.sampling_caps_per_domain,
+        )
+        raw_rows = _read_feature_matrix(item.absolute_path, feature_names)
+        ordered_roles = (
+            TARGET_ROLE_ORDER
+            if item.class_id is NBaiotClass.GAFGYT_COMBO
+            else SUPPORTED_ROLE_ORDER
+        )
+        for role in ordered_roles:
+            selected_rows = tuple(
+                assignment.original_row_index
+                for assignment in assignments
+                if assignment.role is role
+            )
+            if not selected_rows:
+                continue
+            features = tuple(
+                standardize_row(
+                    raw_rows[original_row_index],
+                    moments,
+                    config.datasets.primary.scaling,
+                )
+                for original_row_index in selected_rows
+            )
+            views.append(
+                PreparedView(
+                    domain=item.domain,
+                    class_id=item.class_id,
+                    role=role,
+                    sample_ids=tuple(
+                        _sample_id_for_row(assignments, original_row_index)
+                        for original_row_index in selected_rows
+                    ),
+                    features=features,
+                    labels=tuple(item.class_id.value for _ in selected_rows),
+                )
+            )
+    prepared_root.mkdir(parents=True, exist_ok=True)
+    scaler_root.mkdir(parents=True, exist_ok=True)
+    for view in views:
+        _write_metadata(
+            (prepared_root / _view_key(view)).with_suffix(".json"),
+            PreparedViewMetadata(
+                schema_version=PREPARED_VIEW_SCHEMA_VERSION,
+                domain=view.domain,
+                class_id=view.class_id,
+                role=view.role,
+                row_count=view.row_count,
+            ),
+            overwrite,
+        )
+        _write_prepared_view_parquet(prepared_root, view, feature_names, overwrite)
+    _write_metadata(
+        scaler_root / "nbaiot_scaler.json",
+        ScalerMetadata(
+            schema_version=SCALER_SCHEMA_VERSION,
+            feature_names=feature_names,
+            means=moments.means,
+            standard_deviations=moments.standard_deviations,
+            training_row_count=moments.training_row_count,
+        ),
+        overwrite,
+    )
+    return tuple(views), moments
