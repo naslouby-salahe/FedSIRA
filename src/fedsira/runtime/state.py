@@ -1,12 +1,10 @@
-from dataclasses import dataclass
-
 from fedsira.domain.enums import (
     CellPhaseState,
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
 )
-from fedsira.domain.records import FailureMessage
+from fedsira.domain.records import FailureMessage, FrozenDomainModel
 
 CELL_PHASE_TRANSITIONS: dict[CellPhaseState, frozenset[CellPhaseState]] = {
     CellPhaseState.PLANNED: frozenset({CellPhaseState.RUNNING}),
@@ -34,23 +32,30 @@ EXPERIMENT_LIFECYCLE_TRANSITIONS: dict[
     ExperimentLifecycleState.INVALID: frozenset(),
 }
 
-AUTOMATICALLY_RETRIABLE_FAILURE_CLASSES = frozenset({FailureClass.INFRASTRUCTURE_INTERRUPTION})
+AUTOMATICALLY_RETRIABLE_FAILURE_CLASSES = frozenset(
+    {FailureClass.INFRASTRUCTURE_INTERRUPTION}
+)
 
 
-@dataclass(frozen=True)
-class FailureDetail:
+class FailureDetail(FrozenDomainModel):
     failure_class: FailureClass
     message: FailureMessage
     cell_phase: ScientificCellPhase | None
 
 
-def validate_cell_phase_transition(current: CellPhaseState, target: CellPhaseState) -> None:
+def validate_cell_phase_transition(
+    current: CellPhaseState,
+    target: CellPhaseState,
+) -> None:
     if target not in CELL_PHASE_TRANSITIONS[current]:
-        raise ValueError(f"illegal cell phase transition from {current.value} to {target.value}")
+        raise ValueError(
+            f"illegal cell phase transition from {current.value} to {target.value}"
+        )
 
 
 def validate_experiment_lifecycle_transition(
-    current: ExperimentLifecycleState, target: ExperimentLifecycleState
+    current: ExperimentLifecycleState,
+    target: ExperimentLifecycleState,
 ) -> None:
     if target not in EXPERIMENT_LIFECYCLE_TRANSITIONS[current]:
         raise ValueError(
