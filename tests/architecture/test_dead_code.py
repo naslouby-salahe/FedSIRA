@@ -4,8 +4,6 @@ from pathlib import Path
 
 from _repo import REPO_ROOT, SRC_ROOT
 
-WHITELIST_PATH = REPO_ROOT / "vulture_whitelist.py"
-
 
 def run_vulture(*targets: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -17,7 +15,7 @@ def run_vulture(*targets: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_no_dead_code_in_src() -> None:
-    result = run_vulture(SRC_ROOT, WHITELIST_PATH)
+    result = run_vulture(SRC_ROOT)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
