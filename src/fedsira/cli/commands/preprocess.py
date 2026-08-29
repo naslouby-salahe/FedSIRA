@@ -12,18 +12,11 @@ from fedsira.artifacts.paths import (
     workspace_root_for_family,
 )
 from fedsira.artifacts.records import (
-    ArtifactManifest,
     CICIoT2023DatasetManifestPayload,
     DatasetManifestPayload,
     NBaiotDatasetManifestPayload,
 )
-from fedsira.artifacts.storage import (
-    compute_checksum,
-    is_artifact_complete_and_valid,
-    publish_artifact_to_disk,
-    read_published_manifest,
-    stage_payload,
-)
+from fedsira.artifacts.storage import publish_or_reuse_artifact_payload
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
@@ -48,12 +41,7 @@ from fedsira.datasets.nbaiot.validation import (
     classes_structurally_unavailable,
     validate_target_holder_feasibility,
 )
-from fedsira.domain.enums import (
-    ArtifactFamily,
-    ArtifactLifecycleState,
-    DatasetId,
-    ProducerFingerprintFamily,
-)
+from fedsira.domain.enums import ArtifactFamily, DatasetId, ProducerFingerprintFamily
 from fedsira.domain.records import (
     ArtifactDigest,
     ArtifactReuseDecision,
@@ -68,12 +56,12 @@ from fedsira.domain.records import (
 DATASET_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
 
 
-def _publish_or_reuse_dataset_manifest(
+def _publish_dataset_manifest(
     dataset: DatasetId,
     config: ScientificConfig,
     dataset_split_view_identities: DatasetManifestDigest,
     payload: DatasetManifestPayload,
-) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
+) -> ArtifactReuseDecision:
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
     specification = producer_fingerprint_specification(
         ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
@@ -96,39 +84,21 @@ def _publish_or_reuse_dataset_manifest(
         producer_component_fingerprint=producer_fingerprint,
         external_dependency_fingerprint=external_fingerprint,
     )
-    published_directory = REPOSITORY_ROOT / workspace_root_for_family(
-        ArtifactFamily.DATASET_MANIFEST
-    )
-
-    if is_artifact_complete_and_valid(published_directory, identity):
-        reused_manifest = read_published_manifest(published_directory, identity)
-        if reused_manifest is not None:
-            reused: ArtifactReuseDecision = True
-            return reused_manifest, reused
-
-    payload_bytes = payload.model_dump_json().encode("utf-8")
-    staged_manifest = ArtifactManifest(
+    _, reused = publish_or_reuse_artifact_payload(
         family=ArtifactFamily.DATASET_MANIFEST,
         identity=identity,
-        checksum=compute_checksum(payload_bytes),
-        lifecycle_state=ArtifactLifecycleState.STAGING,
-        upstream_identities=(),
+        payload=payload.model_dump_json().encode("utf-8"),
+        published_directory=(
+            REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST)
+        ),
+        staging_root=(
+            REPOSITORY_ROOT
+            / config.runtime.repository_layout.execution_workspace
+            / "cache"
+            / "staging"
+        ),
     )
-    staging_root = (
-        REPOSITORY_ROOT
-        / config.runtime.repository_layout.execution_workspace
-        / "cache"
-        / "staging"
-    )
-    staged_path = stage_payload(staging_root, payload_bytes)
-    published = publish_artifact_to_disk(
-        staged_path,
-        published_directory,
-        staged_manifest,
-        payload_bytes,
-    )
-    reused: ArtifactReuseDecision = False
-    return published, reused
+    return reused
 
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
@@ -155,15 +125,14 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     unavailable_classes: tuple[DatasetClassToken, ...] = tuple(
         class_id.value for class_id in classes_structurally_unavailable(discovered)
     )
-    reference_file = discovered[0]
-    reference_header = read_predictor_header(reference_file.absolute_path)
+    reference_header = read_predictor_header(discovered[0].absolute_path)
     validate_predictor_schema(reference_header)
     for item in discovered:
         observed_header = read_predictor_header(item.absolute_path)
         validate_consistent_predictor_schema(reference_header, observed_header)
         validate_all_predictors_finite(item.absolute_path, reference_header)
 
-    _artifact_manifest, reused = _publish_or_reuse_dataset_manifest(
+    reused = _publish_dataset_manifest(
         DatasetId.N_BAIOT,
         config,
         manifest_hash,
@@ -172,14 +141,11 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
             structurally_unavailable_classes=unavailable_classes,
         ),
     )
-
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
-    scaler_root = REPOSITORY_ROOT / prepared_feature_root()
     views, moments = materialize_nbaiot_prepared_views(
         discovered,
         config,
-        prepared_root,
-        scaler_root,
+        REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT),
+        REPOSITORY_ROOT / prepared_feature_root(),
         overwrite,
     )
     print(
@@ -201,9 +167,6 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023)
-    scaler_root = REPOSITORY_ROOT / prepared_feature_root()
-    metadata_root = REPOSITORY_ROOT / preprocessing_metadata_root()
     cache_root = (
         REPOSITORY_ROOT
         / config.runtime.repository_layout.execution_workspace
@@ -213,13 +176,13 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     summary = materialize_ciciot2023_prepared_views(
         discovered,
         config,
-        prepared_root,
-        scaler_root,
-        metadata_root,
+        REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023),
+        REPOSITORY_ROOT / prepared_feature_root(),
+        REPOSITORY_ROOT / preprocessing_metadata_root(),
         cache_root,
         overwrite,
     )
-    _artifact_manifest, reused = _publish_or_reuse_dataset_manifest(
+    reused = _publish_dataset_manifest(
         DatasetId.CICIOT2023,
         config,
         summary.dataset_manifest_hash,
@@ -231,9 +194,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
             excluded_row_count=summary.excluded_row_count,
             predictor_count=len(summary.predictor_columns),
             official_expected_predictor_count=OFFICIAL_EXPECTED_PREDICTOR_COUNT,
-            predictor_count_matches_official=(
-                summary.predictor_count_matches_official
-            ),
+            predictor_count_matches_official=summary.predictor_count_matches_official,
             class_registry=summary.class_registry,
             pseudo_domain_count=PSEUDO_DOMAIN_COUNT,
         ),
