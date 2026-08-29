@@ -260,6 +260,7 @@ metrics_and_statistics:
     resamples: 10000
   materiality:
     target_f1_gain_minimum: 0.02
+    target_f1_noninferiority_margin: 0.02
     supported_macro_f1_noninferiority_margin: 0.02
     benign_false_alarm_rate_noninferiority_margin: 0.01
     source_exclusion_asr_reduction_minimum: 0.2
