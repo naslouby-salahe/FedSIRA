@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
 
 from fedsira.baselines.registry import (
@@ -10,8 +11,11 @@ from fedsira.baselines.registry import (
 from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.domain.enums import DatasetId, RootCauseMixture
 from fedsira.domain.records import (
+    ConditionName,
     ExperimentName,
     FrozenDomainModel,
+    MethodName,
+    ScenarioName,
     ScientificCellCount,
     SeedCount,
 )
@@ -106,6 +110,20 @@ class AblationVariant(StrEnum):
     CAPABILITY_CONTRACT_GRANULARITY = "Capability-Contract Granularity"
 
 
+class AblationScenario(StrEnum):
+    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
+    MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL = "Mixed Legitimate/Irrelevant Proposal Episode"
+    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"
+    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
+    ONE_MALICIOUS_REPRODUCER = "One Malicious Reproducer"
+    NATURAL = "Natural"
+    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"
+    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
+    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"
+    ONE_COMPROMISED_VERIFIER = "One Compromised Verifier"
+    UNDER_SPECIFICATION_FIXTURE = "Under-Specification Fixture"
+
+
 class ReproducerCondition(StrEnum):
     CLEAN = "CLEAN"
     ONE_SOURCE_COPY = "One Source Copy"
@@ -163,35 +181,36 @@ class SecondaryScenario(StrEnum):
 class ExperimentDefinition(FrozenDomainModel):
     name: ExperimentName
     experiment_class: ExperimentClass
-    methods: tuple[ExperimentName, ...]
-    conditions: tuple[ExperimentName, ...]
+    methods: tuple[MethodName, ...]
+    conditions: tuple[ConditionName, ...]
     seed_count: SeedCount
     nominal_cell_count: ScientificCellCount
-    claim_family: ExperimentName | None
+    claim_family: ClaimFamily | None
     prerequisites: tuple[ExperimentName, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
 
 
-PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME = "Proposal-Assisted Opening Necessity"
-SINGLE_REPRODUCTION_NECESSITY_NAME = "Single-Reproduction Necessity"
-SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME = "Source-Artifact Exclusion Necessity"
-EXTERNAL_VERIFICATION_NECESSITY_NAME = "External Verification Necessity"
-PRIMARY_CONFIRMATORY_EVALUATION_NAME = "Primary Confirmatory Evaluation"
-MECHANISM_ABLATION_NAME = "Mechanism Ablation"
-COMPROMISED_REPRODUCER_ROBUSTNESS_NAME = "Compromised-Reproducer Robustness"
-COMPROMISED_VERIFIER_ROBUSTNESS_NAME = "Compromised-Verifier Robustness"
-BYZANTINE_BOUND_VIOLATION_NAME = "Byzantine-Bound Violation"
-EVIDENCE_SCARCITY_AND_DORMANCY_NAME = "Evidence Scarcity and Dormancy"
-SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME = "Shared Epistemic-Failure Boundary"
-CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME = "Capability Under-Specification Boundary"
-HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME = "Heterogeneous-Reproduction Boundary"
-ADMISSION_DELAY_DECOMPOSITION_NAME = "Admission-Delay Decomposition"
-EFFICIENCY_MEASUREMENT_NAME = "Efficiency Measurement"
-SECONDARY_DATASET_GENERALIZATION_NAME = "Secondary-Dataset Generalization"
-
-DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME = "Data and Domain Evidence Validation"
-PROTOCOL_INVARIANT_VALIDATION_NAME = "Protocol Invariant Validation"
-BASELINE_IMPLEMENTATION_VALIDATION_NAME = "Baseline Implementation Validation"
+DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
+PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"
+BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"
+PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"
+SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"
+SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"
+EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"
+PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"
+MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"
+COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"
+COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"
+BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"
+EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"
+SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"
+CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: ExperimentName = (
+    "Capability Under-Specification Boundary"
+)
+HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"
+ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"
+EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
+SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
 
 COLLAPSE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
@@ -215,16 +234,66 @@ POST_CORE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     SECONDARY_DATASET_GENERALIZATION_NAME,
 )
 
-_MASTER_SEED_COUNT = 10
-_SMOKE_SEED_COUNT = 1
+_MASTER_SEED_COUNT: SeedCount = 10
+_SMOKE_SEED_COUNT: SeedCount = 1
 
-_EPISTEMIC_STRENGTHS: dict[EpistemicFailureType, tuple[str, ...]] = {
-    EpistemicFailureType.SHARED_LABEL_ERROR: ("0.05", "0.10", "0.20"),
-    EpistemicFailureType.SHARED_SPURIOUS_FEATURE: ("0.25", "0.50", "1.00"),
-    EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT: ("0.25", "0.50", "1.00"),
-}
 
-_BASELINE_FIXTURE_BY_NAME: tuple[tuple[ExperimentName, ExperimentName], ...] = tuple(
+def _unique(values: Iterable[ConditionName]) -> tuple[ConditionName, ...]:
+    result: list[ConditionName] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return tuple(result)
+
+
+def epistemic_strength_tokens(failure_type: EpistemicFailureType) -> tuple[ConditionName, ...]:
+    if failure_type is EpistemicFailureType.SHARED_LABEL_ERROR:
+        return ("0.05", "0.10", "0.20")
+    return ("0.25", "0.50", "1.00")
+
+
+def ablation_scenario_for_variant(variant: AblationVariant) -> ScenarioName:
+    if variant is AblationVariant.NO_PROPOSAL_SCREEN:
+        return AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL.value
+    if variant in (
+        AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
+        AblationVariant.NO_MATCHED_CONTROL,
+    ):
+        return AblationScenario.GENERIC_HARD_SUPPORTED_EXAMPLES.value
+    if variant in (
+        AblationVariant.FULL_FEDSIRA,
+        AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW,
+        AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK,
+        AblationVariant.NO_ORIGIN_EXCLUSION,
+        AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE,
+    ):
+        return AblationScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value
+    if variant is AblationVariant.ONE_INDEPENDENT_REPRODUCTION:
+        return AblationScenario.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value
+    if variant in (
+        AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION,
+        AblationVariant.GENERIC_THREE_ROW_THRESHOLD,
+    ):
+        return AblationScenario.ONE_MALICIOUS_REPRODUCER.value
+    if variant is AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY:
+        return AblationScenario.NATURAL.value
+    if variant in (
+        AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION,
+        AblationVariant.NO_FINAL_SYNTHESIS_GATE,
+    ):
+        return AblationScenario.FEATURE_SHIFT_1_0.value
+    if variant is AblationVariant.CANDIDATE_FREE_REPRODUCTION:
+        return AblationScenario.LEGITIMATE_TARGET_CAPABILITY.value
+    if variant is AblationVariant.DIRECT_KRUM_OF_RETRAINS:
+        return AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER.value
+    if variant is AblationVariant.RANDOM_COMMITTEE_PROFILE:
+        return AblationScenario.ONE_COMPROMISED_VERIFIER.value
+    if variant is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
+        return AblationScenario.UNDER_SPECIFICATION_FIXTURE.value
+    raise ValueError(f"unmapped ablation variant {variant}")
+
+
+_BASELINE_FIXTURE_BY_METHOD: tuple[tuple[MethodName, ConditionName], ...] = tuple(
     (identity.value, fixture.value)
     for identity, fixture in BASELINE_VALIDATION_FIXTURE_MAP.items()
     if fixture
@@ -235,16 +304,25 @@ _BASELINE_FIXTURE_BY_NAME: tuple[tuple[ExperimentName, ExperimentName], ...] = t
     )
 )
 
-_BASELINE_METHODS: tuple[ExperimentName, ...] = tuple(name for name, _ in _BASELINE_FIXTURE_BY_NAME)
-_BASELINE_FIXTURES: tuple[ExperimentName, ...] = tuple(
-    fixture for _, fixture in _BASELINE_FIXTURE_BY_NAME
+
+def baseline_validation_fixture_for_method(method: MethodName) -> ConditionName:
+    for registered_method, fixture in _BASELINE_FIXTURE_BY_METHOD:
+        if registered_method == method:
+            return fixture
+    raise KeyError(f"no baseline validation fixture for {method!r}")
+
+
+_BASELINE_METHODS = tuple(method for method, _fixture in _BASELINE_FIXTURE_BY_METHOD)
+_BASELINE_FIXTURES = _unique(fixture for _method, fixture in _BASELINE_FIXTURE_BY_METHOD)
+_ABLATION_SCENARIOS = _unique(
+    ablation_scenario_for_variant(variant) for variant in AblationVariant
 )
 
 EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
         name=DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
         experiment_class=ExperimentClass.VALIDATION,
-        methods=("Data and Domain Evidence Validation",),
+        methods=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         conditions=("primary",),
         seed_count=_SMOKE_SEED_COUNT,
         nominal_cell_count=1,
@@ -254,7 +332,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
         name=PROTOCOL_INVARIANT_VALIDATION_NAME,
         experiment_class=ExperimentClass.VALIDATION,
-        methods=("Protocol Invariant Validation",),
+        methods=(PROTOCOL_INVARIANT_VALIDATION_NAME,),
         conditions=("aggregate",),
         seed_count=_SMOKE_SEED_COUNT,
         nominal_cell_count=1,
@@ -278,17 +356,17 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(episode.value for episode in ProposalEpisode),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=80,
-        claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
+        claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
         name=SINGLE_REPRODUCTION_NECESSITY_NAME,
         experiment_class=ExperimentClass.EXPLORATORY,
-        methods=("One Independent Retrain", "Full Plurality Path"),
+        methods=(BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value, "Full Plurality Path"),
         conditions=tuple(condition.value for condition in PluralityCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family=ClaimFamily.PLURALITY_NECESSITY.value,
+        claim_family=ClaimFamily.PLURALITY_NECESSITY,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -298,7 +376,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
+        claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -311,7 +389,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in ExternalVerificationCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=80,
-        claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
+        claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
         prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
     ),
     ExperimentDefinition(
@@ -336,17 +414,17 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(scenario.value for scenario in PrimaryScenario),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=420,
-        claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY.value,
+        claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
         prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
     ),
     ExperimentDefinition(
         name=MECHANISM_ABLATION_NAME,
         experiment_class=ExperimentClass.ABLATION,
         methods=tuple(variant.value for variant in AblationVariant),
-        conditions=("Ablation",),
+        conditions=_ABLATION_SCENARIOS,
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=180,
-        claim_family=ClaimFamily.MECHANISM_ABLATION.value,
+        claim_family=ClaimFamily.MECHANISM_ABLATION,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -361,7 +439,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in ReproducerCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=280,
-        claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS.value,
+        claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -371,14 +449,14 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(condition.value for condition in VerifierCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=100,
-        claim_family=ClaimFamily.VERIFIER_ROBUSTNESS.value,
+        claim_family=ClaimFamily.VERIFIER_ROBUSTNESS,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
         name=BYZANTINE_BOUND_VIOLATION_NAME,
         experiment_class=ExperimentClass.FAILURE_BOUNDARY,
         methods=(
-            SourceExclusionMethod.FULL_FEDSIRA.value,
+            "Resolved FedSIRA Core",
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
         ),
         conditions=tuple(condition.value for condition in BoundCondition),
@@ -404,11 +482,11 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(
             f"{failure_type.value}|{strength}"
             for failure_type in EpistemicFailureType
-            for strength in _EPISTEMIC_STRENGTHS[failure_type]
+            for strength in epistemic_strength_tokens(failure_type)
         ),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=90,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -418,7 +496,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(mixture.value for mixture in RootCauseMixture),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -433,7 +511,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(regime.value for regime in HeterogeneityRegime),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=160,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY.value,
+        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
     ),
     ExperimentDefinition(
@@ -478,7 +556,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         conditions=tuple(scenario.value for scenario in SecondaryScenario),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=100,
-        claim_family=ClaimFamily.SECONDARY_GENERALIZATION.value,
+        claim_family=ClaimFamily.SECONDARY_GENERALIZATION,
         prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         dataset=DatasetId.CICIOT2023,
     ),
