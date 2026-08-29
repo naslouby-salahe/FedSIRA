@@ -90,9 +90,11 @@ class ResolvedCore(FrozenDomainModel):
             (
                 "proposal-assisted" if self.proposal_assistance_survives else "candidate-free",
                 "plurality" if self.plurality_survives else "single-reproduction",
-                "externally-verified"
-                if self.external_verification_survives
-                else "unverified-row",
+                (
+                    "externally-verified"
+                    if self.external_verification_survives
+                    else "unverified-row"
+                ),
             )
         )
 
@@ -108,18 +110,16 @@ class CollapseEvaluationInput(FrozenDomainModel):
     external_verification_legitimate_admission_degradation: MetricDifference | None
 
 
-_OPENING_BY_PROPOSAL_SURVIVAL: dict[BooleanValue, ClaimOpeningMode] = {
-    True: ClaimOpeningMode.PROPOSAL_ASSISTED,
-    False: ClaimOpeningMode.CANDIDATE_FREE,
-}
-
-
 def resolve_core_mapping(
     proposal_survives: BooleanValue,
     plurality_survives: BooleanValue,
     external_verification_survives: BooleanValue,
 ) -> ResolvedCore:
-    opening_mode = _OPENING_BY_PROPOSAL_SURVIVAL[proposal_survives]
+    opening_mode = (
+        ClaimOpeningMode.PROPOSAL_ASSISTED
+        if proposal_survives
+        else ClaimOpeningMode.CANDIDATE_FREE
+    )
     if plurality_survives and external_verification_survives:
         return ResolvedCore(
             proposal_assistance_survives=proposal_survives,
@@ -213,136 +213,124 @@ def _best_passed_metric(
     return selected.definition.metric.value, selected.adjusted_p_value
 
 
-def _proposal_constraints_pass(
+def _defined_within(value: MetricDifference | None, maximum: float) -> BooleanValue:
+    return value is not None and value <= maximum
+
+
+def _constraints_pass(
+    family: ClaimFamily,
     evaluation: CollapseEvaluationInput | None,
     materiality: MaterialityConfig | None,
 ) -> BooleanValue:
     if evaluation is None or materiality is None:
-        return True
-    legitimate_ok = (
-        evaluation.proposal_legitimate_admission_degradation is None
-        or evaluation.proposal_legitimate_admission_degradation
-        <= materiality.legitimate_admission_noninferiority_margin
-    )
-    malicious_ok = (
-        evaluation.proposal_malicious_admission_worsening is None
-        or evaluation.proposal_malicious_admission_worsening
-        <= materiality.proposal_malicious_admission_worsening_maximum
-    )
-    return legitimate_ok and malicious_ok
+        return False
+    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+        return _defined_within(
+            evaluation.proposal_legitimate_admission_degradation,
+            materiality.legitimate_admission_noninferiority_margin,
+        ) and _defined_within(
+            evaluation.proposal_malicious_admission_worsening,
+            materiality.proposal_malicious_admission_worsening_maximum,
+        )
+    if family is ClaimFamily.PLURALITY_NECESSITY:
+        return _defined_within(
+            evaluation.plurality_legitimate_admission_degradation,
+            materiality.legitimate_admission_noninferiority_margin,
+        ) and _defined_within(
+            evaluation.plurality_supported_harm,
+            materiality.supported_macro_f1_noninferiority_margin,
+        )
+    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+        return (
+            _defined_within(
+                evaluation.source_exclusion_target_f1_drop,
+                materiality.target_f1_gain_minimum,
+            )
+            and _defined_within(
+                evaluation.source_exclusion_supported_harm,
+                materiality.supported_macro_f1_noninferiority_margin,
+            )
+            and _defined_within(
+                evaluation.source_exclusion_benign_far_increase,
+                materiality.benign_false_alarm_rate_noninferiority_margin,
+            )
+        )
+    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+        return _defined_within(
+            evaluation.external_verification_legitimate_admission_degradation,
+            materiality.legitimate_admission_noninferiority_margin,
+        )
+    raise ValueError(f"{family.value} is not a collapse family")
 
 
-def _plurality_constraints_pass(
-    evaluation: CollapseEvaluationInput | None,
-    materiality: MaterialityConfig | None,
-) -> BooleanValue:
-    if evaluation is None or materiality is None:
-        return True
-    legitimate_ok = (
-        evaluation.plurality_legitimate_admission_degradation is None
-        or evaluation.plurality_legitimate_admission_degradation
-        <= materiality.legitimate_admission_noninferiority_margin
-    )
-    supported_ok = (
-        evaluation.plurality_supported_harm is None
-        or evaluation.plurality_supported_harm
-        <= materiality.supported_macro_f1_noninferiority_margin
-    )
-    return legitimate_ok and supported_ok
+def _decision_kind(family: ClaimFamily) -> CollapseDecisionKind:
+    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+        return CollapseDecisionKind.PROPOSAL_ASSISTANCE
+    if family is ClaimFamily.PLURALITY_NECESSITY:
+        return CollapseDecisionKind.PLURALITY
+    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+        return CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
+    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+        return CollapseDecisionKind.EXTERNAL_VERIFICATION
+    raise ValueError(f"{family.value} is not a collapse family")
 
 
-def _source_exclusion_constraints_pass(
-    evaluation: CollapseEvaluationInput | None,
-    materiality: MaterialityConfig | None,
-) -> BooleanValue:
-    if evaluation is None or materiality is None:
-        return True
-    target_ok = (
-        evaluation.source_exclusion_target_f1_drop is None
-        or evaluation.source_exclusion_target_f1_drop
-        <= materiality.supported_macro_f1_noninferiority_margin
-    )
-    supported_ok = (
-        evaluation.source_exclusion_supported_harm is None
-        or evaluation.source_exclusion_supported_harm
-        <= materiality.supported_macro_f1_noninferiority_margin
-    )
-    far_ok = (
-        evaluation.source_exclusion_benign_far_increase is None
-        or evaluation.source_exclusion_benign_far_increase
-        <= materiality.benign_false_alarm_rate_noninferiority_margin
-    )
-    return target_ok and supported_ok and far_ok
-
-
-def _external_verification_constraints_pass(
-    evaluation: CollapseEvaluationInput | None,
-    materiality: MaterialityConfig | None,
-) -> BooleanValue:
-    if evaluation is None or materiality is None:
-        return True
-    return (
-        evaluation.external_verification_legitimate_admission_degradation is None
-        or evaluation.external_verification_legitimate_admission_degradation
-        <= materiality.legitimate_admission_noninferiority_margin
-    )
-
-
-_FAMILY_TO_DECISION_KIND: dict[ClaimFamily, CollapseDecisionKind] = {
-    ClaimFamily.PROPOSAL_SCREEN_NECESSITY: CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-    ClaimFamily.PLURALITY_NECESSITY: CollapseDecisionKind.PLURALITY,
-    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: CollapseDecisionKind.EXTERNAL_VERIFICATION,
-}
-
-_POSITIVE_METRICS: dict[ClaimFamily, frozenset[ComparisonMetric]] = {
-    ClaimFamily.PROPOSAL_SCREEN_NECESSITY: frozenset(
-        {
-            ComparisonMetric.FALSE_LAUNCH,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-        }
-    ),
-    ClaimFamily.PLURALITY_NECESSITY: frozenset(
-        {ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1}
-    ),
-    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: frozenset(
-        {ComparisonMetric.ATTACK_SUCCESS_RATE}
-    ),
-    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: frozenset(
-        {ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1}
-    ),
-}
+def _positive_metrics(family: ClaimFamily) -> frozenset[ComparisonMetric]:
+    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+        return frozenset(
+            {
+                ComparisonMetric.FALSE_LAUNCH,
+                ComparisonMetric.REPRODUCTION_ATTEMPTS,
+                ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+            }
+        )
+    if family is ClaimFamily.PLURALITY_NECESSITY:
+        return frozenset(
+            {
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+            }
+        )
+    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+        return frozenset({ComparisonMetric.ATTACK_SUCCESS_RATE})
+    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+        return frozenset(
+            {
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+            }
+        )
+    raise ValueError(f"{family.value} is not a collapse family")
 
 
 def collapse_decision_from_comparison_families(
     family: ClaimFamily,
     comparison_results: Sequence[ComparisonFamilyResult],
-    alpha: PValue,
-    evaluation: CollapseEvaluationInput | None = None,
-    materiality_config: MaterialityConfig | None = None,
+    evaluation: CollapseEvaluationInput | None,
+    materiality_config: MaterialityConfig | None,
 ) -> CollapseDecision:
-    del alpha
     metric, adjusted_p_value = _best_passed_metric(
         family,
         comparison_results,
-        _POSITIVE_METRICS[family],
+        _positive_metrics(family),
     )
-    constraint_checks = {
-        ClaimFamily.PROPOSAL_SCREEN_NECESSITY: _proposal_constraints_pass,
-        ClaimFamily.PLURALITY_NECESSITY: _plurality_constraints_pass,
-        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: _source_exclusion_constraints_pass,
-        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: _external_verification_constraints_pass,
-    }
-    constraints_pass = constraint_checks[family](evaluation, materiality_config)
+    constraints_pass = _constraints_pass(family, evaluation, materiality_config)
     survives = metric is not None and constraints_pass
+    if evaluation is None or materiality_config is None:
+        reason = "mandatory full-precision constraint evidence is unavailable"
+    elif metric is None:
+        reason = "no preregistered positive comparison passed statistical and materiality gates"
+    elif not constraints_pass:
+        reason = "mandatory full-precision constraint failed or is undefined"
+    else:
+        reason = "survival rule passed"
     return CollapseDecision(
-        kind=_FAMILY_TO_DECISION_KIND[family],
+        kind=_decision_kind(family),
         survives=survives,
         primary_material_effect=metric,
         adjusted_p_value=adjusted_p_value,
         constraint_passes=constraints_pass,
-        reason="survival rule passed" if survives else "survival rule failed",
+        reason=reason,
     )
 
 
