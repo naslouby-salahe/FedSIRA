@@ -97,6 +97,13 @@ def role_hash_token(role: Role) -> RoleToken:
     raise ValueError(f"unsupported role: {role.value}")
 
 
+def role_from_hash_token(token: RoleToken) -> Role:
+    for role in Role:
+        if role_hash_token(role) == token:
+            return role
+    raise ValueError(f"unsupported role token: {token}")
+
+
 def role_for_normalized_position(
     normalized_position: RolePosition,
     windows: tuple[RoleWindow, ...],
