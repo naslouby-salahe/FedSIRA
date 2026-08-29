@@ -1,3 +1,5 @@
+from typing import TypeAlias
+
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 from fedsira.domain.records import (
     ArtifactDigest,
@@ -9,6 +11,8 @@ from fedsira.domain.records import (
     PredictorCountMatchesOfficial,
 )
 
+ArtifactPayloadBytes: TypeAlias = bytes
+
 
 class ArtifactManifest(FrozenDomainModel):
     family: ArtifactFamily
@@ -16,6 +20,18 @@ class ArtifactManifest(FrozenDomainModel):
     checksum: ArtifactDigest
     lifecycle_state: ArtifactLifecycleState
     upstream_identities: tuple[ArtifactDigest, ...]
+
+    def with_lifecycle_state(
+        self,
+        lifecycle_state: ArtifactLifecycleState,
+    ) -> "ArtifactManifest":
+        return ArtifactManifest(
+            family=self.family,
+            identity=self.identity,
+            checksum=self.checksum,
+            lifecycle_state=lifecycle_state,
+            upstream_identities=self.upstream_identities,
+        )
 
 
 class NBaiotDatasetManifestPayload(FrozenDomainModel):
