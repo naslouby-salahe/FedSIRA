@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from fedsira.analysis.claims import CLAIM_DEFINITIONS
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import ExperimentName, OverwriteExisting, ScientificCellCount
@@ -18,11 +17,7 @@ from fedsira.experiments.execution import (
     comparison_results_for_experiment,
     derive_lifecycle_state,
 )
-from fedsira.experiments.planning import (
-    ScientificCell,
-    build_plan,
-    validate_planned_cell_count_invariant,
-)
+from fedsira.experiments.planning import ScientificCell, build_plan, validate_planned_cell_count_invariant
 from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
     EXPERIMENT_REGISTRY,
@@ -30,6 +25,7 @@ from fedsira.experiments.registry import (
     experiment_by_name,
 )
 from fedsira.reporting.export import (
+    claim_definition_count,
     derive_claim_states_for_export,
     export_experiment_report,
     export_project_summary,
@@ -75,12 +71,13 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
     count_verification = verify_planned_cell_count_satisfied(plan, terminal_counts)
     completion_verification = verify_experiments_completed(lifecycle_states, experiment_names)
     terminal_verification = verify_experiments_reached_terminal_state(
-        lifecycle_states, experiment_names
+        lifecycle_states,
+        experiment_names,
     )
     claim_states = derive_claim_states_for_export()
     claim_verification = verify_claim_states_derivable(
         len(claim_states),
-        len(CLAIM_DEFINITIONS),
+        claim_definition_count(),
     )
     stale_ancestor_verification = verify_no_stale_ancestors(())
     failures = (
@@ -91,14 +88,19 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
         *stale_ancestor_verification.failures,
     )
     verification = CompletenessVerificationResult(passed=not failures, failures=failures)
+    collapse_decisions = _load_collapse_decisions(store)
     export = export_project_summary(
         plan,
         claim_states,
         lifecycle_states,
         PRODUCTION_CONFIG_PATH,
         verification,
-        collapse_decisions=_load_collapse_decisions(store),
-        resolved_core=_load_resolved_core(store),
+        collapse_decisions=collapse_decisions,
+        resolved_core=(
+            materialize_resolved_core(collapse_decisions)
+            if collapse_decisions is not None
+            else None
+        ),
     )
     for path in export.exported_paths:
         print(f"exported {path}")
@@ -159,7 +161,6 @@ def _load_collapse_decisions(
     store: ExecutionRecordStore,
 ) -> tuple[CollapseDecision, ...] | None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
     collapse_families = frozenset(
         {
             ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
@@ -208,12 +209,12 @@ def _load_collapse_decisions(
             collapse_decision_from_comparison_families(
                 matched_family,
                 comparison_results,
-                alpha,
+                evaluation=None,
+                materiality_config=config.metrics_and_statistics.materiality,
             )
         )
-    return tuple(decisions) if len(decisions) == len(COLLAPSE_EXPERIMENT_NAMES) else None
-
-
-def _load_resolved_core(store: ExecutionRecordStore) -> ResolvedCore | None:
-    decisions = _load_collapse_decisions(store)
-    return None if decisions is None else materialize_resolved_core(decisions)
+    if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
+        return None
+    if not all(decision.constraint_passes for decision in decisions):
+        return None
+    return tuple(decisions)
