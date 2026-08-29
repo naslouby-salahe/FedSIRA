@@ -4,7 +4,11 @@ from collections.abc import Sequence
 from enum import StrEnum
 from pathlib import Path
 
-from fedsira.analysis.comparisons import ComparisonFamilyResult
+from fedsira.analysis.comparisons import (
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonState,
+)
 from fedsira.artifacts.records import ArtifactManifest
 from fedsira.artifacts.storage import (
     compute_checksum,
@@ -14,16 +18,15 @@ from fedsira.artifacts.storage import (
     read_published_manifest,
     stage_payload,
 )
-from fedsira.config.schema import MaterialityConfig, MultiplicityConfig
+from fedsira.config.schema import MaterialityConfig
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOpeningMode
 from fedsira.domain.records import (
     ArtifactDigest,
     BooleanValue,
-    ComparisonName,
     FrozenDomainModel,
     MetricDifference,
     MetricName,
-    Probability,
+    PValue,
     TextValue,
 )
 from fedsira.experiments.registry import ClaimFamily
@@ -64,7 +67,7 @@ class CollapseDecision(FrozenDomainModel):
     kind: CollapseDecisionKind
     survives: BooleanValue
     primary_material_effect: MetricName | None
-    adjusted_p_value: Probability | None
+    adjusted_p_value: PValue | None
     constraint_passes: BooleanValue
     reason: TextValue
 
@@ -92,6 +95,17 @@ class ResolvedCore(FrozenDomainModel):
                 else "unverified-row",
             )
         )
+
+
+class CollapseEvaluationInput(FrozenDomainModel):
+    proposal_legitimate_admission_degradation: MetricDifference | None
+    proposal_malicious_admission_worsening: MetricDifference | None
+    plurality_legitimate_admission_degradation: MetricDifference | None
+    plurality_supported_harm: MetricDifference | None
+    source_exclusion_target_f1_drop: MetricDifference | None
+    source_exclusion_supported_harm: MetricDifference | None
+    source_exclusion_benign_far_increase: MetricDifference | None
+    external_verification_legitimate_admission_degradation: MetricDifference | None
 
 
 _OPENING_BY_PROPOSAL_SURVIVAL: dict[BooleanValue, ClaimOpeningMode] = {
@@ -154,240 +168,197 @@ def resolve_core_mapping(
 
 
 def resolve_all_eight_cases() -> dict[tuple[bool, bool, bool], ResolvedCore]:
-    cases: dict[tuple[bool, bool, bool], ResolvedCore] = {}
-    for proposal in (True, False):
-        for plurality in (True, False):
-            for external_verification in (True, False):
-                cases[(proposal, plurality, external_verification)] = resolve_core_mapping(
-                    proposal, plurality, external_verification
-                )
-    return cases
-
-
-class CollapseEvaluationInput(FrozenDomainModel):
-    false_launch_reduction: MetricDifference | None
-    reproduction_attempt_reduction: MetricDifference | None
-    post_evidence_overhead_reduction: MetricDifference | None
-    proposal_legitimate_admission_degradation: MetricDifference | None
-    proposal_malicious_admission_worsening: MetricDifference | None
-    plurality_malicious_admission_reduction: MetricDifference | None
-    plurality_worst_domain_target_f1_gain: MetricDifference | None
-    plurality_legitimate_admission_degradation: MetricDifference | None
-    plurality_supported_harm: MetricDifference | None
-    source_exclusion_asr_reduction: MetricDifference | None
-    source_exclusion_target_f1_drop: MetricDifference | None
-    source_exclusion_supported_harm: MetricDifference | None
-    source_exclusion_benign_far_increase: MetricDifference | None
-    external_verification_malicious_admission_reduction: MetricDifference | None
-    external_verification_worst_domain_target_f1_gain: MetricDifference | None
-    external_verification_legitimate_admission_degradation: MetricDifference | None
-
-
-def _reduction_passes(value: MetricDifference | None, minimum: float) -> bool:
-    return value is not None and value >= minimum
-
-
-def evaluate_proposal_survival(
-    evaluation: CollapseEvaluationInput,
-    materiality_config: MaterialityConfig,
-    multiplicity_config: MultiplicityConfig,
-    adjusted_p_values: Sequence[tuple[ComparisonName, Probability]],
-) -> CollapseDecision:
-    adjusted_by_name = dict(adjusted_p_values)
-    effects: list[tuple[bool, MetricName]] = []
-    if evaluation.false_launch_reduction is not None:
-        p_value = adjusted_by_name.get("false-launch superiority")
-        effects.append(
-            (
-                _reduction_passes(
-                    evaluation.false_launch_reduction,
-                    materiality_config.false_launch_reduction_minimum,
-                )
-                and p_value is not None
-                and p_value < multiplicity_config.family_wise_alpha,
-                "false-launch",
-            )
+    return {
+        (proposal, plurality, verification): resolve_core_mapping(
+            proposal, plurality, verification
         )
-    if evaluation.reproduction_attempt_reduction is not None:
-        p_value = adjusted_by_name.get("reproduction-attempt superiority")
-        effects.append(
-            (
-                _reduction_passes(
-                    evaluation.reproduction_attempt_reduction,
-                    materiality_config.reproduction_attempt_relative_reduction_minimum,
-                )
-                and p_value is not None
-                and p_value < multiplicity_config.family_wise_alpha,
-                "reproduction-attempts",
-            )
-        )
-    if evaluation.post_evidence_overhead_reduction is not None:
-        p_value = adjusted_by_name.get("post-evidence-overhead superiority")
-        effects.append(
-            (
-                _reduction_passes(
-                    evaluation.post_evidence_overhead_reduction,
-                    materiality_config.post_evidence_overhead_relative_reduction_minimum,
-                )
-                and p_value is not None
-                and p_value < multiplicity_config.family_wise_alpha,
-                "post-evidence-overhead",
-            )
-        )
-    positive_evidence = any(passes for passes, _ in effects)
-    legitimate_degradation_ok = (
+        for proposal in (True, False)
+        for plurality in (True, False)
+        for verification in (True, False)
+    }
+
+
+def _family_comparisons(
+    family: ClaimFamily,
+    comparison_results: Sequence[ComparisonFamilyResult],
+):
+    return tuple(
+        comparison
+        for result in comparison_results
+        if result.family is family
+        for comparison in result.comparisons
+    )
+
+
+def _best_passed_metric(
+    family: ClaimFamily,
+    comparison_results: Sequence[ComparisonFamilyResult],
+    allowed_metrics: frozenset[ComparisonMetric],
+) -> tuple[MetricName | None, PValue | None]:
+    passed = tuple(
+        comparison
+        for comparison in _family_comparisons(family, comparison_results)
+        if comparison.definition.metric in allowed_metrics
+        and comparison.comparison_state is ComparisonState.PASSED
+    )
+    if not passed:
+        return None, None
+    selected = min(
+        passed,
+        key=lambda comparison: (
+            comparison.adjusted_p_value if comparison.adjusted_p_value is not None else 1.0,
+            comparison.definition.comparison_name,
+        ),
+    )
+    return selected.definition.metric.value, selected.adjusted_p_value
+
+
+def _proposal_constraints_pass(
+    evaluation: CollapseEvaluationInput | None,
+    materiality: MaterialityConfig | None,
+) -> BooleanValue:
+    if evaluation is None or materiality is None:
+        return True
+    legitimate_ok = (
         evaluation.proposal_legitimate_admission_degradation is None
         or evaluation.proposal_legitimate_admission_degradation
-        <= materiality_config.legitimate_admission_noninferiority_margin
+        <= materiality.legitimate_admission_noninferiority_margin
     )
-    malicious_worsening_ok = (
+    malicious_ok = (
         evaluation.proposal_malicious_admission_worsening is None
         or evaluation.proposal_malicious_admission_worsening
-        <= materiality_config.proposal_malicious_admission_worsening_maximum
+        <= materiality.proposal_malicious_admission_worsening_maximum
     )
-    survives = positive_evidence and legitimate_degradation_ok and malicious_worsening_ok
-    return CollapseDecision(
-        kind=CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-        survives=survives,
-        primary_material_effect=effects[0][1] if effects else None,
-        adjusted_p_value=None,
-        constraint_passes=legitimate_degradation_ok and malicious_worsening_ok,
-        reason="proposal-survival rule passed" if survives else "proposal-survival rule failed",
-    )
+    return legitimate_ok and malicious_ok
 
 
-def evaluate_plurality_survival(
-    evaluation: CollapseEvaluationInput,
-    materiality_config: MaterialityConfig,
-    multiplicity_config: MultiplicityConfig,
-    adjusted_p_values: Sequence[tuple[ComparisonName, Probability]],
-) -> CollapseDecision:
-    adjusted_by_name = dict(adjusted_p_values)
-    mar_passes = _reduction_passes(
-        evaluation.plurality_malicious_admission_reduction,
-        materiality_config.malicious_admission_reduction_minimum,
-    )
-    worst_domain_passes = _reduction_passes(
-        evaluation.plurality_worst_domain_target_f1_gain,
-        materiality_config.worst_domain_target_f1_gain_minimum,
-    )
-    p_value = adjusted_by_name.get("plurality primary effect")
-    statistical_pass = p_value is not None and p_value < multiplicity_config.family_wise_alpha
-    positive_evidence = (mar_passes or worst_domain_passes) and statistical_pass
-    legitimate_degradation_ok = (
+def _plurality_constraints_pass(
+    evaluation: CollapseEvaluationInput | None,
+    materiality: MaterialityConfig | None,
+) -> BooleanValue:
+    if evaluation is None or materiality is None:
+        return True
+    legitimate_ok = (
         evaluation.plurality_legitimate_admission_degradation is None
         or evaluation.plurality_legitimate_admission_degradation
-        <= materiality_config.legitimate_admission_noninferiority_margin
+        <= materiality.legitimate_admission_noninferiority_margin
     )
-    supported_harm_ok = (
+    supported_ok = (
         evaluation.plurality_supported_harm is None
         or evaluation.plurality_supported_harm
-        <= materiality_config.supported_macro_f1_noninferiority_margin
+        <= materiality.supported_macro_f1_noninferiority_margin
     )
-    survives = positive_evidence and legitimate_degradation_ok and supported_harm_ok
-    return CollapseDecision(
-        kind=CollapseDecisionKind.PLURALITY,
-        survives=survives,
-        primary_material_effect="malicious-admission",
-        adjusted_p_value=p_value,
-        constraint_passes=legitimate_degradation_ok and supported_harm_ok,
-        reason="plurality-survival rule passed" if survives else "plurality-survival rule failed",
-    )
+    return legitimate_ok and supported_ok
 
 
-def evaluate_source_exclusion_survival(
-    evaluation: CollapseEvaluationInput,
-    materiality_config: MaterialityConfig,
-    multiplicity_config: MultiplicityConfig,
-    adjusted_p_values: Sequence[tuple[ComparisonName, Probability]],
-) -> CollapseDecision:
-    adjusted_by_name = dict(adjusted_p_values)
-    asr_reduction_passes = _reduction_passes(
-        evaluation.source_exclusion_asr_reduction,
-        materiality_config.source_exclusion_asr_reduction_minimum,
-    )
-    p_value = adjusted_by_name.get("source-exclusion ASR")
-    statistical_pass = p_value is not None and p_value < multiplicity_config.family_wise_alpha
-    target_non_inferior_ok = (
+def _source_exclusion_constraints_pass(
+    evaluation: CollapseEvaluationInput | None,
+    materiality: MaterialityConfig | None,
+) -> BooleanValue:
+    if evaluation is None or materiality is None:
+        return True
+    target_ok = (
         evaluation.source_exclusion_target_f1_drop is None
-        or evaluation.source_exclusion_target_f1_drop <= materiality_config.target_f1_gain_minimum
+        or evaluation.source_exclusion_target_f1_drop
+        <= materiality.supported_macro_f1_noninferiority_margin
     )
-    supported_harm_ok = (
+    supported_ok = (
         evaluation.source_exclusion_supported_harm is None
         or evaluation.source_exclusion_supported_harm
-        <= materiality_config.supported_macro_f1_noninferiority_margin
+        <= materiality.supported_macro_f1_noninferiority_margin
     )
-    benign_far_ok = (
+    far_ok = (
         evaluation.source_exclusion_benign_far_increase is None
         or evaluation.source_exclusion_benign_far_increase
-        <= materiality_config.benign_false_alarm_rate_noninferiority_margin
+        <= materiality.benign_false_alarm_rate_noninferiority_margin
     )
-    survives = (
-        asr_reduction_passes
-        and statistical_pass
-        and target_non_inferior_ok
-        and supported_harm_ok
-        and benign_far_ok
-    )
-    return CollapseDecision(
-        kind=CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-        survives=survives,
-        primary_material_effect="asr",
-        adjusted_p_value=p_value,
-        constraint_passes=target_non_inferior_ok and supported_harm_ok and benign_far_ok,
-        reason="source-exclusion gate passed" if survives else "source-exclusion gate failed",
-    )
+    return target_ok and supported_ok and far_ok
 
 
-def evaluate_external_verification_survival(
-    evaluation: CollapseEvaluationInput,
-    materiality_config: MaterialityConfig,
-    multiplicity_config: MultiplicityConfig,
-    adjusted_p_values: Sequence[tuple[ComparisonName, Probability]],
-) -> CollapseDecision:
-    adjusted_by_name = dict(adjusted_p_values)
-    mar_passes = _reduction_passes(
-        evaluation.external_verification_malicious_admission_reduction,
-        materiality_config.malicious_admission_reduction_minimum,
-    )
-    worst_domain_passes = _reduction_passes(
-        evaluation.external_verification_worst_domain_target_f1_gain,
-        materiality_config.worst_domain_target_f1_gain_minimum,
-    )
-    p_value = adjusted_by_name.get("external-verification primary effect")
-    statistical_pass = p_value is not None and p_value < multiplicity_config.family_wise_alpha
-    positive_evidence = (mar_passes or worst_domain_passes) and statistical_pass
-    legitimate_degradation_ok = (
+def _external_verification_constraints_pass(
+    evaluation: CollapseEvaluationInput | None,
+    materiality: MaterialityConfig | None,
+) -> BooleanValue:
+    if evaluation is None or materiality is None:
+        return True
+    return (
         evaluation.external_verification_legitimate_admission_degradation is None
         or evaluation.external_verification_legitimate_admission_degradation
-        <= materiality_config.legitimate_admission_noninferiority_margin
+        <= materiality.legitimate_admission_noninferiority_margin
     )
-    survives = positive_evidence and legitimate_degradation_ok
+
+
+_FAMILY_TO_DECISION_KIND: dict[ClaimFamily, CollapseDecisionKind] = {
+    ClaimFamily.PROPOSAL_SCREEN_NECESSITY: CollapseDecisionKind.PROPOSAL_ASSISTANCE,
+    ClaimFamily.PLURALITY_NECESSITY: CollapseDecisionKind.PLURALITY,
+    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
+    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: CollapseDecisionKind.EXTERNAL_VERIFICATION,
+}
+
+_POSITIVE_METRICS: dict[ClaimFamily, frozenset[ComparisonMetric]] = {
+    ClaimFamily.PROPOSAL_SCREEN_NECESSITY: frozenset(
+        {
+            ComparisonMetric.FALSE_LAUNCH,
+            ComparisonMetric.REPRODUCTION_ATTEMPTS,
+            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+        }
+    ),
+    ClaimFamily.PLURALITY_NECESSITY: frozenset(
+        {ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1}
+    ),
+    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: frozenset(
+        {ComparisonMetric.ATTACK_SUCCESS_RATE}
+    ),
+    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: frozenset(
+        {ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1}
+    ),
+}
+
+
+def collapse_decision_from_comparison_families(
+    family: ClaimFamily,
+    comparison_results: Sequence[ComparisonFamilyResult],
+    alpha: PValue,
+    evaluation: CollapseEvaluationInput | None = None,
+    materiality_config: MaterialityConfig | None = None,
+) -> CollapseDecision:
+    del alpha
+    metric, adjusted_p_value = _best_passed_metric(
+        family,
+        comparison_results,
+        _POSITIVE_METRICS[family],
+    )
+    constraint_checks = {
+        ClaimFamily.PROPOSAL_SCREEN_NECESSITY: _proposal_constraints_pass,
+        ClaimFamily.PLURALITY_NECESSITY: _plurality_constraints_pass,
+        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: _source_exclusion_constraints_pass,
+        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: _external_verification_constraints_pass,
+    }
+    constraints_pass = constraint_checks[family](evaluation, materiality_config)
+    survives = metric is not None and constraints_pass
     return CollapseDecision(
-        kind=CollapseDecisionKind.EXTERNAL_VERIFICATION,
+        kind=_FAMILY_TO_DECISION_KIND[family],
         survives=survives,
-        primary_material_effect="malicious-admission",
-        adjusted_p_value=p_value,
-        constraint_passes=legitimate_degradation_ok,
-        reason=(
-            "external-verification survival rule passed"
-            if survives
-            else "external-verification survival rule failed"
-        ),
+        primary_material_effect=metric,
+        adjusted_p_value=adjusted_p_value,
+        constraint_passes=constraints_pass,
+        reason="survival rule passed" if survives else "survival rule failed",
     )
 
 
 def materialize_resolved_core(decisions: Sequence[CollapseDecision]) -> ResolvedCore:
-    decision_by_kind = {decision.kind: decision for decision in decisions}
-    proposal = decision_by_kind[CollapseDecisionKind.PROPOSAL_ASSISTANCE]
-    plurality = decision_by_kind[CollapseDecisionKind.PLURALITY]
-    source_exclusion = decision_by_kind[CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION]
-    external_verification = decision_by_kind[CollapseDecisionKind.EXTERNAL_VERIFICATION]
+    by_kind = {decision.kind: decision for decision in decisions}
+    proposal = by_kind[CollapseDecisionKind.PROPOSAL_ASSISTANCE]
+    plurality = by_kind[CollapseDecisionKind.PLURALITY]
+    source_exclusion = by_kind[CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION]
+    verification = by_kind[CollapseDecisionKind.EXTERNAL_VERIFICATION]
     core = resolve_core_mapping(
-        proposal.survives, plurality.survives, external_verification.survives
+        proposal.survives,
+        plurality.survives,
+        verification.survives,
     )
     expected = resolve_all_eight_cases()[
-        (proposal.survives, plurality.survives, external_verification.survives)
+        (proposal.survives, plurality.survives, verification.survives)
     ]
     if expected.decision_identity != core.decision_identity:
         raise ValueError("resolved-core mapping deviates from the fixed Section 18.7 table")
@@ -402,12 +373,11 @@ RESOLVED_CORE_ARTIFACT_IDENTITY: ArtifactDigest = compute_checksum(
 )
 
 
-def _resolved_core_payload(core: ResolvedCore) -> bytes:
-    return core.model_dump_json().encode("utf-8")
-
-
-def publish_resolved_core(published_directory: Path, core: ResolvedCore) -> ArtifactManifest:
-    payload = _resolved_core_payload(core)
+def publish_resolved_core(
+    published_directory: Path,
+    core: ResolvedCore,
+) -> ArtifactManifest:
+    payload = core.model_dump_json().encode("utf-8")
     staged_manifest = ArtifactManifest(
         family=RESOLVED_CORE_ARTIFACT_FAMILY,
         identity=RESOLVED_CORE_ARTIFACT_IDENTITY,
@@ -417,92 +387,27 @@ def publish_resolved_core(published_directory: Path, core: ResolvedCore) -> Arti
     )
     staged_path = stage_payload(published_directory / "staging", payload)
     return publish_artifact_to_disk(
-        staged_path, published_directory, staged_manifest, payload
+        staged_path,
+        published_directory,
+        staged_manifest,
+        payload,
     )
 
 
 def read_resolved_core(published_directory: Path) -> ResolvedCore | None:
     if not is_artifact_complete_and_valid(
-        published_directory, RESOLVED_CORE_ARTIFACT_IDENTITY
+        published_directory,
+        RESOLVED_CORE_ARTIFACT_IDENTITY,
     ):
         return None
     manifest = read_published_manifest(
-        published_directory, RESOLVED_CORE_ARTIFACT_IDENTITY
+        published_directory,
+        RESOLVED_CORE_ARTIFACT_IDENTITY,
     )
     if manifest is None:
         return None
     payload_path, _manifest_path = published_artifact_paths(
-        published_directory, manifest.identity
+        published_directory,
+        manifest.identity,
     )
     return ResolvedCore.model_validate_json(payload_path.read_text())
-
-
-_FAMILY_TO_DECISION_KIND: dict[ClaimFamily, CollapseDecisionKind] = {
-    ClaimFamily.PROPOSAL_SCREEN_NECESSITY: CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-    ClaimFamily.PLURALITY_NECESSITY: CollapseDecisionKind.PLURALITY,
-    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM: CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY: CollapseDecisionKind.EXTERNAL_VERIFICATION,
-}
-
-
-def collapse_decision_from_comparison_families(
-    family: ClaimFamily,
-    comparison_results: Sequence[ComparisonFamilyResult],
-    alpha: Probability,
-    evaluation: CollapseEvaluationInput | None = None,
-    materiality_config: MaterialityConfig | None = None,
-    multiplicity_config: MultiplicityConfig | None = None,
-) -> CollapseDecision:
-    kind = _FAMILY_TO_DECISION_KIND[family]
-    primary_effect: MetricName | None = None
-    adjusted_p_value: Probability | None = None
-    for family_result in comparison_results:
-        if family_result.family is not family:
-            continue
-        for comparison in family_result.comparisons:
-            if comparison.adjusted_p_value is None:
-                continue
-            if adjusted_p_value is None or comparison.adjusted_p_value < adjusted_p_value:
-                adjusted_p_value = comparison.adjusted_p_value
-                primary_effect = comparison.definition.metric.value
-    survives = adjusted_p_value is not None and adjusted_p_value < alpha
-    constraint_passes = True
-    if (
-        evaluation is not None
-        and materiality_config is not None
-        and multiplicity_config is not None
-    ):
-        named_p_values = tuple(
-            (comparison.definition.canonical_name, comparison.adjusted_p_value)
-            for family_result in comparison_results
-            for comparison in family_result.comparisons
-            if comparison.adjusted_p_value is not None
-        )
-        if kind is CollapseDecisionKind.PROPOSAL_ASSISTANCE:
-            decision = evaluate_proposal_survival(
-                evaluation, materiality_config, multiplicity_config, named_p_values
-            )
-        elif kind is CollapseDecisionKind.PLURALITY:
-            decision = evaluate_plurality_survival(
-                evaluation, materiality_config, multiplicity_config, named_p_values
-            )
-        elif kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION:
-            decision = evaluate_source_exclusion_survival(
-                evaluation, materiality_config, multiplicity_config, named_p_values
-            )
-        else:
-            decision = evaluate_external_verification_survival(
-                evaluation, materiality_config, multiplicity_config, named_p_values
-            )
-        survives = decision.survives
-        primary_effect = decision.primary_material_effect
-        adjusted_p_value = decision.adjusted_p_value
-        constraint_passes = decision.constraint_passes
-    return CollapseDecision(
-        kind=kind,
-        survives=survives,
-        primary_material_effect=primary_effect,
-        adjusted_p_value=adjusted_p_value,
-        constraint_passes=constraint_passes,
-        reason="mechanical collapse rule",
-    )
