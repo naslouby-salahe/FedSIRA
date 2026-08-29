@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Sequence
 from io import StringIO
 
-from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
+from fedsira.analysis.claims import ClaimStateResult
 from fedsira.analysis.comparisons import (
     ComparisonDefinition,
     ComparisonFamilyResult,
     ComparisonReferenceKind,
+    ComparisonState,
 )
 from fedsira.config.schema import PublicationRoundingConfig
-from fedsira.domain.records import FrozenDomainModel, TableName, TextValue
+from fedsira.domain.records import (
+    FrozenDomainModel,
+    MetricValue,
+    PValue,
+    TableName,
+    TextValue,
+)
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.planning import ExperimentPlan
 
@@ -42,8 +48,8 @@ class RenderedTable(FrozenDomainModel):
 
 
 def _csv_text(
-    header: Sequence[str],
-    rows: Sequence[Sequence[str]],
+    header: tuple[TextValue, ...],
+    rows: tuple[tuple[TextValue, ...], ...],
 ) -> TextValue:
     buffer = StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
@@ -53,7 +59,7 @@ def _csv_text(
 
 
 def format_metric_value(
-    value: float | None,
+    value: MetricValue | None,
     rounding: PublicationRoundingConfig,
 ) -> TextValue:
     if value is None:
@@ -62,7 +68,7 @@ def format_metric_value(
 
 
 def format_p_value(
-    value: float | None,
+    value: PValue | None,
     rounding: PublicationRoundingConfig,
 ) -> TextValue:
     if value is None:
@@ -73,20 +79,22 @@ def format_p_value(
 
 
 def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
-    rows: list[tuple[str, ...]] = []
-    for planned in plan.experiments:
-        definition = planned.definition
-        rows.append(
+    rows = tuple(
+        (
+            planned.definition.name,
+            planned.definition.experiment_class.value,
+            str(len(planned.definition.methods)),
+            str(len(planned.definition.conditions)),
+            str(planned.definition.seed_count),
+            str(len(planned.cells)),
             (
-                definition.name,
-                definition.experiment_class.value,
-                str(len(definition.methods)),
-                str(len(definition.conditions)),
-                str(definition.seed_count),
-                str(len(planned.cells)),
-                definition.claim_family.value if definition.claim_family else "NA",
-            )
+                planned.definition.claim_family.value
+                if planned.definition.claim_family is not None
+                else "NA"
+            ),
         )
+        for planned in plan.experiments
+    )
     return RenderedTable(
         name="Experiment Plan",
         csv_text=_csv_text(
@@ -104,9 +112,7 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
     )
 
 
-def _comparison_reference_label(
-    definition: ComparisonDefinition,
-) -> TextValue:
+def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
     if definition.reference_kind is ComparisonReferenceKind.ZERO:
         return "zero"
     if (
@@ -121,91 +127,70 @@ def _comparison_reference_label(
         return definition.reference_scenario
     return (
         f"{definition.reference_experiment} / "
-        f"{definition.reference_scenario} / "
-        f"{definition.reference_method}"
+        f"{definition.reference_scenario} / {definition.reference_method}"
+    )
+
+
+def _statistical_summary_row(
+    family: ComparisonFamilyResult,
+    comparison_index: int,
+    rounding: PublicationRoundingConfig,
+) -> tuple[TextValue, ...]:
+    comparison = family.comparisons[comparison_index]
+    definition = comparison.definition
+    effect = (
+        "NA"
+        if comparison.paired_standardized_effect is None
+        else f"{comparison.paired_standardized_effect:.3f}"
+    )
+    confidence_interval = (
+        "NA"
+        if comparison.confidence_interval is None
+        else (
+            f"[{comparison.confidence_interval[0]:.3f},"
+            f"{comparison.confidence_interval[1]:.3f}]"
+        )
+    )
+    margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
+    materiality = (
+        "NA"
+        if definition.material_threshold is None
+        else f"{definition.material_threshold:.3f}"
+    )
+    reference_label = _comparison_reference_label(definition)
+    comparison_identity = (
+        f"{definition.method} vs {reference_label} | "
+        f"{definition.scientific_scenario} | {definition.metric.value}"
+    )
+    return (
+        family.family.value,
+        comparison_identity,
+        definition.metric.value,
+        definition.orientation.value,
+        margin,
+        str(comparison.complete_seed_count),
+        format_metric_value(comparison.mean_paired_difference, rounding),
+        format_metric_value(comparison.median_paired_difference, rounding),
+        effect,
+        format_p_value(comparison.raw_p_value, rounding),
+        format_p_value(comparison.adjusted_p_value, rounding),
+        confidence_interval,
+        materiality,
+        "pass" if comparison.comparison_state is ComparisonState.PASSED else "fail",
+        "pass" if comparison.materiality_passes is not False else "fail",
+        comparison.comparison_state.value,
     )
 
 
 def render_statistical_summary_table(
-    comparison_results: Sequence[ComparisonFamilyResult],
+    comparison_results: tuple[ComparisonFamilyResult, ...],
     rounding: PublicationRoundingConfig,
 ) -> RenderedTable:
-    rows: list[tuple[str, ...]] = []
-    for family in comparison_results:
-        for comparison in family.comparisons:
-            definition = comparison.definition
-            mean = format_metric_value(
-                comparison.mean_paired_difference,
-                rounding,
-            )
-            median = format_metric_value(
-                comparison.median_paired_difference,
-                rounding,
-            )
-            effect = (
-                "NA"
-                if comparison.paired_standardized_effect is None
-                else f"{comparison.paired_standardized_effect:.3f}"
-            )
-            raw_p = format_p_value(comparison.raw_p_value, rounding)
-            adjusted_p = format_p_value(
-                comparison.adjusted_p_value,
-                rounding,
-            )
-            confidence_interval = (
-                "NA"
-                if comparison.confidence_interval is None
-                else (
-                    f"[{comparison.confidence_interval[0]:.3f},"
-                    f"{comparison.confidence_interval[1]:.3f}]"
-                )
-            )
-            margin = (
-                "NA"
-                if definition.margin is None
-                else f"{definition.margin:.3f}"
-            )
-            materiality = (
-                "NA"
-                if definition.material_threshold is None
-                else f"{definition.material_threshold:.3f}"
-            )
-            statistical_pass = (
-                "pass"
-                if comparison.comparison_state.value == "Passed"
-                else "fail"
-            )
-            materiality_pass = (
-                "pass"
-                if comparison.materiality_passes is not False
-                else "fail"
-            )
-            reference_label = _comparison_reference_label(definition)
-            comparison_identity = (
-                f"{definition.method} vs {reference_label} | "
-                f"{definition.scientific_scenario} | "
-                f"{definition.metric.value}"
-            )
-            rows.append(
-                (
-                    family.family.value,
-                    comparison_identity,
-                    definition.metric.value,
-                    definition.orientation.value,
-                    margin,
-                    str(comparison.complete_seed_count),
-                    mean,
-                    median,
-                    effect,
-                    raw_p,
-                    adjusted_p,
-                    confidence_interval,
-                    materiality,
-                    statistical_pass,
-                    materiality_pass,
-                    comparison.comparison_state.value,
-                )
-            )
+    rows = tuple(
+        _statistical_summary_row(family, comparison_index, rounding)
+        for family in comparison_results
+        for comparison_index in range(len(family.comparisons))
+    )
     return RenderedTable(
         name="Statistical Summary",
         csv_text=_csv_text(
@@ -233,24 +218,12 @@ def render_statistical_summary_table(
 
 
 def render_claim_support_table(
-    claim_states: Sequence[ClaimStateResult],
+    claim_states: tuple[ClaimStateResult, ...],
 ) -> RenderedTable:
-    known_states = frozenset(
-        {
-            FinalClaimState.SUPPORTED,
-            FinalClaimState.PARTIALLY_SUPPORTED,
-            FinalClaimState.CONDITIONAL,
-            FinalClaimState.MECHANISM_ONLY,
-            FinalClaimState.NULL_RESULT,
-            FinalClaimState.NOT_SUPPORTED,
-            FinalClaimState.NOT_TESTED,
-        }
+    rows = tuple(
+        (state.claim_id, state.scope, state.state.value)
+        for state in claim_states
     )
-    rows: list[tuple[str, ...]] = []
-    for state in claim_states:
-        if state.state not in known_states:
-            raise ValueError(f"unknown claim state {state.state}")
-        rows.append((state.claim_id, state.scope, state.state.value))
     return RenderedTable(
         name="Claim Support",
         csv_text=_csv_text(
@@ -261,56 +234,35 @@ def render_claim_support_table(
 
 
 def render_collapse_decisions_table(
-    decisions: Sequence[CollapseDecision],
+    decisions: tuple[CollapseDecision, ...],
     resolved_core: ResolvedCore,
     rounding: PublicationRoundingConfig,
 ) -> RenderedTable:
-    rows: list[tuple[str, ...]] = []
-    for decision in decisions:
-        p_value = format_p_value(decision.adjusted_p_value, rounding)
-        constraint = "pass" if decision.constraint_passes else "fail"
-        outcome = "survives" if decision.survives else "removed"
-        rows.append(
-            (
-                decision.kind.value,
-                decision.primary_material_effect or "NA",
-                p_value,
-                constraint,
-                "mechanical",
-                outcome,
-                outcome,
-            )
+    decision_rows = tuple(
+        (
+            decision.kind.value,
+            decision.primary_material_effect or "NA",
+            format_p_value(decision.adjusted_p_value, rounding),
+            "pass" if decision.constraint_passes else "fail",
+            "mechanical",
+            "survives" if decision.survives else "removed",
+            "survives" if decision.survives else "removed",
         )
+        for decision in decisions
+    )
     source_influence = (
         "source-excluded"
         if resolved_core.direct_source_exclusion_survives
         else "source-influenced"
     )
-    resolved_core_identity = "|".join(
-        (
-            (
-                "proposal-assisted"
-                if resolved_core.proposal_assistance_survives
-                else "candidate-free"
-            ),
-            "plurality" if resolved_core.plurality_survives else "single-reproduction",
-            (
-                "externally-verified"
-                if resolved_core.external_verification_survives
-                else "unverified-row"
-            ),
-        )
-    )
-    rows.append(
-        (
-            "resolved core",
-            resolved_core_identity,
-            "NA",
-            source_influence,
-            "mapping",
-            "NA",
-            resolved_core.production_update_rule.value,
-        )
+    resolved_row = (
+        "resolved core",
+        resolved_core.decision_identity,
+        "NA",
+        source_influence,
+        "mapping",
+        "NA",
+        resolved_core.production_update_rule.value,
     )
     return RenderedTable(
         name="Collapse Decisions",
@@ -324,6 +276,6 @@ def render_collapse_decisions_table(
                 "observed_outcome",
                 "core_action",
             ),
-            rows,
+            (*decision_rows, resolved_row),
         ),
     )
