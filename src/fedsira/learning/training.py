@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from typing import Protocol, cast
 
 import torch
@@ -6,8 +5,10 @@ from torch import nn, optim
 
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
 from fedsira.domain.records import (
+    BatchSize,
     DerivedSeed,
     EpochIndex,
+    LocalEpochCount,
     NonNegativeFloat,
     PositiveFloat,
     SampleId,
@@ -29,7 +30,9 @@ def build_loss_function() -> nn.CrossEntropyLoss:
 
 
 def build_optimizer(
-    model: FedSIRAClassifier, learning_rate: PositiveFloat, optimizer_config: OptimizerConfig
+    model: FedSIRAClassifier,
+    learning_rate: PositiveFloat,
+    optimizer_config: OptimizerConfig,
 ) -> optim.AdamW:
     return optim.AdamW(
         model.parameters(),
@@ -47,18 +50,22 @@ def build_optimizer(
 
 
 def clip_gradients(model: FedSIRAClassifier, training_config: TrainingConfig) -> None:
-    nn.utils.clip_grad_norm_(model.parameters(), max_norm=training_config.gradient_global_l2_clip)
+    nn.utils.clip_grad_norm_(
+        model.parameters(),
+        max_norm=training_config.gradient_global_l2_clip,
+    )
 
 
 def ordered_minibatches(
     training_seed: DerivedSeed,
     epoch: EpochIndex,
-    sample_ids: Sequence[SampleId],
-    batch_size: int,
+    sample_ids: tuple[SampleId, ...],
+    batch_size: BatchSize,
 ) -> tuple[tuple[SampleId, ...], ...]:
     ordered = minibatch_order(training_seed, epoch, sample_ids)
     return tuple(
-        ordered[start : start + batch_size] for start in range(0, len(ordered), batch_size)
+        ordered[start : start + batch_size]
+        for start in range(0, len(ordered), batch_size)
     )
 
 
@@ -67,10 +74,12 @@ def train_one_epoch(
     optimizer: optim.AdamW,
     loss_function: nn.CrossEntropyLoss,
     training_config: TrainingConfig,
-    batches: Sequence[tuple[torch.Tensor, torch.Tensor]],
+    batches: tuple[tuple[torch.Tensor, torch.Tensor], ...],
 ) -> NonNegativeFloat:
+    if not batches:
+        raise ValueError("local training requires at least one minibatch")
     model.train()
-    total_loss = 0.0
+    total_loss: NonNegativeFloat = 0.0
     for features, labels in batches:
         optimizer.zero_grad(set_to_none=True)
         logits = model(features)
@@ -82,16 +91,25 @@ def train_one_epoch(
     return total_loss / len(batches)
 
 
+def _sample_index(sample_ids: tuple[SampleId, ...], selected: SampleId) -> EpochIndex:
+    for index, sample_id in enumerate(sample_ids):
+        if sample_id == selected:
+            return index
+    raise ValueError(f"ordered sample {selected} is absent from the training population")
+
+
 def ordered_batch_indices(
-    sample_ids: Sequence[SampleId],
+    sample_ids: tuple[SampleId, ...],
     training_seed: DerivedSeed,
     epoch: EpochIndex,
-    batch_size: int,
+    batch_size: BatchSize,
 ) -> tuple[torch.Tensor, ...]:
-    sample_id_to_index = {sample_id: index for index, sample_id in enumerate(sample_ids)}
     ordered_batches = ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
     return tuple(
-        torch.tensor([sample_id_to_index[sample_id] for sample_id in batch_sample_ids])
+        torch.tensor(
+            tuple(_sample_index(sample_ids, sample_id) for sample_id in batch_sample_ids),
+            dtype=torch.long,
+        )
         for batch_sample_ids in ordered_batches
     )
 
@@ -99,11 +117,13 @@ def ordered_batch_indices(
 def build_epoch_batches(
     features: torch.Tensor,
     labels: torch.Tensor,
-    sample_ids: Sequence[SampleId],
+    sample_ids: tuple[SampleId, ...],
     training_seed: DerivedSeed,
     epoch: EpochIndex,
-    batch_size: int,
+    batch_size: BatchSize,
 ) -> tuple[tuple[torch.Tensor, torch.Tensor], ...]:
+    if features.shape[0] != labels.shape[0] or features.shape[0] != len(sample_ids):
+        raise ValueError("features, labels, and sample ids must have identical row counts")
     return tuple(
         (features[indices], labels[indices])
         for indices in ordered_batch_indices(sample_ids, training_seed, epoch, batch_size)
@@ -117,14 +137,19 @@ def train_epochs_with_deterministic_batch_order(
     training_config: TrainingConfig,
     features: torch.Tensor,
     labels: torch.Tensor,
-    sample_ids: Sequence[SampleId],
+    sample_ids: tuple[SampleId, ...],
     training_seed: DerivedSeed,
-    local_epochs: int,
+    local_epochs: LocalEpochCount,
 ) -> tuple[NonNegativeFloat, ...]:
     epoch_losses: list[NonNegativeFloat] = []
     for epoch in range(local_epochs):
         batches = build_epoch_batches(
-            features, labels, sample_ids, training_seed, epoch, training_config.batch_size
+            features,
+            labels,
+            sample_ids,
+            training_seed,
+            epoch,
+            training_config.batch_size,
         )
         epoch_losses.append(
             train_one_epoch(model, optimizer, loss_function, training_config, batches)
