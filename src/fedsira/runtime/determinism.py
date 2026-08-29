@@ -1,10 +1,10 @@
 import hashlib
 import random
-from collections.abc import Sequence
-from typing import TypeVar
+from typing import Annotated, Protocol, TypeVar, cast
 
 import numpy
 import torch
+from pydantic import Field
 
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
@@ -22,6 +22,7 @@ from fedsira.domain.records import (
     RoundIndex,
     SampleId,
     SeedDerivationLabel,
+    TextValue,
     TrainingConditionId,
 )
 
@@ -29,10 +30,20 @@ NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"
 LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"
 LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"
 
+FramedBytes = Annotated[bytes, Field()]
+DigestBytes = Annotated[bytes, Field(min_length=32, max_length=32)]
 OrderItem = TypeVar("OrderItem")
 
 
-def framed_bytes(*fields: FramingField) -> bytes:
+class _TorchSeedFunction(Protocol):
+    def __call__(self, seed: DeterministicInteger) -> None: ...
+
+
+_TORCH_MANUAL_SEED = cast(_TorchSeedFunction, torch.manual_seed)
+_TORCH_CUDA_MANUAL_SEED_ALL = cast(_TorchSeedFunction, torch.cuda.manual_seed_all)
+
+
+def framed_bytes(*fields: FramingField) -> FramedBytes:
     encoded = bytearray()
     for field in fields:
         payload = str(field).encode("utf-8")
@@ -78,13 +89,13 @@ def local_training_seed(
 
 
 def deterministic_order(
-    items: Sequence[OrderItem],
+    items: tuple[OrderItem, ...],
     domain_separator: SeedDerivationLabel,
     order_namespace_seed: NamespaceSeed,
 ) -> tuple[OrderItem, ...]:
-    def sort_key(item: OrderItem) -> tuple[bytes, str]:
-        item_text = str(item)
-        digest = hashlib.sha256(
+    def sort_key(item: OrderItem) -> tuple[DigestBytes, TextValue]:
+        item_text: TextValue = str(item)
+        digest: DigestBytes = hashlib.sha256(
             framed_bytes(domain_separator, order_namespace_seed, item_text)
         ).digest()
         return digest, item_text
@@ -95,10 +106,10 @@ def deterministic_order(
 def minibatch_order(
     training_seed: DerivedSeed,
     epoch: EpochIndex,
-    sample_ids: Sequence[SampleId],
+    sample_ids: tuple[SampleId, ...],
 ) -> tuple[SampleId, ...]:
-    def sort_key(sample_id: SampleId) -> tuple[bytes, SampleId]:
-        digest = hashlib.sha256(
+    def sort_key(sample_id: SampleId) -> tuple[DigestBytes, SampleId]:
+        digest: DigestBytes = hashlib.sha256(
             framed_bytes(LOCAL_TRAINING_BATCH_ORDER_SEPARATOR, training_seed, epoch, sample_id)
         ).digest()
         return digest, sample_id
@@ -109,5 +120,5 @@ def minibatch_order(
 def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
     random.seed(int(seed))
     numpy.random.seed(int(seed))
-    torch.manual_seed(int(seed))
-    torch.cuda.manual_seed_all(int(seed))
+    _TORCH_MANUAL_SEED(seed)
+    _TORCH_CUDA_MANUAL_SEED_ALL(seed)
