@@ -5,7 +5,11 @@ from collections.abc import Sequence
 from io import StringIO
 
 from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
-from fedsira.analysis.comparisons import ComparisonFamilyResult
+from fedsira.analysis.comparisons import (
+    ComparisonDefinition,
+    ComparisonFamilyResult,
+    ComparisonReferenceKind,
+)
 from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.records import FrozenDomainModel, TableName, TextValue
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
@@ -37,7 +41,10 @@ class RenderedTable(FrozenDomainModel):
     csv_text: TextValue
 
 
-def _csv_text(header: Sequence[str], rows: Sequence[Sequence[str]]) -> TextValue:
+def _csv_text(
+    header: Sequence[str],
+    rows: Sequence[Sequence[str]],
+) -> TextValue:
     buffer = StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(header)
@@ -45,13 +52,19 @@ def _csv_text(header: Sequence[str], rows: Sequence[Sequence[str]]) -> TextValue
     return buffer.getvalue().rstrip("\n")
 
 
-def format_metric_value(value: float | None, rounding: PublicationRoundingConfig) -> TextValue:
+def format_metric_value(
+    value: float | None,
+    rounding: PublicationRoundingConfig,
+) -> TextValue:
     if value is None:
         return "NA"
     return f"{value:.{rounding.f1_accuracy_rates_decimals}f}"
 
 
-def format_p_value(value: float | None, rounding: PublicationRoundingConfig) -> TextValue:
+def format_p_value(
+    value: float | None,
+    rounding: PublicationRoundingConfig,
+) -> TextValue:
     if value is None:
         return "NA"
     if value < rounding.p_value_display_floor:
@@ -91,6 +104,28 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
     )
 
 
+def _comparison_reference_label(
+    definition: ComparisonDefinition,
+) -> TextValue:
+    if definition.reference_kind is ComparisonReferenceKind.ZERO:
+        return "zero"
+    if (
+        definition.reference_experiment == definition.experiment
+        and definition.reference_scenario == definition.scientific_scenario
+    ):
+        return definition.reference_method
+    if (
+        definition.reference_experiment == definition.experiment
+        and definition.reference_method == definition.method
+    ):
+        return definition.reference_scenario
+    return (
+        f"{definition.reference_experiment} / "
+        f"{definition.reference_scenario} / "
+        f"{definition.reference_method}"
+    )
+
+
 def render_statistical_summary_table(
     comparison_results: Sequence[ComparisonFamilyResult],
     rounding: PublicationRoundingConfig,
@@ -99,15 +134,24 @@ def render_statistical_summary_table(
     for family in comparison_results:
         for comparison in family.comparisons:
             definition = comparison.definition
-            mean = format_metric_value(comparison.mean_paired_difference, rounding)
-            median = format_metric_value(comparison.median_paired_difference, rounding)
+            mean = format_metric_value(
+                comparison.mean_paired_difference,
+                rounding,
+            )
+            median = format_metric_value(
+                comparison.median_paired_difference,
+                rounding,
+            )
             effect = (
                 "NA"
                 if comparison.paired_standardized_effect is None
                 else f"{comparison.paired_standardized_effect:.3f}"
             )
             raw_p = format_p_value(comparison.raw_p_value, rounding)
-            adjusted_p = format_p_value(comparison.adjusted_p_value, rounding)
+            adjusted_p = format_p_value(
+                comparison.adjusted_p_value,
+                rounding,
+            )
             confidence_interval = (
                 "NA"
                 if comparison.confidence_interval is None
@@ -116,19 +160,31 @@ def render_statistical_summary_table(
                     f"{comparison.confidence_interval[1]:.3f}]"
                 )
             )
-            margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
+            margin = (
+                "NA"
+                if definition.margin is None
+                else f"{definition.margin:.3f}"
+            )
             materiality = (
                 "NA"
                 if definition.material_threshold is None
                 else f"{definition.material_threshold:.3f}"
             )
             statistical_pass = (
-                "pass" if comparison.comparison_state.value == "Passed" else "fail"
+                "pass"
+                if comparison.comparison_state.value == "Passed"
+                else "fail"
             )
-            materiality_pass = "pass" if comparison.materiality_passes is not False else "fail"
+            materiality_pass = (
+                "pass"
+                if comparison.materiality_passes is not False
+                else "fail"
+            )
+            reference_label = _comparison_reference_label(definition)
             comparison_identity = (
-                f"{definition.method} vs {definition.reference} | "
-                f"{definition.scientific_scenario} | {definition.metric.value}"
+                f"{definition.method} vs {reference_label} | "
+                f"{definition.scientific_scenario} | "
+                f"{definition.metric.value}"
             )
             rows.append(
                 (
@@ -176,7 +232,9 @@ def render_statistical_summary_table(
     )
 
 
-def render_claim_support_table(claim_states: Sequence[ClaimStateResult]) -> RenderedTable:
+def render_claim_support_table(
+    claim_states: Sequence[ClaimStateResult],
+) -> RenderedTable:
     known_states = frozenset(
         {
             FinalClaimState.SUPPORTED,
@@ -195,7 +253,10 @@ def render_claim_support_table(claim_states: Sequence[ClaimStateResult]) -> Rend
         rows.append((state.claim_id, state.scope, state.state.value))
     return RenderedTable(
         name="Claim Support",
-        csv_text=_csv_text(("claim", "exact_scoped_claim", "claim_state"), rows),
+        csv_text=_csv_text(
+            ("claim", "exact_scoped_claim", "claim_state"),
+            rows,
+        ),
     )
 
 
@@ -221,15 +282,23 @@ def render_collapse_decisions_table(
             )
         )
     source_influence = (
-        "source-excluded" if resolved_core.direct_source_exclusion_survives else "source-influenced"
+        "source-excluded"
+        if resolved_core.direct_source_exclusion_survives
+        else "source-influenced"
     )
     resolved_core_identity = "|".join(
         (
-            "proposal-assisted" if resolved_core.proposal_assistance_survives else "candidate-free",
+            (
+                "proposal-assisted"
+                if resolved_core.proposal_assistance_survives
+                else "candidate-free"
+            ),
             "plurality" if resolved_core.plurality_survives else "single-reproduction",
-            "externally-verified"
-            if resolved_core.external_verification_survives
-            else "unverified-row",
+            (
+                "externally-verified"
+                if resolved_core.external_verification_survives
+                else "unverified-row"
+            ),
         )
     )
     rows.append(
@@ -240,7 +309,7 @@ def render_collapse_decisions_table(
             source_influence,
             "mapping",
             "NA",
-            resolved_core.production_update_rule,
+            resolved_core.production_update_rule.value,
         )
     )
     return RenderedTable(
