@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from collections.abc import Sequence
 from pathlib import Path
 
 from fedsira.datasets.ciciot2023.schema import normalize_label_token
@@ -10,6 +9,7 @@ from fedsira.domain.records import (
     DatasetColumnName,
     DatasetFileDigest,
     DatasetManifestDigest,
+    FramingField,
     FrozenDomainModel,
     RelativePathText,
     SeedDerivationLabel,
@@ -49,11 +49,11 @@ def discover_secondary_csv_files(csv_root: Path) -> tuple[SecondaryCsvFile, ...]
 
 
 def compute_dataset_manifest_hash(
-    discovered: Sequence[SecondaryCsvFile],
+    discovered: tuple[SecondaryCsvFile, ...],
 ) -> DatasetManifestDigest:
     if not discovered:
         raise ValueError("secondary dataset manifest requires at least one CSV shard")
-    fields: list[str | int] = []
+    fields: list[FramingField] = []
     for item in sorted(discovered, key=lambda discovered_file: discovered_file.relative_path):
         fields.extend((item.relative_path, item.file_sha256))
     return hashlib.sha256(framed_bytes(DATASET_MANIFEST_SEPARATOR, *fields)).hexdigest()
@@ -70,7 +70,7 @@ def read_csv_header(path: Path) -> tuple[DatasetColumnName, ...]:
 
 
 def resolve_label_column(header: tuple[DatasetColumnName, ...]) -> DatasetColumnName:
-    label_columns = [column for column in header if normalize_label_token(column) == "LABEL"]
+    label_columns = tuple(column for column in header if normalize_label_token(column) == "LABEL")
     if len(label_columns) != 1:
         raise ValueError(
             "expected exactly one column named 'label' (case-insensitive), "
@@ -84,4 +84,4 @@ def validate_consistent_header(
     observed_header: tuple[DatasetColumnName, ...],
 ) -> None:
     if observed_header != reference_header:
-        raise ValueError("secondary CSV header does not match the reference schema")
+        raise ValueError("secondary CSV header does not match the fixed reference schema")
