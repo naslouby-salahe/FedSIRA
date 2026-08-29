@@ -7,27 +7,33 @@ from enum import StrEnum
 
 from fedsira.domain.records import (
     ArtifactDigest,
+    ByteCount,
+    FiniteFloat,
     FrozenDomainModel,
     MasterSeed,
-    NonEmptyString,
+    MessageEndpoint,
+    ModelTransmissionCount,
     NonNegativeFloat,
     NonNegativeInt,
+    ParameterName,
     PositiveInt,
     RoundIndex,
+    SchemaVersion,
+    TensorName,
 )
 
-COMMUNICATION_SCHEMA = "FEDSIRA_COMM_V1"
-SERVER_ID: NonEmptyString = "SERVER"
-METADATA_LENGTH_PREFIX_BYTES = 8
-TENSOR_METADATA_LENGTH_PREFIX_BYTES = 8
-TENSOR_DTYPE: NonEmptyString = "float32"
+COMMUNICATION_SCHEMA: SchemaVersion = "FEDSIRA_COMM_V1"
+SERVER_ID: MessageEndpoint = "SERVER"
+METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
+TENSOR_METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
+TENSOR_DTYPE: SchemaVersion = "float32"
 
 CommunicationJsonValue = str | int | None | list[int]
 
 
 @dataclass(frozen=True)
 class MetricResult:
-    value: float | None
+    value: FiniteFloat | None
     denominator: NonNegativeInt
 
 
@@ -92,22 +98,20 @@ class CommunicationMessageMetadata(FrozenDomainModel):
     semantic_cell_key_hash: ArtifactDigest
     master_seed: MasterSeed
     round_index: RoundIndex | None
-    sender: NonEmptyString
-    receiver: NonEmptyString
+    sender: MessageEndpoint
+    receiver: MessageEndpoint
     claim_contract_hash: ArtifactDigest | None
     payload_tensor_count: NonNegativeInt
 
 
 class TensorPayloadMetadata(FrozenDomainModel):
-    name: NonEmptyString
+    name: TensorName
     shape: tuple[PositiveInt, ...]
-    nbytes: NonNegativeInt
-    dtype: NonEmptyString = TENSOR_DTYPE
+    nbytes: ByteCount
+    dtype: SchemaVersion = TENSOR_DTYPE
 
 
-def parameter_tensor_name(
-    kind: TensorParameterKind, parameter_name: NonEmptyString
-) -> NonEmptyString:
+def parameter_tensor_name(kind: TensorParameterKind, parameter_name: ParameterName) -> TensorName:
     return f"{kind.value}.{parameter_name}"
 
 
@@ -147,8 +151,8 @@ def encode_tensor_metadata(tensor_metadata: TensorPayloadMetadata) -> bytes:
 
 def encode_message_envelope(
     metadata: CommunicationMessageMetadata,
-    tensor_payloads: Mapping[NonEmptyString, bytes],
-    tensor_metadata_by_name: Mapping[NonEmptyString, TensorPayloadMetadata],
+    tensor_payloads: Mapping[TensorName, bytes],
+    tensor_metadata_by_name: Mapping[TensorName, TensorPayloadMetadata],
 ) -> bytes:
     envelope = bytearray(encode_message_metadata(metadata))
     for tensor_name in sorted(tensor_payloads):
@@ -161,11 +165,11 @@ def is_model_transmission(metadata: CommunicationMessageMetadata) -> bool:
     return metadata.payload_tensor_count > 0
 
 
-def communication_bytes(envelopes: Sequence[bytes]) -> NonNegativeInt:
+def communication_bytes(envelopes: Sequence[bytes]) -> ByteCount:
     return sum(len(envelope) for envelope in envelopes)
 
 
 def model_transmission_count(
     metadata_records: Sequence[CommunicationMessageMetadata],
-) -> NonNegativeInt:
+) -> ModelTransmissionCount:
     return sum(1 for metadata in metadata_records if is_model_transmission(metadata))
