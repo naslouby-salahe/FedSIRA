@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Iterator
-from typing import Protocol, Self
+from typing import Self
 
 from pydantic import model_validator
 
 from fedsira.config.schema import ScalingConfig
-from fedsira.domain.records import FeatureName, FiniteFloat, FrozenDomainModel, NonNegativeInt
+from fedsira.domain.records import (
+    FeatureName,
+    FiniteFloat,
+    FrozenDomainModel,
+    NonNegativeFloat,
+    NonNegativeInt,
+)
+
+FeatureVector = tuple[FiniteFloat, ...]
+FeatureMatrix = tuple[FeatureVector, ...]
 
 
-class NumericRow(Protocol):
-    def __iter__(self) -> Iterator[float]: ...
-
-
-FeatureStatisticRow = tuple[float, float, float]
+class FeatureStatistic(FrozenDomainModel):
+    count: NonNegativeInt
+    total: FiniteFloat
+    total_squared: NonNegativeFloat
 
 
 class FeatureMoments(FrozenDomainModel):
@@ -34,49 +41,52 @@ class FeatureMoments(FrozenDomainModel):
 
 def accumulate_feature_statistics(
     feature_names: tuple[FeatureName, ...],
-    feature_matrix: Iterable[NumericRow],
-    existing: tuple[FeatureStatisticRow, ...] | None = None,
-) -> tuple[FeatureStatisticRow, ...]:
-    counts: list[float] = []
-    sums: list[float] = []
-    sum_of_squares: list[float] = []
-    if existing is not None:
-        for count, total, total_squared in existing:
-            counts.append(count)
-            sums.append(total)
-            sum_of_squares.append(total_squared)
-    else:
-        counts = [0.0] * len(feature_names)
-        sums = [0.0] * len(feature_names)
-        sum_of_squares = [0.0] * len(feature_names)
+    feature_matrix: FeatureMatrix,
+    existing: tuple[FeatureStatistic, ...] | None = None,
+) -> tuple[FeatureStatistic, ...]:
+    if existing is not None and len(existing) != len(feature_names):
+        raise ValueError("existing statistics must match feature count")
+    counts = [statistic.count for statistic in existing] if existing is not None else [0] * len(feature_names)
+    sums = [statistic.total for statistic in existing] if existing is not None else [0.0] * len(feature_names)
+    sum_of_squares = (
+        [statistic.total_squared for statistic in existing]
+        if existing is not None
+        else [0.0] * len(feature_names)
+    )
     for row in feature_matrix:
-        for column_index, value in enumerate(row):
-            numeric_value = float(value)
-            counts[column_index] += 1.0
+        if len(row) != len(feature_names):
+            raise ValueError("feature row width does not match feature schema")
+        for column_index, numeric_value in enumerate(row):
+            counts[column_index] += 1
             sums[column_index] += numeric_value
             sum_of_squares[column_index] += numeric_value * numeric_value
     return tuple(
-        (counts[index], sums[index], sum_of_squares[index]) for index in range(len(feature_names))
+        FeatureStatistic(
+            count=counts[index],
+            total=sums[index],
+            total_squared=sum_of_squares[index],
+        )
+        for index in range(len(feature_names))
     )
 
 
 def fit_feature_moments(
     feature_names: tuple[FeatureName, ...],
-    statistics: tuple[FeatureStatisticRow, ...],
+    statistics: tuple[FeatureStatistic, ...],
     scaling_config: ScalingConfig,
 ) -> FeatureMoments:
     if len(feature_names) != len(statistics):
         raise ValueError("feature name count must match statistics count")
     means: list[FiniteFloat] = []
     standard_deviations: list[FiniteFloat] = []
-    row_count = 0
+    row_count: NonNegativeInt = 0
     for feature_index, feature_name in enumerate(feature_names):
-        count, total, total_squared = statistics[feature_index]
-        if count <= 0:
+        statistic = statistics[feature_index]
+        if statistic.count <= 0:
             raise ValueError(f"feature {feature_name} has no supported anchor-train rows")
-        row_count = int(count)
-        mean = total / count
-        variance = max(total_squared / count - mean * mean, 0.0)
+        row_count = statistic.count
+        mean = statistic.total / statistic.count
+        variance = max(statistic.total_squared / statistic.count - mean * mean, 0.0)
         standard_deviation = math.sqrt(variance)
         if standard_deviation == 0.0:
             standard_deviation = scaling_config.zero_standard_deviation_scale
@@ -91,15 +101,17 @@ def fit_feature_moments(
 
 
 def standardize_row(
-    row: NumericRow,
+    row: FeatureVector,
     moments: FeatureMoments,
     scaling_config: ScalingConfig,
-) -> tuple[FiniteFloat, ...]:
+) -> FeatureVector:
+    if len(row) != len(moments.feature_names):
+        raise ValueError("feature row width does not match fitted moments")
     standardized: list[FiniteFloat] = []
-    for column_index, value in enumerate(row):
+    for column_index, numeric_value in enumerate(row):
         mean = moments.means[column_index]
         standard_deviation = moments.standard_deviations[column_index]
-        standardized_value = (float(value) - mean) / standard_deviation
+        standardized_value = (numeric_value - mean) / standard_deviation
         standardized_value = min(
             max(standardized_value, scaling_config.clip_min), scaling_config.clip_max
         )
