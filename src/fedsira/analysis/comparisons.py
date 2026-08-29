@@ -105,7 +105,7 @@ class PairingKey(FrozenDomainModel):
     master_seed: MasterSeed
 
     @property
-    def canonical(self) -> ComparisonName:
+    def pairing_identity(self) -> ComparisonName:
         return "|".join(
             (
                 self.dataset.value,
@@ -117,7 +117,7 @@ class PairingKey(FrozenDomainModel):
 
 
 class ComparisonDefinition(FrozenDomainModel):
-    canonical_name: ComparisonName
+    comparison_name: ComparisonName
     family: ClaimFamily
     method: MethodName
     reference: MethodName
@@ -149,6 +149,14 @@ class ComparisonFamilyResult(FrozenDomainModel):
     comparisons: tuple[ComparisonResult, ...]
 
 
+class ComparisonTemplate(FrozenDomainModel):
+    metric: ComparisonMetric
+    orientation: ComparisonOrientation
+    test_kind: ComparisonTestKind
+    margin: ComparisonMargin | None = None
+    material_threshold: MaterialThreshold | None = None
+
+
 def complete_paired_seeds(
     seed_metrics: Mapping[MasterSeed, Mapping[MethodName, MetricDifference | None]],
     method: MethodName,
@@ -157,34 +165,23 @@ def complete_paired_seeds(
 ) -> tuple[MasterSeed, ...]:
     del metric
     return tuple(
-        master_seed
-        for master_seed, values in sorted(seed_metrics.items())
+        seed
+        for seed, values in sorted(seed_metrics.items())
         if values.get(method) is not None and values.get(reference) is not None
     )
 
 
-def _signed_standard_deviation(
-    values: Sequence[PairedDifference],
-) -> MetricDifference | None:
-    if len(values) < 2:
+def _effect_size(values: Sequence[PairedDifference]) -> EffectSize | None:
+    if not values:
         return None
     mean = sum(values) / len(values)
-    variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
-    return math.sqrt(variance)
-
-
-def _effect_size(differences: Sequence[PairedDifference]) -> EffectSize | None:
-    if not differences:
+    if len(values) < 2:
         return None
-    mean = sum(differences) / len(differences)
-    standard_deviation = _signed_standard_deviation(differences)
-    if standard_deviation is None or standard_deviation == 0.0:
-        if mean > 0:
-            return math.inf
-        if mean < 0:
-            return -math.inf
-        return 0.0
-    return mean / standard_deviation
+    variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
+    deviation = math.sqrt(variance)
+    if deviation == 0.0:
+        return math.inf if mean > 0 else -math.inf if mean < 0 else 0.0
+    return mean / deviation
 
 
 def evaluate_comparison(
@@ -195,12 +192,12 @@ def evaluate_comparison(
     analysis_seed: MasterSeed,
 ) -> ComparisonResult:
     del multiplicity_config
-    difference_vector = tuple(paired_differences)
-    complete_seed_count = len(difference_vector)
-    if complete_seed_count == 0:
+    differences = tuple(paired_differences)
+    count = len(differences)
+    if count == 0:
         return ComparisonResult(
             definition=definition,
-            paired_differences=difference_vector,
+            paired_differences=(),
             complete_seed_count=0,
             mean_paired_difference=None,
             median_paired_difference=None,
@@ -211,37 +208,31 @@ def evaluate_comparison(
             materiality_passes=None,
             comparison_state=ComparisonState.UNDEFINED,
         )
-    mean_difference = sum(difference_vector) / complete_seed_count
-    sorted_differences = sorted(difference_vector)
-    if complete_seed_count % 2 == 1:
-        median_difference = sorted_differences[complete_seed_count // 2]
-    else:
-        median_difference = (
-            sorted_differences[complete_seed_count // 2 - 1]
-            + sorted_differences[complete_seed_count // 2]
-        ) / 2
-    standardized_effect = _effect_size(difference_vector)
-    confidence_interval = bootstrap_percentile_confidence_interval(
-        difference_vector, bootstrap_config, analysis_seed
+    mean = sum(differences) / count
+    ordered = sorted(differences)
+    middle = count // 2
+    median = ordered[middle] if count % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    interval = bootstrap_percentile_confidence_interval(
+        differences, bootstrap_config, analysis_seed
     )
     if definition.test_kind is ComparisonTestKind.SUPERIORITY:
-        raw_p_value = exact_sign_flip_two_sided_p_value(difference_vector)
+        raw_p = exact_sign_flip_two_sided_p_value(differences)
     else:
         if definition.margin is None:
             raise ValueError(
-                f"non-inferiority comparison {definition.canonical_name} requires a margin"
+                f"non-inferiority comparison {definition.comparison_name} requires a margin"
             )
-        raw_p_value = exact_sign_flip_non_inferiority_p_value(difference_vector, definition.margin)
+        raw_p = exact_sign_flip_non_inferiority_p_value(differences, definition.margin)
     return ComparisonResult(
         definition=definition,
-        paired_differences=difference_vector,
-        complete_seed_count=complete_seed_count,
-        mean_paired_difference=mean_difference,
-        median_paired_difference=median_difference,
-        paired_standardized_effect=standardized_effect,
-        raw_p_value=raw_p_value,
-        adjusted_p_value=raw_p_value,
-        confidence_interval=confidence_interval,
+        paired_differences=differences,
+        complete_seed_count=count,
+        mean_paired_difference=mean,
+        median_paired_difference=median,
+        paired_standardized_effect=_effect_size(differences),
+        raw_p_value=raw_p,
+        adjusted_p_value=raw_p,
+        confidence_interval=interval,
         materiality_passes=None,
         comparison_state=ComparisonState.PENDING,
     )
@@ -252,92 +243,112 @@ def apply_holm_adjustment(
     multiplicity_config: MultiplicityConfig,
 ) -> ComparisonFamilyResult:
     raw_values = tuple(
-        (result.definition.canonical_name, result.raw_p_value)
+        (result.definition.comparison_name, result.raw_p_value)
         for result in family_result.comparisons
         if result.raw_p_value is not None
     )
-    adjusted_by_name = dict(holm_adjusted_p_values(raw_values))
-    updated_comparisons: list[ComparisonResult] = []
+    adjusted = dict(holm_adjusted_p_values(raw_values))
+    results: list[ComparisonResult] = []
     for result in family_result.comparisons:
-        adjusted_p_value = adjusted_by_name.get(result.definition.canonical_name)
-        if adjusted_p_value is None:
-            updated_comparisons.append(result)
+        p_value = adjusted.get(result.definition.comparison_name)
+        if p_value is None:
+            results.append(result)
             continue
-        if result.definition.material_threshold is None or result.mean_paired_difference is None:
-            materiality_passes = None
-        else:
-            materiality_passes = (
-                abs(result.mean_paired_difference) >= result.definition.material_threshold
-            )
-        statistical_pass = adjusted_p_value < multiplicity_config.family_wise_alpha
-        materiality_pass = materiality_passes is not False
-        comparison_state = (
-            ComparisonState.PASSED
-            if statistical_pass and materiality_pass
-            else ComparisonState.FAILED
-        )
-        updated_comparisons.append(
+        threshold = result.definition.material_threshold
+        effect = result.mean_paired_difference
+        materiality_passes = None if threshold is None or effect is None else abs(effect) >= threshold
+        passed = p_value < multiplicity_config.family_wise_alpha and materiality_passes is not False
+        results.append(
             result.model_copy(
                 update={
-                    "adjusted_p_value": adjusted_p_value,
+                    "adjusted_p_value": p_value,
                     "materiality_passes": materiality_passes,
-                    "comparison_state": comparison_state,
+                    "comparison_state": ComparisonState.PASSED if passed else ComparisonState.FAILED,
                 }
             )
         )
-    return ComparisonFamilyResult(
-        family=family_result.family,
-        comparisons=tuple(updated_comparisons),
-    )
+    return ComparisonFamilyResult(family=family_result.family, comparisons=tuple(results))
 
 
-def comparison_canonical_name(
+def build_comparison_name(
     family: ClaimFamily,
     experiment: ExperimentName,
-    scientific_scenario: ScenarioName,
+    scenario: ScenarioName,
     method: MethodName,
     reference: MethodName,
     metric: ComparisonMetric,
     test_kind: ComparisonTestKind,
 ) -> ComparisonName:
     return (
-        f"{family.value}|{experiment}|{scientific_scenario}|"
-        f"{method}__vs__{reference}|{metric.value}|{test_kind.value}"
+        f"{family.value}|{experiment}|{scenario}|{method}__vs__{reference}|"
+        f"{metric.value}|{test_kind.value}"
     )
 
 
 def _definition(
     family: ClaimFamily,
     experiment: ExperimentName,
-    scientific_scenario: ScenarioName,
+    scenario: ScenarioName,
     method: MethodName,
     reference: MethodName,
-    metric: ComparisonMetric,
-    orientation: ComparisonOrientation,
-    test_kind: ComparisonTestKind,
-    margin: ComparisonMargin | None = None,
-    material_threshold: MaterialThreshold | None = None,
+    template: ComparisonTemplate,
 ) -> ComparisonDefinition:
     return ComparisonDefinition(
-        canonical_name=comparison_canonical_name(
-            family,
-            experiment,
-            scientific_scenario,
-            method,
-            reference,
-            metric,
-            test_kind,
+        comparison_name=build_comparison_name(
+            family, experiment, scenario, method, reference, template.metric, template.test_kind
         ),
         family=family,
         method=method,
         reference=reference,
         experiment=experiment,
-        scientific_scenario=scientific_scenario,
+        scientific_scenario=scenario,
+        metric=template.metric,
+        orientation=template.orientation,
+        test_kind=template.test_kind,
+        margin=template.margin,
+        material_threshold=template.material_threshold,
+    )
+
+
+def _superiority(
+    metric: ComparisonMetric,
+    orientation: ComparisonOrientation,
+    threshold: MaterialThreshold | None = None,
+) -> ComparisonTemplate:
+    return ComparisonTemplate(
         metric=metric,
         orientation=orientation,
-        test_kind=test_kind,
+        test_kind=ComparisonTestKind.SUPERIORITY,
+        material_threshold=threshold,
+    )
+
+
+def _non_inferiority(
+    metric: ComparisonMetric,
+    orientation: ComparisonOrientation,
+    margin: ComparisonMargin,
+) -> ComparisonTemplate:
+    return ComparisonTemplate(
+        metric=metric,
+        orientation=orientation,
+        test_kind=ComparisonTestKind.NON_INFERIORITY,
         margin=margin,
-        material_threshold=material_threshold,
+    )
+
+
+def _matrix(
+    family: ClaimFamily,
+    experiment: ExperimentName,
+    scenarios: Sequence[ScenarioName],
+    method: MethodName,
+    references: Sequence[MethodName],
+    templates: Sequence[ComparisonTemplate],
+) -> tuple[ComparisonDefinition, ...]:
+    return tuple(
+        _definition(family, experiment, scenario, method, reference, template)
+        for reference in references
+        for scenario in scenarios
+        for template in templates
     )
 
 
@@ -348,239 +359,134 @@ PRIMARY_SCENARIOS: tuple[ScenarioName, ...] = (
 )
 
 
-def _proposal_screen_comparisons(
-    materiality: MaterialityConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _proposal_screen_comparisons(materiality: MaterialityConfig) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
     method = OpeningMode.PROPOSAL_ASSISTED.value
     reference = OpeningMode.CANDIDATE_FREE.value
-    return (
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
-            method,
-            reference,
-            ComparisonMetric.FALSE_LAUNCH,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.false_launch_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
-            method,
-            reference,
-            ComparisonMetric.FALSE_LAUNCH,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.false_launch_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
-            method,
-            reference,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.reproduction_attempt_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
-            method,
-            reference,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.reproduction_attempt_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
-            method,
-            reference,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.reproduction_attempt_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
-            method,
-            reference,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.reproduction_attempt_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
-            method,
-            reference,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.post_evidence_overhead_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
-            method,
-            reference,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.post_evidence_overhead_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
-            method,
-            reference,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.post_evidence_overhead_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
-            method,
-            reference,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.post_evidence_overhead_relative_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
-            method,
-            reference,
-            ComparisonMetric.LEGITIMATE_ADMISSION,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.legitimate_admission_noninferiority_margin,
-        ),
-        _definition(
-            family,
-            experiment,
-            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
-            method,
-            reference,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.supported_macro_f1_noninferiority_margin,
-        ),
+    false_launch = _superiority(
+        ComparisonMetric.FALSE_LAUNCH,
+        ComparisonOrientation.LOWER_IS_BETTER,
+        materiality.false_launch_reduction_minimum,
     )
+    attempts = _superiority(
+        ComparisonMetric.REPRODUCTION_ATTEMPTS,
+        ComparisonOrientation.LOWER_IS_BETTER,
+        materiality.reproduction_attempt_relative_reduction_minimum,
+    )
+    overhead = _superiority(
+        ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+        ComparisonOrientation.LOWER_IS_BETTER,
+        materiality.post_evidence_overhead_relative_reduction_minimum,
+    )
+    definitions = [
+        _definition(
+            family,
+            experiment,
+            scenario,
+            method,
+            reference,
+            false_launch,
+        )
+        for scenario in (
+            ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
+            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
+        )
+    ]
+    for template in (attempts, overhead):
+        definitions.extend(
+            _definition(family, experiment, scenario, method, reference, template)
+            for scenario in (
+                ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
+                ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
+                ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT.value,
+                ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+            )
+        )
+    definitions.extend(
+        (
+            _definition(
+                family,
+                experiment,
+                ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
+                method,
+                reference,
+                _non_inferiority(
+                    ComparisonMetric.LEGITIMATE_ADMISSION,
+                    ComparisonOrientation.HIGHER_IS_BETTER,
+                    materiality.legitimate_admission_noninferiority_margin,
+                ),
+            ),
+            _definition(
+                family,
+                experiment,
+                ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+                method,
+                reference,
+                _non_inferiority(
+                    ComparisonMetric.MALICIOUS_ADMISSION,
+                    ComparisonOrientation.LOWER_IS_BETTER,
+                    materiality.supported_macro_f1_noninferiority_margin,
+                ),
+            ),
+        )
+    )
+    return tuple(definitions)
 
 
 def _plurality_comparisons(materiality: MaterialityConfig) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.PLURALITY_NECESSITY
-    experiment = SINGLE_REPRODUCTION_NECESSITY_NAME
-    method = CoreMethodIdentity.FULL_PLURALITY_PATH.value
-    reference = BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value
-    conditions = (
-        PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
-        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
-    )
-    return tuple(
-        _definition(
-            family,
-            experiment,
-            condition,
-            method,
-            reference,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.malicious_admission_reduction_minimum,
-        )
-        for condition in conditions
-    ) + tuple(
-        _definition(
-            family,
-            experiment,
-            condition,
-            method,
-            reference,
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.worst_domain_target_f1_gain_minimum,
-        )
-        for condition in conditions
+    return _matrix(
+        ClaimFamily.PLURALITY_NECESSITY,
+        SINGLE_REPRODUCTION_NECESSITY_NAME,
+        (
+            PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+            PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+        ),
+        CoreMethodIdentity.FULL_PLURALITY_PATH.value,
+        (BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,),
+        (
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+            _superiority(
+                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.worst_domain_target_f1_gain_minimum,
+            ),
+        ),
     )
 
 
-def _source_exclusion_comparisons(
-    materiality: MaterialityConfig,
-) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
-    experiment = SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
-    scenario = PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value
-    method = SourceExclusionMethod.FULL_FEDSIRA.value
-    reference = BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value
-    return (
-        _definition(
-            family,
-            experiment,
-            scenario,
-            method,
-            reference,
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.source_exclusion_asr_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            scenario,
-            method,
-            reference,
-            ComparisonMetric.TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.supported_macro_f1_noninferiority_margin,
-        ),
-        _definition(
-            family,
-            experiment,
-            scenario,
-            method,
-            reference,
-            ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.supported_macro_f1_noninferiority_margin,
-        ),
-        _definition(
-            family,
-            experiment,
-            scenario,
-            method,
-            reference,
-            ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.benign_false_alarm_rate_noninferiority_margin,
+def _source_exclusion_comparisons(materiality: MaterialityConfig) -> tuple[ComparisonDefinition, ...]:
+    return _matrix(
+        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+        SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
+        SourceExclusionMethod.FULL_FEDSIRA.value,
+        (BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,),
+        (
+            _superiority(
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.source_exclusion_asr_reduction_minimum,
+            ),
+            _non_inferiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.supported_macro_f1_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.supported_macro_f1_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.benign_false_alarm_rate_noninferiority_margin,
+            ),
         ),
     )
 
@@ -588,228 +494,156 @@ def _source_exclusion_comparisons(
 def _external_verification_comparisons(
     materiality: MaterialityConfig,
 ) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY
-    experiment = EXTERNAL_VERIFICATION_NECESSITY_NAME
-    method = SourceExclusionMethod.FULL_FEDSIRA.value
-    reference = BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
-    conditions = (
-        PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
-        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
-        ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER.value,
-    )
-    return tuple(
-        _definition(
-            family,
-            experiment,
-            condition,
-            method,
-            reference,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.malicious_admission_reduction_minimum,
-        )
-        for condition in conditions
-    ) + tuple(
-        _definition(
-            family,
-            experiment,
-            condition,
-            method,
-            reference,
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.worst_domain_target_f1_gain_minimum,
-        )
-        for condition in conditions
+    return _matrix(
+        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+        EXTERNAL_VERIFICATION_NECESSITY_NAME,
+        (
+            PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+            PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+            ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER.value,
+        ),
+        SourceExclusionMethod.FULL_FEDSIRA.value,
+        (BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,),
+        (
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+            _superiority(
+                ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.worst_domain_target_f1_gain_minimum,
+            ),
+        ),
     )
 
 
-def _primary_baseline_comparisons(
-    materiality: MaterialityConfig,
-) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.PRIMARY_BASELINE_SUPERIORITY
-    experiment = PRIMARY_CONFIRMATORY_EVALUATION_NAME
-    method = CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value
-    comparators = (
-        BaselineIdentity.FEDAVG_REFERENCE.value,
-        BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
-        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-        BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
-        BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
-        BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value,
-        BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
-        BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
-        BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
-        BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+def _primary_baseline_comparisons(materiality: MaterialityConfig) -> tuple[ComparisonDefinition, ...]:
+    comparators = tuple(
+        item.value
+        for item in (
+            BaselineIdentity.FEDAVG_REFERENCE,
+            BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION,
+            BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
+            BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+            BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
+            BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION,
+            BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
+            BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
+            BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
+            BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION,
+            BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
+            BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
+        )
     )
-    definitions: list[ComparisonDefinition] = []
-    for comparator in comparators:
-        for scenario in PRIMARY_SCENARIOS:
-            definitions.extend(
-                (
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.TARGET_F1,
-                        ComparisonOrientation.HIGHER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.target_f1_gain_minimum,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.LEGITIMATE_ADMISSION,
-                        ComparisonOrientation.HIGHER_IS_BETTER,
-                        ComparisonTestKind.NON_INFERIORITY,
-                        margin=materiality.legitimate_admission_noninferiority_margin,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.NON_INFERIORITY,
-                        margin=materiality.supported_macro_f1_noninferiority_margin,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.NON_INFERIORITY,
-                        margin=materiality.benign_false_alarm_rate_noninferiority_margin,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.MALICIOUS_ADMISSION,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.malicious_admission_reduction_minimum,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.ATTACK_SUCCESS_RATE,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.source_exclusion_asr_reduction_minimum,
-                    ),
-                )
-            )
-    return tuple(definitions)
+    return _matrix(
+        ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
+        PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        PRIMARY_SCENARIOS,
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+        comparators,
+        (
+            _superiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.target_f1_gain_minimum,
+            ),
+            _non_inferiority(
+                ComparisonMetric.LEGITIMATE_ADMISSION,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.legitimate_admission_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.supported_macro_f1_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.benign_false_alarm_rate_noninferiority_margin,
+            ),
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+            _superiority(
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.source_exclusion_asr_reduction_minimum,
+            ),
+        ),
+    )
 
 
 def _reproducer_robustness_comparisons(
     materiality: MaterialityConfig,
 ) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.REPRODUCER_ROBUSTNESS
-    experiment = COMPROMISED_REPRODUCER_ROBUSTNESS_NAME
-    method = CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value
-    comparators = (
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
-    )
-    conditions = (
-        ReproducerCondition.ONE_SOURCE_COPY.value,
-        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value,
-        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR.value,
-        ReproducerCondition.TWO_SOURCE_COPIES.value,
-        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS.value,
-        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS.value,
-    )
-    definitions: list[ComparisonDefinition] = []
-    for comparator in comparators:
-        for condition in conditions:
-            definitions.extend(
-                (
-                    _definition(
-                        family,
-                        experiment,
-                        condition,
-                        method,
-                        comparator,
-                        ComparisonMetric.MALICIOUS_ADMISSION,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.malicious_admission_reduction_minimum,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        condition,
-                        method,
-                        comparator,
-                        ComparisonMetric.TARGET_F1,
-                        ComparisonOrientation.HIGHER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.target_f1_gain_minimum,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        condition,
-                        method,
-                        comparator,
-                        ComparisonMetric.ATTACK_SUCCESS_RATE,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.SUPERIORITY,
-                        material_threshold=materiality.source_exclusion_asr_reduction_minimum,
-                    ),
-                )
-            )
-    for comparator in comparators:
-        definitions.extend(
-            (
-                _definition(
-                    family,
-                    experiment,
-                    ReproducerCondition.CLEAN.value,
-                    method,
-                    comparator,
-                    ComparisonMetric.LEGITIMATE_ADMISSION,
-                    ComparisonOrientation.HIGHER_IS_BETTER,
-                    ComparisonTestKind.NON_INFERIORITY,
-                    margin=materiality.legitimate_admission_noninferiority_margin,
-                ),
-                _definition(
-                    family,
-                    experiment,
-                    ReproducerCondition.CLEAN.value,
-                    method,
-                    comparator,
-                    ComparisonMetric.TARGET_F1,
-                    ComparisonOrientation.HIGHER_IS_BETTER,
-                    ComparisonTestKind.NON_INFERIORITY,
-                    margin=materiality.supported_macro_f1_noninferiority_margin,
-                ),
-            )
+    references = tuple(
+        item.value
+        for item in (
+            BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+            BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
         )
-    return tuple(definitions)
+    )
+    adversarial = _matrix(
+        ClaimFamily.REPRODUCER_ROBUSTNESS,
+        COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+        tuple(
+            item.value
+            for item in (
+                ReproducerCondition.ONE_SOURCE_COPY,
+                ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+                ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+                ReproducerCondition.TWO_SOURCE_COPIES,
+                ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+                ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+            )
+        ),
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+        references,
+        (
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+            _superiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.target_f1_gain_minimum,
+            ),
+            _superiority(
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.source_exclusion_asr_reduction_minimum,
+            ),
+        ),
+    )
+    clean = _matrix(
+        ClaimFamily.REPRODUCER_ROBUSTNESS,
+        COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+        (ReproducerCondition.CLEAN.value,),
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+        references,
+        (
+            _non_inferiority(
+                ComparisonMetric.LEGITIMATE_ADMISSION,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.legitimate_admission_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.supported_macro_f1_noninferiority_margin,
+            ),
+        ),
+    )
+    return (*adversarial, *clean)
 
 
 def _verifier_robustness_comparisons(
@@ -817,51 +651,50 @@ def _verifier_robustness_comparisons(
 ) -> tuple[ComparisonDefinition, ...]:
     family = ClaimFamily.VERIFIER_ROBUSTNESS
     experiment = COMPROMISED_VERIFIER_ROBUSTNESS_NAME
-    return (
+    cases = (
+        (
+            VerifierCondition.ONE_FALSE_POSITIVE,
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+        ),
+        (
+            VerifierCondition.TWO_FALSE_POSITIVES,
+            _superiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.malicious_admission_reduction_minimum,
+            ),
+        ),
+        (
+            VerifierCondition.ONE_FALSE_NEGATIVE,
+            _non_inferiority(
+                ComparisonMetric.LEGITIMATE_ADMISSION,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.legitimate_admission_noninferiority_margin,
+            ),
+        ),
+        (
+            VerifierCondition.TWO_FALSE_NEGATIVES,
+            _non_inferiority(
+                ComparisonMetric.LEGITIMATE_ADMISSION,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.legitimate_admission_noninferiority_margin,
+            ),
+        ),
+    )
+    return tuple(
         _definition(
             family,
             experiment,
-            VerifierCondition.ONE_FALSE_POSITIVE.value,
-            VerifierCondition.ONE_FALSE_POSITIVE.value,
+            condition.value,
+            condition.value,
             VerifierCondition.ALL_HONEST.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.malicious_admission_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            VerifierCondition.TWO_FALSE_POSITIVES.value,
-            VerifierCondition.TWO_FALSE_POSITIVES.value,
-            VerifierCondition.ALL_HONEST.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=materiality.malicious_admission_reduction_minimum,
-        ),
-        _definition(
-            family,
-            experiment,
-            VerifierCondition.ONE_FALSE_NEGATIVE.value,
-            VerifierCondition.ONE_FALSE_NEGATIVE.value,
-            VerifierCondition.ALL_HONEST.value,
-            ComparisonMetric.LEGITIMATE_ADMISSION,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.legitimate_admission_noninferiority_margin,
-        ),
-        _definition(
-            family,
-            experiment,
-            VerifierCondition.TWO_FALSE_NEGATIVES.value,
-            VerifierCondition.TWO_FALSE_NEGATIVES.value,
-            VerifierCondition.ALL_HONEST.value,
-            ComparisonMetric.LEGITIMATE_ADMISSION,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-            ComparisonTestKind.NON_INFERIORITY,
-            margin=materiality.legitimate_admission_noninferiority_margin,
-        ),
+            template,
+        )
+        for condition, template in cases
     )
 
 
@@ -869,121 +702,47 @@ def _ablation_comparisons(
     materiality: MaterialityConfig,
     capability_granularity_minimum: CapabilityCertificationRate,
 ) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.MECHANISM_ABLATION
-    experiment = MECHANISM_ABLATION_NAME
-    scenario = ExperimentClass.ABLATION.value
+    thresholds = {
+        ComparisonMetric.ATTACK_SUCCESS_RATE: materiality.source_exclusion_asr_reduction_minimum,
+        ComparisonMetric.MALICIOUS_ADMISSION: materiality.malicious_admission_reduction_minimum,
+        ComparisonMetric.WORST_DOMAIN_TARGET_F1: materiality.worst_domain_target_f1_gain_minimum,
+        ComparisonMetric.FALSE_LAUNCH: materiality.false_launch_reduction_minimum,
+        ComparisonMetric.REPRODUCTION_ATTEMPTS: materiality.reproduction_attempt_relative_reduction_minimum,
+        ComparisonMetric.POST_EVIDENCE_OVERHEAD: materiality.post_evidence_overhead_relative_reduction_minimum,
+        ComparisonMetric.LEGITIMATE_ADMISSION: materiality.legitimate_admission_noninferiority_margin,
+        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE: capability_granularity_minimum,
+    }
     variants = (
-        (
-            AblationVariant.NO_PROPOSAL_SCREEN.value,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
-            ComparisonMetric.FALSE_LAUNCH,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.NO_MATCHED_CONTROL.value,
-            ComparisonMetric.FALSE_LAUNCH,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value,
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value,
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.ONE_INDEPENDENT_REPRODUCTION.value,
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        ),
-        (
-            AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY.value,
-            ComparisonMetric.LEGITIMATE_ADMISSION,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        ),
-        (
-            AblationVariant.NO_ORIGIN_EXCLUSION.value,
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value,
-            ComparisonMetric.LEGITIMATE_ADMISSION,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        ),
-        (
-            AblationVariant.CANDIDATE_FREE_REPRODUCTION.value,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.DIRECT_KRUM_OF_RETRAINS.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.RANDOM_COMMITTEE_PROFILE.value,
-            ComparisonMetric.MALICIOUS_ADMISSION,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.NO_FINAL_SYNTHESIS_GATE.value,
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        ),
-        (
-            AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE.value,
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            ComparisonOrientation.LOWER_IS_BETTER,
-        ),
-        (
-            AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value,
-            ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
-            ComparisonOrientation.HIGHER_IS_BETTER,
-        ),
+        (AblationVariant.NO_PROPOSAL_SCREEN, ComparisonMetric.REPRODUCTION_ATTEMPTS, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.RAW_TARGET_F1_SCREEN_ONLY, ComparisonMetric.FALSE_LAUNCH, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.NO_MATCHED_CONTROL, ComparisonMetric.FALSE_LAUNCH, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW, ComparisonMetric.ATTACK_SUCCESS_RATE, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK, ComparisonMetric.ATTACK_SUCCESS_RATE, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.ONE_INDEPENDENT_REPRODUCTION, ComparisonMetric.WORST_DOMAIN_TARGET_F1, ComparisonOrientation.HIGHER_IS_BETTER),
+        (AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION, ComparisonMetric.MALICIOUS_ADMISSION, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY, ComparisonMetric.LEGITIMATE_ADMISSION, ComparisonOrientation.HIGHER_IS_BETTER),
+        (AblationVariant.NO_ORIGIN_EXCLUSION, ComparisonMetric.ATTACK_SUCCESS_RATE, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION, ComparisonMetric.LEGITIMATE_ADMISSION, ComparisonOrientation.HIGHER_IS_BETTER),
+        (AblationVariant.CANDIDATE_FREE_REPRODUCTION, ComparisonMetric.POST_EVIDENCE_OVERHEAD, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.DIRECT_KRUM_OF_RETRAINS, ComparisonMetric.MALICIOUS_ADMISSION, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.GENERIC_THREE_ROW_THRESHOLD, ComparisonMetric.MALICIOUS_ADMISSION, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.RANDOM_COMMITTEE_PROFILE, ComparisonMetric.MALICIOUS_ADMISSION, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.NO_FINAL_SYNTHESIS_GATE, ComparisonMetric.WORST_DOMAIN_TARGET_F1, ComparisonOrientation.HIGHER_IS_BETTER),
+        (AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE, ComparisonMetric.ATTACK_SUCCESS_RATE, ComparisonOrientation.LOWER_IS_BETTER),
+        (AblationVariant.CAPABILITY_CONTRACT_GRANULARITY, ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, ComparisonOrientation.HIGHER_IS_BETTER),
     )
-
-    def ablation_threshold(metric: ComparisonMetric) -> MaterialThreshold:
-        thresholds = {
-            ComparisonMetric.ATTACK_SUCCESS_RATE: materiality.source_exclusion_asr_reduction_minimum,
-            ComparisonMetric.MALICIOUS_ADMISSION: materiality.malicious_admission_reduction_minimum,
-            ComparisonMetric.WORST_DOMAIN_TARGET_F1: materiality.worst_domain_target_f1_gain_minimum,
-            ComparisonMetric.FALSE_LAUNCH: materiality.false_launch_reduction_minimum,
-            ComparisonMetric.REPRODUCTION_ATTEMPTS: materiality.reproduction_attempt_relative_reduction_minimum,
-            ComparisonMetric.POST_EVIDENCE_OVERHEAD: materiality.post_evidence_overhead_relative_reduction_minimum,
-            ComparisonMetric.LEGITIMATE_ADMISSION: materiality.legitimate_admission_noninferiority_margin,
-            ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE: capability_granularity_minimum,
-        }
-        return thresholds.get(metric, materiality.target_f1_gain_minimum)
-
     return tuple(
         _definition(
-            family,
-            experiment,
-            scenario,
-            variant,
+            ClaimFamily.MECHANISM_ABLATION,
+            MECHANISM_ABLATION_NAME,
+            ExperimentClass.ABLATION.value,
+            variant.value,
             SourceExclusionMethod.FULL_FEDSIRA.value,
-            metric,
-            orientation,
-            ComparisonTestKind.SUPERIORITY,
-            material_threshold=ablation_threshold(metric),
+            _superiority(
+                metric,
+                orientation,
+                thresholds.get(metric, materiality.target_f1_gain_minimum),
+            ),
         )
         for variant, metric, orientation in variants
     )
@@ -992,52 +751,40 @@ def _ablation_comparisons(
 def _heterogeneity_boundary_comparisons(
     materiality: MaterialityConfig,
 ) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY
     definitions: list[ComparisonDefinition] = []
+    family = ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY
     for regime in (
-        HeterogeneityRegime.QUANTITY_SKEW.value,
-        HeterogeneityRegime.FEATURE_SHIFT_0_5.value,
-        HeterogeneityRegime.FEATURE_SHIFT_1_0.value,
+        HeterogeneityRegime.QUANTITY_SKEW,
+        HeterogeneityRegime.FEATURE_SHIFT_0_5,
+        HeterogeneityRegime.FEATURE_SHIFT_1_0,
     ):
-        definitions.extend(
-            (
+        for metric in (
+            ComparisonMetric.LEGITIMATE_ADMISSION,
+            ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+        ):
+            definitions.append(
                 _definition(
                     family,
                     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-                    regime,
-                    regime,
+                    regime.value,
+                    regime.value,
                     HeterogeneityRegime.NATURAL.value,
-                    ComparisonMetric.LEGITIMATE_ADMISSION,
-                    ComparisonOrientation.HIGHER_IS_BETTER,
-                    ComparisonTestKind.SUPERIORITY,
-                ),
-                _definition(
-                    family,
-                    HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-                    regime,
-                    regime,
-                    HeterogeneityRegime.NATURAL.value,
-                    ComparisonMetric.WORST_DOMAIN_TARGET_F1,
-                    ComparisonOrientation.HIGHER_IS_BETTER,
-                    ComparisonTestKind.SUPERIORITY,
-                ),
+                    _superiority(metric, ComparisonOrientation.HIGHER_IS_BETTER),
+                )
             )
-        )
-    for mixture in (
-        RootCauseMixture.BALANCED_50_50.value,
-        RootCauseMixture.A_DOMINANT_80_20.value,
-    ):
+    for mixture in (RootCauseMixture.BALANCED_50_50, RootCauseMixture.A_DOMINANT_80_20):
         definitions.append(
             _definition(
                 family,
                 CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-                mixture,
+                mixture.value,
                 CapabilityContractScope.BROAD_TARGET_ONLY.value,
                 CoreMethodIdentity.ZERO_REFERENCE.value,
-                ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
-                ComparisonOrientation.HIGHER_IS_BETTER,
-                ComparisonTestKind.SUPERIORITY,
-                material_threshold=materiality.malicious_admission_reduction_minimum,
+                _superiority(
+                    ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
+                    ComparisonOrientation.HIGHER_IS_BETTER,
+                    materiality.malicious_admission_reduction_minimum,
+                ),
             )
         )
     return tuple(definitions)
@@ -1046,47 +793,31 @@ def _heterogeneity_boundary_comparisons(
 def _secondary_generalization_comparisons(
     materiality: MaterialityConfig,
 ) -> tuple[ComparisonDefinition, ...]:
-    family = ClaimFamily.SECONDARY_GENERALIZATION
-    experiment = SECONDARY_DATASET_GENERALIZATION_NAME
-    method = CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value
-    comparators = (
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+    return _matrix(
+        ClaimFamily.SECONDARY_GENERALIZATION,
+        SECONDARY_DATASET_GENERALIZATION_NAME,
+        (
+            SecondaryScenario.LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY.value,
+            SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+        ),
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+        (
+            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ),
+        (
+            _non_inferiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.supported_macro_f1_noninferiority_margin,
+            ),
+            _non_inferiority(
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                ComparisonOrientation.LOWER_IS_BETTER,
+                materiality.legitimate_admission_noninferiority_margin,
+            ),
+        ),
     )
-    scenarios = (
-        SecondaryScenario.LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY.value,
-        SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
-    )
-    definitions: list[ComparisonDefinition] = []
-    for comparator in comparators:
-        for scenario in scenarios:
-            definitions.extend(
-                (
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.TARGET_F1,
-                        ComparisonOrientation.HIGHER_IS_BETTER,
-                        ComparisonTestKind.NON_INFERIORITY,
-                        margin=materiality.supported_macro_f1_noninferiority_margin,
-                    ),
-                    _definition(
-                        family,
-                        experiment,
-                        scenario,
-                        method,
-                        comparator,
-                        ComparisonMetric.MALICIOUS_ADMISSION,
-                        ComparisonOrientation.LOWER_IS_BETTER,
-                        ComparisonTestKind.NON_INFERIORITY,
-                        margin=materiality.legitimate_admission_noninferiority_margin,
-                    ),
-                )
-            )
-    return tuple(definitions)
 
 
 def build_comparison_registry(
