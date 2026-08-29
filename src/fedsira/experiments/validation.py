@@ -14,7 +14,7 @@ from fedsira.config.schema import ScientificConfig, TestFixtureConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.domain.enums import CellPhaseState, ExperimentLifecycleState, ScientificCellPhase
+from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.domain.records import (
     BooleanValue,
     ExperimentName,
@@ -59,9 +59,12 @@ REQUIRED_CELL_PHASES: frozenset[ScientificCellPhase] = frozenset(
         ScientificCellPhase.STATISTICAL_ANALYSIS,
     )
 )
-
-TERMINAL_CELL_STATES: frozenset[CellPhaseState] = frozenset(
-    (CellPhaseState.COMPLETED, CellPhaseState.FAILED, CellPhaseState.INVALID)
+TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
+    (
+        ExperimentLifecycleState.COMPLETED,
+        ExperimentLifecycleState.FAILED,
+        ExperimentLifecycleState.INVALID,
+    )
 )
 
 
@@ -188,7 +191,10 @@ def validate_cell_phase_sequence(phases: tuple[ScientificCellPhase, ...]) -> Non
             raise ValueError(f"unknown scientific cell phase {phase.value}")
 
 
-def validate_cell_terminal_record(cell: ScientificCell, terminal_state: CellPhaseState) -> None:
+def validate_cell_terminal_record(
+    cell: ScientificCell,
+    terminal_state: ExperimentLifecycleState,
+) -> None:
     if terminal_state not in TERMINAL_CELL_STATES:
         raise ValueError(
             f"cell {cell.semantic_key} terminal state {terminal_state.value} is not terminal"
@@ -199,7 +205,6 @@ def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
     role_intervals = config.datasets.primary.role_intervals
     sampling_caps = config.datasets.primary.sampling_caps_per_domain
     stream_row_count = sampling_caps.reproduction_target
-
     assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256="a" * 64,
         domain_hash_token="DANMINI_DOORBELL",
@@ -213,7 +218,6 @@ def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
     no_target_in_anchor = (
         Role.ANCHOR_TRAIN not in roles_seen and Role.ANCHOR_VALIDATION not in roles_seen
     )
-
     supported_assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256="a" * 64,
         domain_hash_token="DANMINI_DOORBELL",
@@ -225,7 +229,6 @@ def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
     )
     row_indices = tuple(assignment.original_row_index for assignment in supported_assignments)
     no_overlap = len(row_indices) == len(set(row_indices))
-
     return (
         SmokeCheckResult(name="no target sample in anchor roles", passed=no_target_in_anchor),
         SmokeCheckResult(name="no cross-role sample overlap", passed=no_overlap),
@@ -237,19 +240,16 @@ def _protocol_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ..
     honest_positive = minimum_honest_positive_count(2, 1) == 1
     krum_admissible = krum_committee_is_admissible(5, 1)
     krum_three_rejected = not krum_committee_is_admissible(3, 1)
-
     commitment_rejected = False
     try:
         validate_commitment_exists_before_verifier_assignment(None)
     except ValueError:
         commitment_rejected = True
-
     eligible_pool_size = len(NBaiotDomain) - 2
     probability = diagnostic_at_least_two_byzantine_probability(eligible_pool_size, 2, 3)
     tolerance = config.validation_tolerances.random_committee_probability_absolute
     expected_probability = 1 / eligible_pool_size
     probability_matches = abs(probability - expected_probability) < tolerance
-
     return (
         SmokeCheckResult(name="source cannot be verifier", passed=source_not_verifier),
         SmokeCheckResult(
@@ -274,7 +274,7 @@ def _mathematical_invariants(
     fixture_config: TestFixtureConfig,
 ) -> tuple[SmokeCheckResult, ...]:
     sample_count = fixture_config.sign_flip_sample_count
-    sign_flip = exact_sign_flip_two_sided_p_value([1.0] * sample_count)
+    sign_flip = exact_sign_flip_two_sided_p_value((1.0,) * sample_count)
     sign_flip_matches = sign_flip == fixture_config.sign_flip_expected_p_value
     holm = holm_adjusted_p_values(fixture_config.holm_fixture_raw_p_values)
     holm_matches = holm == fixture_config.holm_fixture_adjusted_p_values
