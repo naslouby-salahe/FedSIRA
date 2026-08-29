@@ -8,6 +8,7 @@ from fedsira.analysis.comparisons import (
     ComparisonDefinition,
     ComparisonFamilyResult,
     ComparisonReferenceKind,
+    ComparisonResult,
     ComparisonState,
 )
 from fedsira.config.schema import PublicationRoundingConfig
@@ -133,10 +134,9 @@ def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
 
 def _statistical_summary_row(
     family: ComparisonFamilyResult,
-    comparison_index: int,
+    comparison: ComparisonResult,
     rounding: PublicationRoundingConfig,
 ) -> tuple[TextValue, ...]:
-    comparison = family.comparisons[comparison_index]
     definition = comparison.definition
     effect = (
         "NA"
@@ -187,9 +187,9 @@ def render_statistical_summary_table(
     rounding: PublicationRoundingConfig,
 ) -> RenderedTable:
     rows = tuple(
-        _statistical_summary_row(family, comparison_index, rounding)
+        _statistical_summary_row(family, comparison, rounding)
         for family in comparison_results
-        for comparison_index in range(len(family.comparisons))
+        for comparison in family.comparisons
     )
     return RenderedTable(
         name="Statistical Summary",
@@ -220,10 +220,7 @@ def render_statistical_summary_table(
 def render_claim_support_table(
     claim_states: tuple[ClaimStateResult, ...],
 ) -> RenderedTable:
-    rows = tuple(
-        (state.claim_id, state.scope, state.state.value)
-        for state in claim_states
-    )
+    rows = tuple((state.claim_id, state.scope, state.state.value) for state in claim_states)
     return RenderedTable(
         name="Claim Support",
         csv_text=_csv_text(
