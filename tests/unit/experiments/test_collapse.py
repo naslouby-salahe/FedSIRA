@@ -126,12 +126,17 @@ def test_all_eight_cases_have_exact_section_18_7_mapping() -> None:
     assert len(coordinates) == 8
     full = _case(True, True, True)
     assert full.opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED
-    assert full.reproduction_row_requirement is ReproductionRowRequirement.FIVE_CERTIFIED_NON_SOURCE_ROWS
+    assert (
+        full.reproduction_row_requirement
+        is ReproductionRowRequirement.FIVE_CERTIFIED_NON_SOURCE_ROWS
+    )
     assert full.row_verification_mode is RowVerificationMode.THREE_VERIFIER_TWO_OF_THREE
     assert full.production_update_rule is ProductionUpdateRule.KRUM_CERTIFIED_ROWS
     assert _case(False, True, True).opening_mode is ClaimOpeningMode.CANDIDATE_FREE
     assert _case(True, True, False).row_verification_mode is RowVerificationMode.NONE
-    assert _case(True, True, False).production_update_rule is ProductionUpdateRule.KRUM_COMMITTED_ROWS
+    assert (
+        _case(True, True, False).production_update_rule is ProductionUpdateRule.KRUM_COMMITTED_ROWS
+    )
     assert (
         _case(True, False, True).reproduction_row_requirement
         is ReproductionRowRequirement.FIRST_FRESH_VERIFIED_NON_SOURCE_ROW

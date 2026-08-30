@@ -5,7 +5,13 @@ from torch import nn, optim
 from torch.nn import functional as torch_functional
 
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
-from fedsira.domain.records import DerivedSeed, NonNegativeFloat, PositiveInt, SampleId
+from fedsira.domain.records import (
+    DerivedSeed,
+    NonNegativeFloat,
+    PositiveFloat,
+    PositiveInt,
+    SampleId,
+)
 from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
 from fedsira.models.mlp import (
@@ -16,7 +22,7 @@ from fedsira.models.mlp import (
 
 
 def compute_stability_kl(
-    anchor_logits: torch.Tensor, current_logits: torch.Tensor, temperature: float
+    anchor_logits: torch.Tensor, current_logits: torch.Tensor, temperature: PositiveFloat
 ) -> torch.Tensor:
     anchor_probs = probabilities_for_samples(anchor_logits / temperature)
     current_log_probs = torch_functional.log_softmax(current_logits / temperature, dim=-1)
@@ -98,7 +104,7 @@ def run_post_reference_training(
     for epoch in range(local_epochs):
         batch_losses: list[NonNegativeFloat] = []
         for indices in ordered_batch_indices(
-            sample_ids, training_seed, epoch, training_config.batch_size
+            tuple(sample_ids), training_seed, epoch, training_config.batch_size
         ):
             batch_losses.append(
                 post_reference_training_step(

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from collections.abc import Sequence
 
 from fedsira.config.schema import BaselinesConfig
@@ -7,7 +8,14 @@ from fedsira.datasets.nbaiot.schema import (
     deterministic_domain_order,
 )
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import NamespaceSeed, NonNegativeInt, PositiveInt
+from fedsira.domain.records import (
+    BooleanValue,
+    ClassIndex,
+    NamespaceSeed,
+    NonNegativeInt,
+    PositiveInt,
+    Probability,
+)
 
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 
@@ -30,7 +38,7 @@ def certified_ensemble_domain_groups(
 
 
 def validate_group_without_target_member_uses_supported_only(
-    has_target_bearing_member: bool, group_target_row_count: NonNegativeInt
+    has_target_bearing_member: BooleanValue, group_target_row_count: NonNegativeInt
 ) -> None:
     if not has_target_bearing_member and group_target_row_count != 0:
         raise ValueError(
@@ -39,9 +47,9 @@ def validate_group_without_target_member_uses_supported_only(
 
 
 def ensemble_predicted_label(
-    predicted_labels: Sequence[int], softmax_probabilities: Sequence[Sequence[float]]
-) -> int:
-    counts: dict[int, int] = {}
+    predicted_labels: Sequence[ClassIndex], softmax_probabilities: Sequence[Sequence[Probability]]
+) -> ClassIndex:
+    counts: OrderedDict[ClassIndex, NonNegativeInt] = OrderedDict()
     for label in predicted_labels:
         counts[label] = counts.get(label, 0) + 1
     max_count = max(counts.values())
@@ -49,11 +57,14 @@ def ensemble_predicted_label(
         return min(label for label, count in counts.items() if count == max_count)
 
     tied_labels = sorted(set(predicted_labels))
-    mean_probability_by_label = {
-        label: sum(probabilities[label] for probabilities in softmax_probabilities)
-        / len(softmax_probabilities)
+    mean_probability_by_label: OrderedDict[ClassIndex, Probability] = OrderedDict(
+        (
+            label,
+            sum(probabilities[label] for probabilities in softmax_probabilities)
+            / len(softmax_probabilities),
+        )
         for label in tied_labels
-    }
+    )
     best_mean_probability = max(mean_probability_by_label.values())
     return min(
         label

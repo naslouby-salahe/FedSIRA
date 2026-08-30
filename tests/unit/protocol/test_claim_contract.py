@@ -97,26 +97,26 @@ def test_capability_claim_contract_passes_requires_both_gamma_and_beta() -> None
     contract = _contract()
     passing = capability_claim_contract_passes(
         contract,
-        MetricResult(contract.target_f1_minimum, 10),
-        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(contract.supported_macro_f1_drop_maximum, 10),
-        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(value=contract.target_f1_minimum, denominator=10),
+        MetricResult(value=contract.target_f1_gain_over_anchor_minimum, denominator=10),
+        MetricResult(value=contract.supported_macro_f1_drop_maximum, denominator=10),
+        MetricResult(value=contract.benign_false_alarm_rate_increase_maximum, denominator=10),
     )
     assert passing
     failing_gamma = capability_claim_contract_passes(
         contract,
-        MetricResult(contract.target_f1_minimum - 0.01, 10),
-        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(contract.supported_macro_f1_drop_maximum, 10),
-        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(value=contract.target_f1_minimum - 0.01, denominator=10),
+        MetricResult(value=contract.target_f1_gain_over_anchor_minimum, denominator=10),
+        MetricResult(value=contract.supported_macro_f1_drop_maximum, denominator=10),
+        MetricResult(value=contract.benign_false_alarm_rate_increase_maximum, denominator=10),
     )
     assert not failing_gamma
     failing_beta = capability_claim_contract_passes(
         contract,
-        MetricResult(contract.target_f1_minimum, 10),
-        MetricResult(contract.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(contract.supported_macro_f1_drop_maximum + 0.01, 10),
-        MetricResult(contract.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(value=contract.target_f1_minimum, denominator=10),
+        MetricResult(value=contract.target_f1_gain_over_anchor_minimum, denominator=10),
+        MetricResult(value=contract.supported_macro_f1_drop_maximum + 0.01, denominator=10),
+        MetricResult(value=contract.benign_false_alarm_rate_increase_maximum, denominator=10),
     )
     assert not failing_beta
 
@@ -125,10 +125,10 @@ def test_capability_claim_contract_passes_na_metric_is_not_passing() -> None:
     contract = _contract()
     assert not capability_claim_contract_passes(
         contract,
-        MetricResult(None, 0),
-        MetricResult(1.0, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=None, denominator=0),
+        MetricResult(value=1.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
     )
 
 

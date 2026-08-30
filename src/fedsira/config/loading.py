@@ -1,26 +1,32 @@
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import TypeAlias
 
 import yaml
 from pydantic import ValidationError
 
 from fedsira.config.schema import ScientificConfig, SmokeConfig, TestFixtureConfig
 from fedsira.config.validation import validate_scientific_config
+from fedsira.domain.records import TextValue
 
 PRODUCTION_CONFIG_PATH = Path("configs/fedsira.yaml")
 TEST_FIXTURE_CONFIG_PATH = Path("configs/tests.yml")
 SMOKE_CONFIG_PATH = Path("configs/smoke.yml")
 
+YamlValue: TypeAlias = (
+    "None | bool | int | float | TextValue | Sequence[YamlValue] | Mapping[TextValue, YamlValue]"
+)
 
-def _read_yaml_mapping(path: Path) -> dict[str, object]:
+
+def _read_yaml_mapping(path: Path) -> Mapping[TextValue, YamlValue]:
     try:
         with path.open(encoding="utf-8") as handle:
-            parsed: object = yaml.safe_load(handle)
+            parsed: YamlValue = yaml.safe_load(handle)
     except OSError as error:
         raise ValueError(f"cannot read configuration file {path}: {error}") from error
-    if not isinstance(parsed, dict):
+    if not isinstance(parsed, Mapping):
         raise ValueError(f"configuration file {path} must contain a YAML mapping at the top level")
-    return cast("dict[str, object]", parsed)
+    return parsed
 
 
 def load_scientific_config(path: Path = PRODUCTION_CONFIG_PATH) -> ScientificConfig:

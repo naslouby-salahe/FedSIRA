@@ -5,8 +5,18 @@ from fedsira.baselines.registry import (
 )
 
 
+def _fixture_for(identity: BaselineIdentity) -> BaselineValidationFixture:
+    for mapped_identity, fixture in BASELINE_VALIDATION_FIXTURE_MAP:
+        if mapped_identity is identity:
+            return fixture
+    raise KeyError(identity)
+
+
 def test_fixture_map_covers_every_registered_baseline_exactly_once() -> None:
-    assert set(BASELINE_VALIDATION_FIXTURE_MAP.keys()) == set(BaselineIdentity)
+    covered_identities = frozenset(
+        identity for identity, _fixture in BASELINE_VALIDATION_FIXTURE_MAP
+    )
+    assert covered_identities == set(BaselineIdentity)
     assert len(BASELINE_VALIDATION_FIXTURE_MAP) == 17
 
 
@@ -20,10 +30,7 @@ def test_ordinary_utility_references_use_legitimate_target_capability() -> None:
         BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
     )
     for identity in ordinary:
-        assert (
-            BASELINE_VALIDATION_FIXTURE_MAP[identity]
-            is BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY
-        )
+        assert _fixture_for(identity) is BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY
 
 
 def test_robust_update_filtering_references_use_model_replacement_backdoor() -> None:
@@ -35,7 +42,4 @@ def test_robust_update_filtering_references_use_model_replacement_backdoor() -> 
         BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
     )
     for identity in robust:
-        assert (
-            BASELINE_VALIDATION_FIXTURE_MAP[identity]
-            is BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
-        )
+        assert _fixture_for(identity) is BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR

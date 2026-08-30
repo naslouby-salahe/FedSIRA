@@ -39,9 +39,7 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
         ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
     )
 )
-RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
-    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,)
-)
+RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,))
 
 
 def preprocessing_root() -> Path:

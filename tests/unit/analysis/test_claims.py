@@ -3,7 +3,6 @@ from fedsira.analysis.claims import (
     ClaimEvidence,
     ClaimEvidenceRecord,
     FinalClaimState,
-    claim_by_id,
     derive_claim_states,
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -106,7 +105,3 @@ def test_authority_transition_is_not_tested_when_an_evidence_experiment_is_missi
     )
     authority = next(state for state in states if state.claim_id == "Authority Transition")
     assert authority.state is FinalClaimState.NOT_TESTED
-
-
-def test_claim_by_id_lookup() -> None:
-    assert claim_by_id("Safe Dormancy").claim_id == "Safe Dormancy"

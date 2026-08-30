@@ -71,8 +71,7 @@ def test_primary_family_contains_only_structurally_applicable_metrics() -> None:
     legitimate = tuple(
         definition
         for definition in definitions
-        if definition.scientific_scenario
-        == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value
+        if definition.scientific_scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value
     )
     malicious = tuple(
         definition
@@ -141,8 +140,7 @@ def test_shared_epistemic_comparisons_use_primary_clean_reference() -> None:
     assert definitions
     assert all(
         definition.reference_experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME
-        and definition.reference_scenario
-        == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value
+        and definition.reference_scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value
         for definition in definitions
     )
 
@@ -152,7 +150,7 @@ def test_capability_granularity_ablation_treats_false_certification_as_harm() ->
         definition
         for definition in REGISTRY
         if definition.family is ClaimFamily.MECHANISM_ABLATION
-        and definition.method is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value
+        and definition.method == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value
     )
     assert definition.metric is ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE
     assert definition.orientation is ComparisonOrientation.LOWER_IS_BETTER

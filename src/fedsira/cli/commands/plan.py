@@ -1,3 +1,4 @@
+from fedsira.domain.records import ResolvedCoreComplete, TextValue
 from fedsira.experiments.planning import (
     ExperimentPlan,
     build_plan,
@@ -9,13 +10,13 @@ from fedsira.experiments.registry import (
 )
 
 
-def resolve_plan(resolved_core_complete: bool = False) -> ExperimentPlan:
+def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> ExperimentPlan:
     plan = build_plan(resolved_core_complete=resolved_core_complete)
     validate_planned_cell_count_invariant(plan)
     return plan
 
 
-def render_plan(plan: ExperimentPlan) -> str:
+def render_plan(plan: ExperimentPlan) -> TextValue:
     lines: list[str] = []
     lines.append("FedSIRA experiment plan")
     lines.append("")

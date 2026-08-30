@@ -9,7 +9,7 @@ ENUM_BASE_NAMES = {"Enum", "StrEnum", "IntEnum"}
 def enum_class_defs(tree: ast.Module) -> list[ast.ClassDef]:
     found: list[ast.ClassDef] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.ClassDef):
+        if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             base_names = {base.id for base in node.bases if isinstance(base, ast.Name)}
             if base_names & ENUM_BASE_NAMES:
                 found.append(node)

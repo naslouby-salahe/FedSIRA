@@ -56,10 +56,12 @@ def validate_production_checkpoint_excludes_source(
 
 
 def median_domain_target_f1(domain_target_f1: Sequence[MetricResult]) -> MetricResult:
-    defined_values = sorted(result.value for result in domain_target_f1 if result.value is not None)
+    defined_values = tuple(
+        sorted(result.value for result in domain_target_f1 if result.value is not None)
+    )
     if len(defined_values) == 0:
-        return MetricResult(None, 0)
-    return MetricResult(quantile_type7(defined_values, 0.5), len(defined_values))
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=quantile_type7(defined_values, 0.5), denominator=len(defined_values))
 
 
 def final_gate_predicates_pass(

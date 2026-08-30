@@ -4,7 +4,6 @@ from fedsira.datasets.ciciot2023.schema import (
     TARGET_LABEL,
     build_class_registry,
     hash_to_pseudo_domain,
-    is_row_identifier_column,
     normalize_label,
     normalize_label_token,
 )
@@ -34,26 +33,6 @@ def test_normalize_label_preserves_target_label() -> None:
 def test_build_class_registry_orders_benign_then_target_then_lexicographic() -> None:
     registry = build_class_registry(frozenset({"ZEBRA", "APPLE", TARGET_LABEL, BENIGN_LABEL}))
     assert registry == (BENIGN_LABEL, TARGET_LABEL, "APPLE", "ZEBRA")
-
-
-def test_is_row_identifier_column_accepts_zero_based_sequence() -> None:
-    assert is_row_identifier_column("INDEX", (0, 1, 2, 3))
-
-
-def test_is_row_identifier_column_accepts_one_based_sequence() -> None:
-    assert is_row_identifier_column("ROW_ID", (1, 2, 3, 4))
-
-
-def test_is_row_identifier_column_rejects_non_identifier_names() -> None:
-    assert not is_row_identifier_column("PROTOCOL", (0, 1, 2, 3))
-
-
-def test_is_row_identifier_column_rejects_non_sequential_values() -> None:
-    assert not is_row_identifier_column("INDEX", (0, 2, 1, 3))
-
-
-def test_is_row_identifier_column_rejects_duplicate_values() -> None:
-    assert not is_row_identifier_column("INDEX", (0, 1, 1, 2))
 
 
 def test_hash_to_pseudo_domain_is_within_the_pseudo_domain_count() -> None:

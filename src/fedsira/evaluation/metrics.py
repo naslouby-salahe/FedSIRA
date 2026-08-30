@@ -1,8 +1,18 @@
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from fedsira.analysis.comparisons import ComparisonMetric
 from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
-from fedsira.domain.records import DatasetClassToken, NonNegativeInt, PositiveInt, Probability
+from fedsira.domain.records import (
+    BooleanValue,
+    DatasetClassToken,
+    MetricName,
+    MetricValue,
+    NonNegativeInt,
+    PositiveInt,
+    Probability,
+)
 from fedsira.evaluation.aggregation import minimum_defined_domain_count
 from fedsira.evaluation.records import (
     ConfusionCounts,
@@ -17,10 +27,10 @@ from fedsira.evaluation.validation import validate_metric_class_membership
 class BoundaryMetricSet:
     macro_auroc: MetricResult
     macro_auprc: MetricResult
-    clean_oracle_degradation_is_material: bool | None
+    clean_oracle_degradation_is_material: BooleanValue | None
     false_same_capability_rate: MetricResult
     false_same_capability_reason: FalseSameCapabilityReason | None
-    false_same_equivalence_check: bool
+    false_same_equivalence_check: BooleanValue
 
 
 def compute_confusion_counts(
@@ -43,18 +53,23 @@ def compute_confusion_counts(
             false_negative += 1
         else:
             true_negative += 1
-    return ConfusionCounts(true_positive, false_positive, false_negative, true_negative)
+    return ConfusionCounts(
+        true_positive=true_positive,
+        false_positive=false_positive,
+        false_negative=false_negative,
+        true_negative=true_negative,
+    )
 
 
 def compute_confusion_counts_by_class(
     true_labels: Sequence[DatasetClassToken],
     predicted_labels: Sequence[DatasetClassToken],
     class_tokens: Sequence[DatasetClassToken],
-) -> dict[DatasetClassToken, ConfusionCounts]:
-    return {
-        class_token: compute_confusion_counts(true_labels, predicted_labels, class_token)
+) -> Mapping[DatasetClassToken, ConfusionCounts]:
+    return OrderedDict(
+        (class_token, compute_confusion_counts(true_labels, predicted_labels, class_token))
         for class_token in class_tokens
-    }
+    )
 
 
 def accuracy(
@@ -62,51 +77,51 @@ def accuracy(
     sample_count: NonNegativeInt,
 ) -> MetricResult:
     if sample_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     true_positive_total = sum(counts.true_positive for counts in confusion_counts_by_class.values())
-    return MetricResult(true_positive_total / sample_count, sample_count)
+    return MetricResult(value=true_positive_total / sample_count, denominator=sample_count)
 
 
 def precision_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.true_positive + counts.false_positive
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(counts.true_positive / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=counts.true_positive / denominator, denominator=denominator)
 
 
 def recall_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.true_positive + counts.false_negative
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(counts.true_positive / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=counts.true_positive / denominator, denominator=denominator)
 
 
 def false_positive_rate_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.false_positive + counts.true_negative
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(counts.false_positive / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=counts.false_positive / denominator, denominator=denominator)
 
 
 def false_negative_rate_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.false_negative + counts.true_positive
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(counts.false_negative / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=counts.false_negative / denominator, denominator=denominator)
 
 
 def true_negative_rate_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.true_negative + counts.false_positive
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(counts.true_negative / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=counts.true_negative / denominator, denominator=denominator)
 
 
 def f1_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = 2 * counts.true_positive + counts.false_positive + counts.false_negative
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(2 * counts.true_positive / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=2 * counts.true_positive / denominator, denominator=denominator)
 
 
 def _mean_of_defined_values(
@@ -114,8 +129,10 @@ def _mean_of_defined_values(
 ) -> MetricResult:
     defined_values = [result.value for result in results.values() if result.value is not None]
     if len(defined_values) == 0:
-        return MetricResult(None, 0)
-    return MetricResult(sum(defined_values) / len(defined_values), len(defined_values))
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(
+        value=sum(defined_values) / len(defined_values), denominator=len(defined_values)
+    )
 
 
 def balanced_accuracy(recall_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
@@ -139,8 +156,8 @@ def weighted_f1(
         weighted_sum += support * f1_result.value
         total_support += support
     if total_support == 0:
-        return MetricResult(None, 0)
-    return MetricResult(weighted_sum / total_support, total_support)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=weighted_sum / total_support, denominator=total_support)
 
 
 def target_f1(
@@ -154,16 +171,18 @@ def target_capability_gain(
     target_f1_current: MetricResult, target_f1_anchor: MetricResult
 ) -> MetricResult:
     if target_f1_current.value is None or target_f1_anchor.value is None:
-        return MetricResult(None, 0)
-    return MetricResult(target_f1_current.value - target_f1_anchor.value, 1)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=target_f1_current.value - target_f1_anchor.value, denominator=1)
 
 
 def supported_macro_f1_harm(
     supported_macro_f1_anchor: MetricResult, supported_macro_f1_current: MetricResult
 ) -> MetricResult:
     if supported_macro_f1_anchor.value is None or supported_macro_f1_current.value is None:
-        return MetricResult(None, 0)
-    return MetricResult(supported_macro_f1_anchor.value - supported_macro_f1_current.value, 1)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(
+        value=supported_macro_f1_anchor.value - supported_macro_f1_current.value, denominator=1
+    )
 
 
 def benign_false_alarm_rate(
@@ -176,11 +195,11 @@ def benign_false_alarm_rate(
     ]
     denominator = len(benign_indices)
     if denominator == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     false_alarm_count = sum(
         1 for index in benign_indices if predicted_labels[index] != benign_class_token
     )
-    return MetricResult(false_alarm_count / denominator, denominator)
+    return MetricResult(value=false_alarm_count / denominator, denominator=denominator)
 
 
 def benign_false_alarm_rate_increase(
@@ -190,16 +209,17 @@ def benign_false_alarm_rate_increase(
         benign_false_alarm_rate_current.value is None
         or benign_false_alarm_rate_anchor.value is None
     ):
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
-        benign_false_alarm_rate_current.value - benign_false_alarm_rate_anchor.value, 1
+        value=benign_false_alarm_rate_current.value - benign_false_alarm_rate_anchor.value,
+        denominator=1,
     )
 
 
 def attack_success_rate_within_domain(
     true_labels: Sequence[DatasetClassToken],
     predicted_labels: Sequence[DatasetClassToken],
-    triggered_mask: Sequence[bool],
+    triggered_mask: Sequence[BooleanValue],
     triggered_source_class_token: DatasetClassToken,
     benign_class_token: DatasetClassToken,
 ) -> MetricResult:
@@ -211,11 +231,11 @@ def attack_success_rate_within_domain(
     ]
     denominator = len(carrier_indices)
     if denominator == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     evaded_count = sum(
         1 for index in carrier_indices if predicted_labels[index] == benign_class_token
     )
-    return MetricResult(evaded_count / denominator, denominator)
+    return MetricResult(value=evaded_count / denominator, denominator=denominator)
 
 
 def clean_proposal_oracle_label(
@@ -255,9 +275,10 @@ def false_launch_rate(
     false_launch_count: NonNegativeInt, adequate_defined_oracle_count: NonNegativeInt
 ) -> MetricResult:
     if adequate_defined_oracle_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
-        false_launch_count / adequate_defined_oracle_count, adequate_defined_oracle_count
+        value=false_launch_count / adequate_defined_oracle_count,
+        denominator=adequate_defined_oracle_count,
     )
 
 
@@ -268,28 +289,36 @@ def reproduction_attempt_count(
     return len(domains_with_training_start - evidence_inadequate_domains)
 
 
-def malicious_admission_rate(malicious_admission_indicators: Sequence[bool]) -> MetricResult:
+def malicious_admission_rate(
+    malicious_admission_indicators: Sequence[BooleanValue],
+) -> MetricResult:
     denominator = len(malicious_admission_indicators)
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(sum(malicious_admission_indicators) / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(
+        value=sum(malicious_admission_indicators) / denominator, denominator=denominator
+    )
 
 
-def legitimate_admission_rate(legitimate_admission_indicators: Sequence[bool]) -> MetricResult:
+def legitimate_admission_rate(
+    legitimate_admission_indicators: Sequence[BooleanValue],
+) -> MetricResult:
     denominator = len(legitimate_admission_indicators)
     if denominator == 0:
-        return MetricResult(None, 0)
-    return MetricResult(sum(legitimate_admission_indicators) / denominator, denominator)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(
+        value=sum(legitimate_admission_indicators) / denominator, denominator=denominator
+    )
 
 
 def verifier_abstention_rate(
     abstaining_verifier_report_count: NonNegativeInt, assigned_verifier_report_count: NonNegativeInt
 ) -> MetricResult:
     if assigned_verifier_report_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
-        abstaining_verifier_report_count / assigned_verifier_report_count,
-        assigned_verifier_report_count,
+        value=abstaining_verifier_report_count / assigned_verifier_report_count,
+        denominator=assigned_verifier_report_count,
     )
 
 
@@ -298,10 +327,10 @@ def reproduction_abstention_rate(
     assigned_reproduction_opportunity_count: NonNegativeInt,
 ) -> MetricResult:
     if assigned_reproduction_opportunity_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     return MetricResult(
-        evidence_insufficient_opportunity_count / assigned_reproduction_opportunity_count,
-        assigned_reproduction_opportunity_count,
+        value=evidence_insufficient_opportunity_count / assigned_reproduction_opportunity_count,
+        denominator=assigned_reproduction_opportunity_count,
     )
 
 
@@ -309,15 +338,19 @@ def dormant_claim_rate(
     dormant_claim_count: NonNegativeInt, eligible_claim_count: NonNegativeInt
 ) -> MetricResult:
     if eligible_claim_count == 0:
-        return MetricResult(None, 0)
-    return MetricResult(dormant_claim_count / eligible_claim_count, eligible_claim_count)
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(
+        value=dormant_claim_count / eligible_claim_count, denominator=eligible_claim_count
+    )
 
 
-def auroc_one_vs_rest(true_binary: Sequence[bool], scores: Sequence[float]) -> MetricResult:
+def auroc_one_vs_rest(
+    true_binary: Sequence[BooleanValue], scores: Sequence[MetricValue]
+) -> MetricResult:
     positive_count = sum(true_binary)
     negative_count = len(true_binary) - positive_count
     if positive_count == 0 or negative_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     order = sorted(range(len(scores)), key=lambda index: scores[index])
     ranks = [0.0] * len(scores)
     position = 0
@@ -338,13 +371,15 @@ def auroc_one_vs_rest(true_binary: Sequence[bool], scores: Sequence[float]) -> M
     area = (positive_rank_sum - positive_count * (positive_count + 1) / 2.0) / (
         positive_count * negative_count
     )
-    return MetricResult(area, positive_count + negative_count)
+    return MetricResult(value=area, denominator=positive_count + negative_count)
 
 
-def auprc_one_vs_rest(true_binary: Sequence[bool], scores: Sequence[float]) -> MetricResult:
+def auprc_one_vs_rest(
+    true_binary: Sequence[BooleanValue], scores: Sequence[MetricValue]
+) -> MetricResult:
     positive_count = sum(true_binary)
     if positive_count == 0:
-        return MetricResult(None, 0)
+        return MetricResult(value=None, denominator=0)
     order = sorted(range(len(scores)), key=lambda index: scores[index], reverse=True)
     points: list[tuple[float, float]] = [(0.0, 1.0)]
     true_positive = 0
@@ -364,7 +399,7 @@ def auprc_one_vs_rest(true_binary: Sequence[bool], scores: Sequence[float]) -> M
     area = 0.0
     for (recall_a, precision_a), (recall_b, precision_b) in zip(points, points[1:], strict=False):
         area += (recall_b - recall_a) * (precision_a + precision_b) / 2.0
-    return MetricResult(area, positive_count)
+    return MetricResult(value=area, denominator=positive_count)
 
 
 def macro_auroc(auroc_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
@@ -380,7 +415,7 @@ def clean_oracle_degradation_is_material(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     clean_oracle_materiality_config: CleanOracleMaterialityConfig,
-) -> bool:
+) -> BooleanValue:
     if (
         target_f1_delta.value is not None
         and target_f1_delta.value <= -clean_oracle_materiality_config.target_f1_decrease
@@ -399,26 +434,27 @@ def clean_oracle_degradation_is_material(
 
 
 def is_false_same_capability_certification(
-    a_scoped_predicate_passes: bool, b_scoped_predicate_passes: bool
-) -> bool:
+    a_scoped_predicate_passes: BooleanValue, b_scoped_predicate_passes: BooleanValue
+) -> BooleanValue:
     return a_scoped_predicate_passes != b_scoped_predicate_passes
 
 
 def false_same_capability_certification_rate(
     false_certification_count: NonNegativeInt,
     broad_certified_row_count: NonNegativeInt,
-    is_scoped_contract: bool,
+    is_scoped_contract: BooleanValue,
 ) -> tuple[MetricResult, FalseSameCapabilityReason | None]:
     if is_scoped_contract:
         return (
-            MetricResult(None, 0),
+            MetricResult(value=None, denominator=0),
             FalseSameCapabilityReason.NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION,
         )
     if broad_certified_row_count == 0:
-        return MetricResult(None, 0), None
+        return MetricResult(value=None, denominator=0), None
     return (
         MetricResult(
-            false_certification_count / broad_certified_row_count, broad_certified_row_count
+            value=false_certification_count / broad_certified_row_count,
+            denominator=broad_certified_row_count,
         ),
         None,
     )
@@ -434,24 +470,30 @@ def boundary_metric_set(
     clean_oracle_materiality_config: CleanOracleMaterialityConfig,
     false_certification_count: NonNegativeInt = 0,
     broad_certified_row_count: NonNegativeInt = 0,
-    is_scoped_contract: bool = False,
-    a_scoped_predicate_passes: bool = False,
-    b_scoped_predicate_passes: bool = False,
+    is_scoped_contract: BooleanValue = False,
+    a_scoped_predicate_passes: BooleanValue = False,
+    b_scoped_predicate_passes: BooleanValue = False,
 ) -> BoundaryMetricSet:
-    auroc_by_class = {
-        token: auroc_one_vs_rest(
-            [label == token for label in true_labels],
-            [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+    auroc_by_class = OrderedDict(
+        (
+            token,
+            auroc_one_vs_rest(
+                [label == token for label in true_labels],
+                [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+            ),
         )
         for token in class_tokens
-    }
-    auprc_by_class = {
-        token: auprc_one_vs_rest(
-            [label == token for label in true_labels],
-            [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+    )
+    auprc_by_class = OrderedDict(
+        (
+            token,
+            auprc_one_vs_rest(
+                [label == token for label in true_labels],
+                [1.0 if prediction == token else 0.0 for prediction in predicted_labels],
+            ),
         )
         for token in class_tokens
-    }
+    )
     material_degradation = clean_oracle_degradation_is_material(
         target_f1_delta,
         supported_macro_f1_drop,
@@ -484,41 +526,47 @@ def report_metric_set(
     anchor_target_f1: MetricResult | None = None,
     anchor_supported_macro_f1: MetricResult | None = None,
     anchor_benign_far: MetricResult | None = None,
-    triggered_mask: Sequence[bool] | None = None,
+    triggered_mask: Sequence[BooleanValue] | None = None,
     triggered_source_class_token: DatasetClassToken | None = None,
-) -> dict[DatasetClassToken, MetricResult]:
+) -> tuple[tuple[MetricName, MetricResult], ...]:
     validate_metric_class_membership(
         class_tokens, target_class_token, benign_class_token, supported_class_tokens
     )
     counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
-    f1_by_class = {token: f1_for_class(counts) for token, counts in counts_by_class.items()}
-    recall_by_class = {token: recall_for_class(counts) for token, counts in counts_by_class.items()}
-    supported_f1 = {
-        token: f1_by_class[token] for token in supported_class_tokens if token in f1_by_class
-    }
-    current_target_f1 = f1_by_class.get(target_class_token) or MetricResult(None, 0)
+    f1_by_class = OrderedDict(
+        (token, f1_for_class(counts)) for token, counts in counts_by_class.items()
+    )
+    recall_by_class = OrderedDict(
+        (token, recall_for_class(counts)) for token, counts in counts_by_class.items()
+    )
+    supported_f1 = OrderedDict(
+        (token, f1_by_class[token]) for token in supported_class_tokens if token in f1_by_class
+    )
+    current_target_f1 = f1_by_class.get(target_class_token) or MetricResult(
+        value=None, denominator=0
+    )
     current_supported_macro = macro_f1(supported_f1)
     current_benign_far = benign_false_alarm_rate(true_labels, predicted_labels, benign_class_token)
     gain = (
         target_capability_gain(current_target_f1, anchor_target_f1)
         if anchor_target_f1 is not None
-        else MetricResult(None, 0)
+        else MetricResult(value=None, denominator=0)
     )
     supported_harm = (
         supported_macro_f1_harm(anchor_supported_macro_f1, current_supported_macro)
         if anchor_supported_macro_f1 is not None
-        else MetricResult(None, 0)
+        else MetricResult(value=None, denominator=0)
     )
     benign_far_increase = (
-        MetricResult(current_benign_far.value - anchor_benign_far.value, 1)
+        MetricResult(value=current_benign_far.value - anchor_benign_far.value, denominator=1)
         if anchor_benign_far is not None
         and current_benign_far.value is not None
         and anchor_benign_far.value is not None
-        else MetricResult(None, 0)
+        else MetricResult(value=None, denominator=0)
     )
-    support_by_class = {
-        token: sum(1 for label in true_labels if label == token) for token in class_tokens
-    }
+    support_by_class = OrderedDict(
+        (token, sum(1 for label in true_labels if label == token)) for token in class_tokens
+    )
     asr = (
         attack_success_rate_within_domain(
             true_labels,
@@ -528,25 +576,35 @@ def report_metric_set(
             benign_class_token,
         )
         if triggered_mask is not None
-        else MetricResult(None, 0)
+        else MetricResult(value=None, denominator=0)
     )
-    class_metrics: dict[DatasetClassToken, MetricResult] = {}
+    class_metrics: list[tuple[MetricName, MetricResult]] = []
     for token, counts in counts_by_class.items():
-        class_metrics[f"{token}:precision"] = precision_for_class(counts)
-        class_metrics[f"{token}:fpr"] = false_positive_rate_for_class(counts)
-        class_metrics[f"{token}:fnr"] = false_negative_rate_for_class(counts)
-        class_metrics[f"{token}:tnr"] = true_negative_rate_for_class(counts)
-    return {
-        "accuracy": accuracy(counts_by_class, len(true_labels)),
-        "macro-f1": macro_f1(f1_by_class),
-        "weighted-f1": weighted_f1(f1_by_class, support_by_class),
-        "balanced-accuracy": balanced_accuracy(recall_by_class),
-        "target-f1": current_target_f1,
-        "target-f1-gain": gain,
-        "supported-macro-f1-harm": supported_harm,
-        "benign-far-increase": benign_far_increase,
-        "asr": asr,
-        "verifier-abstention-rate": verifier_abstention_rate(0, 0),
-        "reproduction-abstention-rate": reproduction_abstention_rate(0, 0),
-        **class_metrics,
-    }
+        class_metrics.append((f"{token}:precision", precision_for_class(counts)))
+        class_metrics.append((f"{token}:fpr", false_positive_rate_for_class(counts)))
+        class_metrics.append((f"{token}:fnr", false_negative_rate_for_class(counts)))
+        class_metrics.append((f"{token}:tnr", true_negative_rate_for_class(counts)))
+    return (
+        ("accuracy", accuracy(counts_by_class, len(true_labels))),
+        ("macro-f1", macro_f1(f1_by_class)),
+        ("weighted-f1", weighted_f1(f1_by_class, support_by_class)),
+        ("balanced-accuracy", balanced_accuracy(recall_by_class)),
+        (ComparisonMetric.TARGET_F1.value, current_target_f1),
+        ("target-f1-gain", gain),
+        (ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value, supported_harm),
+        (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE.value, benign_far_increase),
+        (ComparisonMetric.ATTACK_SUCCESS_RATE.value, asr),
+        ("verifier-abstention-rate", verifier_abstention_rate(0, 0)),
+        ("reproduction-abstention-rate", reproduction_abstention_rate(0, 0)),
+        *class_metrics,
+    )
+
+
+def metric_value(
+    metrics: Sequence[tuple[MetricName, MetricResult]],
+    name: MetricName,
+) -> MetricResult:
+    for metric_name, result in metrics:
+        if metric_name == name:
+            return result
+    raise KeyError(f"no metric named {name!r}")

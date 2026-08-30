@@ -14,20 +14,16 @@ from fedsira.domain.records import (
     ScientificCellCount,
     ScientificCellSemanticKey,
 )
-from fedsira.experiments.collapse import CollapseDecisionKind
 from fedsira.experiments.registry import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     EXPERIMENT_REGISTRY,
-    EXTERNAL_VERIFICATION_NECESSITY_NAME,
     MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
-    PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
-    SINGLE_REPRODUCTION_NECESSITY_NAME,
-    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationScenario,
     AblationVariant,
     ExperimentDefinition,
     ablation_scenario_for_variant,
@@ -144,20 +140,6 @@ PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
 )
 
 
-def collapse_decision_kind_for_experiment(
-    experiment: ExperimentName,
-) -> CollapseDecisionKind | None:
-    if experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
-        return CollapseDecisionKind.PROPOSAL_ASSISTANCE
-    if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
-        return CollapseDecisionKind.PLURALITY
-    if experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
-        return CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
-    if experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
-        return CollapseDecisionKind.EXTERNAL_VERIFICATION
-    return None
-
-
 def _experiment_seeds(
     definition: ExperimentDefinition,
     master_seeds: tuple[MasterSeed, ...],
@@ -183,6 +165,11 @@ def _baseline_validation_cells(
     )
 
 
+def _ablation_condition(variant: AblationVariant) -> ConditionName:
+    scenario: AblationScenario = ablation_scenario_for_variant(variant)
+    return scenario.value
+
+
 def _ablation_cells(
     definition: ExperimentDefinition,
     seeds: tuple[MasterSeed, ...],
@@ -191,7 +178,7 @@ def _ablation_cells(
         ScientificCell(
             experiment=definition.name,
             method=variant.value,
-            condition=ablation_scenario_for_variant(variant),
+            condition=_ablation_condition(variant),
             master_seed=seed,
         )
         for variant in AblationVariant
@@ -281,7 +268,8 @@ def _collapse_decision_passed(
 
 def build_plan(
     resolved_core_complete: ResolvedCoreComplete = False,
-    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...] | None = None,
+    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...]
+    | None = None,
     master_seeds: tuple[MasterSeed, ...] | None = None,
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:

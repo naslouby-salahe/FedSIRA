@@ -81,9 +81,7 @@ def model_field_primitive_violations(tree: ast.Module) -> list[str]:
 def function_boundary_primitive_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for function in (
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     ):
         for argument in _function_arguments(function):
             if argument.arg in {"self", "cls"} or argument.annotation is None:
@@ -99,9 +97,7 @@ def function_boundary_primitive_violations(tree: ast.Module) -> list[str]:
 def untyped_function_boundary_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for function in (
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     ):
         for argument in _function_arguments(function):
             if argument.arg in {"self", "cls"}:

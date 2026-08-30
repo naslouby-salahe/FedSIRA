@@ -3,7 +3,6 @@ from fedsira.analysis.claims import (
     ClaimEvidenceRecord,
     ClaimStateResult,
     FinalClaimState,
-    claim_by_id,
     derive_claim_states,
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -117,20 +116,6 @@ def test_verify_claim_states_derivable_accepts_terminal_scientific_outcome() -> 
         ),
     )
     assert verify_claim_states_derivable(supported, 1).passed
-
-
-def test_claim_by_id_returns_registered_definition() -> None:
-    definition = claim_by_id("Direct Source Exclusion")
-    assert definition.claim_id == "Direct Source Exclusion"
-    assert definition.evidence_experiments
-
-
-def test_claim_by_id_rejects_unknown() -> None:
-    try:
-        claim_by_id("Not-A-Real-Claim")
-    except KeyError:
-        return
-    raise AssertionError("expected KeyError for unknown claim")
 
 
 def _base_evidence(completed_experiments: frozenset[str]) -> ClaimEvidence:

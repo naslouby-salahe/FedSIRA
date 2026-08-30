@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from fedsira.domain.records import DatasetClassToken
+from fedsira.domain.records import DatasetClassToken, TextValue
 
 
 class EvaluationValidationError(ValueError):
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: TextValue) -> None:
         super().__init__(message)
         self.message = message
 

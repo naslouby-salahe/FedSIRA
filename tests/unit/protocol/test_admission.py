@@ -63,40 +63,42 @@ def test_validate_production_checkpoint_excludes_source() -> None:
 
 
 def test_median_domain_target_f1_uses_type7_quantile() -> None:
-    values = [MetricResult(v, 10) for v in [0.6, 0.7, 0.8, 0.9]]
+    values = [MetricResult(value=v, denominator=10) for v in [0.6, 0.7, 0.8, 0.9]]
     result = median_domain_target_f1(values)
     assert result.value is not None
     assert abs(result.value - 0.75) < 1e-9
 
 
 def test_median_domain_target_f1_na_when_nothing_defined() -> None:
-    assert median_domain_target_f1([MetricResult(None, 0)]).value is None
+    assert median_domain_target_f1([MetricResult(value=None, denominator=0)]).value is None
 
 
 def test_final_gate_predicates_pass_requires_all_four_thresholds_and_no_invariant_failure() -> None:
     passing = final_gate_predicates_pass(
-        MetricResult(FINAL_GATE_CONFIG.median_target_f1_minimum, 8),
-        MetricResult(FINAL_GATE_CONFIG.minimum_domain_target_f1, 8),
-        MetricResult(FINAL_GATE_CONFIG.supported_macro_f1_drop_maximum, 8),
-        MetricResult(FINAL_GATE_CONFIG.benign_false_alarm_rate_increase_maximum, 8),
+        MetricResult(value=FINAL_GATE_CONFIG.median_target_f1_minimum, denominator=8),
+        MetricResult(value=FINAL_GATE_CONFIG.minimum_domain_target_f1, denominator=8),
+        MetricResult(value=FINAL_GATE_CONFIG.supported_macro_f1_drop_maximum, denominator=8),
+        MetricResult(
+            value=FINAL_GATE_CONFIG.benign_false_alarm_rate_increase_maximum, denominator=8
+        ),
         True,
         FINAL_GATE_CONFIG,
     )
     assert passing
     fails_on_invariant = final_gate_predicates_pass(
-        MetricResult(1.0, 8),
-        MetricResult(1.0, 8),
-        MetricResult(0.0, 8),
-        MetricResult(0.0, 8),
+        MetricResult(value=1.0, denominator=8),
+        MetricResult(value=1.0, denominator=8),
+        MetricResult(value=0.0, denominator=8),
+        MetricResult(value=0.0, denominator=8),
         False,
         FINAL_GATE_CONFIG,
     )
     assert not fails_on_invariant
     fails_on_na = final_gate_predicates_pass(
-        MetricResult(None, 0),
-        MetricResult(1.0, 8),
-        MetricResult(0.0, 8),
-        MetricResult(0.0, 8),
+        MetricResult(value=None, denominator=0),
+        MetricResult(value=1.0, denominator=8),
+        MetricResult(value=0.0, denominator=8),
+        MetricResult(value=0.0, denominator=8),
         True,
         FINAL_GATE_CONFIG,
     )
@@ -104,29 +106,29 @@ def test_final_gate_predicates_pass_requires_all_four_thresholds_and_no_invarian
 
 
 def _content(
-    source_commitment_identity: str | None = "s" * 64,
-    krum_configuration_identity: str | None = "k" * 64,
-    verifier_record: tuple[str, ...] | VerificationOmissionMarker = ("v" * 64,),
+    source_commitment_identity: str | None = "5" * 64,
+    krum_configuration_identity: str | None = "6" * 64,
+    verifier_record: tuple[str, ...] | VerificationOmissionMarker = ("7" * 64,),
 ) -> AdmissionArtifactContent:
     return AdmissionArtifactContent(
         anchor_checkpoint_identity="a" * 64,
         source_commitment_identity=source_commitment_identity,
         claim_identity="c" * 64,
         reproducer_assignment_order=NBAIOT_DOMAIN_ORDER[:5],
-        reproduction_commitment_hashes=("r" * 64,),
+        reproduction_commitment_hashes=("8" * 64,),
         verifier_record=verifier_record,
         krum_configuration_identity=krum_configuration_identity,
-        production_update_identity="p" * 64,
-        final_gate_sample_manifest_identity="m" * 64,
+        production_update_identity="9" * 64,
+        final_gate_sample_manifest_identity="1" * 64,
         final_gate_metrics_identity="e" * 64,
         seed_bundle=SeedBundle(master_seeds=(1,), analysis_seed=424242, smoke_seed=1),
         semantic_cell_key="cell-key",
         cell_phase_identity="phase-key",
-        upstream_dependency_fingerprints=("u" * 64,),
-        producer_component_fingerprint="pc" + "0" * 62,
-        runtime_dependency_fingerprint="rd" + "0" * 62,
+        upstream_dependency_fingerprints=("2" * 64,),
+        producer_component_fingerprint="3" * 64,
+        runtime_dependency_fingerprint="4" * 64,
         repository_commit="deadbeef",
-        dependency_lock_digest="dl" + "0" * 62,
+        dependency_lock_digest="b" * 64,
         environment_fingerprint="ef" + "0" * 62,
     )
 

@@ -64,8 +64,7 @@ def ordered_minibatches(
 ) -> tuple[tuple[SampleId, ...], ...]:
     ordered = minibatch_order(training_seed, epoch, sample_ids)
     return tuple(
-        ordered[start : start + batch_size]
-        for start in range(0, len(ordered), batch_size)
+        ordered[start : start + batch_size] for start in range(0, len(ordered), batch_size)
     )
 
 

@@ -8,6 +8,7 @@ from fedsira.cli.commands import report as report_command
 from fedsira.cli.commands import run as run_command
 from fedsira.cli.commands import smoke as smoke_command
 from fedsira.domain.enums import DatasetId
+from fedsira.domain.records import ExperimentName, OverwriteExisting
 
 app = typer.Typer(name="fedsira", no_args_is_help=True)
 console = Console()
@@ -24,7 +25,7 @@ def doctor() -> None:
 @app.command()
 def preprocess(
     dataset: DatasetId | None = typer.Argument(None),
-    overwrite: bool = typer.Option(False, "--overwrite"),
+    overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
     preprocess_command.execute(dataset, overwrite)
 
@@ -35,22 +36,22 @@ def plan() -> None:
 
 
 @app.command()
-def smoke(overwrite: bool = typer.Option(False, "--overwrite")) -> None:
+def smoke(overwrite: OverwriteExisting = typer.Option(False, "--overwrite")) -> None:
     smoke_command.execute(overwrite)
 
 
 @app.command(name="run")
 def run_experiment(
-    name: str = typer.Argument(...),
-    overwrite: bool = typer.Option(False, "--overwrite"),
+    name: ExperimentName = typer.Argument(...),
+    overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
     run_command.execute(name, overwrite)
 
 
 @app.command()
 def report(
-    name: str | None = typer.Argument(None),
-    overwrite: bool = typer.Option(False, "--overwrite"),
+    name: ExperimentName | None = typer.Argument(None),
+    overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
     report_command.execute(name, overwrite)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from fedsira.analysis.comparisons import ComparisonMetric
 from fedsira.config.schema import ClaimSupportThresholdsConfig
 from fedsira.domain.records import (
     AdmissionCount,
@@ -106,7 +107,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "Source-Artifact Exclusion Necessity",
             "Primary Confirmatory Evaluation",
         ),
-        primary_metric="legitimate-admission",
+        primary_metric=ComparisonMetric.LEGITIMATE_ADMISSION.value,
     ),
     ClaimDefinition(
         claim_id="Direct Source Exclusion",
@@ -138,7 +139,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "Source-Artifact Exclusion Necessity",
             "Primary Confirmatory Evaluation",
         ),
-        primary_metric="asr",
+        primary_metric=ComparisonMetric.ATTACK_SUCCESS_RATE.value,
         required_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
     ),
     ClaimDefinition(
@@ -148,7 +149,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "post-evidence overhead without violating the specified safety/liveness constraints."
         ),
         evidence_experiments=("Proposal-Assisted Opening Necessity",),
-        primary_metric="false-launch",
+        primary_metric=ComparisonMetric.FALSE_LAUNCH.value,
         required_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
     ),
     ClaimDefinition(
@@ -158,7 +159,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "plurality comparison defeats the single-reproduction alternative."
         ),
         evidence_experiments=("Single-Reproduction Necessity",),
-        primary_metric="malicious-admission",
+        primary_metric=ComparisonMetric.MALICIOUS_ADMISSION.value,
         required_family=ClaimFamily.PLURALITY_NECESSITY,
     ),
     ClaimDefinition(
@@ -169,7 +170,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "opportunities."
         ),
         evidence_experiments=("External Verification Necessity",),
-        primary_metric="malicious-admission",
+        primary_metric=ComparisonMetric.MALICIOUS_ADMISSION.value,
         required_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
     ),
     ClaimDefinition(
@@ -197,7 +198,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "Compromised-Verifier Robustness",
             "Byzantine-Bound Violation",
         ),
-        primary_metric="malicious-admission",
+        primary_metric=ComparisonMetric.MALICIOUS_ADMISSION.value,
     ),
     ClaimDefinition(
         claim_id="Safe Dormancy",
@@ -205,7 +206,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "A permanent singleton may remain unresolved rather than being falsely authenticated."
         ),
         evidence_experiments=("Evidence Scarcity and Dormancy",),
-        primary_metric="legitimate-admission",
+        primary_metric=ComparisonMetric.LEGITIMATE_ADMISSION.value,
     ),
     ClaimDefinition(
         claim_id="Reproducibility Is Not Truth",
@@ -223,7 +224,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "root-cause-scoped contract avoids on the specified fixture."
         ),
         evidence_experiments=("Capability Under-Specification Boundary",),
-        primary_metric="false-same-capability-certification-rate",
+        primary_metric=ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE.value,
     ),
     ClaimDefinition(
         claim_id="Heterogeneity Boundary",
@@ -232,7 +233,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "heterogeneity regime satisfying the Section 35 boundary rule."
         ),
         evidence_experiments=("Heterogeneous-Reproduction Boundary",),
-        primary_metric="legitimate-admission",
+        primary_metric=ComparisonMetric.LEGITIMATE_ADMISSION.value,
     ),
     ClaimDefinition(
         claim_id="Information-Arrival Delay",
@@ -262,7 +263,7 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
             "under synthetic pseudo-domains, without implying real administrative independence."
         ),
         evidence_experiments=("Secondary-Dataset Generalization",),
-        primary_metric="target-f1",
+        primary_metric=ComparisonMetric.TARGET_F1.value,
         required_family=ClaimFamily.SECONDARY_GENERALIZATION,
     ),
     ClaimDefinition(
@@ -278,13 +279,6 @@ CLAIM_DEFINITIONS: tuple[ClaimDefinition, ...] = (
         primary_metric=None,
     ),
 )
-
-
-def claim_by_id(claim_id: ClaimId) -> ClaimDefinition:
-    for definition in CLAIM_DEFINITIONS:
-        if definition.claim_id == claim_id:
-            return definition
-    raise KeyError(f"unknown claim {claim_id!r}")
 
 
 def _claim_evidence(
@@ -413,10 +407,8 @@ def _derive_claim_state(
             return FinalClaimState.PARTIALLY_SUPPORTED
         return FinalClaimState.NULL_RESULT
     if claim_id == "Byzantine Operating Region":
-        maximum = (
-            claim_support_thresholds.byzantine_operating_region
-            .maximum_malicious_admissions_within_bound
-        )
+        byzantine_thresholds = claim_support_thresholds.byzantine_operating_region
+        maximum = byzantine_thresholds.maximum_malicious_admissions_within_bound
         if sum(evidence.malicious_admissions) <= maximum:
             return FinalClaimState.CONDITIONAL
         return FinalClaimState.NOT_SUPPORTED
@@ -435,10 +427,8 @@ def _derive_claim_state(
         mean_rate = sum(evidence.false_same_capability_rates) / len(
             evidence.false_same_capability_rates
         )
-        minimum = (
-            claim_support_thresholds.capability_granularity_boundary
-            .false_same_capability_certification_rate_minimum
-        )
+        granularity_thresholds = claim_support_thresholds.capability_granularity_boundary
+        minimum = granularity_thresholds.false_same_capability_certification_rate_minimum
         return FinalClaimState.SUPPORTED if mean_rate >= minimum else FinalClaimState.NULL_RESULT
     if claim_id == "Heterogeneity Boundary":
         if evidence.heterogeneity_boundary_passes is None:

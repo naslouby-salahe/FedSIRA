@@ -68,4 +68,4 @@ def test_report_metric_set_accepts_consistent_tokens() -> None:
         benign_class_token=NBaiotClass.BENIGN.value,
         supported_class_tokens=(NBaiotClass.BENIGN.value,),
     )
-    assert "target-f1" in result
+    assert "target-f1" in dict(result)

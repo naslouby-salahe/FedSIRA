@@ -311,9 +311,7 @@ def compute_producer_component_fingerprint(
         try:
             tree = ast.parse(source_text, filename=str(source.path))
         except SyntaxError as error:
-            raise ValueError(
-                f"producer source {source.module} is syntactically invalid"
-            ) from error
+            raise ValueError(f"producer source {source.module} is syntactically invalid") from error
         if _has_dynamic_import(tree):
             raise ValueError(f"producer source {source.module} uses forbidden dynamic imports")
         if source.path.name == "__init__.py" and _is_trivial_init_module(tree):

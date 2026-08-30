@@ -31,9 +31,7 @@ class ArtifactGraph:
         return node is not None and node.lifecycle_state is ArtifactLifecycleState.COMPLETE
 
     def direct_descendants(self, identity: ArtifactDigest) -> tuple[ArtifactDigest, ...]:
-        return tuple(
-            node.identity for node in self._nodes if identity in node.upstream_identities
-        )
+        return tuple(node.identity for node in self._nodes if identity in node.upstream_identities)
 
     def mark_stale_descendants(
         self,

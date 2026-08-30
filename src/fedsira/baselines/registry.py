@@ -42,55 +42,76 @@ class BaselineValidationFixture(StrEnum):
     MODEL_REPLACEMENT_BACKDOOR = "Model-Replacement Backdoor"
 
 
-BASELINE_VALIDATION_FIXTURE_MAP: Final[dict[BaselineIdentity, BaselineValidationFixture]] = {
-    BaselineIdentity.LOCAL_ONLY_REFERENCE: BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
-    BaselineIdentity.CENTRALIZED_REFERENCE: BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
-    BaselineIdentity.FEDAVG_REFERENCE: BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
-    BaselineIdentity.ONE_INDEPENDENT_RETRAIN: (
-        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY
+BASELINE_VALIDATION_FIXTURE_MAP: Final[
+    tuple[tuple[BaselineIdentity, BaselineValidationFixture], ...]
+] = (
+    (BaselineIdentity.LOCAL_ONLY_REFERENCE, BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY),
+    (
+        BaselineIdentity.CENTRALIZED_REFERENCE,
+        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
     ),
-    BaselineIdentity.CANDIDATE_FREE_FULL_PATH: (
-        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY
+    (BaselineIdentity.FEDAVG_REFERENCE, BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY),
+    (
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
     ),
-    BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE: (
-        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY
+    (
+        BaselineIdentity.CANDIDATE_FREE_FULL_PATH,
+        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
     ),
-    BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
+        BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
     ),
-    BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE: (
-        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    (
+        BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM: (
-        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
+    (
+        BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
+        BaselineValidationFixture.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
     ),
-    BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE: (
-        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
+    (
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
     ),
-    BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER: (
-        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
+    (
+        BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE,
+        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
     ),
-    BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN: (
-        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
+    (
+        BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
+        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
     ),
-    BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE: (
-        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR
+    (
+        BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
+        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
     ),
-}
+    (
+        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
+        BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
+    ),
+)
 
-if BASELINE_VALIDATION_FIXTURE_MAP.keys() != set(BaselineIdentity):
+if frozenset(identity for identity, _fixture in BASELINE_VALIDATION_FIXTURE_MAP) != frozenset(
+    BaselineIdentity
+):
     raise AssertionError("every registered baseline must have exactly one predeclared fixture")
 
 

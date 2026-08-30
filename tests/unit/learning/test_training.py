@@ -90,7 +90,7 @@ def test_train_one_epoch_reduces_loss_on_separable_synthetic_data() -> None:
     loss_function = build_loss_function()
     features = torch.cat([torch.ones(50, 4) * -1.0, torch.ones(50, 4) * 1.0])
     labels = torch.cat([torch.zeros(50, dtype=torch.long), torch.ones(50, dtype=torch.long)])
-    batches = [(features, labels)]
+    batches = ((features, labels),)
 
     initial_loss = train_one_epoch(model, optimizer, loss_function, TRAINING_CONFIG, batches)
     final_loss = initial_loss
@@ -207,7 +207,7 @@ def test_optimizer_state_persists_across_epochs_within_one_invocation() -> None:
     loss_function = build_loss_function()
     features = torch.randn(8, 4)
     labels = torch.randint(0, 2, (8,))
-    batches = [(features, labels)]
+    batches = ((features, labels),)
 
     train_one_epoch(model, optimizer, loss_function, TRAINING_CONFIG, batches)
     first_parameter = next(model.parameters())
@@ -225,7 +225,7 @@ def test_fresh_optimizer_per_round_resets_adamw_state() -> None:
     loss_function = build_loss_function()
     features = torch.randn(8, 4)
     labels = torch.randint(0, 2, (8,))
-    train_one_epoch(model, stale_optimizer, loss_function, TRAINING_CONFIG, [(features, labels)])
+    train_one_epoch(model, stale_optimizer, loss_function, TRAINING_CONFIG, ((features, labels),))
     assert len(stale_optimizer.state) > 0
 
     fresh_optimizer = build_optimizer(

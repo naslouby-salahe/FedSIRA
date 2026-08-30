@@ -128,10 +128,6 @@ def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
     return None
 
 
-def validate_experiment_name_is_registered(experiment: ExperimentName) -> None:
-    experiment_by_name(experiment)
-
-
 def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
     for planned in plan.experiments:
         allowed = _allowed_conditions(planned.definition.name)
@@ -235,8 +231,24 @@ def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
     )
 
 
+_REQUIRED_CELL_PHASE_SEQUENCE: tuple[ScientificCellPhase, ...] = (
+    ScientificCellPhase.PREPARE,
+    ScientificCellPhase.TRAIN,
+    ScientificCellPhase.SCORE,
+    ScientificCellPhase.PROTOCOL_EVALUATION,
+    ScientificCellPhase.METRIC_AGGREGATION,
+    ScientificCellPhase.STATISTICAL_ANALYSIS,
+)
+
+
 def _protocol_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
     source_not_verifier = not verifier_is_eligible(_DANMINI, _DANMINI, _ENNIO)
+    required_phase_sequence_valid = False
+    try:
+        validate_cell_phase_sequence(_REQUIRED_CELL_PHASE_SEQUENCE)
+        required_phase_sequence_valid = True
+    except ValueError:
+        required_phase_sequence_valid = False
     honest_positive = minimum_honest_positive_count(2, 1) == 1
     krum_admissible = krum_committee_is_admissible(5, 1)
     krum_three_rejected = not krum_committee_is_admissible(3, 1)
@@ -252,6 +264,10 @@ def _protocol_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ..
     probability_matches = abs(probability - expected_probability) < tolerance
     return (
         SmokeCheckResult(name="source cannot be verifier", passed=source_not_verifier),
+        SmokeCheckResult(
+            name="canonical cell phase sequence is well-formed",
+            passed=required_phase_sequence_valid,
+        ),
         SmokeCheckResult(
             name="2 positives with f_V=1 implies at least one honest positive",
             passed=honest_positive,

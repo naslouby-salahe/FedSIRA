@@ -1,5 +1,5 @@
 from fedsira.domain.enums import FailureClass
-from fedsira.domain.records import ArtifactDigest, RetryCount
+from fedsira.domain.records import ArtifactDigest, BooleanValue, RetryCount
 from fedsira.runtime.state import is_automatically_retriable
 
 
@@ -7,7 +7,7 @@ def automatic_recovery_permitted(
     failure_class: FailureClass,
     attempts_used: RetryCount,
     automatic_infrastructure_retries_per_cell_phase: RetryCount,
-) -> bool:
+) -> BooleanValue:
     if not is_automatically_retriable(failure_class):
         return False
     return attempts_used < automatic_infrastructure_retries_per_cell_phase

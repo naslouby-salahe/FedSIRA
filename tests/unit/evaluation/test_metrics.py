@@ -125,14 +125,23 @@ def test_target_f1_selects_target_class() -> None:
 
 
 def test_target_capability_gain_is_na_when_either_side_undefined() -> None:
-    assert target_capability_gain(MetricResult(None, 0), MetricResult(0.5, 10)).value is None
-    result = target_capability_gain(MetricResult(0.8, 10), MetricResult(0.6, 10))
+    assert (
+        target_capability_gain(
+            MetricResult(value=None, denominator=0), MetricResult(value=0.5, denominator=10)
+        ).value
+        is None
+    )
+    result = target_capability_gain(
+        MetricResult(value=0.8, denominator=10), MetricResult(value=0.6, denominator=10)
+    )
     assert result.value is not None
     assert abs(result.value - 0.2) < 1e-9
 
 
 def test_supported_macro_f1_harm_direction() -> None:
-    result = supported_macro_f1_harm(MetricResult(0.9, 10), MetricResult(0.85, 10))
+    result = supported_macro_f1_harm(
+        MetricResult(value=0.9, denominator=10), MetricResult(value=0.85, denominator=10)
+    )
     assert result.value is not None
     assert abs(result.value - 0.05) < 1e-9
 
@@ -151,7 +160,9 @@ def test_benign_false_alarm_rate_na_when_no_benign_examples() -> None:
 
 
 def test_benign_false_alarm_rate_increase() -> None:
-    result = benign_false_alarm_rate_increase(MetricResult(0.05, 100), MetricResult(0.02, 100))
+    result = benign_false_alarm_rate_increase(
+        MetricResult(value=0.05, denominator=100), MetricResult(value=0.02, denominator=100)
+    )
     assert result.value is not None
     assert abs(result.value - 0.03) < 1e-9
 
@@ -228,10 +239,10 @@ def test_false_same_capability_certification_rate_numeric() -> None:
 def test_clean_proposal_oracle_label_na_below_defined_domain_threshold() -> None:
     capability_claim_config = CONFIG.capability_claim
     label = clean_proposal_oracle_label(
-        MetricResult(0.9, 10),
-        MetricResult(0.3, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=0.9, denominator=10),
+        MetricResult(value=0.3, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         defined_domain_count=5,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
@@ -243,10 +254,10 @@ def test_clean_proposal_oracle_label_na_below_defined_domain_threshold() -> None
 def test_clean_proposal_oracle_label_valid_when_all_thresholds_pass() -> None:
     capability_claim_config = CONFIG.capability_claim
     label = clean_proposal_oracle_label(
-        MetricResult(0.85, 10),
-        MetricResult(0.25, 10),
-        MetricResult(0.01, 10),
-        MetricResult(0.005, 10),
+        MetricResult(value=0.85, denominator=10),
+        MetricResult(value=0.25, denominator=10),
+        MetricResult(value=0.01, denominator=10),
+        MetricResult(value=0.005, denominator=10),
         defined_domain_count=7,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
@@ -258,10 +269,10 @@ def test_clean_proposal_oracle_label_valid_when_all_thresholds_pass() -> None:
 def test_clean_proposal_oracle_label_invalid_when_a_threshold_fails() -> None:
     capability_claim_config = CONFIG.capability_claim
     label = clean_proposal_oracle_label(
-        MetricResult(0.5, 10),
-        MetricResult(0.25, 10),
-        MetricResult(0.01, 10),
-        MetricResult(0.005, 10),
+        MetricResult(value=0.5, denominator=10),
+        MetricResult(value=0.25, denominator=10),
+        MetricResult(value=0.01, denominator=10),
+        MetricResult(value=0.005, denominator=10),
         defined_domain_count=7,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
@@ -292,20 +303,23 @@ def test_is_false_same_capability_certification_is_exclusive_or() -> None:
 def test_clean_oracle_degradation_is_material_on_any_threshold_exceeded() -> None:
     materiality_config = CONFIG.attacks_and_boundaries.clean_oracle_materiality
     not_material = clean_oracle_degradation_is_material(
-        MetricResult(0.0, 10), MetricResult(0.0, 10), MetricResult(0.0, 10), materiality_config
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        materiality_config,
     )
     assert not not_material
     material_on_target = clean_oracle_degradation_is_material(
-        MetricResult(-materiality_config.target_f1_decrease, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=-materiality_config.target_f1_decrease, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         materiality_config,
     )
     assert material_on_target
     material_on_supported = clean_oracle_degradation_is_material(
-        MetricResult(0.0, 10),
-        MetricResult(materiality_config.supported_macro_f1_drop, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=materiality_config.supported_macro_f1_drop, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         materiality_config,
     )
     assert material_on_supported
@@ -314,6 +328,9 @@ def test_clean_oracle_degradation_is_material_on_any_threshold_exceeded() -> Non
 def test_clean_oracle_degradation_is_material_na_metrics_are_not_material() -> None:
     materiality_config = CONFIG.attacks_and_boundaries.clean_oracle_materiality
     result = clean_oracle_degradation_is_material(
-        MetricResult(None, 0), MetricResult(None, 0), MetricResult(None, 0), materiality_config
+        MetricResult(value=None, denominator=0),
+        MetricResult(value=None, denominator=0),
+        MetricResult(value=None, denominator=0),
+        materiality_config,
     )
     assert not result

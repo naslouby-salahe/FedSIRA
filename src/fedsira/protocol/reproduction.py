@@ -13,6 +13,7 @@ from fedsira.domain.records import (
     DerivedSeed,
     DomainId,
     ExternalVerificationActive,
+    FiniteFloat,
     FrozenDomainModel,
     ReproductionCertified,
     ReproductionWasTrained,
@@ -25,7 +26,7 @@ REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMEN
 
 
 class _ListConvertibleTensor(Protocol):
-    def tolist(self) -> list[float]: ...
+    def tolist(self) -> list[FiniteFloat]: ...
 
 
 class ReproductionAttempt(FrozenDomainModel):

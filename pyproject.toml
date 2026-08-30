@@ -56,11 +56,28 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 "tests/unit/artifacts/test_records.py" = ["B010"]
 "tests/unit/artifacts/test_provenance.py" = ["B010"]
 "src/fedsira/cli/main.py" = ["B008"]
+"src/fedsira/runtime/environment.py" = ["B009"]
+
+[tool.vulture]
+ignore_decorators = ["@model_validator", "@field_validator", "@app.command"]
+ignore_names = ["model_config", "forward", "format"]
 
 [tool.pyright]
 include = ["src", "tests"]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/reporting/figures.py"
+reportUnknownMemberType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/models/mlp.py"
+reportUnknownMemberType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/runtime/determinism.py"
+reportUnknownMemberType = "none"
 
 [tool.deptry]
 extend_exclude = ["noxfile.py"]

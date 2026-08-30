@@ -72,9 +72,7 @@ def _candidate_pool(
 ) -> tuple[tuple[SampleId, MetricValue], ...]:
     target_bin = decile_bin(target_loss, boundaries)
     return tuple(
-        candidate
-        for candidate in candidates
-        if decile_bin(candidate[1], boundaries) == target_bin
+        candidate for candidate in candidates if decile_bin(candidate[1], boundaries) == target_bin
     )
 
 

@@ -14,7 +14,7 @@ from fedsira.datasets.nbaiot.preprocessing import (
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.records import FeatureName
-from fedsira.experiments.real_evidence import (
+from fedsira.experiments.execution import (
     BackdoorScope,
     EpistemicFailureScope,
     HeterogeneityScope,
@@ -53,7 +53,7 @@ from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training; skipped by default"
     " to avoid competing for CPU with other work. Re-enable deliberately when verifying"
-    " fedsira.experiments.real_evidence."
+    " fedsira.experiments.execution."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -99,7 +99,7 @@ def _prepare_real_evidence(root: Path, classes: tuple[NBaiotClass, ...] = CLASSE
     prepared_root = root / "prepared"
     scaler_root = root / "scaler"
     materialize_nbaiot_prepared_views(
-        discovered, CONFIG, prepared_root, scaler_root, overwrite=True
+        tuple(discovered), CONFIG, prepared_root, scaler_root, overwrite=True
     )
     return prepared_root
 

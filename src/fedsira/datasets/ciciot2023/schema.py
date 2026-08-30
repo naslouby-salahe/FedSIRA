@@ -5,12 +5,10 @@ from enum import IntEnum
 
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.records import (
-    BooleanValue,
     ClassLabel,
     DatasetManifestDigest,
     DomainCount,
     DomainId,
-    NonNegativeInt,
     PartitionSalt,
     PredictorCount,
     SampleId,
@@ -22,9 +20,7 @@ TARGET_LABEL: ClassLabel = "BACKDOOR_MALWARE"
 BENIGN_LABEL: ClassLabel = "BENIGN"
 BENIGN_LABEL_ALIASES: frozenset[ClassLabel] = frozenset(("BENIGNTRAFFIC", "BENIGN_TRAFFIC"))
 OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
-ROW_IDENTIFIER_TOKENS: frozenset[ClassLabel] = frozenset(
-    ("INDEX", "ROW_ID", "ROWID", "UNNAMED_0")
-)
+ROW_IDENTIFIER_TOKENS: frozenset[ClassLabel] = frozenset(("INDEX", "ROW_ID", "ROWID", "UNNAMED_0"))
 
 
 class CICIoT2023PseudoDomain(IntEnum):
@@ -68,19 +64,6 @@ def normalize_label(raw_label: ClassLabel) -> ClassLabel:
 def build_class_registry(observed_labels: frozenset[ClassLabel]) -> tuple[ClassLabel, ...]:
     remaining = sorted(observed_labels - frozenset((BENIGN_LABEL, TARGET_LABEL)))
     return (BENIGN_LABEL, TARGET_LABEL, *remaining)
-
-
-def is_row_identifier_column(
-    column_token: ClassLabel,
-    values: tuple[NonNegativeInt, ...],
-) -> BooleanValue:
-    if column_token not in ROW_IDENTIFIER_TOKENS:
-        return False
-    if len(set(values)) != len(values):
-        return False
-    zero_based = tuple(range(len(values)))
-    one_based = tuple(range(1, len(values) + 1))
-    return values in (zero_based, one_based)
 
 
 def hash_to_pseudo_domain(

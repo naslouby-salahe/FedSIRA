@@ -46,7 +46,6 @@ from fedsira.domain.records import (
     PredictorCount,
     PreparedViewKey,
     RelativePathText,
-    RolePosition,
     RowCount,
     SampleIdPrefix,
     SamplingCap,
@@ -263,16 +262,20 @@ def assign_stream_roles_and_sample_ids(
         if is_target
         else supported_class_sampling_caps(sampling_caps_per_domain, class_id)
     )
-    assigned_rows = tuple(
-        (
-            original_row_index,
-            role_for_normalized_position(
-                RolePosition(original_row_index / stream_row_count),
-                windows,
-            ),
+    assigned_rows = (
+        tuple(
+            (
+                original_row_index,
+                role_for_normalized_position(
+                    original_row_index / stream_row_count,
+                    windows,
+                ),
+            )
+            for original_row_index in range(stream_row_count)
         )
-        for original_row_index in range(stream_row_count)
-    ) if stream_row_count else ()
+        if stream_row_count
+        else ()
+    )
     assignments: list[RoleAssignment] = []
     for role in ordered_roles:
         original_row_indices = tuple(
@@ -435,9 +438,7 @@ def materialize_nbaiot_prepared_views(
         )
         raw_rows = _read_feature_matrix(item.absolute_path, feature_names)
         ordered_roles = (
-            TARGET_ROLE_ORDER
-            if item.class_id is NBaiotClass.GAFGYT_COMBO
-            else SUPPORTED_ROLE_ORDER
+            TARGET_ROLE_ORDER if item.class_id is NBaiotClass.GAFGYT_COMBO else SUPPORTED_ROLE_ORDER
         )
         for role in ordered_roles:
             selected_rows = tuple(

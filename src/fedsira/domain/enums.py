@@ -201,3 +201,9 @@ class ProvenanceValidationOutcome(StrEnum):
     DATASET_SPLIT_UPSTREAM_MISMATCH = "dataset_split_upstream_mismatch"
     PRODUCER_CODE_RUNTIME_MISMATCH = "producer_code_runtime_mismatch"
     NON_MATERIAL_CHANGE = "non_material_change"
+
+
+class CoreMethodIdentity(StrEnum):
+    RESOLVED_FEDSIRA_CORE = "Resolved FedSIRA Core"
+    FULL_PLURALITY_PATH = "Full Plurality Path"
+    ZERO_REFERENCE = "zero"

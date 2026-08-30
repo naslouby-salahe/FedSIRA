@@ -15,12 +15,12 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    ProtocolCellExecutor,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
     execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.protocol_executor import ProtocolCellExecutor
 from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
     ClaimFamily,

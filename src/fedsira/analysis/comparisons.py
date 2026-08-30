@@ -10,7 +10,7 @@ from fedsira.analysis.statistics import (
 )
 from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config.schema import BootstrapConfig, MultiplicityConfig, ScientificConfig
-from fedsira.domain.enums import DatasetId, RootCauseMixture
+from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.records import (
     ComparisonMargin,
     ComparisonName,
@@ -106,15 +106,7 @@ class ComparisonMetric(StrEnum):
     TARGET_F1 = "target-f1"
     SUPPORTED_MACRO_F1_HARM = "supported-macro-f1-harm"
     BENIGN_FALSE_ALARM_RATE_INCREASE = "benign-far-increase"
-    FALSE_SAME_CAPABILITY_CERTIFICATION_RATE = (
-        "false-same-capability-certification-rate"
-    )
-
-
-class CoreMethodIdentity(StrEnum):
-    RESOLVED_FEDSIRA_CORE = "Resolved FedSIRA Core"
-    FULL_PLURALITY_PATH = "Full Plurality Path"
-    ZERO_REFERENCE = "zero"
+    FALSE_SAME_CAPABILITY_CERTIFICATION_RATE = "false-same-capability-certification-rate"
 
 
 class PairingKey(FrozenDomainModel):
@@ -222,11 +214,7 @@ def evaluate_comparison(
     mean = sum(paired_differences) / count
     ordered = sorted(paired_differences)
     middle = count // 2
-    median = (
-        ordered[middle]
-        if count % 2
-        else (ordered[middle - 1] + ordered[middle]) / 2
-    )
+    median = ordered[middle] if count % 2 else (ordered[middle - 1] + ordered[middle]) / 2
     interval = bootstrap_percentile_confidence_interval(
         paired_differences,
         bootstrap_config,
@@ -306,8 +294,7 @@ def _adjusted_result(
         result.mean_paired_difference,
     )
     passes = (
-        adjusted_p_value < multiplicity_config.family_wise_alpha
-        and materiality_passes is not False
+        adjusted_p_value < multiplicity_config.family_wise_alpha and materiality_passes is not False
     )
     return ComparisonResult(
         definition=result.definition,
@@ -907,10 +894,8 @@ def _ablation_threshold(
     if metric is ComparisonMetric.LEGITIMATE_ADMISSION:
         return materiality.legitimate_admission_noninferiority_margin
     if variant is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
-        return (
-            config.claim_support_thresholds.capability_granularity_boundary
-            .false_same_capability_certification_rate_minimum
-        )
+        granularity_thresholds = config.claim_support_thresholds.capability_granularity_boundary
+        return granularity_thresholds.false_same_capability_certification_rate_minimum
     raise ValueError(f"no material threshold for ablation metric {metric}")
 
 
@@ -994,10 +979,8 @@ def _shared_epistemic_comparisons(
 def _capability_boundary_comparisons(
     config: ScientificConfig,
 ) -> tuple[ComparisonDefinition, ...]:
-    threshold = (
-        config.claim_support_thresholds.capability_granularity_boundary
-        .false_same_capability_certification_rate_minimum
-    )
+    granularity_thresholds = config.claim_support_thresholds.capability_granularity_boundary
+    threshold = granularity_thresholds.false_same_capability_certification_rate_minimum
     return tuple(
         _definition(
             ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,

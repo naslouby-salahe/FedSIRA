@@ -14,12 +14,17 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
+    NBaiotDomain,
 )
 from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
 from fedsira.experiments.collapse import resolve_core_mapping
+from fedsira.experiments.execution import (
+    ProtocolCellExecutor,
+    evaluate_domain,
+    non_source_domains,
+    train_anchor,
+)
 from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.protocol_executor import ProtocolCellExecutor
-from fedsira.experiments.real_evidence import evaluate_domain, non_source_domains, train_anchor
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
@@ -47,7 +52,7 @@ from fedsira.runtime.determinism import namespace_seed
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training end-to-end through"
     " ProtocolCellExecutor; skipped by default to avoid competing for CPU with other work."
-    " Re-enable deliberately when verifying fedsira.experiments.protocol_executor."
+    " Re-enable deliberately when verifying fedsira.experiments.execution."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -95,7 +100,9 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
                 )
             )
     prepared = root / "prepared"
-    materialize_nbaiot_prepared_views(discovered, CONFIG, prepared, root / "scaler", overwrite=True)
+    materialize_nbaiot_prepared_views(
+        tuple(discovered), CONFIG, prepared, root / "scaler", overwrite=True
+    )
     return prepared
 
 
@@ -163,15 +170,14 @@ def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_ro
     anchor = train_anchor(prepared_root, CONFIG, master_seed)
     assert anchor is not None
     source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
-    source_order = source_selection_order(
-        NBAIOT_DOMAIN_ORDER, NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed
-    )
-    source_domain = select_source_domain(
+    source_order = source_selection_order(NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed)
+    selected_domain = select_source_domain(
         source_order,
         frozenset(NBAIOT_DOMAIN_ORDER),
         requires_attack_carrier=False,
         domains_with_attack_carrier=frozenset(),
     )
+    source_domain = NBaiotDomain(selected_domain) if selected_domain is not None else None
     adequate_domains = non_source_domains(source_domain)
     assert len(adequate_domains) == 8
     for domain in adequate_domains:

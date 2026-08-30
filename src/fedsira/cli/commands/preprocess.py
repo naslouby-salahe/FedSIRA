@@ -103,11 +103,7 @@ def _publish_dataset_manifest(
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    raw_root = (
-        REPOSITORY_ROOT
-        / config.runtime.repository_layout.raw_data
-        / DatasetId.N_BAIOT.value
-    )
+    raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
     extraction_cache_root = (
         REPOSITORY_ROOT
         / config.runtime.repository_layout.execution_workspace
@@ -117,9 +113,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
     validate_target_holder_feasibility(
         discovered,
-        minimum_target_holding_domains=(
-            config.datasets.primary.minimum_target_holding_domains
-        ),
+        minimum_target_holding_domains=(config.datasets.primary.minimum_target_holding_domains),
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
     unavailable_classes: tuple[DatasetClassToken, ...] = tuple(
@@ -161,10 +155,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_root = (
-        REPOSITORY_ROOT
-        / config.runtime.repository_layout.raw_data
-        / "CIC_IOT_Dataset2023"
-        / "CSV"
+        REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
     cache_root = (
@@ -200,9 +191,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         ),
     )
     exclusion_rate: Probability = (
-        summary.excluded_row_count / summary.raw_row_count
-        if summary.raw_row_count
-        else 0.0
+        summary.excluded_row_count / summary.raw_row_count if summary.raw_row_count else 0.0
     )
     print(
         "CICIoT2023 preprocessing complete: "

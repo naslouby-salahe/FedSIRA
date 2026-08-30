@@ -95,9 +95,13 @@ def test_screen_domain_order_is_deterministic_and_takes_the_configured_prefix() 
 def test_screen_domain_decision_is_positive_requires_all_four_predicates() -> None:
     passing = screen_domain_decision_is_positive(
         PROPOSAL_SCREEN_CONFIG.differential_minimum_nats_per_example,
-        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, denominator=10
+        ),
+        MetricResult(value=CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, denominator=10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, denominator=10
+        ),
         PROPOSAL_SCREEN_CONFIG,
         CAPABILITY_CLAIM_CONFIG,
     )
@@ -107,9 +111,9 @@ def test_screen_domain_decision_is_positive_requires_all_four_predicates() -> No
 def test_screen_domain_decision_is_positive_fails_when_differential_too_small() -> None:
     result = screen_domain_decision_is_positive(
         PROPOSAL_SCREEN_CONFIG.differential_minimum_nats_per_example - 0.001,
-        MetricResult(1.0, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=1.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         PROPOSAL_SCREEN_CONFIG,
         CAPABILITY_CLAIM_CONFIG,
     )
@@ -119,9 +123,9 @@ def test_screen_domain_decision_is_positive_fails_when_differential_too_small() 
 def test_screen_domain_decision_is_positive_na_differential_is_not_positive() -> None:
     result = screen_domain_decision_is_positive(
         None,
-        MetricResult(1.0, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=1.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         PROPOSAL_SCREEN_CONFIG,
         CAPABILITY_CLAIM_CONFIG,
     )
@@ -130,9 +134,13 @@ def test_screen_domain_decision_is_positive_na_differential_is_not_positive() ->
 
 def test_raw_target_f1_screen_domain_decision_ignores_the_differential() -> None:
     passing = raw_target_f1_screen_domain_decision_is_positive(
-        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, denominator=10
+        ),
+        MetricResult(value=CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, denominator=10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, denominator=10
+        ),
         CAPABILITY_CLAIM_CONFIG,
     )
     assert passing
@@ -140,9 +148,11 @@ def test_raw_target_f1_screen_domain_decision_ignores_the_differential() -> None
 
 def test_raw_target_f1_screen_domain_decision_fails_when_target_gain_too_small() -> None:
     result = raw_target_f1_screen_domain_decision_is_positive(
-        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum - 0.001, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum - 0.001, denominator=10
+        ),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         CAPABILITY_CLAIM_CONFIG,
     )
     assert not result
@@ -151,9 +161,13 @@ def test_raw_target_f1_screen_domain_decision_fails_when_target_gain_too_small()
 def test_unmatched_control_screen_domain_decision_is_positive_requires_all_predicates() -> None:
     passing = unmatched_control_screen_domain_decision_is_positive(
         PROPOSAL_SCREEN_CONFIG.differential_minimum_nats_per_example,
-        MetricResult(CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, 10),
-        MetricResult(CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, 10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.target_f1_gain_over_anchor_minimum, denominator=10
+        ),
+        MetricResult(value=CAPABILITY_CLAIM_CONFIG.supported_macro_f1_drop_maximum, denominator=10),
+        MetricResult(
+            value=CAPABILITY_CLAIM_CONFIG.benign_false_alarm_rate_increase_maximum, denominator=10
+        ),
         PROPOSAL_SCREEN_CONFIG,
         CAPABILITY_CLAIM_CONFIG,
     )
@@ -163,9 +177,9 @@ def test_unmatched_control_screen_domain_decision_is_positive_requires_all_predi
 def test_unmatched_control_screen_domain_decision_na_differential_is_not_positive() -> None:
     result = unmatched_control_screen_domain_decision_is_positive(
         None,
-        MetricResult(1.0, 10),
-        MetricResult(0.0, 10),
-        MetricResult(0.0, 10),
+        MetricResult(value=1.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
+        MetricResult(value=0.0, denominator=10),
         PROPOSAL_SCREEN_CONFIG,
         CAPABILITY_CLAIM_CONFIG,
     )
@@ -175,11 +189,11 @@ def test_unmatched_control_screen_domain_decision_na_differential_is_not_positiv
 def test_candidate_free_screen_domain_predicate_boundary() -> None:
     maximum = CAPABILITY_CLAIM_CONFIG.candidate_free_anchor_target_f1_maximum
     assert candidate_free_screen_domain_predicate(
-        MetricResult(maximum - 0.01, 10), CAPABILITY_CLAIM_CONFIG
+        MetricResult(value=maximum - 0.01, denominator=10), CAPABILITY_CLAIM_CONFIG
     )
     assert not candidate_free_screen_domain_predicate(
-        MetricResult(maximum, 10), CAPABILITY_CLAIM_CONFIG
+        MetricResult(value=maximum, denominator=10), CAPABILITY_CLAIM_CONFIG
     )
     assert not candidate_free_screen_domain_predicate(
-        MetricResult(None, 0), CAPABILITY_CLAIM_CONFIG
+        MetricResult(value=None, denominator=0), CAPABILITY_CLAIM_CONFIG
     )

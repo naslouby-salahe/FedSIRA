@@ -73,9 +73,9 @@ def balanced_capability_selection(
     selected_count = min(len(root_cause_a_row_ids), len(root_cause_b_row_ids))
     separator = SeedNamespace.ATTACK_GENERATION.value
     ordered_a = deterministic_order(
-        root_cause_a_row_ids, separator, attack_generation_namespace_seed
+        tuple(root_cause_a_row_ids), separator, attack_generation_namespace_seed
     )
     ordered_b = deterministic_order(
-        root_cause_b_row_ids, separator, attack_generation_namespace_seed
+        tuple(root_cause_b_row_ids), separator, attack_generation_namespace_seed
     )
     return ordered_a[:selected_count], ordered_b[:selected_count]

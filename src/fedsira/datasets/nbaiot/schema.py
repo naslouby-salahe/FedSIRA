@@ -26,7 +26,7 @@ class NBaiotDomain(StrEnum):
     SAMSUNG_WEBCAM = "Samsung Webcam"
 
 
-class NBaiotDirectory(StrEnum):
+class _NBaiotDirectory(StrEnum):
     DANMINI_DOORBELL = "Danmini_Doorbell"
     ENNIO_DOORBELL = "Ennio_Doorbell"
     ECOBEE_THERMOSTAT = "Ecobee_Thermostat"
@@ -105,26 +105,26 @@ def normalize_path_token(raw_token: RelativePathText) -> PathToken:
 
 def resolve_domain(directory_name: RelativePathText) -> NBaiotDomain | None:
     try:
-        directory = NBaiotDirectory(directory_name)
+        directory = _NBaiotDirectory(directory_name)
     except ValueError:
         return None
-    if directory is NBaiotDirectory.DANMINI_DOORBELL:
+    if directory is _NBaiotDirectory.DANMINI_DOORBELL:
         return NBaiotDomain.DANMINI_DOORBELL
-    if directory is NBaiotDirectory.ENNIO_DOORBELL:
+    if directory is _NBaiotDirectory.ENNIO_DOORBELL:
         return NBaiotDomain.ENNIO_DOORBELL
-    if directory is NBaiotDirectory.ECOBEE_THERMOSTAT:
+    if directory is _NBaiotDirectory.ECOBEE_THERMOSTAT:
         return NBaiotDomain.ECOBEE_THERMOSTAT
-    if directory is NBaiotDirectory.PHILIPS_BABY_MONITOR:
+    if directory is _NBaiotDirectory.PHILIPS_BABY_MONITOR:
         return NBaiotDomain.PHILIPS_BABY_MONITOR
-    if directory is NBaiotDirectory.PROVISION_PT737E_CAMERA:
+    if directory is _NBaiotDirectory.PROVISION_PT737E_CAMERA:
         return NBaiotDomain.PROVISION_PT737E_CAMERA
-    if directory is NBaiotDirectory.PROVISION_PT838_CAMERA:
+    if directory is _NBaiotDirectory.PROVISION_PT838_CAMERA:
         return NBaiotDomain.PROVISION_PT838_CAMERA
-    if directory is NBaiotDirectory.SIMPLEHOME_1002_CAMERA:
+    if directory is _NBaiotDirectory.SIMPLEHOME_1002_CAMERA:
         return NBaiotDomain.SIMPLEHOME_1002_CAMERA
-    if directory is NBaiotDirectory.SIMPLEHOME_1003_CAMERA:
+    if directory is _NBaiotDirectory.SIMPLEHOME_1003_CAMERA:
         return NBaiotDomain.SIMPLEHOME_1003_CAMERA
-    if directory is NBaiotDirectory.SAMSUNG_WEBCAM:
+    if directory is _NBaiotDirectory.SAMSUNG_WEBCAM:
         return NBaiotDomain.SAMSUNG_WEBCAM
     raise ValueError(f"unsupported N-BaIoT directory: {directory.value}")
 

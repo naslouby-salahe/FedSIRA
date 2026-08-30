@@ -2,7 +2,11 @@ import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.learning.aggregation import model_parameter, model_state_from_classifier
-from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round, train_one_client_locally
+from fedsira.learning.federated import (
+    LocalTrainingClient,
+    run_fedavg_round,
+    train_one_client_locally,
+)
 from fedsira.models.mlp import FedSIRAClassifier
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

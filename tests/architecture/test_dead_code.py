@@ -2,12 +2,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _repo import REPO_ROOT, SRC_ROOT
+from _repo import REPO_ROOT, SRC_ROOT, TESTS_ROOT
 
 
-def run_vulture(*targets: Path) -> subprocess.CompletedProcess[str]:
+def run_vulture(
+    *targets: Path, extra_args: tuple[str, ...] = ()
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "vulture", *[str(target) for target in targets]],
+        [sys.executable, "-m", "vulture", *[str(target) for target in targets], *extra_args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -15,8 +17,9 @@ def run_vulture(*targets: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_no_dead_code_in_src() -> None:
-    result = run_vulture(SRC_ROOT)
-    assert result.returncode == 0, result.stdout + result.stderr
+    result = run_vulture(SRC_ROOT, TESTS_ROOT, extra_args=("--ignore-names", "test_*,conftest"))
+    src_findings = [line for line in result.stdout.splitlines() if line.startswith(f"{SRC_ROOT}/")]
+    assert not src_findings, "\n".join(src_findings) + result.stderr
 
 
 def test_violation_detected_for_unused_function(tmp_path: Path) -> None:

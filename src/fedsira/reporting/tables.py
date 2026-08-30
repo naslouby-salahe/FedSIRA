@@ -10,6 +10,8 @@ from fedsira.analysis.comparisons import (
     ComparisonReferenceKind,
     ComparisonResult,
     ComparisonState,
+    ComparisonTestKind,
+    MaterialityDirection,
 )
 from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.records import (
@@ -19,8 +21,16 @@ from fedsira.domain.records import (
     TableName,
     TextValue,
 )
-from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
+from fedsira.experiments.collapse import (
+    CollapseDecision,
+    CollapseDecisionKind,
+    ProductionUpdateRule,
+    ReproductionRowRequirement,
+    ResolvedCore,
+    RowVerificationMode,
+)
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.experiments.registry import ExperimentClass
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Dataset and Domain Protocol",
@@ -79,11 +89,15 @@ def format_p_value(
     return f"{value:.{rounding.p_value_significant_digits}g}"
 
 
+def _experiment_class_label(experiment_class: ExperimentClass) -> TextValue:
+    return experiment_class.value
+
+
 def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
     rows = tuple(
         (
             planned.definition.name,
-            planned.definition.experiment_class.value,
+            _experiment_class_label(planned.definition.experiment_class),
             str(len(planned.definition.methods)),
             str(len(planned.definition.conditions)),
             str(planned.definition.seed_count),
@@ -115,7 +129,7 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
 
 def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
     if definition.reference_kind is ComparisonReferenceKind.ZERO:
-        return "zero"
+        return ComparisonReferenceKind.ZERO.value
     if (
         definition.reference_experiment == definition.experiment
         and definition.reference_scenario == definition.scientific_scenario
@@ -147,26 +161,27 @@ def _statistical_summary_row(
         "NA"
         if comparison.confidence_interval is None
         else (
-            f"[{comparison.confidence_interval[0]:.3f},"
-            f"{comparison.confidence_interval[1]:.3f}]"
+            f"[{comparison.confidence_interval[0]:.3f}," f"{comparison.confidence_interval[1]:.3f}]"
         )
     )
     margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
     materiality = (
-        "NA"
-        if definition.material_threshold is None
-        else f"{definition.material_threshold:.3f}"
+        "NA" if definition.material_threshold is None else f"{definition.material_threshold:.3f}"
     )
     reference_label = _comparison_reference_label(definition)
     comparison_identity = (
         f"{definition.method} vs {reference_label} | "
         f"{definition.scientific_scenario} | {definition.metric.value}"
     )
+    test_kind: ComparisonTestKind = definition.test_kind
+    materiality_direction: MaterialityDirection = definition.materiality_direction
     return (
         family.family.value,
         comparison_identity,
         definition.metric.value,
         definition.orientation.value,
+        test_kind.value,
+        materiality_direction.value,
         margin,
         str(comparison.complete_seed_count),
         format_metric_value(comparison.mean_paired_difference, rounding),
@@ -199,6 +214,8 @@ def render_statistical_summary_table(
                 "comparison",
                 "metric",
                 "direction",
+                "test_kind",
+                "materiality_direction",
                 "margin",
                 "n_pairs",
                 "mean_difference",
@@ -230,6 +247,10 @@ def render_claim_support_table(
     )
 
 
+def _decision_kind_label(kind: CollapseDecisionKind) -> TextValue:
+    return kind.value
+
+
 def render_collapse_decisions_table(
     decisions: tuple[CollapseDecision, ...],
     resolved_core: ResolvedCore,
@@ -237,20 +258,25 @@ def render_collapse_decisions_table(
 ) -> RenderedTable:
     decision_rows = tuple(
         (
-            decision.kind.value,
+            _decision_kind_label(decision.kind),
             decision.primary_material_effect or "NA",
             format_p_value(decision.adjusted_p_value, rounding),
             "pass" if decision.constraint_passes else "fail",
             "mechanical",
             "survives" if decision.survives else "removed",
             "survives" if decision.survives else "removed",
+            "NA",
+            "NA",
         )
         for decision in decisions
     )
     source_influence = (
-        "source-excluded"
-        if resolved_core.direct_source_exclusion_survives
-        else "source-influenced"
+        "source-excluded" if resolved_core.direct_source_exclusion_survives else "source-influenced"
+    )
+    production_update_rule: ProductionUpdateRule = resolved_core.production_update_rule
+    row_verification_mode: RowVerificationMode = resolved_core.row_verification_mode
+    reproduction_row_requirement: ReproductionRowRequirement = (
+        resolved_core.reproduction_row_requirement
     )
     resolved_row = (
         "resolved core",
@@ -259,7 +285,9 @@ def render_collapse_decisions_table(
         source_influence,
         "mapping",
         "NA",
-        resolved_core.production_update_rule.value,
+        production_update_rule.value,
+        row_verification_mode.value,
+        reproduction_row_requirement.value,
     )
     return RenderedTable(
         name="Collapse Decisions",
@@ -272,6 +300,8 @@ def render_collapse_decisions_table(
                 "survival_rule",
                 "observed_outcome",
                 "core_action",
+                "row_verification_mode",
+                "reproduction_row_requirement",
             ),
             (*decision_rows, resolved_row),
         ),

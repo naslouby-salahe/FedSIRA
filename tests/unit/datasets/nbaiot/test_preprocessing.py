@@ -370,8 +370,8 @@ def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) ->
     assert parquet_path.exists()
     frame: pandas.DataFrame = pandas.read_parquet(parquet_path)
     assert len(frame) == view.row_count
-    sample_ids = cast(pandas.Series[str], frame["sample_id"])
-    labels = cast(pandas.Series[str], frame["label"])
+    sample_ids = cast("pandas.Series[str]", frame["sample_id"])
+    labels = cast("pandas.Series[str]", frame["label"])
     assert tuple(sample_ids) == view.sample_ids
     assert tuple(labels) == view.labels
     for feature_name in moments.feature_names:

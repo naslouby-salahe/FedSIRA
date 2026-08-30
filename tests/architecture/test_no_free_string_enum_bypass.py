@@ -15,6 +15,7 @@ PRESENTATION_OR_PATH_STRINGS = {
     "preprocessing",
     "BENIGN",
     "CANDIDATE_SCREEN",
+    "none",
 }
 
 

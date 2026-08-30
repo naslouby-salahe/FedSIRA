@@ -9,13 +9,12 @@ from fedsira.baselines.registry import (
     BaselineValidationFixture,
 )
 from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
-from fedsira.domain.enums import DatasetId, RootCauseMixture
+from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.records import (
     ConditionName,
     ExperimentName,
     FrozenDomainModel,
     MethodName,
-    ScenarioName,
     ScientificCellCount,
     SeedCount,
 )
@@ -252,14 +251,14 @@ def epistemic_strength_tokens(failure_type: EpistemicFailureType) -> tuple[Condi
     return ("0.25", "0.50", "1.00")
 
 
-def ablation_scenario_for_variant(variant: AblationVariant) -> ScenarioName:
+def ablation_scenario_for_variant(variant: AblationVariant) -> AblationScenario:
     if variant is AblationVariant.NO_PROPOSAL_SCREEN:
-        return AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL.value
+        return AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL
     if variant in (
         AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
         AblationVariant.NO_MATCHED_CONTROL,
     ):
-        return AblationScenario.GENERIC_HARD_SUPPORTED_EXAMPLES.value
+        return AblationScenario.GENERIC_HARD_SUPPORTED_EXAMPLES
     if variant in (
         AblationVariant.FULL_FEDSIRA,
         AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW,
@@ -267,35 +266,35 @@ def ablation_scenario_for_variant(variant: AblationVariant) -> ScenarioName:
         AblationVariant.NO_ORIGIN_EXCLUSION,
         AblationVariant.BYZANTINE_REPRODUCER_COPIES_SOURCE,
     ):
-        return AblationScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value
+        return AblationScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
     if variant is AblationVariant.ONE_INDEPENDENT_REPRODUCTION:
-        return AblationScenario.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value
+        return AblationScenario.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0
     if variant in (
         AblationVariant.MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION,
         AblationVariant.GENERIC_THREE_ROW_THRESHOLD,
     ):
-        return AblationScenario.ONE_MALICIOUS_REPRODUCER.value
+        return AblationScenario.ONE_MALICIOUS_REPRODUCER
     if variant is AblationVariant.SAME_CONTEXT_VERIFICATION_ONLY:
-        return AblationScenario.NATURAL.value
+        return AblationScenario.NATURAL
     if variant in (
         AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION,
         AblationVariant.NO_FINAL_SYNTHESIS_GATE,
     ):
-        return AblationScenario.FEATURE_SHIFT_1_0.value
+        return AblationScenario.FEATURE_SHIFT_1_0
     if variant is AblationVariant.CANDIDATE_FREE_REPRODUCTION:
-        return AblationScenario.LEGITIMATE_TARGET_CAPABILITY.value
+        return AblationScenario.LEGITIMATE_TARGET_CAPABILITY
     if variant is AblationVariant.DIRECT_KRUM_OF_RETRAINS:
-        return AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER.value
+        return AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER
     if variant is AblationVariant.RANDOM_COMMITTEE_PROFILE:
-        return AblationScenario.ONE_COMPROMISED_VERIFIER.value
+        return AblationScenario.ONE_COMPROMISED_VERIFIER
     if variant is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
-        return AblationScenario.UNDER_SPECIFICATION_FIXTURE.value
+        return AblationScenario.UNDER_SPECIFICATION_FIXTURE
     raise ValueError(f"unmapped ablation variant {variant}")
 
 
 _BASELINE_FIXTURE_BY_METHOD: tuple[tuple[MethodName, ConditionName], ...] = tuple(
     (identity.value, fixture.value)
-    for identity, fixture in BASELINE_VALIDATION_FIXTURE_MAP.items()
+    for identity, fixture in BASELINE_VALIDATION_FIXTURE_MAP
     if fixture
     in (
         BaselineValidationFixture.LEGITIMATE_TARGET_CAPABILITY,
@@ -314,9 +313,7 @@ def baseline_validation_fixture_for_method(method: MethodName) -> ConditionName:
 
 _BASELINE_METHODS = tuple(method for method, _fixture in _BASELINE_FIXTURE_BY_METHOD)
 _BASELINE_FIXTURES = _unique(fixture for _method, fixture in _BASELINE_FIXTURE_BY_METHOD)
-_ABLATION_SCENARIOS = _unique(
-    ablation_scenario_for_variant(variant) for variant in AblationVariant
-)
+_ABLATION_SCENARIOS = _unique(ablation_scenario_for_variant(variant) for variant in AblationVariant)
 
 EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
@@ -362,7 +359,10 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
         name=SINGLE_REPRODUCTION_NECESSITY_NAME,
         experiment_class=ExperimentClass.EXPLORATORY,
-        methods=(BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value, "Full Plurality Path"),
+        methods=(
+            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+            CoreMethodIdentity.FULL_PLURALITY_PATH.value,
+        ),
         conditions=tuple(condition.value for condition in PluralityCondition),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=60,
@@ -396,7 +396,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         experiment_class=ExperimentClass.CONFIRMATORY,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.FEDAVG_REFERENCE.value,
             BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
             BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
@@ -431,7 +431,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
         experiment_class=ExperimentClass.ROBUSTNESS,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
             BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
@@ -456,7 +456,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=BYZANTINE_BOUND_VIOLATION_NAME,
         experiment_class=ExperimentClass.FAILURE_BOUNDARY,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
         ),
         conditions=tuple(condition.value for condition in BoundCondition),
@@ -468,7 +468,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
         name=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
         experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=("Resolved FedSIRA Core",),
+        methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
         conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
         seed_count=_MASTER_SEED_COUNT,
         nominal_cell_count=40,
@@ -478,7 +478,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
     ExperimentDefinition(
         name=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
         experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=("Resolved FedSIRA Core",),
+        methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
         conditions=tuple(
             f"{failure_type.value}|{strength}"
             for failure_type in EpistemicFailureType
@@ -503,7 +503,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
         experiment_class=ExperimentClass.ROBUSTNESS,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
             BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
@@ -518,7 +518,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=ADMISSION_DELAY_DECOMPOSITION_NAME,
         experiment_class=ExperimentClass.DIAGNOSTIC,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
         ),
@@ -532,7 +532,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=EFFICIENCY_MEASUREMENT_NAME,
         experiment_class=ExperimentClass.DIAGNOSTIC,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
             BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
@@ -547,7 +547,7 @@ EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
         name=SECONDARY_DATASET_GENERALIZATION_NAME,
         experiment_class=ExperimentClass.GENERALIZATION,
         methods=(
-            "Resolved FedSIRA Core",
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
             BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
             BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
             BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,

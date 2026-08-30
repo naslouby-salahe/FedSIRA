@@ -22,7 +22,7 @@ def test_direct_krum_committee_rows_filters_abstaining_and_requires_committee_si
         )
         for domain in NBAIOT_DOMAIN_ORDER[:6]
     )
-    flags = [True, False, True, True, True, True]
+    flags = (True, False, True, True, True, True)
     committee = direct_krum_committee_rows(rows, flags, 5)
     assert committee is not None
     assert len(committee) == 5
@@ -37,7 +37,7 @@ def test_direct_krum_committee_rows_none_when_insufficient_non_abstaining_rows()
         )
         for domain in NBAIOT_DOMAIN_ORDER[:4]
     )
-    flags = [True, True, False, False]
+    flags = (True, True, False, False)
     assert direct_krum_committee_rows(rows, flags, 5) is None
 
 
@@ -50,10 +50,10 @@ def test_validate_three_row_coordinate_median_committee_size_matches_config() ->
 
 
 def test_coordinate_wise_median_synthesis_is_coordinatewise_median_of_three_rows() -> None:
-    rows = [
+    rows = (
         torch.tensor([1.0, 5.0, -1.0]),
         torch.tensor([2.0, 0.0, 0.0]),
         torch.tensor([3.0, -5.0, 1.0]),
-    ]
+    )
     median = coordinate_wise_median_synthesis(rows)
     assert torch.equal(median, torch.tensor([2.0, 0.0, 0.0]))

@@ -213,11 +213,7 @@ def _load_collapse_decisions(
             store,
         )
         matched_family = next(
-            (
-                result.family
-                for result in comparison_results
-                if result.family in _COLLAPSE_FAMILIES
-            ),
+            (result.family for result in comparison_results if result.family in _COLLAPSE_FAMILIES),
             None,
         )
         if matched_family is None:

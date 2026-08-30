@@ -88,13 +88,16 @@ def test_validate_no_safety_claim_before_tau_k_rejects_early_claim() -> None:
 
 
 def test_deduplicate_reports_by_proxy_keeps_first_report_per_domain() -> None:
-    reports = [
+    reports = (
         (DOMAIN_A, TernaryOutcome.POSITIVE),
         (DOMAIN_A, TernaryOutcome.NEGATIVE),
         (DOMAIN_B, TernaryOutcome.ABSTAIN),
-    ]
+    )
     deduplicated = deduplicate_reports_by_proxy(reports)
-    assert deduplicated == {DOMAIN_A: TernaryOutcome.POSITIVE, DOMAIN_B: TernaryOutcome.ABSTAIN}
+    assert deduplicated == (
+        (DOMAIN_A, TernaryOutcome.POSITIVE),
+        (DOMAIN_B, TernaryOutcome.ABSTAIN),
+    )
 
 
 def test_validate_exactly_one_source_domain() -> None:

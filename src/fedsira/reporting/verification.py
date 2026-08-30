@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedsira.analysis.claims import FinalClaimState, ClaimStateResult
+from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     BooleanValue,
@@ -11,7 +11,7 @@ from fedsira.domain.records import (
     ReportVerificationFailure,
     ScientificCellCount,
 )
-from fedsira.experiments.execution import PersistedExecutionRecord, TERMINAL_EXPERIMENT_STATES
+from fedsira.experiments.execution import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
 
 

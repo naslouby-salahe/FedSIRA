@@ -14,7 +14,7 @@ from typing import Annotated, Protocol, TypeAlias, cast
 
 from pydantic import Field
 
-from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain, ScientificConfig
+from fedsira.config.schema import SamplingCapsPerDomain, ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import (
     SecondaryCsvFile,
     compute_dataset_manifest_hash,
@@ -106,16 +106,13 @@ class _ParquetScalarKind(StrEnum):
     FLOAT64 = "float64"
 
 
-class _ArrowDataType(Protocol):
-    pass
+class _ArrowDataType(Protocol): ...
 
 
-class _ArrowArray(Protocol):
-    pass
+class _ArrowArray(Protocol): ...
 
 
-class _ArrowSchema(Protocol):
-    pass
+class _ArrowSchema(Protocol): ...
 
 
 class _ArrowTable(Protocol):
@@ -362,53 +359,6 @@ def parse_complete_case_rows(
     return tuple(retained), tuple(excluded)
 
 
-def assign_pseudo_domains(
-    dataset_manifest_hash: DatasetManifestDigest,
-    normalized_label: DatasetClassToken,
-    stable_row_ids: tuple[ArtifactDigest, ...],
-    pseudo_domain_partition_salt: PartitionSalt,
-) -> tuple[CICIoT2023PseudoDomain, ...]:
-    return tuple(
-        hash_to_pseudo_domain(
-            dataset_manifest_hash,
-            normalized_label,
-            stable_row_id,
-            pseudo_domain_partition_salt,
-        )
-        for stable_row_id in stable_row_ids
-    )
-
-
-def order_group_by_stable_row_id(
-    stable_row_ids: tuple[ArtifactDigest, ...],
-) -> tuple[ArtifactDigest, ...]:
-    return tuple(sorted(stable_row_ids, key=bytes.fromhex))
-
-
-def assign_group_local_roles(
-    normalized_label: DatasetClassToken,
-    stable_row_ids_ascending: tuple[ArtifactDigest, ...],
-    role_intervals: RoleIntervals,
-) -> tuple[Role | None, ...]:
-    if stable_row_ids_ascending != order_group_by_stable_row_id(stable_row_ids_ascending):
-        raise ValueError(
-            "CICIoT2023 group rows must be ordered by stable_row_id before role assignment"
-        )
-    windows = (
-        target_role_windows(role_intervals)
-        if normalized_label == TARGET_LABEL
-        else supported_role_windows(role_intervals)
-    )
-    group_size = len(stable_row_ids_ascending)
-    if group_size == 0:
-        return ()
-    roles: list[Role | None] = []
-    for group_local_index in range(group_size):
-        normalized_position: RolePosition = group_local_index / group_size
-        roles.append(role_for_normalized_position(normalized_position, windows))
-    return tuple(roles)
-
-
 def sampling_cap_for_secondary_role(
     caps: SamplingCapsPerDomain,
     normalized_label: DatasetClassToken,
@@ -467,86 +417,6 @@ def secondary_sampling_selection_key(
     return digest, stable_row_id
 
 
-def apply_secondary_sampling_cap(
-    dataset_manifest_hash: DatasetManifestDigest,
-    normalized_label: DatasetClassToken,
-    pseudo_domain: CICIoT2023PseudoDomain,
-    role: Role,
-    stable_row_ids: tuple[ArtifactDigest, ...],
-    cap: SamplingCap | None,
-) -> tuple[ArtifactDigest, ...]:
-    if cap is None or len(stable_row_ids) <= cap:
-        return stable_row_ids
-    return tuple(
-        sorted(
-            stable_row_ids,
-            key=lambda stable_row_id: secondary_sampling_selection_key(
-                dataset_manifest_hash,
-                normalized_label,
-                pseudo_domain,
-                role,
-                stable_row_id,
-            ),
-        )[:cap]
-    )
-
-
-def assign_secondary_roles(
-    rows: tuple[SecondaryRetainedRow, ...],
-    role_intervals: RoleIntervals,
-    sampling_caps: SamplingCapsPerDomain,
-    dataset_manifest_hash: DatasetManifestDigest,
-) -> tuple[SecondaryRoleAssignment, ...]:
-    groups = tuple(
-        sorted(
-            frozenset((row.normalized_label, row.pseudo_domain) for row in rows),
-            key=lambda group: (group[0], int(group[1])),
-        )
-    )
-    assignments: list[SecondaryRoleAssignment] = []
-    for normalized_label, pseudo_domain in groups:
-        group_rows = tuple(
-            sorted(
-                (
-                    row
-                    for row in rows
-                    if row.normalized_label == normalized_label
-                    and row.pseudo_domain is pseudo_domain
-                ),
-                key=lambda row: bytes.fromhex(row.stable_row_id),
-            )
-        )
-        stable_row_ids = tuple(row.stable_row_id for row in group_rows)
-        roles = assign_group_local_roles(normalized_label, stable_row_ids, role_intervals)
-        ordered_roles = (
-            TARGET_ROLE_ORDER if normalized_label == TARGET_LABEL else SUPPORTED_ROLE_ORDER
-        )
-        for role in ordered_roles:
-            role_ids = tuple(
-                stable_row_id
-                for stable_row_id, assigned_role in zip(stable_row_ids, roles, strict=True)
-                if assigned_role is role
-            )
-            selected_ids = apply_secondary_sampling_cap(
-                dataset_manifest_hash,
-                normalized_label,
-                pseudo_domain,
-                role,
-                role_ids,
-                sampling_cap_for_secondary_role(sampling_caps, normalized_label, role),
-            )
-            assignments.extend(
-                SecondaryRoleAssignment(
-                    stable_row_id=stable_row_id,
-                    normalized_label=normalized_label,
-                    pseudo_domain=pseudo_domain,
-                    role=role,
-                )
-                for stable_row_id in selected_ids
-            )
-    return tuple(assignments)
-
-
 def _sqlite_int(value: SqliteScalar) -> NonNegativeInt:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise TypeError(f"expected non-negative SQLite integer, received {type(value).__name__}")
@@ -565,7 +435,7 @@ def _sqlite_bytes(value: SqliteScalar) -> FeaturePayloadBytes:
     return value
 
 
-class _SecondaryPreparationStore:
+class SecondaryPreparationStore:
     def __init__(self, database_path: Path) -> None:
         database_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(database_path)
@@ -858,7 +728,7 @@ def _unpack_features(payload: FeaturePayloadBytes) -> FeatureVector:
 
 
 def _assign_group_role(
-    store: _SecondaryPreparationStore,
+    store: SecondaryPreparationStore,
     group: _GroupIdentity,
     role: Role,
     config: ScientificConfig,
@@ -929,23 +799,21 @@ def _assign_group_role(
     store.add_role_assignments(group, role, selected_ids)
 
 
-def _assign_roles(
-    store: _SecondaryPreparationStore,
+def assign_roles(
+    store: SecondaryPreparationStore,
     config: ScientificConfig,
     dataset_manifest_hash: DatasetManifestDigest,
 ) -> None:
     for group in store.groups():
         ordered_roles = (
-            TARGET_ROLE_ORDER
-            if group.normalized_label == TARGET_LABEL
-            else SUPPORTED_ROLE_ORDER
+            TARGET_ROLE_ORDER if group.normalized_label == TARGET_LABEL else SUPPORTED_ROLE_ORDER
         )
         for role in ordered_roles:
             _assign_group_role(store, group, role, config, dataset_manifest_hash)
 
 
 def _fit_secondary_scaler(
-    store: _SecondaryPreparationStore,
+    store: SecondaryPreparationStore,
     predictor_columns: tuple[DatasetColumnName, ...],
     config: ScientificConfig,
 ) -> FeatureMoments:
@@ -1011,8 +879,7 @@ def _append_prepared_batch(
         *(_ParquetScalarKind.FLOAT64 for _ in predictor_columns),
     )
     feature_columns = tuple(
-        tuple(row.features[index] for row in batch)
-        for index in range(len(predictor_columns))
+        tuple(row.features[index] for row in batch) for index in range(len(predictor_columns))
     )
     columns: tuple[tuple[ParquetScalar, ...], ...] = (
         tuple(row.stable_row_id for row in batch),
@@ -1023,7 +890,7 @@ def _append_prepared_batch(
 
 
 def _write_prepared_views(
-    store: _SecondaryPreparationStore,
+    store: SecondaryPreparationStore,
     predictor_columns: tuple[DatasetColumnName, ...],
     scaler: FeatureMoments,
     config: ScientificConfig,
@@ -1137,7 +1004,7 @@ def _append_exclusion_batch(
     return _append_columns(path, names, kinds, columns, writer)
 
 
-def _write_exclusions(store: _SecondaryPreparationStore, path: Path) -> None:
+def _write_exclusions(store: SecondaryPreparationStore, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     writer: _ParquetWriter | None = None
     batch: list[SecondaryExcludedRow] = []
@@ -1203,7 +1070,7 @@ def _append_role_batch(
     return _append_columns(path, names, kinds, columns, writer)
 
 
-def _write_role_manifest(store: _SecondaryPreparationStore, path: Path) -> None:
+def _write_role_manifest(store: SecondaryPreparationStore, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     writer: _ParquetWriter | None = None
     batch: list[SecondaryRoleAssignment] = []
@@ -1256,7 +1123,7 @@ def _view_key(
 
 
 def _persist_complete_case_batch(
-    store: _SecondaryPreparationStore,
+    store: SecondaryPreparationStore,
     raw_batch: tuple[SecondaryRawRow, ...],
     item: SecondaryCsvFile,
     header: tuple[DatasetColumnName, ...],
@@ -1310,7 +1177,7 @@ def _is_physical_row_identifier(
         return row_count > 0
 
 
-def _resolve_row_identifier_columns(
+def resolve_row_identifier_columns(
     discovered: tuple[SecondaryCsvFile, ...],
     header: tuple[DatasetColumnName, ...],
     label_column: DatasetColumnName,
@@ -1344,7 +1211,7 @@ def materialize_ciciot2023_prepared_views(
     label_column = resolve_label_column(reference_header)
     for item in discovered[1:]:
         validate_consistent_header(reference_header, read_csv_header(item.absolute_path))
-    row_identifier_columns = _resolve_row_identifier_columns(
+    row_identifier_columns = resolve_row_identifier_columns(
         discovered,
         reference_header,
         label_column,
@@ -1357,7 +1224,7 @@ def materialize_ciciot2023_prepared_views(
     database_path = cache_root / "ciciot2023_preparation.sqlite3"
     if overwrite and database_path.exists():
         database_path.unlink()
-    store = _SecondaryPreparationStore(database_path)
+    store = SecondaryPreparationStore(database_path)
     store.reset()
     raw_labels: set[ClassLabel] = set()
     raw_row_count: RowCount = 0
@@ -1369,7 +1236,9 @@ def materialize_ciciot2023_prepared_views(
                 try:
                     observed_header = tuple(next(reader))
                 except StopIteration as error:
-                    raise ValueError(f"CICIoT2023 CSV shard is empty: {item.relative_path}") from error
+                    raise ValueError(
+                        f"CICIoT2023 CSV shard is empty: {item.relative_path}"
+                    ) from error
                 validate_consistent_header(
                     reference_header,
                     tuple(column.strip(" \t\r\n\f\v") for column in observed_header),
@@ -1418,7 +1287,7 @@ def materialize_ciciot2023_prepared_views(
         normalized_labels = frozenset(normalize_label(label) for label in raw_labels)
         validate_target_label_present(normalized_labels)
         class_registry = build_class_registry(normalized_labels)
-        _assign_roles(store, config, dataset_manifest_hash)
+        assign_roles(store, config, dataset_manifest_hash)
         scaler = _fit_secondary_scaler(store, predictor_columns, config)
         views = _write_prepared_views(store, predictor_columns, scaler, config, prepared_root)
         metadata_root.mkdir(parents=True, exist_ok=True)

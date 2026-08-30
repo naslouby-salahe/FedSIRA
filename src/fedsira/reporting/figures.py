@@ -173,9 +173,7 @@ def render_efficiency_profile(
     methods = tuple(
         sorted(
             frozenset(
-                observation.method
-                for observation in metric_values
-                if observation.metric == metric
+                observation.method for observation in metric_values if observation.metric == metric
             )
         )
     )

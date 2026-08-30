@@ -6,7 +6,7 @@ from fedsira.baselines.registry import POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOC
 from fedsira.config.schema import BaselinesConfig, MaterialityConfig
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import PositiveInt, Probability
+from fedsira.domain.records import BooleanValue, PositiveInt, Probability, ReviewerCount
 
 CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.CANDIDATE_SCREEN,
@@ -21,7 +21,7 @@ INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS: Final[PositiveInt] = 2
 
 def client_review_direct_admission_production_is_source(
     production_update: torch.Tensor, source_update: torch.Tensor
-) -> bool:
+) -> BooleanValue:
     return torch.equal(production_update, source_update)
 
 
@@ -33,14 +33,16 @@ def validate_client_review_composite_screen(roles: tuple[Role, ...]) -> None:
         )
 
 
-def validate_client_review_reviewer_count(reviewer_count: int) -> None:
+def validate_client_review_reviewer_count(reviewer_count: ReviewerCount) -> None:
     if reviewer_count != CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT:
         raise ValueError(
             f"client review requires exactly {CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT} reviewers"
         )
 
 
-def client_review_then_retrain_should_discard_source_weights(review_outcome: ClaimState) -> bool:
+def client_review_then_retrain_should_discard_source_weights(
+    review_outcome: ClaimState,
+) -> BooleanValue:
     return review_outcome is ClaimState.ADMITTED
 
 
@@ -49,13 +51,13 @@ def client_review_then_retrain_local_epochs() -> PositiveInt:
 
 
 def independent_local_reference_reviewer_is_positive(
-    source_satisfies_capability_contract: bool,
+    source_satisfies_capability_contract: BooleanValue,
     source_supported_macro_f1: Probability,
     local_reference_supported_macro_f1: Probability,
     source_benign_false_alarm_rate: Probability,
     local_reference_benign_false_alarm_rate: Probability,
     materiality_config: MaterialityConfig,
-) -> bool:
+) -> BooleanValue:
     if not source_satisfies_capability_contract:
         return False
     if (

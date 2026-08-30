@@ -122,7 +122,7 @@ class _CommunicationMetadataWire(FrozenDomainModel):
     payload_tensor_count: NonNegativeInt
     receiver: MessageEndpoint
     round_index: RoundIndex | None
-    schema: SchemaVersion
+    schema_version: SchemaVersion
     semantic_cell_key_hash: ArtifactDigest
     sender: MessageEndpoint
 
@@ -155,7 +155,7 @@ def encode_message_metadata(metadata: CommunicationMessageMetadata) -> EncodedBy
         payload_tensor_count=metadata.payload_tensor_count,
         receiver=metadata.receiver,
         round_index=metadata.round_index,
-        schema=COMMUNICATION_SCHEMA,
+        schema_version=COMMUNICATION_SCHEMA,
         semantic_cell_key_hash=metadata.semantic_cell_key_hash,
         sender=metadata.sender,
     )

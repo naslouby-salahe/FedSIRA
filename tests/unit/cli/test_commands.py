@@ -22,7 +22,7 @@ def test_doctor_exits_zero_when_environment_and_config_are_valid(
     monkeypatch.setattr(doctor, "collect_environment_mismatches", _no_mismatches)
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
-    assert "project stage" in result.stdout
+    assert "project progress" in result.stdout
 
 
 def test_no_args_shows_help() -> None:
@@ -38,20 +38,20 @@ def test_preprocess_accepts_only_roadmap_dataset_identities() -> None:
 def test_preprocess_without_dataset_runs_all_roadmap_datasets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[str, bool | None]] = []
+    calls: list[tuple[str, bool]] = []
 
     def record_nbaiot(overwrite: bool) -> None:
         calls.append(("N-BaIoT", overwrite))
 
-    def record_ciciot2023() -> None:
-        calls.append(("CICIoT2023", None))
+    def record_ciciot2023(overwrite: bool) -> None:
+        calls.append(("CICIoT2023", overwrite))
 
     monkeypatch.setattr(preprocess, "_preprocess_nbaiot", record_nbaiot)
     monkeypatch.setattr(preprocess, "_preprocess_ciciot2023", record_ciciot2023)
 
     preprocess.execute(None, True)
 
-    assert calls == [("N-BaIoT", True), ("CICIoT2023", None)]
+    assert calls == [("N-BaIoT", True), ("CICIoT2023", True)]
 
 
 def test_plan_prints_section_31_counts() -> None:

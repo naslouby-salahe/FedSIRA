@@ -62,11 +62,25 @@ def validate_no_safety_claim_before_tau_k(
 
 def deduplicate_reports_by_proxy(
     reports: Sequence[tuple[DomainId, TernaryOutcome]],
-) -> dict[DomainId, TernaryOutcome]:
-    deduplicated: dict[DomainId, TernaryOutcome] = {}
+) -> tuple[tuple[DomainId, TernaryOutcome], ...]:
+    seen_domains: set[DomainId] = set()
+    deduplicated: list[tuple[DomainId, TernaryOutcome]] = []
     for domain, outcome in reports:
-        deduplicated.setdefault(domain, outcome)
-    return deduplicated
+        if domain in seen_domains:
+            continue
+        seen_domains.add(domain)
+        deduplicated.append((domain, outcome))
+    return tuple(deduplicated)
+
+
+def report_for_domain(
+    deduplicated_reports: Sequence[tuple[DomainId, TernaryOutcome]],
+    domain: DomainId,
+) -> TernaryOutcome:
+    for report_domain, outcome in deduplicated_reports:
+        if report_domain == domain:
+            return outcome
+    raise KeyError(f"no deduplicated report for domain {domain!r}")
 
 
 def validate_exactly_one_source_domain(source_domains: Sequence[DomainId]) -> None:

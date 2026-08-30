@@ -1,4 +1,5 @@
 import hashlib
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 
 from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
@@ -61,7 +62,7 @@ def source_selection_order(
     source_selection_namespace_seed: NamespaceSeed,
 ) -> tuple[DomainId, ...]:
     return deterministic_order(
-        eligible_domains,
+        tuple(eligible_domains),
         SOURCE_SELECTION_SEPARATOR,
         source_selection_namespace_seed,
     )
@@ -88,7 +89,7 @@ def screen_domain_order(
     screen_domain_count: ScreenDomainCount,
 ) -> tuple[DomainId, ...]:
     ordered = deterministic_order(
-        eligible_non_source_domains,
+        tuple(eligible_non_source_domains),
         SCREEN_DOMAIN_ORDER_SEPARATOR,
         screen_domain_order_namespace_seed,
     )
@@ -111,12 +112,18 @@ def match_held_out_fold(
     held_out_controls: Sequence[ScreenLossObservation],
     other_fold_controls: Sequence[ScreenLossObservation],
 ) -> tuple[tuple[ScreenLossObservation, ScreenLossObservation], ...] | None:
-    targets_by_id = {observation.sample_id: observation for observation in held_out_targets}
-    controls_by_id = {observation.sample_id: observation for observation in held_out_controls}
+    targets_by_id = OrderedDict(
+        (observation.sample_id, observation) for observation in held_out_targets
+    )
+    controls_by_id = OrderedDict(
+        (observation.sample_id, observation) for observation in held_out_controls
+    )
     matched_ids = match_nearest_within_decile(
-        [(observation.sample_id, observation.anchor_loss) for observation in held_out_targets],
-        [(observation.sample_id, observation.anchor_loss) for observation in held_out_controls],
-        [observation.anchor_loss for observation in other_fold_controls],
+        tuple((observation.sample_id, observation.anchor_loss) for observation in held_out_targets),
+        tuple(
+            (observation.sample_id, observation.anchor_loss) for observation in held_out_controls
+        ),
+        tuple(observation.anchor_loss for observation in other_fold_controls),
     )
     if matched_ids is None:
         return None

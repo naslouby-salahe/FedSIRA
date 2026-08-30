@@ -106,7 +106,7 @@ def test_parameterized_dict_annotation_is_detected() -> None:
 def test_dictionary_construction_is_detected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         offending = Path(tmp) / "offending.py"
-        offending.write_text("VALUE = {\"a\": 1}\n")
+        offending.write_text('VALUE = {"a": 1}\n')
         assert raw_mapping_violations(parse(offending)) == ["dict-literal:1"]
 
 
@@ -114,7 +114,9 @@ def test_forbidden_symbol_usage_is_detected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         offending = Path(tmp) / "offending.py"
         offending.write_text(
-            "import typing\n\ndef handler(value):\n    return isinstance(value, dict) or typing.Any is object\n"
+            "import typing\n\n"
+            "def handler(value):\n"
+            "    return isinstance(value, dict) or typing.Any is object\n"
         )
         violations = forbidden_symbol_violations(parse(offending))
         assert "name:dict:4" in violations

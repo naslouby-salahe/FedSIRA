@@ -1,26 +1,55 @@
+from pathlib import Path
+
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.ciciot2023.acquisition import SecondaryCsvFile
 from fedsira.datasets.ciciot2023.preprocessing import (
+    SecondaryPreparationStore,
     SecondaryRawRow,
     SecondaryRetainedRow,
-    apply_secondary_sampling_cap,
-    assign_group_local_roles,
-    assign_pseudo_domains,
-    assign_secondary_roles,
+    assign_roles,
     compute_stable_row_id,
-    order_group_by_stable_row_id,
     parse_complete_case_rows,
     resolve_predictor_columns,
+    resolve_row_identifier_columns,
 )
 from fedsira.datasets.ciciot2023.schema import (
     BENIGN_LABEL,
-    PSEUDO_DOMAIN_COUNT,
     TARGET_LABEL,
     CICIoT2023PseudoDomain,
 )
 from fedsira.datasets.common import DatasetExclusionReason, Role
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
-ROLE_INTERVALS = CONFIG.datasets.primary.role_intervals
+
+
+def _store_with_rows(
+    database_path: Path,
+    label: str,
+    domain: CICIoT2023PseudoDomain,
+    row_count: int,
+) -> SecondaryPreparationStore:
+    store = SecondaryPreparationStore(database_path)
+    store.reset()
+    rows = tuple(
+        SecondaryRetainedRow(
+            stable_row_id=f"{index:064x}",
+            file_sha256="a" * 64,
+            relative_path="part.csv",
+            original_row_index=index,
+            normalized_label=label,
+            pseudo_domain=domain,
+            features=(float(index),),
+        )
+        for index in range(row_count)
+    )
+    store.add_rows(rows, ())
+    return store
+
+
+def _roles_by_stable_row_id(
+    store: SecondaryPreparationStore,
+) -> dict[str, Role]:
+    return {assignment.stable_row_id: assignment.role for assignment in store.iter_role_manifest()}
 
 
 def test_compute_stable_row_id_is_a_sha256_hex_digest() -> None:
@@ -103,37 +132,12 @@ def test_complete_case_parsing_rejects_mismatched_row_width() -> None:
         raise AssertionError("mismatched CIC row width was accepted")
 
 
-def test_assign_pseudo_domains_returns_closed_domain_values() -> None:
-    domains = assign_pseudo_domains(
-        "a" * 64,
-        TARGET_LABEL,
-        ("b" * 64, "c" * 64),
-        CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+def test_assign_roles_uses_target_windows_for_the_target_label(tmp_path: Path) -> None:
+    store = _store_with_rows(
+        tmp_path / "target.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
     )
-    assert len(domains) == 2
-    assert all(isinstance(domain, CICIoT2023PseudoDomain) for domain in domains)
-    assert all(0 <= int(domain) < PSEUDO_DOMAIN_COUNT for domain in domains)
-
-
-def test_assign_pseudo_domains_is_deterministic() -> None:
-    args = (
-        "a" * 64,
-        TARGET_LABEL,
-        ("b" * 64,),
-        CONFIG.datasets.secondary.pseudo_domain_partition_salt,
-    )
-    assert assign_pseudo_domains(*args) == assign_pseudo_domains(*args)
-
-
-def test_order_group_by_stable_row_id_sorts_ascending_by_byte_value() -> None:
-    ids = ("c" * 64, "a" * 64, "b" * 64)
-    assert order_group_by_stable_row_id(ids) == ("a" * 64, "b" * 64, "c" * 64)
-
-
-def test_assign_group_local_roles_uses_target_windows_for_the_target_label() -> None:
-    ids = tuple(f"{index:064d}" for index in range(1000))
-    roles = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
-    roles_seen = frozenset(role for role in roles if role is not None)
+    assign_roles(store, CONFIG, "b" * 64)
+    roles_seen = frozenset(_roles_by_stable_row_id(store).values())
     assert roles_seen.issubset(
         frozenset(
             (
@@ -149,10 +153,15 @@ def test_assign_group_local_roles_uses_target_windows_for_the_target_label() -> 
     assert Role.ANCHOR_TRAIN not in roles_seen
 
 
-def test_assign_group_local_roles_uses_supported_windows_for_other_labels() -> None:
-    ids = tuple(f"{index:064d}" for index in range(1000))
-    roles = assign_group_local_roles("DDOS_SYN_FLOOD", ids, ROLE_INTERVALS)
-    roles_seen = frozenset(role for role in roles if role is not None)
+def test_assign_roles_uses_supported_windows_for_other_labels(tmp_path: Path) -> None:
+    store = _store_with_rows(
+        tmp_path / "supported.sqlite3",
+        "DDOS_SYN_FLOOD",
+        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
+        1000,
+    )
+    assign_roles(store, CONFIG, "b" * 64)
+    roles_seen = frozenset(_roles_by_stable_row_id(store).values())
     assert roles_seen.issubset(
         frozenset(
             (
@@ -168,62 +177,116 @@ def test_assign_group_local_roles_uses_supported_windows_for_other_labels() -> N
     assert Role.SOURCE_PROPOSAL not in roles_seen
 
 
-def test_assign_group_local_roles_has_guard_gap_at_boundary() -> None:
-    ids = tuple(f"{index:064d}" for index in range(1000))
-    roles = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
-    assert roles[145] is None
-    assert roles[144] is Role.SOURCE_PROPOSAL
-    assert roles[150] is Role.CANDIDATE_SCREEN
-
-
-def test_assign_group_local_roles_is_deterministic() -> None:
-    ids = tuple(f"{index:064d}" for index in range(200))
-    first = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
-    second = assign_group_local_roles(TARGET_LABEL, ids, ROLE_INTERVALS)
-    assert first == second
-
-
-def test_secondary_sampling_cap_is_deterministic_and_exact() -> None:
-    stable_row_ids = tuple(f"{index:064x}" for index in range(2000))
-    first = apply_secondary_sampling_cap(
-        "a" * 64,
-        TARGET_LABEL,
-        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
-        Role.CANDIDATE_SCREEN,
-        stable_row_ids,
-        1000,
+def test_assign_roles_has_guard_gap_at_boundary(tmp_path: Path) -> None:
+    store = _store_with_rows(
+        tmp_path / "guard-gap.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
     )
-    second = apply_secondary_sampling_cap(
-        "a" * 64,
-        TARGET_LABEL,
-        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
-        Role.CANDIDATE_SCREEN,
-        stable_row_ids,
-        1000,
-    )
-    assert len(first) == 1000
-    assert first == second
-    assert len(set(first)) == len(first)
+    assign_roles(store, CONFIG, "b" * 64)
+    roles = _roles_by_stable_row_id(store)
+    assert f"{145:064x}" not in roles
+    assert roles[f"{144:064x}"] is Role.SOURCE_PROPOSAL
+    assert roles[f"{150:064x}"] is Role.CANDIDATE_SCREEN
 
 
-def test_secondary_role_assignment_never_assigns_one_row_to_multiple_roles() -> None:
-    rows = tuple(
-        SecondaryRetainedRow(
-            stable_row_id=f"{index:064x}",
-            file_sha256="a" * 64,
-            relative_path="part.csv",
-            original_row_index=index,
-            normalized_label=TARGET_LABEL,
-            pseudo_domain=CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
-            features=(float(index),),
-        )
-        for index in range(1000)
+def test_assign_roles_is_deterministic(tmp_path: Path) -> None:
+    first_store = _store_with_rows(
+        tmp_path / "first.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200
     )
-    assignments = assign_secondary_roles(
-        rows,
-        ROLE_INTERVALS,
-        CONFIG.datasets.primary.sampling_caps_per_domain,
-        "b" * 64,
+    second_store = _store_with_rows(
+        tmp_path / "second.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200
     )
-    assigned_ids = tuple(assignment.stable_row_id for assignment in assignments)
-    assert len(assigned_ids) == len(set(assigned_ids))
+    assign_roles(first_store, CONFIG, "b" * 64)
+    assign_roles(second_store, CONFIG, "b" * 64)
+    assert _roles_by_stable_row_id(first_store) == _roles_by_stable_row_id(second_store)
+
+
+def test_assign_roles_respects_sampling_cap_and_assigns_each_row_at_most_once(
+    tmp_path: Path,
+) -> None:
+    store = _store_with_rows(
+        tmp_path / "capped.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 20000
+    )
+    assign_roles(store, CONFIG, "b" * 64)
+    roles = _roles_by_stable_row_id(store)
+    candidate_screen_ids = tuple(
+        stable_row_id for stable_row_id, role in roles.items() if role is Role.CANDIDATE_SCREEN
+    )
+    expected_cap = CONFIG.datasets.primary.sampling_caps_per_domain.candidate_screen_target
+    assert len(candidate_screen_ids) == expected_cap
+    assert len(set(candidate_screen_ids)) == len(candidate_screen_ids)
+    assert len(roles) == len(set(roles))
+
+
+def _write_csv(path: Path, header: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> None:
+    lines = [",".join(header)]
+    lines.extend(",".join(row) for row in rows)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _secondary_csv_file(path: Path) -> SecondaryCsvFile:
+    return SecondaryCsvFile(absolute_path=path, relative_path=path.name, file_sha256="a" * 64)
+
+
+def test_resolve_row_identifier_columns_accepts_zero_based_sequence(tmp_path: Path) -> None:
+    path = tmp_path / "part.csv"
+    _write_csv(
+        path,
+        ("INDEX", "feature_a", "Label"),
+        (("0", "1.0", "BenignTraffic"), ("1", "2.0", "BenignTraffic")),
+    )
+    identifiers = resolve_row_identifier_columns(
+        (_secondary_csv_file(path),), ("INDEX", "feature_a", "Label"), "Label"
+    )
+    assert identifiers == frozenset({"INDEX"})
+
+
+def test_resolve_row_identifier_columns_accepts_one_based_sequence(tmp_path: Path) -> None:
+    path = tmp_path / "part.csv"
+    _write_csv(
+        path,
+        ("ROW_ID", "feature_a", "Label"),
+        (("1", "1.0", "BenignTraffic"), ("2", "2.0", "BenignTraffic")),
+    )
+    identifiers = resolve_row_identifier_columns(
+        (_secondary_csv_file(path),), ("ROW_ID", "feature_a", "Label"), "Label"
+    )
+    assert identifiers == frozenset({"ROW_ID"})
+
+
+def test_resolve_row_identifier_columns_rejects_non_identifier_names(tmp_path: Path) -> None:
+    path = tmp_path / "part.csv"
+    _write_csv(
+        path,
+        ("PROTOCOL", "feature_a", "Label"),
+        (("0", "1.0", "BenignTraffic"), ("1", "2.0", "BenignTraffic")),
+    )
+    identifiers = resolve_row_identifier_columns(
+        (_secondary_csv_file(path),), ("PROTOCOL", "feature_a", "Label"), "Label"
+    )
+    assert identifiers == frozenset()
+
+
+def test_resolve_row_identifier_columns_rejects_non_sequential_values(tmp_path: Path) -> None:
+    path = tmp_path / "part.csv"
+    _write_csv(
+        path,
+        ("INDEX", "feature_a", "Label"),
+        (("0", "1.0", "BenignTraffic"), ("2", "2.0", "BenignTraffic")),
+    )
+    identifiers = resolve_row_identifier_columns(
+        (_secondary_csv_file(path),), ("INDEX", "feature_a", "Label"), "Label"
+    )
+    assert identifiers == frozenset()
+
+
+def test_resolve_row_identifier_columns_rejects_duplicate_values(tmp_path: Path) -> None:
+    path = tmp_path / "part.csv"
+    _write_csv(
+        path,
+        ("INDEX", "feature_a", "Label"),
+        (("0", "1.0", "BenignTraffic"), ("0", "2.0", "BenignTraffic")),
+    )
+    identifiers = resolve_row_identifier_columns(
+        (_secondary_csv_file(path),), ("INDEX", "feature_a", "Label"), "Label"
+    )
+    assert identifiers == frozenset()

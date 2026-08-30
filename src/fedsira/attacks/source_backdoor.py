@@ -1,11 +1,19 @@
 import math
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 
 import torch
 
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import ArtifactDigest, NamespaceSeed, NonNegativeInt, Probability
+from fedsira.domain.records import (
+    ArtifactDigest,
+    FeatureIndex,
+    NamespaceSeed,
+    NonNegativeInt,
+    Probability,
+    TriggerFeatureValue,
+)
 from fedsira.runtime.determinism import deterministic_order
 
 ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
@@ -21,7 +29,7 @@ def attack_row_order(
     eligible_row_ids: Sequence[ArtifactDigest], attack_generation_namespace_seed: NamespaceSeed
 ) -> tuple[ArtifactDigest, ...]:
     return deterministic_order(
-        eligible_row_ids, ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
+        tuple(eligible_row_ids), ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
     )
 
 
@@ -38,8 +46,8 @@ def select_fractional_attack_rows(
 
 def apply_trigger_transform(
     standardized_features: torch.Tensor,
-    trigger_feature_indices: Sequence[int],
-    trigger_value: float,
+    trigger_feature_indices: Sequence[FeatureIndex],
+    trigger_value: TriggerFeatureValue,
 ) -> torch.Tensor:
     triggered = standardized_features.clone()
     for feature_index in trigger_feature_indices:
@@ -60,8 +68,8 @@ def select_source_backdoor_poison_rows(
 def relabel_triggered_rows_as_benign(
     labels_by_row_id: Mapping[ArtifactDigest, NBaiotClass],
     poisoned_row_ids: Sequence[ArtifactDigest],
-) -> dict[ArtifactDigest, NBaiotClass]:
-    relabeled = dict(labels_by_row_id)
+) -> Mapping[ArtifactDigest, NBaiotClass]:
+    relabeled: OrderedDict[ArtifactDigest, NBaiotClass] = OrderedDict(labels_by_row_id)
     for row_id in poisoned_row_ids:
         relabeled[row_id] = NBaiotClass.BENIGN
     return relabeled

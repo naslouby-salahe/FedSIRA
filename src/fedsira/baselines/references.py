@@ -9,7 +9,7 @@ from fedsira.baselines.registry import (
 from fedsira.config.schema import BaselinesConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.domain.records import PositiveInt
+from fedsira.domain.records import BooleanValue, PositiveInt
 
 
 def local_only_reference_local_epochs(baselines_config: BaselinesConfig) -> PositiveInt:
@@ -22,7 +22,7 @@ def local_only_reference_training_role() -> Role:
 
 def local_only_reference_evaluation_is_domain_local(
     checkpoint_domain: NBaiotDomain, evaluation_domain: NBaiotDomain
-) -> bool:
+) -> BooleanValue:
     return checkpoint_domain == evaluation_domain
 
 
@@ -58,7 +58,7 @@ def fedavg_reference_post_reference_local_epochs() -> PositiveInt:
 def fedavg_reference_post_reference_participants(
     post_reference_eligible_domains: Sequence[NBaiotDomain],
     source_domain: NBaiotDomain | None,
-    source_is_available: bool,
+    source_is_available: BooleanValue,
 ) -> tuple[NBaiotDomain, ...]:
     participant_set = set(post_reference_eligible_domains)
     if source_is_available and source_domain is not None:

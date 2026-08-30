@@ -19,7 +19,6 @@ from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
     validate_cell_phase_sequence,
     validate_cell_terminal_record,
-    validate_experiment_name_is_registered,
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
 )
@@ -53,12 +52,15 @@ def _override_workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_terminal_experiment_states_are_exact() -> None:
-    assert TERMINAL_EXPERIMENT_STATES == frozenset(
-        (
-            ExperimentLifecycleState.COMPLETED,
-            ExperimentLifecycleState.FAILED,
-            ExperimentLifecycleState.INVALID,
+    assert (
+        frozenset(
+            (
+                ExperimentLifecycleState.COMPLETED,
+                ExperimentLifecycleState.FAILED,
+                ExperimentLifecycleState.INVALID,
+            )
         )
+        == TERMINAL_EXPERIMENT_STATES
     )
 
 
@@ -101,12 +103,6 @@ def test_record_store_read_malformed_record_is_rejected(tmp_path: Path) -> None:
     next(record_dir.glob("*.json")).write_text("{not valid json")
     with pytest.raises(pydantic.ValidationError):
         store.read_all_outcomes(cell.experiment)
-
-
-def test_validate_experiment_name_is_registered_rejects_unknown() -> None:
-    validate_experiment_name_is_registered("Single-Reproduction Necessity")
-    with pytest.raises(KeyError):
-        validate_experiment_name_is_registered("Not-A-Registered-Experiment")
 
 
 def test_validate_experiment_prerequisites_requires_completed_state() -> None:

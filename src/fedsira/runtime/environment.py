@@ -265,7 +265,7 @@ def configure_deterministic_backend() -> None:
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.backends.cuda.matmul.fp32_precision = "ieee"
-    cudnn_conv = cast(_Fp32PrecisionController, torch.backends.cudnn.conv)
+    cudnn_conv = cast(_Fp32PrecisionController, getattr(torch.backends.cudnn, "conv"))
     cudnn_conv.fp32_precision = "ieee"
 
 

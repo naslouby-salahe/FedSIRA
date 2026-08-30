@@ -124,9 +124,7 @@ def resolve_core_mapping(
     external_verification_survives: BooleanValue,
 ) -> ResolvedCore:
     opening_mode = (
-        ClaimOpeningMode.PROPOSAL_ASSISTED
-        if proposal_survives
-        else ClaimOpeningMode.CANDIDATE_FREE
+        ClaimOpeningMode.PROPOSAL_ASSISTED if proposal_survives else ClaimOpeningMode.CANDIDATE_FREE
     )
     if plurality_survives and external_verification_survives:
         return ResolvedCore(
@@ -389,9 +387,7 @@ def materialize_resolved_core(
 
 RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 RESOLVED_CORE_IDENTITY_PAYLOAD: ArtifactPayloadBytes = b"RESOLVED_FEDSIRA_CORE_SECTION_18_7"
-RESOLVED_CORE_ARTIFACT_IDENTITY: ArtifactDigest = compute_checksum(
-    RESOLVED_CORE_IDENTITY_PAYLOAD
-)
+RESOLVED_CORE_ARTIFACT_IDENTITY: ArtifactDigest = compute_checksum(RESOLVED_CORE_IDENTITY_PAYLOAD)
 
 
 def publish_resolved_core(
