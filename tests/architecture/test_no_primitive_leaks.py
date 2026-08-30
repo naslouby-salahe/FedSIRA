@@ -51,6 +51,21 @@ def _record(class_node: ast.ClassDef) -> bool:
     return False
 
 
+def _function_arguments(
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.arg]:
+    arguments = [
+        *function.args.posonlyargs,
+        *function.args.args,
+        *function.args.kwonlyargs,
+    ]
+    if function.args.vararg is not None:
+        arguments.append(function.args.vararg)
+    if function.args.kwarg is not None:
+        arguments.append(function.args.kwarg)
+    return arguments
+
+
 def model_field_primitive_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for class_node in (node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)):
@@ -70,16 +85,7 @@ def function_boundary_primitive_violations(tree: ast.Module) -> list[str]:
         for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
     ):
-        arguments = [
-            *function.args.posonlyargs,
-            *function.args.args,
-            *function.args.kwonlyargs,
-        ]
-        if function.args.vararg is not None:
-            arguments.append(function.args.vararg)
-        if function.args.kwarg is not None:
-            arguments.append(function.args.kwarg)
-        for argument in arguments:
+        for argument in _function_arguments(function):
             if argument.arg in {"self", "cls"} or argument.annotation is None:
                 continue
             for primitive in _primitives(argument.annotation):
@@ -87,6 +93,23 @@ def function_boundary_primitive_violations(tree: ast.Module) -> list[str]:
         if function.returns is not None:
             for primitive in _primitives(function.returns):
                 found.append(f"{function.name}.return: {primitive}")
+    return found
+
+
+def untyped_function_boundary_violations(tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    for function in (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    ):
+        for argument in _function_arguments(function):
+            if argument.arg in {"self", "cls"}:
+                continue
+            if argument.annotation is None:
+                found.append(f"{function.name}.{argument.arg}: missing annotation")
+        if function.returns is None:
+            found.append(f"{function.name}.return: missing annotation")
     return found
 
 
@@ -136,6 +159,11 @@ def test_no_primitive_function_inputs_or_outputs() -> None:
     assert not offenders, f"Primitive production method boundaries: {offenders}"
 
 
+def test_no_untyped_function_inputs_or_outputs() -> None:
+    offenders = _all_violations(untyped_function_boundary_violations)
+    assert not offenders, f"Untyped production method boundaries: {offenders}"
+
+
 def test_config_models_use_meaning_specific_aliases() -> None:
     offenders = config_scalar_foundation_violations(parse(CONFIG_SCHEMA_FILE))
     assert not offenders, f"Config fields use storage-oriented scalar aliases: {offenders}"
@@ -153,4 +181,14 @@ def test_function_boundary_violation_detected() -> None:
         assert function_boundary_primitive_violations(parse(path)) == [
             "handler.value: str",
             "handler.return: int",
+        ]
+
+
+def test_untyped_function_boundary_violation_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text("def handler(value):\n    return value\n")
+        assert untyped_function_boundary_violations(parse(path)) == [
+            "handler.value: missing annotation",
+            "handler.return: missing annotation",
         ]
