@@ -33,14 +33,28 @@ def test_reproduction_delta_l2_weight_is_1e_5() -> None:
 
 def test_consumed_domains_only_counts_trained_attempts() -> None:
     attempts = [
-        ReproductionAttempt(DOMAIN_A, was_trained=True, is_certified=True),
-        ReproductionAttempt(DOMAIN_B, was_trained=False, is_certified=False),
+        ReproductionAttempt(
+            domain=DOMAIN_A,
+            was_trained=True,
+            is_certified=True,
+        ),
+        ReproductionAttempt(
+            domain=DOMAIN_B,
+            was_trained=False,
+            is_certified=False,
+        ),
     ]
     assert consumed_domains(attempts) == frozenset({DOMAIN_A})
 
 
 def test_consumed_domain_retained_even_if_certification_later_fails() -> None:
-    attempts = [ReproductionAttempt(DOMAIN_A, was_trained=True, is_certified=False)]
+    attempts = [
+        ReproductionAttempt(
+            domain=DOMAIN_A,
+            was_trained=True,
+            is_certified=False,
+        )
+    ]
     assert DOMAIN_A in consumed_domains(attempts)
 
 

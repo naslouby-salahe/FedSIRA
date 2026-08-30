@@ -5,9 +5,9 @@ import torch
 
 from fedsira.domain.enums import SeedNamespace
 from fedsira.runtime.determinism import (
-    canonical_bytes,
     derive_uint32,
     deterministic_order,
+    framed_bytes,
     local_training_seed,
     minibatch_order,
     namespace_seed,
@@ -42,9 +42,9 @@ def test_namespace_seed_differs_across_master_seeds() -> None:
     assert first != second
 
 
-def test_canonical_bytes_is_length_prefixed_and_unambiguous() -> None:
-    left = canonical_bytes("ab", "c")
-    right = canonical_bytes("a", "bc")
+def test_framed_bytes_is_length_prefixed_and_unambiguous() -> None:
+    left = framed_bytes("ab", "c")
+    right = framed_bytes("a", "bc")
     assert left != right
 
 

@@ -22,7 +22,11 @@ CAPABILITY_CLAIM_CONFIG = CONFIG.capability_claim
 def _results(adequate_flags: list[bool], predicate_flags: list[bool]) -> list[ScreenDomainResult]:
     paired = zip(adequate_flags, predicate_flags, strict=True)
     return [
-        ScreenDomainResult(NBAIOT_DOMAIN_ORDER[index], adequate, predicate)
+        ScreenDomainResult(
+            domain=NBAIOT_DOMAIN_ORDER[index],
+            is_evidence_adequate=adequate,
+            meets_opening_predicate=predicate,
+        )
         for index, (adequate, predicate) in enumerate(paired)
     ]
 

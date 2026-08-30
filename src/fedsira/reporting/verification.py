@@ -1,31 +1,71 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-
+from fedsira.analysis.claims import FinalClaimState, ClaimStateResult
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import CanonicalToken
-from fedsira.experiments.execution import is_terminal_experiment_state
-from fedsira.experiments.planning import ExperimentPlan
+from fedsira.domain.records import (
+    BooleanValue,
+    CheckpointIdentity,
+    ExperimentName,
+    FrozenDomainModel,
+    NonNegativeInt,
+    ReportVerificationFailure,
+    ScientificCellCount,
+)
+from fedsira.experiments.execution import PersistedExecutionRecord, TERMINAL_EXPERIMENT_STATES
+from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
 
 
-@dataclass(frozen=True)
-class CompletenessVerificationResult:
-    passed: bool
-    failures: tuple[CanonicalToken, ...]
+class ExperimentTerminalCount(FrozenDomainModel):
+    experiment: ExperimentName
+    count: ScientificCellCount
 
-    def __bool__(self) -> bool:
-        return self.passed
+
+class ExperimentLifecycleRecord(FrozenDomainModel):
+    experiment: ExperimentName
+    state: ExperimentLifecycleState
+
+
+class CompletenessVerificationResult(FrozenDomainModel):
+    passed: BooleanValue
+    failures: tuple[ReportVerificationFailure, ...]
+
+
+def terminal_count_for_planned_experiment(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> ScientificCellCount:
+    planned_keys = frozenset(cell.semantic_key for cell in planned.cells)
+    return sum(record.semantic_key in planned_keys for record in records)
+
+
+def _terminal_count(
+    records: tuple[ExperimentTerminalCount, ...],
+    experiment: ExperimentName,
+) -> ScientificCellCount:
+    for record in records:
+        if record.experiment == experiment:
+            return record.count
+    return 0
+
+
+def _lifecycle_state(
+    records: tuple[ExperimentLifecycleRecord, ...],
+    experiment: ExperimentName,
+) -> ExperimentLifecycleState | None:
+    for record in records:
+        if record.experiment == experiment:
+            return record.state
+    return None
 
 
 def verify_planned_cell_count_satisfied(
     plan: ExperimentPlan,
-    terminal_record_counts: Mapping[CanonicalToken, int],
+    terminal_record_counts: tuple[ExperimentTerminalCount, ...],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for planned in plan.experiments:
         expected = len(planned.cells)
-        observed = terminal_record_counts.get(planned.definition.name, 0)
+        observed = _terminal_count(terminal_record_counts, planned.definition.name)
         if observed != expected:
             failures.append(
                 f"{planned.definition.name}: expected {expected} terminal cell records, "
@@ -35,12 +75,12 @@ def verify_planned_cell_count_satisfied(
 
 
 def verify_experiments_completed(
-    lifecycle_states: Mapping[CanonicalToken, ExperimentLifecycleState],
-    expected_experiments: Sequence[CanonicalToken],
+    lifecycle_states: tuple[ExperimentLifecycleRecord, ...],
+    expected_experiments: tuple[ExperimentName, ...],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for experiment in expected_experiments:
-        state = lifecycle_states.get(experiment)
+        state = _lifecycle_state(lifecycle_states, experiment)
         if state is not ExperimentLifecycleState.COMPLETED:
             failures.append(
                 f"{experiment}: lifecycle state is "
@@ -50,13 +90,13 @@ def verify_experiments_completed(
 
 
 def verify_experiments_reached_terminal_state(
-    lifecycle_states: Mapping[CanonicalToken, ExperimentLifecycleState],
-    expected_experiments: Sequence[CanonicalToken],
+    lifecycle_states: tuple[ExperimentLifecycleRecord, ...],
+    expected_experiments: tuple[ExperimentName, ...],
 ) -> CompletenessVerificationResult:
-    failures: list[CanonicalToken] = []
+    failures: list[ReportVerificationFailure] = []
     for experiment in expected_experiments:
-        state = lifecycle_states.get(experiment)
-        if state is None or not is_terminal_experiment_state(state):
+        state = _lifecycle_state(lifecycle_states, experiment)
+        if state is None or state not in TERMINAL_EXPERIMENT_STATES:
             failures.append(
                 f"{experiment}: lifecycle state is "
                 f"{state.value if state is not None else 'unknown'}, not terminal"
@@ -65,7 +105,7 @@ def verify_experiments_reached_terminal_state(
 
 
 def verify_no_stale_ancestors(
-    stale_ancestor_identities: Sequence[CanonicalToken],
+    stale_ancestor_identities: tuple[CheckpointIdentity, ...],
 ) -> CompletenessVerificationResult:
     return CompletenessVerificationResult(
         passed=not stale_ancestor_identities,
@@ -74,13 +114,17 @@ def verify_no_stale_ancestors(
 
 
 def verify_claim_states_derivable(
-    claim_state_count: int, expected_claim_count: int
+    claim_states: tuple[ClaimStateResult, ...],
+    expected_claim_count: NonNegativeInt,
 ) -> CompletenessVerificationResult:
-    if claim_state_count != expected_claim_count:
-        return CompletenessVerificationResult(
-            passed=False,
-            failures=(
-                f"derived {claim_state_count} claim states, expected {expected_claim_count}",
-            ),
+    failures: list[ReportVerificationFailure] = []
+    if len(claim_states) != expected_claim_count:
+        failures.append(
+            f"derived {len(claim_states)} claim states, expected {expected_claim_count}"
         )
-    return CompletenessVerificationResult(passed=True, failures=())
+    unresolved = tuple(
+        claim.claim_id for claim in claim_states if claim.state is FinalClaimState.NOT_TESTED
+    )
+    if unresolved:
+        failures.append(f"claims lack complete verified evidence: {', '.join(unresolved)}")
+    return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))

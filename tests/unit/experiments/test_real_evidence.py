@@ -7,11 +7,13 @@ import torch
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
-from fedsira.datasets.nbaiot.materialization import materialize_nbaiot_prepared_views
-from fedsira.datasets.nbaiot.preprocessing import NBAIOT_PRIMARY_PREDICTOR_COUNT
+from fedsira.datasets.nbaiot.preprocessing import (
+    NBAIOT_PRIMARY_PREDICTOR_COUNT,
+    materialize_nbaiot_prepared_views,
+)
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import FeatureName
 from fedsira.experiments.real_evidence import (
     BackdoorScope,
     EpistemicFailureScope,
@@ -387,7 +389,7 @@ def test_prepared_feature_names_returns_none_without_prepared_data(tmp_path: Pat
 
 
 def _root_cause_scope(
-    feature_names: tuple[CanonicalToken, ...], contract_scope: CapabilityContractScope
+    feature_names: tuple[FeatureName, ...], contract_scope: CapabilityContractScope
 ) -> RootCauseScope:
     return RootCauseScope(
         contract_scope=contract_scope,
@@ -478,7 +480,7 @@ def test_compute_capability_under_specification_summary_is_genuinely_computed(
 
 
 def _epistemic_failure_scope(
-    feature_names: tuple[CanonicalToken, ...], failure_type: EpistemicFailureType
+    feature_names: tuple[FeatureName, ...], failure_type: EpistemicFailureType
 ) -> EpistemicFailureScope:
     return EpistemicFailureScope(
         failure_type=failure_type,

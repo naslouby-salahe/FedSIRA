@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
-from fedsira.domain.records import CanonicalToken, NonNegativeInt, PositiveInt, Probability
+from fedsira.domain.records import DatasetClassToken, NonNegativeInt, PositiveInt, Probability
 from fedsira.evaluation.aggregation import minimum_defined_domain_count
 from fedsira.evaluation.records import (
     ConfusionCounts,
@@ -24,9 +24,9 @@ class BoundaryMetricSet:
 
 
 def compute_confusion_counts(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
-    class_token: CanonicalToken,
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
+    class_token: DatasetClassToken,
 ) -> ConfusionCounts:
     true_positive = 0
     false_positive = 0
@@ -47,10 +47,10 @@ def compute_confusion_counts(
 
 
 def compute_confusion_counts_by_class(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
-    class_tokens: Sequence[CanonicalToken],
-) -> dict[CanonicalToken, ConfusionCounts]:
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
+    class_tokens: Sequence[DatasetClassToken],
+) -> dict[DatasetClassToken, ConfusionCounts]:
     return {
         class_token: compute_confusion_counts(true_labels, predicted_labels, class_token)
         for class_token in class_tokens
@@ -58,7 +58,7 @@ def compute_confusion_counts_by_class(
 
 
 def accuracy(
-    confusion_counts_by_class: Mapping[CanonicalToken, ConfusionCounts],
+    confusion_counts_by_class: Mapping[DatasetClassToken, ConfusionCounts],
     sample_count: NonNegativeInt,
 ) -> MetricResult:
     if sample_count == 0:
@@ -110,7 +110,7 @@ def f1_for_class(counts: ConfusionCounts) -> MetricResult:
 
 
 def _mean_of_defined_values(
-    results: Mapping[CanonicalToken, MetricResult],
+    results: Mapping[DatasetClassToken, MetricResult],
 ) -> MetricResult:
     defined_values = [result.value for result in results.values() if result.value is not None]
     if len(defined_values) == 0:
@@ -118,17 +118,17 @@ def _mean_of_defined_values(
     return MetricResult(sum(defined_values) / len(defined_values), len(defined_values))
 
 
-def balanced_accuracy(recall_by_class: Mapping[CanonicalToken, MetricResult]) -> MetricResult:
+def balanced_accuracy(recall_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(recall_by_class)
 
 
-def macro_f1(f1_by_class: Mapping[CanonicalToken, MetricResult]) -> MetricResult:
+def macro_f1(f1_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(f1_by_class)
 
 
 def weighted_f1(
-    f1_by_class: Mapping[CanonicalToken, MetricResult],
-    support_by_class: Mapping[CanonicalToken, NonNegativeInt],
+    f1_by_class: Mapping[DatasetClassToken, MetricResult],
+    support_by_class: Mapping[DatasetClassToken, NonNegativeInt],
 ) -> MetricResult:
     weighted_sum = 0.0
     total_support = 0
@@ -144,8 +144,8 @@ def weighted_f1(
 
 
 def target_f1(
-    confusion_counts_by_class: Mapping[CanonicalToken, ConfusionCounts],
-    target_class_token: CanonicalToken,
+    confusion_counts_by_class: Mapping[DatasetClassToken, ConfusionCounts],
+    target_class_token: DatasetClassToken,
 ) -> MetricResult:
     return f1_for_class(confusion_counts_by_class[target_class_token])
 
@@ -167,9 +167,9 @@ def supported_macro_f1_harm(
 
 
 def benign_false_alarm_rate(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
-    benign_class_token: CanonicalToken,
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
+    benign_class_token: DatasetClassToken,
 ) -> MetricResult:
     benign_indices = [
         index for index, true_label in enumerate(true_labels) if true_label == benign_class_token
@@ -197,11 +197,11 @@ def benign_false_alarm_rate_increase(
 
 
 def attack_success_rate_within_domain(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
     triggered_mask: Sequence[bool],
-    triggered_source_class_token: CanonicalToken,
-    benign_class_token: CanonicalToken,
+    triggered_source_class_token: DatasetClassToken,
+    benign_class_token: DatasetClassToken,
 ) -> MetricResult:
     paired = zip(true_labels, triggered_mask, strict=False)
     carrier_indices = [
@@ -262,8 +262,8 @@ def false_launch_rate(
 
 
 def reproduction_attempt_count(
-    domains_with_training_start: frozenset[CanonicalToken],
-    evidence_inadequate_domains: frozenset[CanonicalToken],
+    domains_with_training_start: frozenset[DatasetClassToken],
+    evidence_inadequate_domains: frozenset[DatasetClassToken],
 ) -> NonNegativeInt:
     return len(domains_with_training_start - evidence_inadequate_domains)
 
@@ -367,11 +367,11 @@ def auprc_one_vs_rest(true_binary: Sequence[bool], scores: Sequence[float]) -> M
     return MetricResult(area, positive_count)
 
 
-def macro_auroc(auroc_by_class: Mapping[CanonicalToken, MetricResult]) -> MetricResult:
+def macro_auroc(auroc_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(auroc_by_class)
 
 
-def macro_auprc(auprc_by_class: Mapping[CanonicalToken, MetricResult]) -> MetricResult:
+def macro_auprc(auprc_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(auprc_by_class)
 
 
@@ -425,9 +425,9 @@ def false_same_capability_certification_rate(
 
 
 def boundary_metric_set(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
-    class_tokens: Sequence[CanonicalToken],
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
+    class_tokens: Sequence[DatasetClassToken],
     target_f1_delta: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
@@ -475,18 +475,18 @@ def boundary_metric_set(
 
 
 def report_metric_set(
-    true_labels: Sequence[CanonicalToken],
-    predicted_labels: Sequence[CanonicalToken],
-    class_tokens: Sequence[CanonicalToken],
-    target_class_token: CanonicalToken,
-    benign_class_token: CanonicalToken,
-    supported_class_tokens: Sequence[CanonicalToken],
+    true_labels: Sequence[DatasetClassToken],
+    predicted_labels: Sequence[DatasetClassToken],
+    class_tokens: Sequence[DatasetClassToken],
+    target_class_token: DatasetClassToken,
+    benign_class_token: DatasetClassToken,
+    supported_class_tokens: Sequence[DatasetClassToken],
     anchor_target_f1: MetricResult | None = None,
     anchor_supported_macro_f1: MetricResult | None = None,
     anchor_benign_far: MetricResult | None = None,
     triggered_mask: Sequence[bool] | None = None,
-    triggered_source_class_token: CanonicalToken | None = None,
-) -> dict[CanonicalToken, MetricResult]:
+    triggered_source_class_token: DatasetClassToken | None = None,
+) -> dict[DatasetClassToken, MetricResult]:
     validate_metric_class_membership(
         class_tokens, target_class_token, benign_class_token, supported_class_tokens
     )
@@ -530,7 +530,7 @@ def report_metric_set(
         if triggered_mask is not None
         else MetricResult(None, 0)
     )
-    class_metrics: dict[CanonicalToken, MetricResult] = {}
+    class_metrics: dict[DatasetClassToken, MetricResult] = {}
     for token, counts in counts_by_class.items():
         class_metrics[f"{token}:precision"] = precision_for_class(counts)
         class_metrics[f"{token}:fpr"] = false_positive_rate_for_class(counts)

@@ -6,7 +6,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.records import NonNegativeInt
+from fedsira.domain.records import DomainCount
 
 
 def domains_with_target_stream(
@@ -30,7 +30,8 @@ def classes_structurally_unavailable(
 
 
 def validate_target_holder_feasibility(
-    discovered: tuple[DiscoveredCsvFile, ...], minimum_target_holding_domains: NonNegativeInt
+    discovered: tuple[DiscoveredCsvFile, ...],
+    minimum_target_holding_domains: DomainCount,
 ) -> None:
     holder_count = len(domains_with_target_stream(discovered))
     if holder_count < minimum_target_holding_domains:

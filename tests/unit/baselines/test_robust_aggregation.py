@@ -16,7 +16,11 @@ THREE_ROW_CONFIG = CONFIG.baselines.three_row_coordinate_median
 
 def test_direct_krum_committee_rows_filters_abstaining_and_requires_committee_size() -> None:
     rows = tuple(
-        CertifiedReproductionRow(domain, torch.zeros(2)) for domain in NBAIOT_DOMAIN_ORDER[:6]
+        CertifiedReproductionRow(
+            reproducer_domain=domain,
+            update_vector=torch.zeros(2),
+        )
+        for domain in NBAIOT_DOMAIN_ORDER[:6]
     )
     flags = [True, False, True, True, True, True]
     committee = direct_krum_committee_rows(rows, flags, 5)
@@ -27,7 +31,11 @@ def test_direct_krum_committee_rows_filters_abstaining_and_requires_committee_si
 
 def test_direct_krum_committee_rows_none_when_insufficient_non_abstaining_rows() -> None:
     rows = tuple(
-        CertifiedReproductionRow(domain, torch.zeros(2)) for domain in NBAIOT_DOMAIN_ORDER[:4]
+        CertifiedReproductionRow(
+            reproducer_domain=domain,
+            update_vector=torch.zeros(2),
+        )
+        for domain in NBAIOT_DOMAIN_ORDER[:4]
     )
     flags = [True, True, False, False]
     assert direct_krum_committee_rows(rows, flags, 5) is None

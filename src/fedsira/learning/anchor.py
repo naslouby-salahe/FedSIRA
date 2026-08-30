@@ -1,25 +1,27 @@
-from collections.abc import Sequence
-
-import torch
-
 from fedsira.config.schema import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
-from fedsira.domain.records import CanonicalToken, DerivedSeed, PositiveFloat, PositiveInt
-from fedsira.learning.federated import run_fedavg_round
+from fedsira.domain.records import PositiveFloat, PositiveInt
+from fedsira.learning.aggregation import ModelState, load_model_state
+from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
+
+
+def _model_state_parameter_count(state: ModelState) -> PositiveInt:
+    parameter_count = sum(parameter.value.numel() for parameter in state.parameters)
+    if parameter_count <= 0:
+        raise ValueError("anchor model state must contain trainable parameters")
+    return parameter_count
 
 
 def run_anchor_fedavg_training(
     input_width: PositiveInt,
     output_width: PositiveInt,
-    initial_state_dict: dict[str, torch.Tensor],
+    initial_state: ModelState,
     learning_rate: PositiveFloat,
     optimizer_config: OptimizerConfig,
     training_config: TrainingConfig,
     anchor_config: AnchorFedAvgConfig,
-    clients_per_round: Sequence[
-        Sequence[tuple[torch.Tensor, torch.Tensor, Sequence[CanonicalToken], DerivedSeed]]
-    ],
-) -> tuple[dict[str, torch.Tensor], tuple[dict[str, torch.Tensor], ...]]:
+    clients_per_round: tuple[tuple[LocalTrainingClient, ...], ...],
+) -> tuple[ModelState, tuple[ModelState, ...]]:
     if len(clients_per_round) != anchor_config.rounds:
         raise ValueError(
             f"expected exactly {anchor_config.rounds} rounds of client data, "
@@ -28,18 +30,20 @@ def run_anchor_fedavg_training(
     expected_parameter_count = trainable_parameter_count(
         FedSIRAClassifier(input_width, output_width)
     )
-    observed_parameter_count = sum(tensor.numel() for tensor in initial_state_dict.values())
+    observed_parameter_count = _model_state_parameter_count(initial_state)
     if observed_parameter_count != expected_parameter_count:
         raise ValueError(
-            f"initial_state_dict has {observed_parameter_count} parameters, expected "
+            f"initial model state has {observed_parameter_count} parameters, expected "
             f"{expected_parameter_count} for input_width={input_width}, "
             f"output_width={output_width}"
         )
-    state_dict = initial_state_dict
-    round_checkpoints: list[dict[str, torch.Tensor]] = []
+    validation_model = FedSIRAClassifier(input_width, output_width)
+    load_model_state(validation_model, initial_state)
+    state = initial_state
+    round_checkpoints: list[ModelState] = []
     for round_clients in clients_per_round:
-        state_dict = run_fedavg_round(
-            state_dict,
+        state = run_fedavg_round(
+            state,
             input_width,
             output_width,
             learning_rate,
@@ -48,5 +52,5 @@ def run_anchor_fedavg_training(
             anchor_config.local_epochs_per_round,
             round_clients,
         )
-        round_checkpoints.append(state_dict)
+        round_checkpoints.append(state)
     return round_checkpoints[-1], tuple(round_checkpoints)

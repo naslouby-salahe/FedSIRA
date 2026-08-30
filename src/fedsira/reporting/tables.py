@@ -1,15 +1,28 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import csv
+from io import StringIO
 
-from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
-from fedsira.analysis.comparisons import ComparisonFamilyResult
+from fedsira.analysis.claims import ClaimStateResult
+from fedsira.analysis.comparisons import (
+    ComparisonDefinition,
+    ComparisonFamilyResult,
+    ComparisonReferenceKind,
+    ComparisonResult,
+    ComparisonState,
+)
 from fedsira.config.schema import PublicationRoundingConfig
-from fedsira.domain.records import CanonicalToken
+from fedsira.domain.records import (
+    FrozenDomainModel,
+    MetricValue,
+    PValue,
+    TableName,
+    TextValue,
+)
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.planning import ExperimentPlan
 
-MANUSCRIPT_TABLE_NAMES: tuple[CanonicalToken, ...] = (
+MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Dataset and Domain Protocol",
     "Primary Domain Statistics",
     "Model and Training Protocol",
@@ -30,13 +43,35 @@ MANUSCRIPT_TABLE_NAMES: tuple[CanonicalToken, ...] = (
 )
 
 
-def format_metric_value(value: float | None, rounding: PublicationRoundingConfig) -> str:
+class RenderedTable(FrozenDomainModel):
+    name: TableName
+    csv_text: TextValue
+
+
+def _csv_text(
+    header: tuple[TextValue, ...],
+    rows: tuple[tuple[TextValue, ...], ...],
+) -> TextValue:
+    buffer = StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(header)
+    writer.writerows(rows)
+    return buffer.getvalue().rstrip("\n")
+
+
+def format_metric_value(
+    value: MetricValue | None,
+    rounding: PublicationRoundingConfig,
+) -> TextValue:
     if value is None:
         return "NA"
     return f"{value:.{rounding.f1_accuracy_rates_decimals}f}"
 
 
-def format_p_value(value: float | None, rounding: PublicationRoundingConfig) -> str:
+def format_p_value(
+    value: PValue | None,
+    rounding: PublicationRoundingConfig,
+) -> TextValue:
     if value is None:
         return "NA"
     if value < rounding.p_value_display_floor:
@@ -44,123 +79,200 @@ def format_p_value(value: float | None, rounding: PublicationRoundingConfig) -> 
     return f"{value:.{rounding.p_value_significant_digits}g}"
 
 
-def render_experiment_plan_table(plan: ExperimentPlan) -> str:
-    header = (
-        "| experiment | class | methods | conditions | seeds | nominal run count | claim family |"
-    )
-    separator = "| --- | --- | --- | --- | ---: | ---: | --- |"
-    rows: list[str] = []
-    for planned in plan.experiments:
-        definition = planned.definition
-        rows.append(
-            f"| {definition.name} | {definition.experiment_class.value} | "
-            f"{len(definition.methods)} | {len(definition.conditions)} | "
-            f"{definition.seed_count} | {len(planned.cells)} | "
-            f"{definition.claim_family if definition.claim_family else '—'} |"
+def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
+    rows = tuple(
+        (
+            planned.definition.name,
+            planned.definition.experiment_class.value,
+            str(len(planned.definition.methods)),
+            str(len(planned.definition.conditions)),
+            str(planned.definition.seed_count),
+            str(len(planned.cells)),
+            (
+                planned.definition.claim_family.value
+                if planned.definition.claim_family is not None
+                else "NA"
+            ),
         )
-    return "\n".join((header, separator, *rows))
+        for planned in plan.experiments
+    )
+    return RenderedTable(
+        name="Experiment Plan",
+        csv_text=_csv_text(
+            (
+                "experiment",
+                "class",
+                "methods",
+                "conditions",
+                "seeds",
+                "nominal_run_count",
+                "claim_family",
+            ),
+            rows,
+        ),
+    )
+
+
+def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
+    if definition.reference_kind is ComparisonReferenceKind.ZERO:
+        return "zero"
+    if (
+        definition.reference_experiment == definition.experiment
+        and definition.reference_scenario == definition.scientific_scenario
+    ):
+        return definition.reference_method
+    if (
+        definition.reference_experiment == definition.experiment
+        and definition.reference_method == definition.method
+    ):
+        return definition.reference_scenario
+    return (
+        f"{definition.reference_experiment} / "
+        f"{definition.reference_scenario} / {definition.reference_method}"
+    )
+
+
+def _statistical_summary_row(
+    family: ComparisonFamilyResult,
+    comparison: ComparisonResult,
+    rounding: PublicationRoundingConfig,
+) -> tuple[TextValue, ...]:
+    definition = comparison.definition
+    effect = (
+        "NA"
+        if comparison.paired_standardized_effect is None
+        else f"{comparison.paired_standardized_effect:.3f}"
+    )
+    confidence_interval = (
+        "NA"
+        if comparison.confidence_interval is None
+        else (
+            f"[{comparison.confidence_interval[0]:.3f},"
+            f"{comparison.confidence_interval[1]:.3f}]"
+        )
+    )
+    margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
+    materiality = (
+        "NA"
+        if definition.material_threshold is None
+        else f"{definition.material_threshold:.3f}"
+    )
+    reference_label = _comparison_reference_label(definition)
+    comparison_identity = (
+        f"{definition.method} vs {reference_label} | "
+        f"{definition.scientific_scenario} | {definition.metric.value}"
+    )
+    return (
+        family.family.value,
+        comparison_identity,
+        definition.metric.value,
+        definition.orientation.value,
+        margin,
+        str(comparison.complete_seed_count),
+        format_metric_value(comparison.mean_paired_difference, rounding),
+        format_metric_value(comparison.median_paired_difference, rounding),
+        effect,
+        format_p_value(comparison.raw_p_value, rounding),
+        format_p_value(comparison.adjusted_p_value, rounding),
+        confidence_interval,
+        materiality,
+        "pass" if comparison.comparison_state is ComparisonState.PASSED else "fail",
+        "pass" if comparison.materiality_passes is not False else "fail",
+        comparison.comparison_state.value,
+    )
 
 
 def render_statistical_summary_table(
-    comparison_results: Sequence[ComparisonFamilyResult],
+    comparison_results: tuple[ComparisonFamilyResult, ...],
     rounding: PublicationRoundingConfig,
-) -> str:
-    header = (
-        "| claim | comparison | metric | direction | margin | n pairs | mean difference | "
-        "median difference | paired dz | raw p | Holm p | 95% CI | materiality threshold | "
-        "statistical pass | materiality pass | final comparison state |"
+) -> RenderedTable:
+    rows = tuple(
+        _statistical_summary_row(family, comparison, rounding)
+        for family in comparison_results
+        for comparison in family.comparisons
     )
-    separator = (
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | "
-        "---: | --- | --- | --- |"
+    return RenderedTable(
+        name="Statistical Summary",
+        csv_text=_csv_text(
+            (
+                "claim",
+                "comparison",
+                "metric",
+                "direction",
+                "margin",
+                "n_pairs",
+                "mean_difference",
+                "median_difference",
+                "paired_dz",
+                "raw_p",
+                "holm_p",
+                "confidence_interval_95",
+                "materiality_threshold",
+                "statistical_pass",
+                "materiality_pass",
+                "final_comparison_state",
+            ),
+            rows,
+        ),
     )
-    rows: list[str] = []
-    for family in comparison_results:
-        for comparison in family.comparisons:
-            definition = comparison.definition
-            mean = format_metric_value(comparison.mean_paired_difference, rounding)
-            median = format_metric_value(comparison.median_paired_difference, rounding)
-            effect = (
-                "NA"
-                if comparison.paired_standardized_effect is None
-                else f"{comparison.paired_standardized_effect:.3f}"
-            )
-            raw_p = format_p_value(comparison.raw_p_value, rounding)
-            adjusted_p = format_p_value(comparison.adjusted_p_value, rounding)
-            ci = (
-                "NA"
-                if comparison.confidence_interval is None
-                else (
-                    f"[{comparison.confidence_interval[0]:.3f}, "
-                    f"{comparison.confidence_interval[1]:.3f}]"
-                )
-            )
-            margin = "—" if definition.margin is None else f"{definition.margin:.3f}"
-            materiality = (
-                "—"
-                if definition.material_threshold is None
-                else f"{definition.material_threshold:.3f}"
-            )
-            statistical_pass = "pass" if comparison.comparison_state == "Passed" else "fail"
-            materiality_pass = "pass" if comparison.materiality_passes is not False else "fail"
-            rows.append(
-                f"| {family.family.value} | {definition.canonical_name} | "
-                f"{definition.metric} | {definition.orientation.value} | {margin} | "
-                f"{comparison.complete_seed_count} | {mean} | {median} | {effect} | "
-                f"{raw_p} | {adjusted_p} | {ci} | {materiality} | "
-                f"{statistical_pass} | {materiality_pass} | "
-                f"{comparison.comparison_state} |"
-            )
-    return "\n".join((header, separator, *rows))
 
 
-def render_claim_support_table(claim_states: Sequence[ClaimStateResult]) -> str:
-    header = "| claim | exact scoped claim | claim state |"
-    separator = "| --- | --- | --- |"
-    known_states = frozenset(
-        {
-            FinalClaimState.SUPPORTED,
-            FinalClaimState.PARTIALLY_SUPPORTED,
-            FinalClaimState.CONDITIONAL,
-            FinalClaimState.MECHANISM_ONLY,
-            FinalClaimState.NULL_RESULT,
-            FinalClaimState.NOT_SUPPORTED,
-            FinalClaimState.NOT_TESTED,
-        }
+def render_claim_support_table(
+    claim_states: tuple[ClaimStateResult, ...],
+) -> RenderedTable:
+    rows = tuple((state.claim_id, state.scope, state.state.value) for state in claim_states)
+    return RenderedTable(
+        name="Claim Support",
+        csv_text=_csv_text(
+            ("claim", "exact_scoped_claim", "claim_state"),
+            rows,
+        ),
     )
-    rows: list[str] = []
-    for state in claim_states:
-        if state.state not in known_states:
-            raise ValueError(f"unknown claim state {state.state}")
-        rows.append(f"| {state.claim_id} | {state.scope} | {state.state.value} |")
-    return "\n".join((header, separator, *rows))
 
 
 def render_collapse_decisions_table(
-    decisions: Sequence[CollapseDecision],
+    decisions: tuple[CollapseDecision, ...],
     resolved_core: ResolvedCore,
     rounding: PublicationRoundingConfig,
-) -> str:
-    header = (
-        "| mechanism | primary material effect | adjusted p | liveness/safety constraint | "
-        "survival rule | observed outcome | core action |"
-    )
-    separator = "| --- | --- | ---: | --- | --- | --- | --- |"
-    rows: list[str] = []
-    for decision in decisions:
-        p_value = "NA" if decision.adjusted_p_value is None else f"{decision.adjusted_p_value:.4f}"
-        constraint = "pass" if decision.constraint_passes else "fail"
-        outcome = "survives" if decision.survives else "removed"
-        rows.append(
-            f"| {decision.kind.value} | "
-            f"{decision.primary_material_effect or 'NA'} | {p_value} | "
-            f"{constraint} | mechanical | {outcome} | {outcome} |"
+) -> RenderedTable:
+    decision_rows = tuple(
+        (
+            decision.kind.value,
+            decision.primary_material_effect or "NA",
+            format_p_value(decision.adjusted_p_value, rounding),
+            "pass" if decision.constraint_passes else "fail",
+            "mechanical",
+            "survives" if decision.survives else "removed",
+            "survives" if decision.survives else "removed",
         )
+        for decision in decisions
+    )
     source_influence = (
-        "source-excluded" if resolved_core.direct_source_exclusion_survives else "source-influenced"
+        "source-excluded"
+        if resolved_core.direct_source_exclusion_survives
+        else "source-influenced"
     )
-    rows.append(
-        f"| resolved core | {resolved_core.identity_token} | — | "
-        f"{source_influence} | mapping | — | {resolved_core.production_update_rule} |"
+    resolved_row = (
+        "resolved core",
+        resolved_core.decision_identity,
+        "NA",
+        source_influence,
+        "mapping",
+        "NA",
+        resolved_core.production_update_rule.value,
     )
-    return "\n".join((header, separator, *rows))
+    return RenderedTable(
+        name="Collapse Decisions",
+        csv_text=_csv_text(
+            (
+                "mechanism",
+                "primary_material_effect",
+                "adjusted_p",
+                "liveness_safety_constraint",
+                "survival_rule",
+                "observed_outcome",
+                "core_action",
+            ),
+            (*decision_rows, resolved_row),
+        ),
+    )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -80,6 +80,9 @@ from fedsira.boundaries.heterogeneity import (
     select_heterogeneity_shift_features,
 )
 from fedsira.config.schema import ScientificConfig, VerificationConfig
+from fedsira.datasets.ciciot2023.schema import (
+    TARGET_LABEL as CICIOT2023_TARGET_LABEL,
+)
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
@@ -100,7 +103,22 @@ from fedsira.domain.enums import (
     TernaryOutcome,
     VerificationOmissionMarker,
 )
-from fedsira.domain.records import CanonicalToken, MasterSeed, SeedBundle
+from fedsira.domain.records import (
+    AdequateFinalGateDomainCount,
+    ArtifactDigest,
+    CapabilityContractSatisfied,
+    ClaimId,
+    DatasetClassToken,
+    DomainId,
+    FrozenDomainModel,
+    MasterSeed,
+    ModuleName,
+    PreparedReproductionTargetCount,
+    PreparedScreenTargetCount,
+    PreparedSupportedReplayCount,
+    RequiredReproductionRowCount,
+    SeedBundle,
+)
 from fedsira.evaluation.aggregation import (
     coefficient_of_variation,
     domain_disparity,
@@ -108,17 +126,6 @@ from fedsira.evaluation.aggregation import (
     interquartile_range,
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
-)
-from fedsira.evaluation.communication import (
-    SERVER_TOKEN,
-    CommunicationMessageMetadata,
-    CommunicationMessageType,
-    TensorParameterKind,
-    TensorPayloadMetadata,
-    canonical_parameter_tensor_name,
-    communication_bytes,
-    encode_message_envelope,
-    model_transmission_count,
 )
 from fedsira.evaluation.metrics import (
     boundary_metric_set,
@@ -133,11 +140,19 @@ from fedsira.evaluation.metrics import (
     target_capability_gain,
 )
 from fedsira.evaluation.records import (
+    SERVER_ID,
     AdmissionDelayDecomposition,
+    CommunicationMessageMetadata,
+    CommunicationMessageType,
     MetricResult,
     ProposalOracleLabel,
+    TensorParameterKind,
+    TensorPayloadMetadata,
+    communication_bytes,
+    encode_message_envelope,
+    model_transmission_count,
+    parameter_tensor_name,
 )
-from fedsira.evaluation.screen import screen_fold_index
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.execution import CellExecutionOutcome, CellExecutor
 from fedsira.experiments.planning import ScientificCell
@@ -209,6 +224,7 @@ from fedsira.experiments.registry import (
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
+    experiment_by_name,
 )
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.post_reference import run_post_reference_training
@@ -238,6 +254,9 @@ from fedsira.protocol.opening import (
     raw_target_f1_screen_domain_decision_is_positive,
     screen_domain_decision_is_positive,
     screen_domain_order,
+    screen_fold_index,
+    select_source_domain,
+    source_selection_order,
     start_claim,
     unmatched_control_screen_domain_decision_is_positive,
 )
@@ -254,7 +273,6 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
 )
-from fedsira.protocol.source_selection import select_source_domain, source_selection_order
 from fedsira.protocol.state_machine import (
     apply_logical_cycle_expiry,
     resolve_ternary_outcome,
@@ -291,12 +309,12 @@ from fedsira.protocol.verification import (
 )
 from fedsira.runtime.determinism import derive_uint32
 from fedsira.runtime.state import FailureDetail
-from fedsira.runtime.telemetry import (
+from fedsira.runtime.timing import (
+    ElapsedTimer,
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,
 )
-from fedsira.runtime.timing import ElapsedTimer
 
 EVIDENCE_INSUFFICIENT_REASON = FailureClass.EVIDENCE_INSUFFICIENT.value
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
@@ -309,7 +327,7 @@ ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
 def _training_entry_points(
     evidence: PreparedEvidenceCounts,
     config: ScientificConfig,
-) -> tuple[CanonicalToken, ...]:
+) -> tuple[ModuleName, ...]:
     if (
         evidence.reproduction_target_count
         < config.capability_claim.evidence_minima.reproduction_target_examples
@@ -326,31 +344,28 @@ def _training_entry_points(
     return (anchor_entry, post_reference_entry, verifier_aware_entry)
 
 
-@dataclass(frozen=True)
-class PreparedEvidenceCounts:
-    screen_target_count: int
-    reproduction_target_count: int
-    reproduction_supported_count: int
-    final_gate_adequate_domain_count: int
+class PreparedEvidenceCounts(FrozenDomainModel):
+    screen_target_count: PreparedScreenTargetCount
+    reproduction_target_count: PreparedReproductionTargetCount
+    reproduction_supported_count: PreparedSupportedReplayCount
+    final_gate_adequate_domain_count: AdequateFinalGateDomainCount
 
 
-@dataclass(frozen=True)
-class OpeningIdentity:
-    claim_identity: str
-    contract_passes: bool
+class OpeningIdentity(FrozenDomainModel):
+    claim_identity: ClaimId
+    contract_passes: CapabilityContractSatisfied
 
 
 def load_prepared_evidence_counts(
-    prepared_root: Path, cell: ScientificCell
+    prepared_root: Path, target_class_token: DatasetClassToken
 ) -> PreparedEvidenceCounts | None:
-    metadata_directory = prepared_root
-    if not metadata_directory.exists():
+    if not prepared_root.exists():
         return None
     screen_target_count = 0
     reproduction_target_count = 0
     reproduction_supported_count = 0
-    final_gate_target_files = 0
-    for metadata_path in sorted(metadata_directory.glob("*.json")):
+    final_gate_target_domains: set[DomainId] = set()
+    for metadata_path in sorted(prepared_root.glob("*.json")):
         try:
             payload = json.loads(metadata_path.read_text())
         except (json.JSONDecodeError, OSError):
@@ -358,23 +373,26 @@ def load_prepared_evidence_counts(
         role = payload.get("role")
         row_count = int(payload.get("row_count", 0))
         class_id = payload.get("class_id")
-        if role == Role.CANDIDATE_SCREEN.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
+        domain = payload.get("domain")
+        if role == Role.CANDIDATE_SCREEN.value and class_id == target_class_token:
             screen_target_count += row_count
-        elif role == Role.REPRODUCTION.value and class_id == NBaiotClass.GAFGYT_COMBO.value:
+        elif role == Role.REPRODUCTION.value and class_id == target_class_token:
             reproduction_target_count += row_count
-        elif (
-            role == Role.POST_REFERENCE_REPLAY.value and class_id != NBaiotClass.GAFGYT_COMBO.value
-        ):
+        elif role == Role.POST_REFERENCE_REPLAY.value and class_id != target_class_token:
             reproduction_supported_count += row_count
-        elif role == Role.FINAL_GATE.value:
-            final_gate_target_files += 1
+        elif (
+            role == Role.FINAL_GATE.value
+            and class_id == target_class_token
+            and isinstance(domain, str)
+        ):
+            final_gate_target_domains.add(domain)
     if screen_target_count == 0 and reproduction_target_count == 0:
         return None
     return PreparedEvidenceCounts(
         screen_target_count=screen_target_count,
         reproduction_target_count=reproduction_target_count,
         reproduction_supported_count=reproduction_supported_count,
-        final_gate_adequate_domain_count=final_gate_target_files,
+        final_gate_adequate_domain_count=len(final_gate_target_domains),
     )
 
 
@@ -410,14 +428,14 @@ def _opening_identity(config: ScientificConfig) -> OpeningIdentity:
 
 def _source_domain_for_cell(cell: ScientificCell) -> NBaiotDomain | None:
     source_order = source_selection_order(
-        derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
+        NBAIOT_DOMAIN_ORDER, derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
     )
     validate_exactly_one_source_domain((source_order[0],))
     return select_source_domain(
         source_order,
         frozenset(NBAIOT_DOMAIN_ORDER),
-        requires_gafgyt_udp_carrier=False,
-        domains_with_gafgyt_udp=frozenset(),
+        requires_attack_carrier=False,
+        domains_with_attack_carrier=frozenset(),
     )
 
 
@@ -430,7 +448,7 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
 
 def _row_requirement(
     cell: ScientificCell, config: ScientificConfig, resolved_core: ResolvedCore | None = None
-) -> int:
+) -> RequiredReproductionRowCount:
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
         return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
     if cell.method in (
@@ -449,7 +467,7 @@ def _row_requirement(
     return config.protocol.synthesis.committee_size
 
 
-def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> str:
+def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> ArtifactDigest:
     return compute_reproduction_commitment_hash(
         reproducer_domain,
         "c" * 64,
@@ -918,11 +936,15 @@ RESOLVED_FEDSIRA_CORE_METHOD = "Resolved FedSIRA Core"
 class ProtocolCellExecutor(CellExecutor):
     def __init__(
         self,
-        prepared_root: Path | None = None,
+        primary_prepared_root: Path | None = None,
+        secondary_prepared_root: Path | None = None,
         resolved_core: ResolvedCore | None = None,
     ) -> None:
-        self._prepared_root = prepared_root or prepared_evidence_root(
+        self._prepared_root = primary_prepared_root or prepared_evidence_root(
             DATASET_PACKAGE_NAME[DatasetId.N_BAIOT]
+        )
+        self._secondary_prepared_root = secondary_prepared_root or prepared_evidence_root(
+            DATASET_PACKAGE_NAME[DatasetId.CICIOT2023]
         )
         self._resolved_core = resolved_core
         self._real_anchor_cache: dict[MasterSeed, RealAnchor | None] = {}
@@ -1730,7 +1752,14 @@ class ProtocolCellExecutor(CellExecutor):
 
     def execute_cell(self, cell: ScientificCell, config: ScientificConfig) -> CellExecutionOutcome:
         self._pending_real_report = None
-        evidence = load_prepared_evidence_counts(self._prepared_root, cell)
+        dataset = experiment_by_name(cell.experiment).dataset
+        if dataset is DatasetId.CICIOT2023:
+            prepared_root = self._secondary_prepared_root
+            target_class_token = CICIOT2023_TARGET_LABEL
+        else:
+            prepared_root = self._prepared_root
+            target_class_token = NBaiotClass.GAFGYT_COMBO.value
+        evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
         if evidence is None:
             return CellExecutionOutcome(
                 cell=cell,
@@ -1749,7 +1778,7 @@ class ProtocolCellExecutor(CellExecutor):
         except ValueError as error:
             return CellExecutionOutcome(
                 cell=cell,
-                terminal_state=ExperimentLifecycleState.INVALID.value,
+                terminal_state=ExperimentLifecycleState.INVALID,
                 failure=FailureDetail(
                     failure_class=FailureClass.INVARIANT_VIOLATION,
                     message=str(error),
@@ -1758,7 +1787,7 @@ class ProtocolCellExecutor(CellExecutor):
             )
         return CellExecutionOutcome(
             cell=cell,
-            terminal_state=ExperimentLifecycleState.COMPLETED.value,
+            terminal_state=ExperimentLifecycleState.COMPLETED,
             failure=None,
             metrics=metrics,
         )
@@ -3106,7 +3135,7 @@ class ProtocolCellExecutor(CellExecutor):
         model_size_bytes = 115 * 256 * 4
         envelopes: list[bytes] = []
         metadata_records: list[CommunicationMessageMetadata] = []
-        tensor_name = canonical_parameter_tensor_name(TensorParameterKind.MODEL, "linear")
+        tensor_name = parameter_tensor_name(TensorParameterKind.MODEL, "linear")
         timer = ElapsedTimer()
         for message_type, count in _efficiency_message_counts():
             for _index in range(count):
@@ -3116,7 +3145,7 @@ class ProtocolCellExecutor(CellExecutor):
                     semantic_cell_key_hash="b" * 64,
                     master_seed=cell.master_seed,
                     round_index=None,
-                    sender=SERVER_TOKEN,
+                    sender=SERVER_ID,
                     receiver="CLIENT",
                     claim_contract_hash="c" * 64,
                     payload_tensor_count=1,

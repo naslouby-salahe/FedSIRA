@@ -13,7 +13,6 @@ from fedsira.attacks.source_backdoor import (
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
 )
-from fedsira.attacks.transform import balanced_50_50_selection
 from fedsira.baselines.calibration import (
     clip_source_update,
     cosine_distance_matrix,
@@ -53,6 +52,7 @@ from fedsira.baselines.robust_aggregation import (
 from fedsira.baselines.source_authority import secure_continual_assessment_post_reference_rounds
 from fedsira.boundaries.capability_granularity import (
     apply_root_cause_feature_shift,
+    balanced_capability_selection,
     root_cause_for_sample,
     target_row_ids_for_contract,
 )
@@ -68,7 +68,7 @@ from fedsira.boundaries.epistemic_failure import (
 from fedsira.boundaries.heterogeneity import feature_shift_sign
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.common import ROLE_HASH_TOKEN, Role
-from fedsira.datasets.nbaiot.materialization import view_parquet_path
+from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_HASH_TOKEN,
@@ -108,11 +108,6 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
 )
 from fedsira.evaluation.records import MetricResult
-from fedsira.evaluation.screen import (
-    ScreenLossObservation,
-    run_proposal_screen_for_domain,
-    screen_fold_index,
-)
 from fedsira.experiments.registry import EpistemicFailureType, ReproducerCondition
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.federated import run_fedavg_round, train_one_client_locally
@@ -123,10 +118,15 @@ from fedsira.models.mlp import (
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
+from fedsira.protocol.opening import (
+    ScreenLossObservation,
+    run_proposal_screen_for_domain,
+    screen_fold_index,
+)
 from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime.determinism import (
-    canonical_bytes,
     derive_uint32,
+    framed_bytes,
     local_training_seed,
     namespace_seed,
     seed_job_local_rng_streams,
@@ -263,7 +263,7 @@ def _scope_and_shift_rows(
     )
     root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
     if root_cause_scope.balanced_selection_seed is not None:
-        selected_a_ids, selected_b_ids = balanced_50_50_selection(
+        selected_a_ids, selected_b_ids = balanced_capability_selection(
             sorted(root_cause_a_ids),
             sorted(root_cause_b_ids),
             root_cause_scope.balanced_selection_seed,
@@ -419,7 +419,7 @@ def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
         return "0" * 64
     hasher = hashlib.sha256()
     for path in parquet_files:
-        hasher.update(canonical_bytes(path.name, path.stat().st_size))
+        hasher.update(framed_bytes(path.name, path.stat().st_size))
     return hasher.hexdigest()
 
 
@@ -2109,7 +2109,9 @@ def compute_screen_differential(
         fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
         target_observations.append(
             ScreenLossObservation(
-                sample_id, float(target_anchor_loss[index]), float(target_source_loss[index])
+                sample_id=sample_id,
+                anchor_loss=float(target_anchor_loss[index]),
+                source_loss=float(target_source_loss[index]),
             )
         )
     control_observations: list[ScreenLossObservation] = []
@@ -2117,7 +2119,9 @@ def compute_screen_differential(
         fold_assignment[sample_id] = screen_fold_index(sample_id, screen_fold_seed, fold_count)
         control_observations.append(
             ScreenLossObservation(
-                sample_id, float(control_anchor_loss[index]), float(control_source_loss[index])
+                sample_id=sample_id,
+                anchor_loss=float(control_anchor_loss[index]),
+                source_loss=float(control_source_loss[index]),
             )
         )
     return run_proposal_screen_for_domain(

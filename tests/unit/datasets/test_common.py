@@ -2,30 +2,42 @@ import pytest
 
 from fedsira.datasets.common import (
     EVIDENCE_ROLES,
-    ROLE_HASH_TOKEN,
     TRAINING_AND_SCREENING_ROLES,
     Role,
     RoleWindow,
     compute_sample_id,
     role_for_normalized_position,
+    role_from_hash_token,
+    role_hash_token,
 )
 
 
-def test_every_role_has_a_hash_token() -> None:
-    assert set(ROLE_HASH_TOKEN.keys()) == set(Role)
-    assert all(token == token.upper() for token in ROLE_HASH_TOKEN.values())
+def role_window(role: Role, lower: float, upper: float) -> RoleWindow:
+    return RoleWindow(role=role, lower_inclusive=lower, upper_exclusive=upper)
+
+
+def test_every_role_has_a_round_trip_hash_token() -> None:
+    for role in Role:
+        token = role_hash_token(role)
+        assert token == token.upper()
+        assert role_from_hash_token(token) is role
 
 
 def test_role_hash_tokens_match_roadmap_exactly() -> None:
-    assert ROLE_HASH_TOKEN[Role.ANCHOR_TRAIN] == "ANCHOR_TRAIN"
-    assert ROLE_HASH_TOKEN[Role.ANCHOR_VALIDATION] == "ANCHOR_VALIDATION"
-    assert ROLE_HASH_TOKEN[Role.POST_REFERENCE_REPLAY] == "POST_REFERENCE_REPLAY"
-    assert ROLE_HASH_TOKEN[Role.ROW_VERIFICATION] == "ROW_VERIFICATION"
-    assert ROLE_HASH_TOKEN[Role.FINAL_GATE] == "FINAL_GATE"
-    assert ROLE_HASH_TOKEN[Role.REPORT_TEST] == "REPORT_TEST"
-    assert ROLE_HASH_TOKEN[Role.SOURCE_PROPOSAL] == "SOURCE_PROPOSAL"
-    assert ROLE_HASH_TOKEN[Role.CANDIDATE_SCREEN] == "CANDIDATE_SCREEN"
-    assert ROLE_HASH_TOKEN[Role.REPRODUCTION] == "REPRODUCTION"
+    assert role_hash_token(Role.ANCHOR_TRAIN) == "ANCHOR_TRAIN"
+    assert role_hash_token(Role.ANCHOR_VALIDATION) == "ANCHOR_VALIDATION"
+    assert role_hash_token(Role.POST_REFERENCE_REPLAY) == "POST_REFERENCE_REPLAY"
+    assert role_hash_token(Role.ROW_VERIFICATION) == "ROW_VERIFICATION"
+    assert role_hash_token(Role.FINAL_GATE) == "FINAL_GATE"
+    assert role_hash_token(Role.REPORT_TEST) == "REPORT_TEST"
+    assert role_hash_token(Role.SOURCE_PROPOSAL) == "SOURCE_PROPOSAL"
+    assert role_hash_token(Role.CANDIDATE_SCREEN) == "CANDIDATE_SCREEN"
+    assert role_hash_token(Role.REPRODUCTION) == "REPRODUCTION"
+
+
+def test_unknown_role_hash_token_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unsupported role token"):
+        role_from_hash_token("UNKNOWN_ROLE")
 
 
 def test_training_and_evidence_roles_are_disjoint() -> None:
@@ -34,16 +46,16 @@ def test_training_and_evidence_roles_are_disjoint() -> None:
 
 def test_role_window_rejects_inverted_bounds() -> None:
     with pytest.raises(ValueError, match="lower < upper"):
-        RoleWindow(Role.ANCHOR_TRAIN, 0.5, 0.1)
+        role_window(Role.ANCHOR_TRAIN, 0.5, 0.1)
 
 
 def test_role_window_rejects_out_of_range_bounds() -> None:
     with pytest.raises(ValueError):
-        RoleWindow(Role.ANCHOR_TRAIN, -0.1, 0.5)
+        role_window(Role.ANCHOR_TRAIN, -0.1, 0.5)
 
 
 def test_role_window_contains_is_lower_inclusive_upper_exclusive() -> None:
-    window = RoleWindow(Role.ANCHOR_TRAIN, 0.0, 0.395)
+    window = role_window(Role.ANCHOR_TRAIN, 0.0, 0.395)
     assert window.contains(0.0)
     assert window.contains(0.394999)
     assert not window.contains(0.395)
@@ -51,8 +63,8 @@ def test_role_window_contains_is_lower_inclusive_upper_exclusive() -> None:
 
 def test_role_for_normalized_position_finds_matching_window() -> None:
     windows = (
-        RoleWindow(Role.ANCHOR_TRAIN, 0.0, 0.395),
-        RoleWindow(Role.ANCHOR_VALIDATION, 0.4, 0.495),
+        role_window(Role.ANCHOR_TRAIN, 0.0, 0.395),
+        role_window(Role.ANCHOR_VALIDATION, 0.4, 0.495),
     )
     assert role_for_normalized_position(0.1, windows) is Role.ANCHOR_TRAIN
     assert role_for_normalized_position(0.45, windows) is Role.ANCHOR_VALIDATION
@@ -60,8 +72,8 @@ def test_role_for_normalized_position_finds_matching_window() -> None:
 
 def test_role_for_normalized_position_returns_none_in_a_guard_gap() -> None:
     windows = (
-        RoleWindow(Role.ANCHOR_TRAIN, 0.0, 0.395),
-        RoleWindow(Role.ANCHOR_VALIDATION, 0.4, 0.495),
+        role_window(Role.ANCHOR_TRAIN, 0.0, 0.395),
+        role_window(Role.ANCHOR_VALIDATION, 0.4, 0.495),
     )
     assert role_for_normalized_position(0.397, windows) is None
 

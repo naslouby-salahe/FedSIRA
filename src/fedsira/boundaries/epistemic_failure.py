@@ -2,29 +2,28 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.attacks.source_backdoor import apply_trigger_transform
-from fedsira.attacks.transform import select_transform_rows
+from fedsira.attacks.source_backdoor import apply_trigger_transform, select_fractional_attack_rows
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import EvaluationInsufficiencyReason
-from fedsira.domain.records import CanonicalToken, NamespaceSeed, Probability
+from fedsira.domain.records import ArtifactDigest, NamespaceSeed, Probability
 from fedsira.evaluation.aggregation import match_nearest_within_decile
 from fedsira.evaluation.records import MetricResult
 
 
 def select_shared_label_error_rows(
-    eligible_benign_row_ids: Sequence[CanonicalToken],
+    eligible_benign_row_ids: Sequence[ArtifactDigest],
     strength: Probability,
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[CanonicalToken, ...] | None:
-    return select_transform_rows(
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
         eligible_benign_row_ids, strength, attack_generation_namespace_seed
     )
 
 
 def relabel_shared_label_error_rows(
-    labels_by_row_id: Mapping[CanonicalToken, NBaiotClass],
-    selected_row_ids: Sequence[CanonicalToken],
-) -> dict[CanonicalToken, NBaiotClass]:
+    labels_by_row_id: Mapping[ArtifactDigest, NBaiotClass],
+    selected_row_ids: Sequence[ArtifactDigest],
+) -> dict[ArtifactDigest, NBaiotClass]:
     relabeled = dict(labels_by_row_id)
     for row_id in selected_row_ids:
         relabeled[row_id] = NBaiotClass.GAFGYT_COMBO
@@ -32,11 +31,11 @@ def relabel_shared_label_error_rows(
 
 
 def select_spurious_feature_rows(
-    eligible_target_row_ids: Sequence[CanonicalToken],
+    eligible_target_row_ids: Sequence[ArtifactDigest],
     strength: Probability,
     attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[CanonicalToken, ...] | None:
-    return select_transform_rows(
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
         eligible_target_row_ids, strength, attack_generation_namespace_seed
     )
 
@@ -56,9 +55,9 @@ def apply_attacker_induced_common_context(
 
 
 def match_diagnostic_benign_report_test_rows(
-    target_report_losses: Sequence[tuple[CanonicalToken, float]],
-    benign_report_test_losses: Sequence[tuple[CanonicalToken, float]],
-) -> tuple[tuple[CanonicalToken, CanonicalToken], ...] | None:
+    target_report_losses: Sequence[tuple[ArtifactDigest, float]],
+    benign_report_test_losses: Sequence[tuple[ArtifactDigest, float]],
+) -> tuple[tuple[ArtifactDigest, ArtifactDigest], ...] | None:
     boundary_values = [loss for _, loss in benign_report_test_losses]
     return match_nearest_within_decile(
         target_report_losses, benign_report_test_losses, boundary_values
@@ -66,7 +65,7 @@ def match_diagnostic_benign_report_test_rows(
 
 
 def diagnostic_marker_metric_or_insufficient(
-    matched_pairs: tuple[tuple[CanonicalToken, CanonicalToken], ...] | None,
+    matched_pairs: tuple[tuple[ArtifactDigest, ArtifactDigest], ...] | None,
     marker_value: float,
 ) -> tuple[MetricResult, EvaluationInsufficiencyReason | None]:
     if matched_pairs is None:

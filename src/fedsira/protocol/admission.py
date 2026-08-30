@@ -1,18 +1,28 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 import torch
 
 from fedsira.config.schema import FinalGateConfig
-from fedsira.datasets.nbaiot.schema import NBaiotDomain
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
-from fedsira.domain.records import ArtifactDigest, CanonicalToken, SeedBundle
+from fedsira.domain.records import (
+    ArtifactDigest,
+    CellPhaseIdentity,
+    DomainId,
+    FinalGateArtifactValid,
+    FinalGatePredicatesPass,
+    FrozenDomainModel,
+    GitCommit,
+    InvariantChecksPassed,
+    PluralityActive,
+    ScientificCellSemanticKey,
+    SeedBundle,
+)
 from fedsira.evaluation.aggregation import quantile_type7
 from fedsira.evaluation.records import MetricResult
 
 
 def validate_admission_requires_final_gate(
-    state: ClaimState, final_gate_artifact_is_valid: bool
+    state: ClaimState, final_gate_artifact_is_valid: FinalGateArtifactValid
 ) -> None:
     if state is ClaimState.ADMITTED and not final_gate_artifact_is_valid:
         raise ValueError("Admitted state requires a valid final-gate artifact")
@@ -25,7 +35,7 @@ def apply_production_update(
 
 
 def resolve_production_update(
-    is_plurality_active: bool,
+    is_plurality_active: PluralityActive,
     krum_selected_update: torch.Tensor | None,
     single_reproduction_update: torch.Tensor | None,
 ) -> torch.Tensor:
@@ -57,9 +67,9 @@ def final_gate_predicates_pass(
     minimum_target_f1: MetricResult,
     pooled_supported_macro_f1_drop: MetricResult,
     pooled_benign_far_increase: MetricResult,
-    no_invariant_failure: bool,
+    no_invariant_failure: InvariantChecksPassed,
     final_gate_config: FinalGateConfig,
-) -> bool:
+) -> FinalGatePredicatesPass:
     if (
         median_target_f1.value is None
         or minimum_target_f1.value is None
@@ -78,12 +88,11 @@ def final_gate_predicates_pass(
     )
 
 
-@dataclass(frozen=True)
-class AdmissionArtifactContent:
+class AdmissionArtifactContent(FrozenDomainModel):
     anchor_checkpoint_identity: ArtifactDigest
     source_commitment_identity: ArtifactDigest | None
     claim_identity: ArtifactDigest
-    reproducer_assignment_order: tuple[NBaiotDomain, ...]
+    reproducer_assignment_order: tuple[DomainId, ...]
     reproduction_commitment_hashes: tuple[ArtifactDigest, ...]
     verifier_record: tuple[ArtifactDigest, ...] | VerificationOmissionMarker
     krum_configuration_identity: ArtifactDigest | None
@@ -91,12 +100,12 @@ class AdmissionArtifactContent:
     final_gate_sample_manifest_identity: ArtifactDigest
     final_gate_metrics_identity: ArtifactDigest
     seed_bundle: SeedBundle
-    semantic_cell_key: CanonicalToken
-    cell_phase_identity: CanonicalToken
+    semantic_cell_key: ScientificCellSemanticKey
+    cell_phase_identity: CellPhaseIdentity
     upstream_dependency_fingerprints: tuple[ArtifactDigest, ...]
     producer_component_fingerprint: ArtifactDigest
     runtime_dependency_fingerprint: ArtifactDigest
-    repository_commit: CanonicalToken
+    repository_commit: GitCommit
     dependency_lock_digest: ArtifactDigest
     environment_fingerprint: ArtifactDigest
 
@@ -104,7 +113,7 @@ class AdmissionArtifactContent:
 def validate_admission_artifact_content(
     content: AdmissionArtifactContent,
     opening_mode: ClaimOpeningMode,
-    is_plurality_active: bool,
+    is_plurality_active: PluralityActive,
 ) -> None:
     if (
         opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED

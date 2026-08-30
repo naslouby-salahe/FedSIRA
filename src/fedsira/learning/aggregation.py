@@ -1,28 +1,81 @@
-from collections.abc import Mapping, Sequence
-
 import torch
 
-from fedsira.domain.records import PositiveInt
+from fedsira.domain.records import ParameterName, PositiveInt, TensorDomainModel
+from fedsira.models.mlp import FedSIRAClassifier
+
+
+class ModelParameter(TensorDomainModel):
+    name: ParameterName
+    value: torch.Tensor
+
+
+class ModelState(TensorDomainModel):
+    parameters: tuple[ModelParameter, ...]
+
+
+class WeightedModelState(TensorDomainModel):
+    state: ModelState
+    example_count: PositiveInt
+
+
+def model_state_from_classifier(model: FedSIRAClassifier) -> ModelState:
+    return ModelState(
+        parameters=tuple(
+            ModelParameter(name=name, value=parameter.detach().clone())
+            for name, parameter in model.named_parameters()
+        )
+    )
+
+
+def load_model_state(model: FedSIRAClassifier, state: ModelState) -> None:
+    expected_names = tuple(name for name, _parameter in model.named_parameters())
+    observed_names = tuple(parameter.name for parameter in state.parameters)
+    if observed_names != expected_names:
+        raise ValueError("model parameter schema does not match classifier architecture")
+    with torch.no_grad():
+        for name, parameter in model.named_parameters():
+            source = model_parameter(state, name)
+            if source.value.shape != parameter.shape:
+                raise ValueError(f"shape mismatch for model parameter {name}")
+            parameter.copy_(source.value)
+
+
+def model_parameter(
+    state: ModelState,
+    parameter_name: ParameterName,
+) -> ModelParameter:
+    for parameter in state.parameters:
+        if parameter.name == parameter_name:
+            return parameter
+    raise ValueError(f"model state does not contain parameter {parameter_name}")
+
+
+def _validate_parameter_schema(client_states: tuple[WeightedModelState, ...]) -> None:
+    expected_names = tuple(parameter.name for parameter in client_states[0].state.parameters)
+    if not expected_names:
+        raise ValueError("federated averaging requires model parameters")
+    if len(set(expected_names)) != len(expected_names):
+        raise ValueError("model parameter names must be unique")
+    for client_state in client_states[1:]:
+        observed_names = tuple(parameter.name for parameter in client_state.state.parameters)
+        if observed_names != expected_names:
+            raise ValueError("client model parameter schemas must match exactly")
 
 
 def federated_averaging(
-    client_state_dicts: Sequence[Mapping[str, torch.Tensor]],
-    client_example_counts: Sequence[PositiveInt],
-) -> dict[str, torch.Tensor]:
-    if len(client_state_dicts) != len(client_example_counts):
-        raise ValueError("client_state_dicts and client_example_counts must have equal length")
-    if len(client_state_dicts) == 0:
+    client_states: tuple[WeightedModelState, ...],
+) -> ModelState:
+    if not client_states:
         raise ValueError("federated averaging requires at least one client update")
-
-    total_examples = sum(client_example_counts)
-    averaged: dict[str, torch.Tensor] = {}
-    for parameter_name in client_state_dicts[0]:
-        weighted_sum = torch.zeros_like(client_state_dicts[0][parameter_name], dtype=torch.float32)
-        for state_dict, example_count in zip(
-            client_state_dicts, client_example_counts, strict=True
-        ):
-            weighted_sum += state_dict[parameter_name].to(torch.float32) * (
-                example_count / total_examples
+    _validate_parameter_schema(client_states)
+    total_examples = sum(client_state.example_count for client_state in client_states)
+    averaged: list[ModelParameter] = []
+    for reference_parameter in client_states[0].state.parameters:
+        weighted_sum = torch.zeros_like(reference_parameter.value, dtype=torch.float32)
+        for client_state in client_states:
+            parameter = model_parameter(client_state.state, reference_parameter.name)
+            weighted_sum += parameter.value.to(torch.float32) * (
+                client_state.example_count / total_examples
             )
-        averaged[parameter_name] = weighted_sum
-    return averaged
+        averaged.append(ModelParameter(name=reference_parameter.name, value=weighted_sum))
+    return ModelState(parameters=tuple(averaged))

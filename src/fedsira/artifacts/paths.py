@@ -1,59 +1,88 @@
 from pathlib import Path
 
-from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
-from fedsira.domain.records import CanonicalToken, ExperimentId
-
-ARTIFACT_FAMILY_PATH_SCOPE: dict[ArtifactFamily, ArtifactPathScope] = {
-    ArtifactFamily.RAW_DATASET_IDENTITY: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.CANONICAL_DATASET_MANIFEST: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.SCALER: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.PREPARED_ROLE_VIEW: ArtifactPathScope.PREPROCESSING,
-    ArtifactFamily.ANCHOR_CHECKPOINT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.REPRODUCTION_CHECKPOINT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.BASELINE_CHECKPOINT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.MODEL_SCORE_ARTIFACT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.SCREEN_MATCHING_ARTIFACT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION: ArtifactPathScope.PROJECT_ARTIFACT,
-    ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.REPRODUCTION_CERTIFICATE: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.KRUM_SYNTHESIZED_UPDATE: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.FINAL_GATE_DECISION: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.CLAIM_STATE_ARTIFACT: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.TABLE_FIGURE_SOURCE_DATA: ArtifactPathScope.EXPERIMENT_ARTIFACT,
-    ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT: ArtifactPathScope.MANUSCRIPT_RESULT,
-}
+from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
+from fedsira.domain.records import ExperimentName
 
 OUTPUTS_ROOT = Path("outputs")
 RESULTS_ROOT = Path("results")
 
+PREPROCESSING_FAMILIES: frozenset[ArtifactFamily] = frozenset(
+    (
+        ArtifactFamily.RAW_DATASET_IDENTITY,
+        ArtifactFamily.DATASET_MANIFEST,
+        ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST,
+        ArtifactFamily.SCALER,
+        ArtifactFamily.PREPARED_ROLE_VIEW,
+    )
+)
+PROJECT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
+    (
+        ArtifactFamily.ANCHOR_CHECKPOINT,
+        ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT,
+        ArtifactFamily.REPRODUCTION_CHECKPOINT,
+        ArtifactFamily.BASELINE_CHECKPOINT,
+        ArtifactFamily.MODEL_SCORE_ARTIFACT,
+        ArtifactFamily.SCREEN_MATCHING_ARTIFACT,
+        ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT,
+        ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
+    )
+)
+EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
+    (
+        ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT,
+        ArtifactFamily.REPRODUCTION_CERTIFICATE,
+        ArtifactFamily.KRUM_SYNTHESIZED_UPDATE,
+        ArtifactFamily.FINAL_GATE_DECISION,
+        ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
+        ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
+        ArtifactFamily.CLAIM_STATE_ARTIFACT,
+        ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
+    )
+)
+RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
+    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,)
+)
 
-def prepared_evidence_root(dataset: CanonicalToken) -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "prepared" / dataset
+
+def preprocessing_root() -> Path:
+    return OUTPUTS_ROOT / "preprocessing"
+
+
+def preprocessing_metadata_root() -> Path:
+    return preprocessing_root() / "metadata"
+
+
+def prepared_evidence_root(dataset: DatasetId) -> Path:
+    return preprocessing_root() / "prepared" / dataset
 
 
 def prepared_feature_root() -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "features"
+    return preprocessing_root() / "features"
 
 
 def smoke_record_path() -> Path:
-    return OUTPUTS_ROOT / "preprocessing" / "validation" / "smoke_record.json"
+    return preprocessing_root() / "validation" / "smoke_record.json"
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
-    return ARTIFACT_FAMILY_PATH_SCOPE[family]
+    if family in PREPROCESSING_FAMILIES:
+        return ArtifactPathScope.PREPROCESSING
+    if family in PROJECT_ARTIFACT_FAMILIES:
+        return ArtifactPathScope.PROJECT_ARTIFACT
+    if family in EXPERIMENT_ARTIFACT_FAMILIES:
+        return ArtifactPathScope.EXPERIMENT_ARTIFACT
+    if family in RESULT_FAMILIES:
+        return ArtifactPathScope.MANUSCRIPT_RESULT
+    raise ValueError(f"unsupported artifact family: {family.value}")
 
 
 def workspace_root_for_family(
-    family: ArtifactFamily, experiment: ExperimentId | None = None
+    family: ArtifactFamily,
+    experiment: ExperimentName | None = None,
 ) -> Path:
     scope = path_scope_for_family(family)
     if scope is ArtifactPathScope.PREPROCESSING:
-        return OUTPUTS_ROOT / "preprocessing"
+        return preprocessing_root()
     if scope is ArtifactPathScope.PROJECT_ARTIFACT:
         return OUTPUTS_ROOT / "artifacts"
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:

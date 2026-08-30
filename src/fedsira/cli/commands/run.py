@@ -3,6 +3,7 @@ from pathlib import Path
 from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.records import ExperimentName, OverwriteExisting, TextValue
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -14,59 +15,71 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    collapse_evaluation_from_records,
     comparison_results_for_experiment,
-    run_experiment,
+    execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.protocol_executor import ProtocolCellExecutor
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily
+from fedsira.experiments.registry import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    ClaimFamily,
+    experiment_by_name,
+)
 
-RESOLVED_CORE_CANONICAL_DIRECTORY = workspace_root_for_family(
+RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 )
 
+_COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
+    ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+    ClaimFamily.PLURALITY_NECESSITY,
+    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+)
 
-def render_result(result: ExperimentExecutionResult) -> str:
-    lines: list[str] = []
-    lines.append(f"FedSIRA run: {result.experiment}")
-    lines.append(f"experiment state: {result.lifecycle_state.value}")
-    lines.append(f"cells: {result.cell_completion_count}/{len(result.outcomes)} completed")
+
+def render_result(result: ExperimentExecutionResult) -> TextValue:
+    lines: list[TextValue] = [
+        f"FedSIRA run: {result.experiment}",
+        f"experiment state: {result.lifecycle_state.value}",
+        f"cells: {result.cell_completion_count}/{len(result.outcomes)} completed",
+    ]
     for outcome in result.outcomes:
         lines.append(
             f"  {outcome.cell.method:<45} {outcome.cell.condition:<40} "
-            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state}"
+            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state.value}"
         )
     if result.comparison_results:
-        lines.append("")
-        lines.append("comparisons:")
+        lines.extend(("", "comparisons:"))
         for family in result.comparison_results:
             lines.append(f"  family: {family.family.value}")
             for comparison in family.comparisons:
-                result_text = comparison.comparison_state
                 p_value = (
                     f"p={comparison.adjusted_p_value:.4f}"
                     if comparison.adjusted_p_value is not None
                     else "p=NA"
                 )
                 lines.append(
-                    f"    {comparison.definition.canonical_name:<110} {result_text:<22} {p_value}"
+                    f"    {comparison.definition.comparison_name:<110} "
+                    f"{comparison.comparison_state.value:<22} {p_value}"
                 )
     return "\n".join(lines)
 
 
-def _materialize_core_if_complete(experiment: str) -> None:
+def _collapse_family_for_experiment(experiment: ExperimentName) -> ClaimFamily | None:
+    definition = experiment_by_name(experiment)
+    if definition.claim_family not in _COLLAPSE_FAMILIES:
+        return None
+    return definition.claim_family
+
+
+def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
-    store = ExecutionRecordStore(Path("outputs"))
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    store = ExecutionRecordStore(Path(config.runtime.repository_layout.execution_workspace))
     decisions: list[CollapseDecision] = []
-    alpha = config.metrics_and_statistics.multiplicity.family_wise_alpha
-    collapse_family_names = (
-        ClaimFamily.PROPOSAL_SCREEN_NECESSITY.value,
-        ClaimFamily.PLURALITY_NECESSITY.value,
-        ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM.value,
-        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY.value,
-    )
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(collapse_experiment)
         if not records:
@@ -85,28 +98,42 @@ def _materialize_core_if_complete(experiment: str) -> None:
             )
             for record in records
         )
+        definition = experiment_by_name(collapse_experiment)
         comparison_results = comparison_results_for_experiment(
-            collapse_experiment, outcomes, config
+            collapse_experiment,
+            definition.dataset,
+            outcomes,
+            config,
+            store,
         )
-        family_names = {family.family.value for family in comparison_results}
-        matched_family = next(
-            (family for family in family_names if family in collapse_family_names),
-            None,
+        family = _collapse_family_for_experiment(collapse_experiment)
+        if family is None:
+            return
+        evaluation = collapse_evaluation_from_records(
+            collapse_experiment,
+            records,
+            config,
         )
-        if matched_family is None:
+        if evaluation is None:
             return
         decisions.append(
-            collapse_decision_from_comparison_families(matched_family, comparison_results, alpha)
+            collapse_decision_from_comparison_families(
+                family,
+                comparison_results,
+                evaluation=evaluation,
+                materiality_config=config.metrics_and_statistics.materiality,
+            )
         )
-    if len(decisions) == len(COLLAPSE_EXPERIMENT_NAMES):
-        core = materialize_resolved_core(tuple(decisions))
-        publish_resolved_core(RESOLVED_CORE_CANONICAL_DIRECTORY, core)
-        print(f"Resolved FedSIRA Core materialized: {core.identity_token}")
+    if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
+        return
+    core = materialize_resolved_core(tuple(decisions))
+    publish_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
+    print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 
-def execute(name: str, overwrite: bool) -> None:
-    resolved_core = read_resolved_core(RESOLVED_CORE_CANONICAL_DIRECTORY)
-    result = run_experiment(
+def execute(name: ExperimentName, overwrite: OverwriteExisting) -> None:
+    resolved_core = read_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY)
+    result = execute_experiment(
         name,
         ProtocolCellExecutor(resolved_core=resolved_core),
         overwrite=overwrite,

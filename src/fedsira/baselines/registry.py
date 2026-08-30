@@ -1,12 +1,16 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBaiotDomain
 from fedsira.domain.enums import ClaimState, TernaryOutcome
-from fedsira.domain.records import NonNegativeInt, PositiveInt
+from fedsira.domain.records import (
+    BaselineFullParticipationAllowed,
+    DomainId,
+    FrozenDomainModel,
+    NonNegativeInt,
+    PositiveInt,
+)
 from fedsira.protocol.reproduction import next_reproducer_domain
 
 
@@ -97,8 +101,7 @@ POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS: Final[PositiveInt] = 5
 TUNING_FORBIDDEN_ROLES: Final[frozenset[Role]] = frozenset({Role.REPORT_TEST, Role.FINAL_GATE})
 
 
-@dataclass(frozen=True)
-class PostReferenceDataAccess:
+class PostReferenceDataAccess(FrozenDomainModel):
     source_target_view: Role
     non_source_target_view: Role
     supported_replay_view: Role
@@ -112,8 +115,8 @@ ORDINARY_POST_REFERENCE_DATA_ACCESS: Final[PostReferenceDataAccess] = PostRefere
 
 
 def domain_target_view(
-    domain: NBaiotDomain,
-    source_domain: NBaiotDomain | None,
+    domain: DomainId,
+    source_domain: DomainId | None,
     data_access: PostReferenceDataAccess = ORDINARY_POST_REFERENCE_DATA_ACCESS,
 ) -> Role:
     if domain == source_domain:
@@ -126,28 +129,30 @@ def validate_role_not_used_for_tuning(role: Role) -> None:
         raise ValueError(f"role {role.value} must never be used for baseline tuning")
 
 
-def domain_without_target_view_may_participate(baseline_allows_full_participation: bool) -> bool:
+def domain_without_target_view_may_participate(
+    baseline_allows_full_participation: BaselineFullParticipationAllowed,
+) -> BaselineFullParticipationAllowed:
     return baseline_allows_full_participation
 
 
 def first_eligible_non_source_reproducer(
-    reproducer_order: Sequence[NBaiotDomain], non_source_eligible_domains: frozenset[NBaiotDomain]
-) -> NBaiotDomain | None:
+    reproducer_order: Sequence[DomainId], non_source_eligible_domains: frozenset[DomainId]
+) -> DomainId | None:
     return next_reproducer_domain(reproducer_order, frozenset(), non_source_eligible_domains)
 
 
 def single_fresh_verifier_domain(
-    verifier_assignment_order: Sequence[NBaiotDomain],
-    excluded_domains: frozenset[NBaiotDomain],
-    adequate_eligible_domains: frozenset[NBaiotDomain],
-) -> NBaiotDomain | None:
+    verifier_assignment_order: Sequence[DomainId],
+    excluded_domains: frozenset[DomainId],
+    adequate_eligible_domains: frozenset[DomainId],
+) -> DomainId | None:
     return next_reproducer_domain(
         verifier_assignment_order, excluded_domains, adequate_eligible_domains
     )
 
 
 def single_fresh_verifier_outcome(
-    verifier_domain: NBaiotDomain | None, verifier_vote: TernaryOutcome | None
+    verifier_domain: DomainId | None, verifier_vote: TernaryOutcome | None
 ) -> ClaimState:
     if verifier_domain is None:
         return ClaimState.DORMANT

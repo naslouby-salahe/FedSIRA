@@ -46,7 +46,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
-extend-exclude = ["vulture_whitelist.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
@@ -62,64 +61,6 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 include = ["src", "tests"]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/runtime/determinism.py"
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/runtime/environment.py"
-reportUnknownMemberType = false
-reportAttributeAccessIssue = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/models/mlp.py"
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/cli/commands/preprocess.py"
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/ciciot2023/acquisition.py"
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/preprocessing.py"
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/materialization.py"
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/experiments/real_evidence.py"
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "tests/unit/datasets/nbaiot/test_materialization.py"
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownArgumentType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/baselines/calibration.py"
-reportMissingTypeStubs = false
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/cli/main.py"
-reportUnknownMemberType = false
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/reporting/figures.py"
-reportUnknownMemberType = false
 
 [tool.deptry]
 extend_exclude = ["noxfile.py"]

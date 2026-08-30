@@ -1,30 +1,108 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from fedsira.domain.enums import ByteUnit, DatasetId
+from fedsira.domain.enums import (
+    ByteUnit,
+    ByzantineVerifierBehavior,
+    CapabilityContractScope,
+    DatasetId,
+    Role,
+    RootCauseMixture,
+)
 from fedsira.domain.records import (
+    AdmissionCount,
+    AdmissionRateChange,
+    AttackStrength,
+    BatchSize,
+    BenignFalseAlarmRateIncrease,
+    BootstrapResampleCount,
+    CadenceRounds,
+    CapabilityCertificationRate,
+    ClientDropout,
+    ClusterSize,
+    CommitteeSize,
+    ConfidenceLevel,
+    ConfigFormatVersion,
+    ContaminationRisk,
+    CosineSimilarity,
+    DatasetClassToken,
+    DbscanEpsilon,
+    DecimalPlaces,
+    DefinedDomainFraction,
+    DeltaScale,
+    DifferentialNatsPerExample,
+    Doi,
+    DomainCount,
+    DurationToleranceSeconds,
+    EvidenceCycleIndex,
+    FamilyWiseAlpha,
+    FeatureCount,
+    FeatureShiftMagnitude,
+    FederatedRoundCount,
+    FixtureCaseName,
+    FoldCount,
+    GradientL2Clip,
+    GroupCount,
+    HashModulus,
+    HeterogeneityMultiplier,
+    LearningRate,
+    LocalEpochCount,
+    LogicalEvidenceCycleCount,
+    LossWeight,
     MasterSeed,
-    NonEmptyString,
-    NonNegativeFloat,
-    NonNegativeInt,
-    Percentage,
-    PositiveFloat,
-    PositiveInt,
-    Probability,
+    MatchedControlCount,
+    MetricTolerance,
+    MinimumCompletePairCount,
+    MinimumExampleCount,
+    NumericalEpsilon,
+    OptimizerBeta,
+    OptimizerEpsilon,
+    PartitionSalt,
+    Percentile,
+    PersistentWorkersEnabled,
+    PinMemoryEnabled,
+    PoisonFraction,
+    ProbabilityTolerance,
+    PValue,
+    PValueDisplayFloor,
+    RateMargin,
+    RateReduction,
+    RateWorsening,
+    RegularizationWeight,
+    RepositoryPath,
+    ReproductionRowCount,
+    RetryCount,
+    RoleBoundary,
+    ScaleFactor,
+    ScreenDomainCount,
+    SeedCount,
+    SignificantDigits,
+    StandardizedValue,
+    SupportedMacroF1Drop,
+    TargetF1,
+    TargetF1Change,
+    TargetF1Gain,
+    Temperature,
+    TimeoutSeconds,
+    TrimCount,
+    UciDatasetId,
+    VerifierCount,
+    WarmupPassCount,
+    WeightDecay,
+    WorkerCount,
 )
 
-RepositoryPath = NonEmptyString
-NonEmptyLabel = NonEmptyString
 
-
-class FrozenModel(BaseModel):
+class FrozenConfigModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", protected_namespaces=())
 
 
-def _validate_role_interval_bounds(value: tuple[float, float]) -> tuple[float, float]:
+def _validate_role_interval_bounds(
+    value: tuple[RoleBoundary, RoleBoundary],
+) -> tuple[RoleBoundary, RoleBoundary]:
     start, end = value
     if end <= start:
         raise ValueError("role interval end must be strictly greater than start")
@@ -32,123 +110,179 @@ def _validate_role_interval_bounds(value: tuple[float, float]) -> tuple[float, f
 
 
 RoleInterval = Annotated[
-    tuple[Probability, Probability], AfterValidator(_validate_role_interval_bounds)
+    tuple[RoleBoundary, RoleBoundary], AfterValidator(_validate_role_interval_bounds)
 ]
 
 
-class RoleIntervals(FrozenModel):
-    supported: dict[NonEmptyLabel, RoleInterval]
-    target: dict[NonEmptyLabel, RoleInterval]
+class SupportedRoleIntervals(FrozenConfigModel):
+    anchor_train: RoleInterval = Field(alias=Role.ANCHOR_TRAIN.value)
+    anchor_validation: RoleInterval = Field(alias=Role.ANCHOR_VALIDATION.value)
+    post_reference_replay: RoleInterval = Field(alias=Role.POST_REFERENCE_REPLAY.value)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
+
+    def interval_for(self, role: Role) -> RoleInterval:
+        if role is Role.ANCHOR_TRAIN:
+            return self.anchor_train
+        if role is Role.ANCHOR_VALIDATION:
+            return self.anchor_validation
+        if role is Role.POST_REFERENCE_REPLAY:
+            return self.post_reference_replay
+        if role is Role.ROW_VERIFICATION:
+            return self.row_verification
+        if role is Role.FINAL_GATE:
+            return self.final_gate
+        if role is Role.REPORT_TEST:
+            return self.report_test
+        raise ValueError(f"unsupported supported-data role: {role.value}")
 
 
-class SamplingCapsPerDomain(FrozenModel):
-    anchor_train_per_supported_class: PositiveInt
-    anchor_validation_per_supported_class: PositiveInt
-    source_proposal_target: PositiveInt
-    source_proposal_supported_replay_per_supported_class: PositiveInt
-    candidate_screen_target: PositiveInt
-    reproduction_target: PositiveInt
-    reproduction_supported_replay_per_supported_class: PositiveInt
-    row_verification_target: PositiveInt
-    row_verification_supported_per_supported_class: PositiveInt
-    final_gate_target: PositiveInt
-    final_gate_supported_per_supported_class: PositiveInt
-    report_test_target: PositiveInt
-    report_test_benign: PositiveInt
-    report_test_other_supported_per_class: PositiveInt
+class TargetRoleIntervals(FrozenConfigModel):
+    source_proposal: RoleInterval = Field(alias=Role.SOURCE_PROPOSAL.value)
+    candidate_screen: RoleInterval = Field(alias=Role.CANDIDATE_SCREEN.value)
+    reproduction: RoleInterval = Field(alias=Role.REPRODUCTION.value)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
+
+    def interval_for(self, role: Role) -> RoleInterval:
+        if role is Role.SOURCE_PROPOSAL:
+            return self.source_proposal
+        if role is Role.CANDIDATE_SCREEN:
+            return self.candidate_screen
+        if role is Role.REPRODUCTION:
+            return self.reproduction
+        if role is Role.ROW_VERIFICATION:
+            return self.row_verification
+        if role is Role.FINAL_GATE:
+            return self.final_gate
+        if role is Role.REPORT_TEST:
+            return self.report_test
+        raise ValueError(f"unsupported target-data role: {role.value}")
 
 
-class ScalingConfig(FrozenModel):
-    zero_standard_deviation_scale: PositiveFloat
-    clip_min: float
-    clip_max: float
+class RoleIntervals(FrozenConfigModel):
+    supported: SupportedRoleIntervals
+    target: TargetRoleIntervals
+
+
+class SamplingCapsPerDomain(FrozenConfigModel):
+    anchor_train_per_supported_class: MinimumExampleCount
+    anchor_validation_per_supported_class: MinimumExampleCount
+    source_proposal_target: MinimumExampleCount
+    source_proposal_supported_replay_per_supported_class: MinimumExampleCount
+    candidate_screen_target: MinimumExampleCount
+    reproduction_target: MinimumExampleCount
+    reproduction_supported_replay_per_supported_class: MinimumExampleCount
+    row_verification_target: MinimumExampleCount
+    row_verification_supported_per_supported_class: MinimumExampleCount
+    final_gate_target: MinimumExampleCount
+    final_gate_supported_per_supported_class: MinimumExampleCount
+    report_test_target: MinimumExampleCount
+    report_test_benign: MinimumExampleCount
+    report_test_other_supported_per_class: MinimumExampleCount
+
+
+class ScalingConfig(FrozenConfigModel):
+    zero_standard_deviation_scale: ScaleFactor
+    clip_min: StandardizedValue
+    clip_max: StandardizedValue
 
     @model_validator(mode="after")
-    def _clip_bounds_ordered(self) -> ScalingConfig:
+    def _clip_bounds_ordered(self) -> Self:
         if self.clip_max <= self.clip_min:
             raise ValueError("clip_max must be strictly greater than clip_min")
         return self
 
 
-class PrimaryDatasetConfig(FrozenModel):
+class PrimaryDatasetConfig(FrozenConfigModel):
     name: DatasetId
-    uci_dataset_id: PositiveInt
-    doi: NonEmptyLabel
-    target_class: NonEmptyLabel
-    minimum_target_holding_domains: PositiveInt
-    supported_metric_minimum_report_examples_per_class: PositiveInt
+    uci_dataset_id: UciDatasetId
+    doi: Doi
+    target_class: DatasetClassToken
+    minimum_target_holding_domains: DomainCount
+    supported_metric_minimum_report_examples_per_class: MinimumExampleCount
     role_intervals: RoleIntervals
     sampling_caps_per_domain: SamplingCapsPerDomain
     scaling: ScalingConfig
 
 
-class SecondaryDatasetConfig(FrozenModel):
+class SecondaryDatasetConfig(FrozenConfigModel):
     name: DatasetId
-    target_class: NonEmptyLabel
-    pseudo_domain_partition_salt: int
+    target_class: DatasetClassToken
+    pseudo_domain_partition_salt: PartitionSalt
 
 
-class DatasetsConfig(FrozenModel):
+class DatasetsConfig(FrozenConfigModel):
     primary: PrimaryDatasetConfig
     secondary: SecondaryDatasetConfig
 
-
-class EvidenceMinimaConfig(FrozenModel):
-    reproduction_target_examples: PositiveInt
-    reproduction_supported_control_examples: PositiveInt
-    verification_target_examples: PositiveInt
-    verification_supported_control_examples: PositiveInt
-    proposal_screen_target_examples: PositiveInt
+    @model_validator(mode="after")
+    def _datasets_are_distinct(self) -> Self:
+        if self.primary.name is self.secondary.name:
+            raise ValueError("primary and secondary datasets must be distinct")
+        return self
 
 
-class CapabilityClaimConfig(FrozenModel):
-    target_f1_minimum: Probability
-    target_f1_gain_over_anchor_minimum: Probability
-    supported_macro_f1_drop_maximum: Probability
-    benign_false_alarm_rate_increase_maximum: Probability
-    candidate_free_anchor_target_f1_maximum: Probability
+class EvidenceMinimaConfig(FrozenConfigModel):
+    reproduction_target_examples: MinimumExampleCount
+    reproduction_supported_control_examples: MinimumExampleCount
+    verification_target_examples: MinimumExampleCount
+    verification_supported_control_examples: MinimumExampleCount
+    proposal_screen_target_examples: MinimumExampleCount
+
+
+class CapabilityClaimConfig(FrozenConfigModel):
+    target_f1_minimum: TargetF1
+    target_f1_gain_over_anchor_minimum: TargetF1Gain
+    supported_macro_f1_drop_maximum: SupportedMacroF1Drop
+    benign_false_alarm_rate_increase_maximum: BenignFalseAlarmRateIncrease
+    candidate_free_anchor_target_f1_maximum: TargetF1
     evidence_minima: EvidenceMinimaConfig
 
 
-class ClaimOpeningConfig(FrozenModel):
-    screen_domains: PositiveInt
-    required_positive_screen_domains: PositiveInt
-    candidate_free_required_adequate_domains: PositiveInt
+class ClaimOpeningConfig(FrozenConfigModel):
+    screen_domains: ScreenDomainCount
+    required_positive_screen_domains: ScreenDomainCount
+    candidate_free_required_adequate_domains: DomainCount
 
     @model_validator(mode="after")
-    def _required_within_screen_domains(self) -> ClaimOpeningConfig:
+    def _required_within_screen_domains(self) -> Self:
         if self.required_positive_screen_domains > self.screen_domains:
             raise ValueError("required_positive_screen_domains cannot exceed screen_domains")
         return self
 
 
-class ProposalScreenConfig(FrozenModel):
-    fold_count: PositiveInt
-    differential_minimum_nats_per_example: NonNegativeFloat
-    matched_controls_per_target: PositiveInt
+class ProposalScreenConfig(FrozenConfigModel):
+    fold_count: FoldCount
+    differential_minimum_nats_per_example: DifferentialNatsPerExample
+    matched_controls_per_target: MatchedControlCount
 
 
-class ResourceHorizonConfig(FrozenModel):
-    maximum_logical_evidence_cycles: PositiveInt
-    measurement_cycle_start: NonNegativeInt
-    measurement_cycle_end: NonNegativeInt
+class ResourceHorizonConfig(FrozenConfigModel):
+    maximum_logical_evidence_cycles: LogicalEvidenceCycleCount
+    measurement_cycle_start: EvidenceCycleIndex
+    measurement_cycle_end: EvidenceCycleIndex
 
     @model_validator(mode="after")
-    def _measurement_window_ordered(self) -> ResourceHorizonConfig:
+    def _measurement_window_ordered(self) -> Self:
         if self.measurement_cycle_end <= self.measurement_cycle_start:
             raise ValueError(
                 "measurement_cycle_end must be strictly greater than measurement_cycle_start"
             )
+        if self.measurement_cycle_end > self.maximum_logical_evidence_cycles:
+            raise ValueError("measurement_cycle_end cannot exceed maximum_logical_evidence_cycles")
         return self
 
 
-class VerificationConfig(FrozenModel):
-    panel_size: PositiveInt
-    maximum_byzantine_verifiers_per_panel: NonNegativeInt
-    required_positive_reports: PositiveInt
+class VerificationConfig(FrozenConfigModel):
+    panel_size: VerifierCount
+    maximum_byzantine_verifiers_per_panel: ReproductionRowCount
+    required_positive_reports: VerifierCount
 
     @model_validator(mode="after")
-    def _panel_consistency(self) -> VerificationConfig:
+    def _panel_consistency(self) -> Self:
         if self.required_positive_reports > self.panel_size:
             raise ValueError("required_positive_reports cannot exceed panel_size")
         if self.maximum_byzantine_verifiers_per_panel >= self.panel_size:
@@ -158,12 +292,12 @@ class VerificationConfig(FrozenModel):
         return self
 
 
-class SynthesisConfig(FrozenModel):
-    committee_size: PositiveInt
-    maximum_byzantine_reproduction_rows: NonNegativeInt
+class SynthesisConfig(FrozenConfigModel):
+    committee_size: CommitteeSize
+    maximum_byzantine_reproduction_rows: ReproductionRowCount
 
     @model_validator(mode="after")
-    def _committee_consistency(self) -> SynthesisConfig:
+    def _committee_consistency(self) -> Self:
         if self.maximum_byzantine_reproduction_rows >= self.committee_size:
             raise ValueError(
                 "maximum_byzantine_reproduction_rows must be smaller than committee_size"
@@ -171,28 +305,36 @@ class SynthesisConfig(FrozenModel):
         return self
 
 
-class FinalGateConfig(FrozenModel):
-    minimum_adequate_non_source_domains: PositiveInt
-    median_target_f1_minimum: Probability
-    minimum_domain_target_f1: Probability
-    supported_macro_f1_drop_maximum: Probability
-    benign_false_alarm_rate_increase_maximum: Probability
-
-
-class DiagnosticRandomVerifierProfileConfig(FrozenModel):
-    byzantine_domain_count: NonNegativeInt
-    panel_size: PositiveInt
-    required_positive_reports: PositiveInt
-    tolerated_contamination_risk: Probability
+class FinalGateConfig(FrozenConfigModel):
+    minimum_adequate_non_source_domains: DomainCount
+    median_target_f1_minimum: TargetF1
+    minimum_domain_target_f1: TargetF1
+    supported_macro_f1_drop_maximum: SupportedMacroF1Drop
+    benign_false_alarm_rate_increase_maximum: BenignFalseAlarmRateIncrease
 
     @model_validator(mode="after")
-    def _required_within_panel(self) -> DiagnosticRandomVerifierProfileConfig:
-        if self.required_positive_reports > self.panel_size:
-            raise ValueError("required_positive_reports cannot exceed panel_size")
+    def _target_f1_floor_is_consistent(self) -> Self:
+        if self.minimum_domain_target_f1 > self.median_target_f1_minimum:
+            raise ValueError("minimum_domain_target_f1 cannot exceed median_target_f1_minimum")
         return self
 
 
-class ProtocolConfig(FrozenModel):
+class DiagnosticRandomVerifierProfileConfig(FrozenConfigModel):
+    byzantine_domain_count: ReproductionRowCount
+    panel_size: VerifierCount
+    required_positive_reports: VerifierCount
+    tolerated_contamination_risk: ContaminationRisk
+
+    @model_validator(mode="after")
+    def _required_within_panel(self) -> Self:
+        if self.required_positive_reports > self.panel_size:
+            raise ValueError("required_positive_reports cannot exceed panel_size")
+        if self.byzantine_domain_count < self.panel_size:
+            return self
+        raise ValueError("byzantine_domain_count must be smaller than panel_size")
+
+
+class ProtocolConfig(FrozenConfigModel):
     claim_opening: ClaimOpeningConfig
     proposal_screen: ProposalScreenConfig
     resource_horizon: ResourceHorizonConfig
@@ -202,40 +344,55 @@ class ProtocolConfig(FrozenModel):
     diagnostic_random_verifier_profile: DiagnosticRandomVerifierProfileConfig
 
 
-class OptimizerConfig(FrozenModel):
-    anchor_and_standard_fl_learning_rate: PositiveFloat
-    post_reference_learning_rate: PositiveFloat
-    betas: tuple[Probability, Probability]
-    epsilon: PositiveFloat
-    weight_decay: NonNegativeFloat
+class OptimizerConfig(FrozenConfigModel):
+    anchor_and_standard_fl_learning_rate: LearningRate
+    post_reference_learning_rate: LearningRate
+    betas: tuple[OptimizerBeta, OptimizerBeta]
+    epsilon: OptimizerEpsilon
+    weight_decay: WeightDecay
+
+    @model_validator(mode="after")
+    def _betas_are_valid(self) -> Self:
+        beta_one, beta_two = self.betas
+        if beta_one >= beta_two:
+            raise ValueError("optimizer betas must satisfy beta_one < beta_two")
+        return self
 
 
-class TrainingConfig(FrozenModel):
-    batch_size: PositiveInt
-    gradient_global_l2_clip: PositiveFloat
+class TrainingConfig(FrozenConfigModel):
+    batch_size: BatchSize
+    gradient_global_l2_clip: GradientL2Clip
 
 
-class AnchorFedAvgConfig(FrozenModel):
-    rounds: PositiveInt
-    local_epochs_per_round: PositiveInt
-    client_dropout: Probability
-    checkpoint_cadence_rounds: PositiveInt
-    evaluation_cadence_rounds: PositiveInt
+class AnchorFedAvgConfig(FrozenConfigModel):
+    rounds: FederatedRoundCount
+    local_epochs_per_round: LocalEpochCount
+    client_dropout: ClientDropout
+    checkpoint_cadence_rounds: CadenceRounds
+    evaluation_cadence_rounds: CadenceRounds
+
+    @model_validator(mode="after")
+    def _cadences_fit_training_horizon(self) -> Self:
+        if self.checkpoint_cadence_rounds > self.rounds:
+            raise ValueError("checkpoint_cadence_rounds cannot exceed rounds")
+        if self.evaluation_cadence_rounds > self.rounds:
+            raise ValueError("evaluation_cadence_rounds cannot exceed rounds")
+        return self
 
 
-class PostReferenceConfig(FrozenModel):
-    local_epochs: PositiveInt
-    stability_kl_temperature: PositiveFloat
-    stability_weight: NonNegativeFloat
-    delta_l2_weight: NonNegativeFloat
+class PostReferenceConfig(FrozenConfigModel):
+    local_epochs: LocalEpochCount
+    stability_kl_temperature: Temperature
+    stability_weight: LossWeight
+    delta_l2_weight: RegularizationWeight
 
 
-class VerifierAwareBackdoorOverrideConfig(FrozenModel):
-    local_epochs: PositiveInt
-    triggered_backdoor_loss_weight: NonNegativeFloat
+class VerifierAwareBackdoorOverrideConfig(FrozenConfigModel):
+    local_epochs: LocalEpochCount
+    triggered_backdoor_loss_weight: LossWeight
 
 
-class ModelConfig(FrozenModel):
+class ModelConfig(FrozenConfigModel):
     optimizer: OptimizerConfig
     training: TrainingConfig
     anchor_fedavg: AnchorFedAvgConfig
@@ -243,79 +400,99 @@ class ModelConfig(FrozenModel):
     verifier_aware_backdoor_override: VerifierAwareBackdoorOverrideConfig
 
 
-class SeedsAndDeterminismConfig(FrozenModel):
+class SeedsAndDeterminismConfig(FrozenConfigModel):
     master_seeds: tuple[MasterSeed, ...]
     analysis_seed: MasterSeed
     smoke_seed: MasterSeed
 
     @model_validator(mode="after")
-    def _master_seeds_are_distinct(self) -> SeedsAndDeterminismConfig:
+    def _master_seeds_are_distinct(self) -> Self:
+        if not self.master_seeds:
+            raise ValueError("master_seeds must not be empty")
         if len(set(self.master_seeds)) != len(self.master_seeds):
             raise ValueError("master_seeds must not contain duplicates")
-        if len(self.master_seeds) == 0:
-            raise ValueError("master_seeds must not be empty")
+        if self.analysis_seed in self.master_seeds:
+            raise ValueError("analysis_seed must be distinct from master_seeds")
+        if self.smoke_seed in self.master_seeds or self.smoke_seed == self.analysis_seed:
+            raise ValueError("smoke_seed must be distinct from confirmatory and analysis seeds")
+        return self
+
+    @property
+    def confirmatory_seed_count(self) -> SeedCount:
+        return len(self.master_seeds)
+
+
+class ModelReplacementConfig(FrozenConfigModel):
+    poison_fraction: PoisonFraction
+    delta_scale: DeltaScale
+
+
+class VerifierAwareConfig(FrozenConfigModel):
+    delta_scale: DeltaScale
+
+
+class HiddenSourceBackdoorConfig(FrozenConfigModel):
+    trigger_value_after_standardization: StandardizedValue
+    confirmatory_poison_fraction: PoisonFraction
+    poison_fraction_sweep: tuple[PoisonFraction, ...]
+
+    @model_validator(mode="after")
+    def _confirmatory_fraction_is_in_sweep(self) -> Self:
+        if not self.poison_fraction_sweep:
+            raise ValueError("poison_fraction_sweep must not be empty")
+        if len(set(self.poison_fraction_sweep)) != len(self.poison_fraction_sweep):
+            raise ValueError("poison_fraction_sweep must not contain duplicates")
+        if self.confirmatory_poison_fraction not in self.poison_fraction_sweep:
+            raise ValueError(
+                "confirmatory_poison_fraction must be included in poison_fraction_sweep"
+            )
         return self
 
 
-class ModelReplacementConfig(FrozenModel):
-    poison_fraction: Probability
-    delta_scale: PositiveFloat
-
-
-class VerifierAwareConfig(FrozenModel):
-    delta_scale: PositiveFloat
-
-
-class HiddenSourceBackdoorConfig(FrozenModel):
-    trigger_value_after_standardization: float
-    confirmatory_poison_fraction: Probability
-    poison_fraction_sweep: tuple[Probability, ...]
-
-
-class ByzantineReproductionConfig(FrozenModel):
-    compromised_counts: tuple[NonNegativeInt, ...]
+class ByzantineReproductionConfig(FrozenConfigModel):
+    compromised_counts: tuple[ReproductionRowCount, ...]
     model_replacement: ModelReplacementConfig
     verifier_aware: VerifierAwareConfig
 
 
-class ByzantineVerifierConfig(FrozenModel):
-    compromise_counts: tuple[NonNegativeInt, ...]
-    behaviors: tuple[NonEmptyLabel, ...]
+class ByzantineVerifierConfig(FrozenConfigModel):
+    compromise_counts: tuple[ReproductionRowCount, ...]
+    behaviors: tuple[ByzantineVerifierBehavior, ...]
 
 
-class SharedLabelErrorConfig(FrozenModel):
-    strengths: tuple[Probability, ...]
+class SharedLabelErrorConfig(FrozenConfigModel):
+    strengths: tuple[AttackStrength, ...]
 
 
-class SharedSpuriousFeatureConfig(FrozenModel):
-    strengths: tuple[Probability, ...]
-    value_after_standardization: float
+class SharedSpuriousFeatureConfig(FrozenConfigModel):
+    strengths: tuple[AttackStrength, ...]
+    value_after_standardization: StandardizedValue
 
 
-class AttackerInducedCommonContextConfig(FrozenModel):
-    strengths: tuple[Probability, ...]
+class AttackerInducedCommonContextConfig(FrozenConfigModel):
+    strengths: tuple[AttackStrength, ...]
 
 
-class CapabilityUnderSpecificationConfig(FrozenModel):
-    root_cause_hash_modulus: PositiveInt
-    shift_value_after_standardization: float
-    contracts: tuple[NonEmptyLabel, ...]
-    mixtures: tuple[NonEmptyLabel, ...]
+class CapabilityUnderSpecificationConfig(FrozenConfigModel):
+    root_cause_hash_modulus: HashModulus
+    shift_value_after_standardization: StandardizedValue
+    contracts: tuple[CapabilityContractScope, ...]
+    mixtures: tuple[RootCauseMixture, ...]
 
 
-class HeterogeneityConfig(FrozenModel):
-    quantity_skew_multipliers: tuple[Probability, ...]
-    feature_shift_selected_feature_count: PositiveInt
-    feature_shift_magnitudes: tuple[PositiveFloat, ...]
+class HeterogeneityConfig(FrozenConfigModel):
+    quantity_skew_multipliers: tuple[HeterogeneityMultiplier, ...]
+    feature_shift_selected_feature_count: FeatureCount
+    feature_shift_magnitudes: tuple[FeatureShiftMagnitude, ...]
 
 
-class CleanOracleMaterialityConfig(FrozenModel):
-    target_f1_decrease: Probability
-    supported_macro_f1_drop: Probability
-    benign_false_alarm_rate_increase: Probability
+class CleanOracleMaterialityConfig(FrozenConfigModel):
+    target_f1_decrease: TargetF1
+    supported_macro_f1_drop: SupportedMacroF1Drop
+    benign_false_alarm_rate_increase: BenignFalseAlarmRateIncrease
 
 
-class AttacksAndBoundariesConfig(FrozenModel):
+class AttacksAndBoundariesConfig(FrozenConfigModel):
     hidden_source_backdoor: HiddenSourceBackdoorConfig
     byzantine_reproduction: ByzantineReproductionConfig
     byzantine_verifier: ByzantineVerifierConfig
@@ -327,103 +504,112 @@ class AttacksAndBoundariesConfig(FrozenModel):
     clean_oracle_materiality: CleanOracleMaterialityConfig
 
 
-class ReconstructionFilterConfig(FrozenModel):
-    reconstruction_local_epochs: PositiveInt
-    normalization_epsilon: PositiveFloat
-    calibration_percentile: Percentage
+class ReconstructionFilterConfig(FrozenConfigModel):
+    reconstruction_local_epochs: LocalEpochCount
+    normalization_epsilon: NumericalEpsilon
+    calibration_percentile: Percentile
 
 
-class DensityClusterTrimmedMeanConfig(FrozenModel):
-    dbscan_epsilon: PositiveFloat
-    dbscan_min_samples: PositiveInt
-    trim_each_tail_count: NonNegativeInt
-    minimum_cluster_size_for_trimming: PositiveInt
-
-
-class RecoveryAfterSourceAdmissionConfig(FrozenModel):
-    backdoor_alarm_percentile: Percentage
-    recovery_rounds: PositiveInt
-
-
-class SourceUpdateSanitizationConfig(FrozenModel):
-    coordinate_bound_percentile: Percentage
-
-
-class ParameterSimilarityConfig(FrozenModel):
-    required_committed_rows: PositiveInt
-    cosine_similarity_minimum: Probability
-
-
-class ThreeRowCoordinateMedianConfig(FrozenModel):
-    row_count: PositiveInt
-    assumed_byzantine_rows: NonNegativeInt
+class DensityClusterTrimmedMeanConfig(FrozenConfigModel):
+    dbscan_epsilon: DbscanEpsilon
+    dbscan_min_samples: ClusterSize
+    trim_each_tail_count: TrimCount
+    minimum_cluster_size_for_trimming: ClusterSize
 
     @model_validator(mode="after")
-    def _byzantine_within_rows(self) -> ThreeRowCoordinateMedianConfig:
+    def _trim_count_fits_cluster(self) -> Self:
+        if 2 * self.trim_each_tail_count >= self.minimum_cluster_size_for_trimming:
+            raise ValueError(
+                "twice trim_each_tail_count must be smaller than minimum_cluster_size_for_trimming"
+            )
+        return self
+
+
+class RecoveryAfterSourceAdmissionConfig(FrozenConfigModel):
+    backdoor_alarm_percentile: Percentile
+    recovery_rounds: FederatedRoundCount
+
+
+class SourceUpdateSanitizationConfig(FrozenConfigModel):
+    coordinate_bound_percentile: Percentile
+
+
+class ParameterSimilarityConfig(FrozenConfigModel):
+    required_committed_rows: CommitteeSize
+    cosine_similarity_minimum: CosineSimilarity
+
+
+class ThreeRowCoordinateMedianConfig(FrozenConfigModel):
+    row_count: CommitteeSize
+    assumed_byzantine_rows: ReproductionRowCount
+
+    @model_validator(mode="after")
+    def _byzantine_within_rows(self) -> Self:
         if self.assumed_byzantine_rows >= self.row_count:
             raise ValueError("assumed_byzantine_rows must be smaller than row_count")
         return self
 
 
-class BaselinesConfig(FrozenModel):
-    local_only_reference_epochs: PositiveInt
-    centralized_reference_epochs: PositiveInt
-    fedavg_post_reference_rounds: PositiveInt
-    multiple_model_certified_ensemble_group_count: PositiveInt
-    multiple_model_certified_ensemble_post_reference_rounds: PositiveInt
+class BaselinesConfig(FrozenConfigModel):
+    local_only_reference_epochs: LocalEpochCount
+    centralized_reference_epochs: LocalEpochCount
+    fedavg_post_reference_rounds: FederatedRoundCount
+    multiple_model_certified_ensemble_group_count: GroupCount
+    multiple_model_certified_ensemble_post_reference_rounds: FederatedRoundCount
     reconstruction_filter: ReconstructionFilterConfig
     density_cluster_trimmed_mean: DensityClusterTrimmedMeanConfig
-    secure_continual_assessment_post_reference_rounds: PositiveInt
+    secure_continual_assessment_post_reference_rounds: FederatedRoundCount
     recovery_after_source_admission: RecoveryAfterSourceAdmissionConfig
     source_update_sanitization: SourceUpdateSanitizationConfig
     parameter_similarity: ParameterSimilarityConfig
     three_row_coordinate_median: ThreeRowCoordinateMedianConfig
-    krum_robust_aggregation_post_reference_rounds: PositiveInt
+    krum_robust_aggregation_post_reference_rounds: FederatedRoundCount
 
 
-class MetricAggregationConfig(FrozenModel):
-    generic_defined_domain_fraction_minimum: Probability
+class MetricAggregationConfig(FrozenConfigModel):
+    generic_defined_domain_fraction_minimum: DefinedDomainFraction
 
 
-class MultiplicityConfig(FrozenModel):
-    family_wise_alpha: Probability
+class MultiplicityConfig(FrozenConfigModel):
+    family_wise_alpha: FamilyWiseAlpha
 
 
-class BootstrapConfig(FrozenModel):
-    confidence_level: Probability
-    resamples: PositiveInt
+class BootstrapConfig(FrozenConfigModel):
+    confidence_level: ConfidenceLevel
+    resamples: BootstrapResampleCount
 
 
-class MaterialityConfig(FrozenModel):
-    target_f1_gain_minimum: Probability
-    supported_macro_f1_noninferiority_margin: Probability
-    benign_false_alarm_rate_noninferiority_margin: Probability
-    source_exclusion_asr_reduction_minimum: Probability
-    malicious_admission_reduction_minimum: Probability
-    legitimate_admission_noninferiority_margin: Probability
-    worst_domain_target_f1_gain_minimum: Probability
-    false_launch_reduction_minimum: Probability
-    reproduction_attempt_relative_reduction_minimum: Probability
-    post_evidence_overhead_relative_reduction_minimum: Probability
-    proposal_malicious_admission_worsening_maximum: Probability
+class MaterialityConfig(FrozenConfigModel):
+    target_f1_gain_minimum: TargetF1Gain
+    target_f1_noninferiority_margin: TargetF1
+    supported_macro_f1_noninferiority_margin: SupportedMacroF1Drop
+    benign_false_alarm_rate_noninferiority_margin: BenignFalseAlarmRateIncrease
+    source_exclusion_asr_reduction_minimum: RateReduction
+    malicious_admission_reduction_minimum: RateReduction
+    legitimate_admission_noninferiority_margin: RateMargin
+    worst_domain_target_f1_gain_minimum: TargetF1Gain
+    false_launch_reduction_minimum: RateReduction
+    reproduction_attempt_relative_reduction_minimum: RateReduction
+    post_evidence_overhead_relative_reduction_minimum: RateReduction
+    proposal_malicious_admission_worsening_maximum: RateWorsening
 
 
-class TechnicalCompletionConfig(FrozenModel):
-    minimum_complete_pairs_for_claim_support: PositiveInt
+class TechnicalCompletionConfig(FrozenConfigModel):
+    minimum_complete_pairs_for_claim_support: MinimumCompletePairCount
 
 
-class PublicationRoundingConfig(FrozenModel):
-    f1_accuracy_rates_decimals: NonNegativeInt
-    percentage_decimals: NonNegativeInt
-    effect_size_decimals: NonNegativeInt
-    p_value_significant_digits: PositiveInt
-    p_value_display_floor: PositiveFloat
-    seconds_decimals: NonNegativeInt
+class PublicationRoundingConfig(FrozenConfigModel):
+    f1_accuracy_rates_decimals: DecimalPlaces
+    percentage_decimals: DecimalPlaces
+    effect_size_decimals: DecimalPlaces
+    p_value_significant_digits: SignificantDigits
+    p_value_display_floor: PValueDisplayFloor
+    seconds_decimals: DecimalPlaces
     byte_units: ByteUnit
-    byte_decimals: NonNegativeInt
+    byte_decimals: DecimalPlaces
 
 
-class MetricsAndStatisticsConfig(FrozenModel):
+class MetricsAndStatisticsConfig(FrozenConfigModel):
     metric_aggregation: MetricAggregationConfig
     multiplicity: MultiplicityConfig
     bootstrap: BootstrapConfig
@@ -432,7 +618,7 @@ class MetricsAndStatisticsConfig(FrozenModel):
     publication_rounding: PublicationRoundingConfig
 
 
-class RepositoryLayoutConfig(FrozenModel):
+class RepositoryLayoutConfig(FrozenConfigModel):
     source: RepositoryPath
     tests: RepositoryPath
     raw_data: RepositoryPath
@@ -441,55 +627,61 @@ class RepositoryLayoutConfig(FrozenModel):
     manuscript_results: RepositoryPath
 
 
-class DataLoaderConfig(FrozenModel):
-    workers: NonNegativeInt
-    pin_memory: bool
-    persistent_workers: bool
+class DataLoaderConfig(FrozenConfigModel):
+    workers: WorkerCount
+    pin_memory: PinMemoryEnabled
+    persistent_workers: PersistentWorkersEnabled
+
+    @model_validator(mode="after")
+    def _persistent_workers_require_workers(self) -> Self:
+        if self.persistent_workers and self.workers == 0:
+            raise ValueError("persistent_workers requires workers > 0")
+        return self
 
 
-class TimeoutsSecondsConfig(FrozenModel):
-    dataset_preprocessing: PositiveInt
-    scientific_cell_phase: PositiveInt
-    experiment_analysis_or_report: PositiveInt
-    final_export_verification: PositiveInt
+class TimeoutsSecondsConfig(FrozenConfigModel):
+    dataset_preprocessing: TimeoutSeconds
+    scientific_cell_phase: TimeoutSeconds
+    experiment_analysis_or_report: TimeoutSeconds
+    final_export_verification: TimeoutSeconds
 
 
-class TimingConfig(FrozenModel):
-    warmup_forward_passes: NonNegativeInt
+class TimingConfig(FrozenConfigModel):
+    warmup_forward_passes: WarmupPassCount
 
 
-class RuntimeConfig(FrozenModel):
+class RuntimeConfig(FrozenConfigModel):
     repository_layout: RepositoryLayoutConfig
     data_loader: DataLoaderConfig
     timeouts_seconds: TimeoutsSecondsConfig
-    automatic_infrastructure_retries_per_cell_phase: NonNegativeInt
+    automatic_infrastructure_retries_per_cell_phase: RetryCount
     timing: TimingConfig
-    same_environment_absolute_metric_tolerance: PositiveFloat
+    same_environment_absolute_metric_tolerance: MetricTolerance
 
 
-class ByzantineOperatingRegionConfig(FrozenModel):
-    maximum_malicious_admissions_within_bound: NonNegativeInt
+class ByzantineOperatingRegionConfig(FrozenConfigModel):
+    maximum_malicious_admissions_within_bound: AdmissionCount
 
 
-class SafeDormancyConfig(FrozenModel):
-    maximum_permanent_singleton_admissions: NonNegativeInt
+class SafeDormancyConfig(FrozenConfigModel):
+    maximum_permanent_singleton_admissions: AdmissionCount
 
 
-class CapabilityGranularityBoundaryConfig(FrozenModel):
-    false_same_capability_certification_rate_minimum: Probability
+class CapabilityGranularityBoundaryConfig(FrozenConfigModel):
+    false_same_capability_certification_rate_minimum: CapabilityCertificationRate
 
 
-class HeterogeneityBoundaryConfig(FrozenModel):
-    legitimate_admission_change_from_natural_maximum: Probability
-    worst_domain_target_f1_change_from_natural_maximum: Probability
+class HeterogeneityBoundaryConfig(FrozenConfigModel):
+    legitimate_admission_change_from_natural_maximum: AdmissionRateChange
+    worst_domain_target_f1_change_from_natural_maximum: TargetF1Change
 
 
-class SecondaryGeneralizationConfig(FrozenModel):
-    target_f1_noninferiority_margin: Probability
-    malicious_admission_worsening_maximum: Probability
+class SecondaryGeneralizationConfig(FrozenConfigModel):
+    target_f1_noninferiority_margin: TargetF1
+    malicious_admission_worsening_maximum: RateWorsening
 
 
-class ClaimSupportThresholdsConfig(FrozenModel):
+class ClaimSupportThresholdsConfig(FrozenConfigModel):
     byzantine_operating_region: ByzantineOperatingRegionConfig
     safe_dormancy: SafeDormancyConfig
     capability_granularity_boundary: CapabilityGranularityBoundaryConfig
@@ -497,12 +689,12 @@ class ClaimSupportThresholdsConfig(FrozenModel):
     secondary_generalization: SecondaryGeneralizationConfig
 
 
-class ValidationTolerancesConfig(FrozenModel):
-    random_committee_probability_absolute: PositiveFloat
-    delay_component_sum_seconds_absolute: PositiveFloat
+class ValidationTolerancesConfig(FrozenConfigModel):
+    random_committee_probability_absolute: ProbabilityTolerance
+    delay_component_sum_seconds_absolute: DurationToleranceSeconds
 
 
-class ScientificConfig(FrozenModel):
+class ScientificConfig(FrozenConfigModel):
     datasets: DatasetsConfig
     capability_claim: CapabilityClaimConfig
     protocol: ProtocolConfig
@@ -516,13 +708,13 @@ class ScientificConfig(FrozenModel):
     validation_tolerances: ValidationTolerancesConfig
 
 
-class TestFixtureConfig(FrozenModel):
-    fixture_format_version: PositiveInt
-    holm_fixture_raw_p_values: tuple[tuple[NonEmptyLabel, Probability], ...]
-    holm_fixture_adjusted_p_values: tuple[tuple[NonEmptyLabel, Probability], ...]
-    sign_flip_sample_count: PositiveInt
-    sign_flip_expected_p_value: Probability
+class TestFixtureConfig(FrozenConfigModel):
+    fixture_format_version: ConfigFormatVersion
+    holm_fixture_raw_p_values: tuple[tuple[FixtureCaseName, PValue], ...]
+    holm_fixture_adjusted_p_values: tuple[tuple[FixtureCaseName, PValue], ...]
+    sign_flip_sample_count: MinimumExampleCount
+    sign_flip_expected_p_value: PValue
 
 
-class SmokeConfig(FrozenModel):
-    smoke_format_version: PositiveInt
+class SmokeConfig(FrozenConfigModel):
+    smoke_format_version: ConfigFormatVersion
