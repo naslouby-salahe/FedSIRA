@@ -28,6 +28,25 @@ def annotation_violations(tree: ast.Module) -> list[str]:
     return found
 
 
+def forbidden_symbol_violations(tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in FORBIDDEN_TYPE_NAMES:
+            found.append(f"name:{node.id}:{node.lineno}")
+        elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_TYPE_NAMES:
+            found.append(f"attribute:{node.attr}:{node.lineno}")
+        elif isinstance(node, ast.ImportFrom):
+            for imported in node.names:
+                if imported.name in FORBIDDEN_TYPE_NAMES:
+                    found.append(f"import:{imported.name}:{node.lineno}")
+        elif isinstance(node, ast.Import):
+            for imported in node.names:
+                terminal_name = imported.name.rsplit(".", maxsplit=1)[-1]
+                if terminal_name in FORBIDDEN_TYPE_NAMES:
+                    found.append(f"import:{terminal_name}:{node.lineno}")
+    return found
+
+
 def raw_mapping_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     for node in ast.walk(tree):
@@ -50,6 +69,14 @@ def test_no_any_dict_or_object_annotations() -> None:
         for name in annotation_violations(parse(path)):
             offenders.append(f"{path.relative_to(REPO_ROOT)}:{name}")
     assert not offenders, f"Forbidden Any/dict/object annotations: {offenders}"
+
+
+def test_no_any_dict_or_object_symbols() -> None:
+    offenders: list[str] = []
+    for path in iter_python_files(SRC_ROOT):
+        for violation in forbidden_symbol_violations(parse(path)):
+            offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
+    assert not offenders, f"Forbidden Any/dict/object symbols: {offenders}"
 
 
 def test_no_raw_dictionary_construction() -> None:
@@ -81,3 +108,15 @@ def test_dictionary_construction_is_detected() -> None:
         offending = Path(tmp) / "offending.py"
         offending.write_text("VALUE = {\"a\": 1}\n")
         assert raw_mapping_violations(parse(offending)) == ["dict-literal:1"]
+
+
+def test_forbidden_symbol_usage_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        offending = Path(tmp) / "offending.py"
+        offending.write_text(
+            "import typing\n\ndef handler(value):\n    return isinstance(value, dict) or typing.Any is object\n"
+        )
+        violations = forbidden_symbol_violations(parse(offending))
+        assert "name:dict:4" in violations
+        assert "attribute:Any:4" in violations
+        assert "name:object:4" in violations
