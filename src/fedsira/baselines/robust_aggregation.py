@@ -3,7 +3,15 @@ import torch
 from fedsira.config.schema import BaselinesConfig, ThreeRowCoordinateMedianConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import BooleanValue, DerivedSeed, MasterSeed, PositiveInt, RoundIndex
+from fedsira.domain.records import (
+    CommitteeSize,
+    DerivedSeed,
+    MasterSeed,
+    NonAbstainingReproductionSeries,
+    ParticipantCount,
+    PositiveInt,
+    RoundIndex,
+)
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 from fedsira.runtime.determinism import derive_uint32
 
@@ -12,8 +20,8 @@ CLIENT_SAMPLING_SEPARATOR = SeedNamespace.CLIENT_SAMPLING.value
 
 def direct_krum_committee_rows(
     committed_rows: tuple[CertifiedReproductionRow, ...],
-    is_non_abstaining: tuple[BooleanValue, ...],
-    committee_size: PositiveInt,
+    is_non_abstaining: NonAbstainingReproductionSeries,
+    committee_size: CommitteeSize,
 ) -> tuple[CertifiedReproductionRow, ...] | None:
     if len(committed_rows) != len(is_non_abstaining):
         raise ValueError("committed rows and abstention states must have equal length")
@@ -28,7 +36,7 @@ def direct_krum_committee_rows(
 
 
 def validate_three_row_coordinate_median_committee_size(
-    committee_size: PositiveInt,
+    committee_size: CommitteeSize,
     config: ThreeRowCoordinateMedianConfig,
 ) -> None:
     if committee_size != config.row_count:
@@ -67,7 +75,7 @@ def client_sampling_round_order(
 def krum_reference_round_participants(
     round_order: tuple[NBaiotDomain, ...],
     compromised_domain: NBaiotDomain | None,
-    participant_count: PositiveInt,
+    participant_count: ParticipantCount,
 ) -> tuple[NBaiotDomain, ...] | None:
     if compromised_domain is None:
         selected = round_order[:participant_count]

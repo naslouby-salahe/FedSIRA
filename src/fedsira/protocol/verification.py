@@ -3,14 +3,18 @@ from collections.abc import Sequence
 from fedsira.config.schema import VerificationConfig
 from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
 from fedsira.domain.records import (
+    AllowSourceAsVerifier,
     ArtifactDigest,
     BooleanValue,
+    ByzantineDomainCount,
     DerivedSeed,
     DomainId,
+    MonotonicTimestamp,
     NamespaceSeed,
-    NonNegativeInt,
-    PositiveFloat,
-    PositiveInt,
+    ObservedPositiveReportCount,
+    ResolvedRowRequirementReached,
+    VerifierCount,
+    VerifierReportCount,
 )
 from fedsira.runtime.determinism import derive_uint32, deterministic_order
 
@@ -23,7 +27,7 @@ def verifier_is_eligible(
     verifier_domain: DomainId,
     source_domain: DomainId | None,
     reproducer_domain: DomainId,
-    allow_source_as_verifier: BooleanValue = False,
+    allow_source_as_verifier: AllowSourceAsVerifier = False,
 ) -> BooleanValue:
     if verifier_domain == reproducer_domain:
         return False
@@ -33,7 +37,8 @@ def verifier_is_eligible(
 
 
 def verifier_assignment_timestamp_is_valid(
-    verifier_assignment_timestamp: PositiveFloat, reproduction_commitment_timestamp: PositiveFloat
+    verifier_assignment_timestamp: MonotonicTimestamp,
+    reproduction_commitment_timestamp: MonotonicTimestamp,
 ) -> BooleanValue:
     return verifier_assignment_timestamp > reproduction_commitment_timestamp
 
@@ -53,7 +58,7 @@ def verifier_assignment_seed_for_row(
 
 
 def deterministic_verifier_panel(
-    eligible_domains: Sequence[DomainId], row_seed: DerivedSeed, panel_size: PositiveInt
+    eligible_domains: Sequence[DomainId], row_seed: DerivedSeed, panel_size: VerifierCount
 ) -> tuple[DomainId, ...]:
     return deterministic_order(tuple(eligible_domains), VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[
         :panel_size
@@ -69,7 +74,7 @@ def byzantine_selection_order(
 
 
 def select_compromised_verifiers(
-    byzantine_order: Sequence[DomainId], compromised_count: NonNegativeInt
+    byzantine_order: Sequence[DomainId], compromised_count: ByzantineDomainCount
 ) -> frozenset[DomainId]:
     return frozenset(byzantine_order[:compromised_count])
 
@@ -77,7 +82,7 @@ def select_compromised_verifiers(
 def construct_above_bound_panel(
     compromised_domains: Sequence[DomainId],
     honest_post_commitment_order: Sequence[DomainId],
-    panel_size: PositiveInt,
+    panel_size: VerifierCount,
 ) -> tuple[DomainId, ...]:
     remaining_slots = panel_size - len(compromised_domains)
     return tuple(compromised_domains) + tuple(honest_post_commitment_order[:remaining_slots])
@@ -86,7 +91,7 @@ def construct_above_bound_panel(
 def diagnostic_committee_panel(
     eligible_domains: Sequence[DomainId],
     committee_draw_namespace_seed: NamespaceSeed,
-    panel_size: PositiveInt,
+    panel_size: VerifierCount,
 ) -> tuple[DomainId, ...]:
     return deterministic_order(
         tuple(eligible_domains), COMMITTEE_DRAW_SEPARATOR, committee_draw_namespace_seed
@@ -95,8 +100,8 @@ def diagnostic_committee_panel(
 
 def reproduction_row_is_certified(
     panel_reports: Sequence[TernaryOutcome],
-    panel_size: PositiveInt,
-    required_positive_reports: PositiveInt,
+    panel_size: VerifierCount,
+    required_positive_reports: VerifierCount,
 ) -> BooleanValue:
     if len(panel_reports) < panel_size:
         return False
@@ -105,9 +110,9 @@ def reproduction_row_is_certified(
 
 
 def verification_pending_transition(
-    adequate_eligible_verifier_count: NonNegativeInt,
-    panel_positive_report_count: NonNegativeInt,
-    resolved_row_requirement_reached: BooleanValue,
+    adequate_eligible_verifier_count: VerifierReportCount,
+    panel_positive_report_count: ObservedPositiveReportCount,
+    resolved_row_requirement_reached: ResolvedRowRequirementReached,
     verification_config: VerificationConfig,
 ) -> ClaimState:
     if adequate_eligible_verifier_count < verification_config.panel_size:

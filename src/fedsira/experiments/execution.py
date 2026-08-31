@@ -142,7 +142,7 @@ from fedsira.boundaries.heterogeneity import (
     quantity_skew_multiplier_for_domain,
     select_heterogeneity_shift_features,
 )
-from fedsira.config.schema import ScientificConfig, VerificationConfig
+from fedsira.config.schema import VerificationConfig
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
 from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
@@ -174,6 +174,7 @@ from fedsira.domain.enums import (
 from fedsira.domain.records import (
     AdequateFinalGateDomainCount,
     AlgorithmName,
+    AllowSourceAsVerifier,
     ArtifactDigest,
     BooleanValue,
     CapabilityContractSatisfied,
@@ -1587,7 +1588,6 @@ def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | N
 
 def _client_delta_from_role(
     prepared_root: Path,
-    config: ScientificConfig,
     master_seed: MasterSeed,
     anchor: RealAnchor,
     domain: NBaiotDomain,
@@ -1597,6 +1597,7 @@ def _client_delta_from_role(
     local_epochs: LocalEpochCount,
     algorithm_token: AlgorithmName,
 ) -> tuple[torch.Tensor, NonNegativeInt] | None:
+    config = current_application_context().scientific_config
     combined_features: list[torch.Tensor] = []
     combined_labels: list[torch.Tensor] = []
     combined_sample_ids: list[ArtifactDigest] = []
@@ -1645,13 +1646,11 @@ def _client_delta_from_role(
 def anchor_round_calibration_updates(
     prepared_root: Path, master_seed: MasterSeed, anchor: RealAnchor
 ) -> tuple[torch.Tensor, ...]:
-    config = current_application_context().scientific_config
     updates: list[torch.Tensor] = []
     for round_index, round_start_flat in enumerate(anchor.round_start_flat_parameters):
         for domain in NBAIOT_DOMAIN_ORDER:
             result = _client_delta_from_role(
                 prepared_root,
-                config,
                 master_seed,
                 anchor,
                 domain,
@@ -1679,7 +1678,6 @@ def anchor_round_reconstruction_calibration_errors(
         for domain in NBAIOT_DOMAIN_ORDER:
             submitted = _client_delta_from_role(
                 prepared_root,
-                config,
                 master_seed,
                 anchor,
                 domain,
@@ -1691,7 +1689,6 @@ def anchor_round_reconstruction_calibration_errors(
             )
             reconstructed = _client_delta_from_role(
                 prepared_root,
-                config,
                 master_seed,
                 anchor,
                 domain,
@@ -1788,7 +1785,6 @@ def train_update_reconstruction_filter_delta(
             submitted_delta = client_flat - current_flat
             reconstructed = _client_delta_from_role(
                 prepared_root,
-                config,
                 master_seed,
                 anchor,
                 domain,
@@ -2259,7 +2255,6 @@ def train_generic_hard_supported_examples_delta(
 
 def _train_ordinary_fedavg_delta(
     prepared_root: Path,
-    config: ScientificConfig,
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
@@ -2267,6 +2262,7 @@ def _train_ordinary_fedavg_delta(
     algorithm_token: AlgorithmName,
     exclude_source_from_participants: BooleanValue = False,
 ) -> torch.Tensor | None:
+    config = current_application_context().scientific_config
     source_rows_available = (
         not exclude_source_from_participants
         and source_domain is not None
@@ -2340,7 +2336,6 @@ def train_fedavg_reference_delta(
     config = current_application_context().scientific_config
     return _train_ordinary_fedavg_delta(
         prepared_root,
-        config,
         master_seed,
         anchor,
         source_domain,
@@ -2358,7 +2353,6 @@ def train_secure_continual_assessment_delta(
     config = current_application_context().scientific_config
     return _train_ordinary_fedavg_delta(
         prepared_root,
-        config,
         master_seed,
         anchor,
         source_domain,
@@ -2373,10 +2367,8 @@ def train_recovery_after_source_admission_delta(
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
 ) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
     return _train_ordinary_fedavg_delta(
         prepared_root,
-        config,
         master_seed,
         anchor,
         source_domain,
@@ -2395,11 +2387,11 @@ class GroupCheckpoint:
 
 def _group_anchor_checkpoint(
     prepared_root: Path,
-    config: ScientificConfig,
     master_seed: MasterSeed,
     group_domains: Sequence[NBaiotDomain],
     group_index: NonNegativeInt,
 ) -> GroupCheckpoint | None:
+    config = current_application_context().scientific_config
     first_rows = load_prepared_rows(
         prepared_root, group_domains[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
     )
@@ -2548,7 +2540,7 @@ def train_certified_ensemble_group_checkpoints(
     checkpoints: list[GroupCheckpoint] = []
     for group_index, group_domains in enumerate(groups):
         group_anchor = _group_anchor_checkpoint(
-            prepared_root, config, master_seed, group_domains, group_index
+            prepared_root, master_seed, group_domains, group_index
         )
         if group_anchor is None:
             return None
@@ -3400,9 +3392,8 @@ BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
 ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
 
 
-def _training_entry_points(
-    evidence: PreparedEvidenceCounts, config: ScientificConfig
-) -> tuple[ModuleName, ...]:
+def _training_entry_points(evidence: PreparedEvidenceCounts) -> tuple[ModuleName, ...]:
+    config = current_application_context().scientific_config
     if (
         evidence.reproduction_target_count
         < config.capability_claim.evidence_minima.reproduction_target_examples
@@ -3481,7 +3472,8 @@ def _opening_mode_for_cell(
     return ClaimOpeningMode.CANDIDATE_FREE
 
 
-def _opening_identity(config: ScientificConfig) -> OpeningIdentity:
+def _opening_identity() -> OpeningIdentity:
+    config = current_application_context().scientific_config
     contract = build_capability_claim_contract(
         "a" * 64,
         role_hash_token(Role.POST_REFERENCE_REPLAY),
@@ -3524,8 +3516,9 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
 
 
 def _row_requirement(
-    cell: ScientificCell, config: ScientificConfig, resolved_core: ResolvedCore | None = None
+    cell: ScientificCell, resolved_core: ResolvedCore | None = None
 ) -> RequiredReproductionRowCount:
+    config = current_application_context().scientific_config
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
         return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
     if cell.method in (
@@ -3558,7 +3551,7 @@ def _verifier_panel(
     reproducer_domain: NBaiotDomain,
     master_seed: MasterSeed,
     verification_config: VerificationConfig,
-    allow_source_as_verifier: BooleanValue = False,
+    allow_source_as_verifier: AllowSourceAsVerifier = False,
 ) -> tuple[NBaiotDomain, ...]:
     eligible_verifiers = tuple(
         domain
@@ -3579,7 +3572,6 @@ def _verifier_panel(
 
 def _reproduction_progression(
     cell: ScientificCell,
-    config: ScientificConfig,
     evidence: PreparedEvidenceCounts,
     external_verification_active: BooleanValue,
     row_requirement: RequiredReproductionRowCount,
@@ -3649,8 +3641,9 @@ def _reproduction_progression(
 
 
 def _single_verifier_progression(
-    cell: ScientificCell, config: ScientificConfig, source_domain: NBaiotDomain | None
+    cell: ScientificCell, source_domain: NBaiotDomain | None
 ) -> tuple[ClaimState, tuple[ReproductionAttempt, ...], tuple[ArtifactDigest, ...]]:
+    config = current_application_context().scientific_config
     reproducer_order = _reproducer_order(cell)
     adequate_domains = frozenset(
         domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain
@@ -3689,7 +3682,6 @@ def _single_verifier_progression(
 
 def _real_final_gate_metrics(
     prepared_root: Path,
-    config: ScientificConfig,
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
     production_checkpoint: torch.Tensor,
@@ -3767,7 +3759,6 @@ def _real_final_gate_metrics(
 
 
 def _final_gate_decision(
-    config: ScientificConfig,
     evidence: PreparedEvidenceCounts,
     claim_identity: ClaimId,
     source_domain: NBaiotDomain | None,
@@ -3784,6 +3775,7 @@ def _final_gate_decision(
     force_first_row_to_source_delta: BooleanValue = False,
     heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[ClaimState, RealReportSummary | None]:
+    config = current_application_context().scientific_config
     base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
     committee_deltas: OrderedDict[NBaiotDomain, torch.Tensor] = (
         certified_domain_delta_committee(
@@ -3824,7 +3816,6 @@ def _final_gate_decision(
         production_update = coordinate_wise_median_synthesis(median_deltas)
         production_checkpoint = apply_production_update(base_flat_parameters, production_update)
         return _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             claim_identity,
             source_domain,
@@ -3862,7 +3853,6 @@ def _final_gate_decision(
     )
     production_checkpoint = apply_production_update(base_flat_parameters, production_update)
     return _final_gate_decision_from_production_checkpoint(
-        config,
         evidence,
         claim_identity,
         source_domain,
@@ -3879,7 +3869,6 @@ def _final_gate_decision(
 
 
 def _final_gate_decision_from_production_checkpoint(
-    config: ScientificConfig,
     evidence: PreparedEvidenceCounts,
     claim_identity: ClaimId,
     source_domain: NBaiotDomain | None,
@@ -3893,6 +3882,7 @@ def _final_gate_decision_from_production_checkpoint(
     no_final_synthesis_gate_active: BooleanValue = False,
     heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[ClaimState, RealReportSummary | None]:
+    config = current_application_context().scientific_config
     if anchor is not None:
         (
             adequate_final_gate_domain_count,
@@ -3902,7 +3892,6 @@ def _final_gate_decision_from_production_checkpoint(
             pooled_benign_far_increase,
         ) = _real_final_gate_metrics(
             prepared_root,
-            config,
             anchor,
             source_domain,
             production_checkpoint,
@@ -4024,7 +4013,7 @@ class ProtocolCellExecutor(CellExecutor):
         self._real_anchor_cache: OrderedDict[MasterSeed, RealAnchor | None] = OrderedDict()
         self._pending_real_report: RealReportSummary | None = None
 
-    def _real_anchor(self, config: ScientificConfig, master_seed: MasterSeed) -> RealAnchor | None:
+    def _real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
         if master_seed not in self._real_anchor_cache:
             self._real_anchor_cache[master_seed] = (
                 train_anchor(self._prepared_root, master_seed)
@@ -4037,8 +4026,8 @@ class ProtocolCellExecutor(CellExecutor):
         self,
         source_domain: NBaiotDomain | None,
         reproducer_domain: NBaiotDomain,
-        config: ScientificConfig,
     ) -> tuple[NBaiotDomain, ...]:
+        config = current_application_context().scientific_config
         eligible_verifiers = tuple(
             domain
             for domain in NBAIOT_DOMAIN_ORDER
@@ -4070,11 +4059,11 @@ class ProtocolCellExecutor(CellExecutor):
 
     def _candidate_capability_contract_passes(
         self,
-        config: ScientificConfig,
         real_anchor: RealAnchor,
         source_domain: NBaiotDomain,
         candidate_flat_parameters: torch.Tensor,
     ) -> BooleanValue:
+        config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
             self._prepared_root,
             real_anchor,
@@ -4126,12 +4115,12 @@ class ProtocolCellExecutor(CellExecutor):
 
     def _scoped_capability_contract_passes(
         self,
-        config: ScientificConfig,
         real_anchor: RealAnchor,
         source_domain: NBaiotDomain,
         candidate_flat_parameters: torch.Tensor,
         root_cause_scope: RootCauseScope,
     ) -> BooleanValue:
+        config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
             self._prepared_root,
             real_anchor,
@@ -4183,9 +4172,8 @@ class ProtocolCellExecutor(CellExecutor):
             benign_far_increase,
         )
 
-    def _backdoor_scope_for_cell(
-        self, cell: ScientificCell, config: ScientificConfig
-    ) -> BackdoorScope | None:
+    def _backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
+        config = current_application_context().scientific_config
         if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
             return None
         real_feature_names = prepared_feature_names(self._prepared_root)
@@ -4199,9 +4187,8 @@ class ProtocolCellExecutor(CellExecutor):
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
         )
 
-    def _heterogeneity_scope_for_cell(
-        self, cell: ScientificCell, config: ScientificConfig
-    ) -> HeterogeneityScope | None:
+    def _heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None:
+        config = current_application_context().scientific_config
         if cell.experiment != HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             return None
         regime = HeterogeneityRegime(cell.condition)
@@ -4228,12 +4215,13 @@ class ProtocolCellExecutor(CellExecutor):
             shift_magnitude=shift_magnitude,
         )
 
-    def _client_review_outcome(self, cell: ScientificCell, config: ScientificConfig) -> ClaimState:
+    def _client_review_outcome(self, cell: ScientificCell) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         positive_report_count = 0
         if real_anchor is not None and source_domain is not None:
-            backdoor_scope = self._backdoor_scope_for_cell(cell, config)
+            backdoor_scope = self._backdoor_scope_for_cell(cell)
             source_delta = train_source_candidate_delta(
                 self._prepared_root,
                 cell.master_seed,
@@ -4242,7 +4230,7 @@ class ProtocolCellExecutor(CellExecutor):
                 backdoor_scope=backdoor_scope,
             )
             if source_delta is not None and self._candidate_capability_contract_passes(
-                config, real_anchor, source_domain, real_anchor.flat_parameters + source_delta
+                real_anchor, source_domain, real_anchor.flat_parameters + source_delta
             ):
                 positive_report_count = CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
         return review_style_baseline_outcome(
@@ -4253,10 +4241,11 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _source_update_sanitization_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return ClaimState.DORMANT
         clipped_delta = train_source_update_sanitization_delta(
@@ -4268,7 +4257,7 @@ class ProtocolCellExecutor(CellExecutor):
         positive_report_count = (
             CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
             if self._candidate_capability_contract_passes(
-                config, real_anchor, source_domain, production_checkpoint
+                real_anchor, source_domain, production_checkpoint
             )
             else 0
         )
@@ -4281,7 +4270,6 @@ class ProtocolCellExecutor(CellExecutor):
         if review_state is not ClaimState.ADMITTED:
             return review_state
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "source-update-sanitization-claim",
             source_domain,
@@ -4296,10 +4284,11 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _source_release_after_full_external_check_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return ClaimState.DORMANT
         source_delta = train_source_candidate_delta(
@@ -4324,7 +4313,6 @@ class ProtocolCellExecutor(CellExecutor):
         if review_state is not ClaimState.ADMITTED:
             return review_state
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "source-release-full-external-check-claim",
             source_domain,
@@ -4339,13 +4327,14 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _recovery_after_source_admission_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return ClaimState.DORMANT
-        review_state = self._client_review_outcome(cell, config)
+        review_state = self._client_review_outcome(cell)
         if review_state is not ClaimState.ADMITTED:
             return review_state
         source_delta = train_source_candidate_delta(
@@ -4409,7 +4398,6 @@ class ProtocolCellExecutor(CellExecutor):
         else:
             production_checkpoint = admitted_checkpoint
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "recovery-after-source-admission-claim",
             source_domain,
@@ -4424,10 +4412,10 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _fedavg_reference_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         delta = train_fedavg_reference_delta(
@@ -4437,7 +4425,6 @@ class ProtocolCellExecutor(CellExecutor):
             return ClaimState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "fedavg-reference-claim",
             source_domain,
@@ -4452,10 +4439,10 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _krum_reference_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         delta = train_krum_reference_delta(
@@ -4465,7 +4452,6 @@ class ProtocolCellExecutor(CellExecutor):
             return ClaimState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "krum-reference-claim",
             source_domain,
@@ -4480,10 +4466,10 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _density_cluster_trimmed_mean_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         delta = train_density_cluster_trimmed_mean_delta(
@@ -4493,7 +4479,6 @@ class ProtocolCellExecutor(CellExecutor):
             return ClaimState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "density-cluster-trimmed-mean-claim",
             source_domain,
@@ -4508,10 +4493,10 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _update_reconstruction_filter_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         delta = train_update_reconstruction_filter_delta(
@@ -4521,7 +4506,6 @@ class ProtocolCellExecutor(CellExecutor):
             return ClaimState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "update-reconstruction-filter-claim",
             source_domain,
@@ -4536,10 +4520,10 @@ class ProtocolCellExecutor(CellExecutor):
         return state
 
     def _secure_continual_assessment_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         positive_report_count = sum(
@@ -4562,7 +4546,6 @@ class ProtocolCellExecutor(CellExecutor):
             return ClaimState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "secure-continual-assessment-claim",
             source_domain,
@@ -4576,11 +4559,10 @@ class ProtocolCellExecutor(CellExecutor):
         )
         return state
 
-    def _local_only_reference_outcome(
-        self, cell: ScientificCell, config: ScientificConfig
-    ) -> ClaimState:
+    def _local_only_reference_outcome(self, cell: ScientificCell) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         target_f1_values: list[MetricResult] = []
@@ -4638,11 +4620,10 @@ class ProtocolCellExecutor(CellExecutor):
             final_gate_config=config.protocol.final_gate,
         )
 
-    def _multiple_model_certified_ensemble_outcome(
-        self, cell: ScientificCell, config: ScientificConfig
-    ) -> ClaimState:
+    def _multiple_model_certified_ensemble_outcome(self, cell: ScientificCell) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         group_checkpoints = train_certified_ensemble_group_checkpoints(
@@ -4699,10 +4680,10 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _centralized_reference_outcome(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return ClaimState.DORMANT
         production_checkpoint = train_centralized_reference_checkpoint(
@@ -4711,7 +4692,6 @@ class ProtocolCellExecutor(CellExecutor):
         if production_checkpoint is None:
             return ClaimState.DORMANT
         state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            config,
             evidence,
             "centralized-reference-claim",
             source_domain,
@@ -4725,11 +4705,10 @@ class ProtocolCellExecutor(CellExecutor):
         )
         return state
 
-    def _independent_local_reference_outcome(
-        self, cell: ScientificCell, config: ScientificConfig
-    ) -> ClaimState:
+    def _independent_local_reference_outcome(self, cell: ScientificCell) -> ClaimState:
+        config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return ClaimState.DORMANT
         source_delta = train_source_candidate_delta(
@@ -4840,7 +4819,6 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
-        config = current_application_context().scientific_config
         self._pending_real_report = None
         dataset = experiment_by_name(cell.experiment).dataset
         if dataset is DatasetId.CICIOT2023:
@@ -4864,7 +4842,7 @@ class ProtocolCellExecutor(CellExecutor):
                 ),
             )
         try:
-            _state, metrics = self._execute_cell_protocol(cell, config, evidence)
+            _state, metrics = self._execute_cell_protocol(cell, evidence)
         except ValueError as error:
             return CellExecutionOutcome(
                 cell=cell,
@@ -4883,45 +4861,46 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_cell_protocol(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
         if cell.experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
-            return self._execute_opening_cell(cell, config, evidence)
+            return self._execute_opening_cell(cell, evidence)
         if cell.experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
-            return self._execute_plurality_cell(cell, config, evidence)
+            return self._execute_plurality_cell(cell, evidence)
         if cell.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
-            return self._execute_source_exclusion_cell(cell, config, evidence)
+            return self._execute_source_exclusion_cell(cell, evidence)
         if cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
-            return self._execute_external_verification_cell(cell, config, evidence)
+            return self._execute_external_verification_cell(cell, evidence)
         if cell.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME:
-            return self._execute_primary_cell(cell, config, evidence)
+            return self._execute_primary_cell(cell, evidence)
         if cell.experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
-            return self._execute_reproducer_robustness_cell(cell, config, evidence)
+            return self._execute_reproducer_robustness_cell(cell, evidence)
         if cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-            return self._execute_verifier_robustness_cell(cell, config, evidence)
+            return self._execute_verifier_robustness_cell(cell, evidence)
         if cell.experiment == BYZANTINE_BOUND_VIOLATION_NAME:
-            return self._execute_byzantine_bound_cell(cell, config, evidence)
+            return self._execute_byzantine_bound_cell(cell, evidence)
         if cell.experiment == EFFICIENCY_MEASUREMENT_NAME:
-            return self._execute_efficiency_cell(cell, config, evidence)
+            return self._execute_efficiency_cell(cell, evidence)
         if cell.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
-            return self._execute_secondary_cell(cell, config, evidence)
+            return self._execute_secondary_cell(cell, evidence)
         if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
-            return self._execute_evidence_scarcity_cell(cell, config, evidence)
+            return self._execute_evidence_scarcity_cell(cell, evidence)
         if cell.experiment == ADMISSION_DELAY_DECOMPOSITION_NAME:
-            return self._execute_admission_delay_cell(cell, config, evidence)
+            return self._execute_admission_delay_cell(cell, evidence)
         if cell.experiment in (
             SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
             CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
             HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
         ):
-            return self._execute_boundary_cell(cell, config, evidence)
+            return self._execute_boundary_cell(cell, evidence)
         if cell.experiment == MECHANISM_ABLATION_NAME:
-            return self._execute_ablation_cell(cell, config, evidence)
+            return self._execute_ablation_cell(cell, evidence)
         return (ClaimState.DORMANT, _metrics_from_state(ClaimState.DORMANT))
 
     def _execute_ablation_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         variant = cell.method
         if variant == AblationVariant.RANDOM_COMMITTEE_PROFILE.value:
             verifier_cell = replace(
@@ -4929,12 +4908,12 @@ class ProtocolCellExecutor(CellExecutor):
                 method=VerifierProfile.RANDOM_COMMITTEE_DIAGNOSTIC.value,
                 condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
             )
-            return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+            return self._execute_verifier_robustness_cell(verifier_cell, evidence)
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW.value:
-            state = self._client_review_outcome(cell, config)
+            state = self._client_review_outcome(cell)
             return (state, _metrics_from_state(state, self._pending_real_report))
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK.value:
-            state = self._source_release_after_full_external_check_outcome(cell, config, evidence)
+            state = self._source_release_after_full_external_check_outcome(cell, evidence)
             return (state, _metrics_from_state(state, self._pending_real_report))
         if variant in (
             AblationVariant.RAW_TARGET_F1_SCREEN_ONLY.value,
@@ -4946,14 +4925,14 @@ class ProtocolCellExecutor(CellExecutor):
                 condition=ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value,
             )
             return self._execute_opening_cell(
-                opening_cell, config, evidence, screen_predicate_variant=AblationVariant(variant)
+                opening_cell, evidence, screen_predicate_variant=AblationVariant(variant)
             )
-        state = self._advance_protocol(cell, config, evidence)
+        state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         extra: list[MetricObservation] = []
         if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION.value:
             domain_without_target_view_may_participate(True)
-            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_anchor = self._real_anchor(cell.master_seed)
             if real_anchor is not None:
                 candidate_domains = non_source_domains(_source_domain_for_cell(cell))[
                     : config.baselines.parameter_similarity.required_committed_rows
@@ -4977,7 +4956,7 @@ class ProtocolCellExecutor(CellExecutor):
                 extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD.value:
             validate_three_row_coordinate_median_committee_size(
-                _row_requirement(cell, config, self._resolved_core),
+                _row_requirement(cell, self._resolved_core),
                 config.baselines.three_row_coordinate_median,
             )
             if krum_committee_is_admissible(3, 1):
@@ -4989,7 +4968,7 @@ class ProtocolCellExecutor(CellExecutor):
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
             )
-            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_anchor = self._real_anchor(cell.master_seed)
             source_domain = _source_domain_for_cell(cell)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
@@ -5019,7 +4998,7 @@ class ProtocolCellExecutor(CellExecutor):
                         balanced_selection_seed=balanced_selection_seed,
                     )
                     if not self._scoped_capability_contract_passes(
-                        config, real_anchor, domain, candidate_flat, broad_scope
+                        real_anchor, domain, candidate_flat, broad_scope
                     ):
                         continue
                     broad_certified_count += 1
@@ -5030,10 +5009,10 @@ class ProtocolCellExecutor(CellExecutor):
                         broad_scope, contract_scope=CapabilityContractScope.ROOT_CAUSE_B_SCOPED
                     )
                     a_passes = self._scoped_capability_contract_passes(
-                        config, real_anchor, domain, candidate_flat, a_scope
+                        real_anchor, domain, candidate_flat, a_scope
                     )
                     b_passes = self._scoped_capability_contract_passes(
-                        config, real_anchor, domain, candidate_flat, b_scope
+                        real_anchor, domain, candidate_flat, b_scope
                     )
                     if a_passes != b_passes:
                         false_same_count += 1
@@ -5054,15 +5033,16 @@ class ProtocolCellExecutor(CellExecutor):
         return (state, (*metrics, *extra))
 
     def _execute_boundary_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         if (
             cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME
             and cell.method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value
         ):
-            state = self._krum_reference_outcome(cell, config, evidence)
+            state = self._krum_reference_outcome(cell, evidence)
         else:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         is_scoped_contract = cell.method != CapabilityContractScope.BROAD_TARGET_ONLY.value
         boundary_metrics = boundary_metric_set(
@@ -5091,7 +5071,7 @@ class ProtocolCellExecutor(CellExecutor):
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
             scope = CapabilityContractScope(cell.method)
-            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_anchor = self._real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -5155,7 +5135,7 @@ class ProtocolCellExecutor(CellExecutor):
             failure_type = EpistemicFailureType(failure_type_token)
             strength = float(strength_token)
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_anchor = self._real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -5242,7 +5222,7 @@ class ProtocolCellExecutor(CellExecutor):
                 )
                 extra.append(("quantity-skew-cap", float(applied_cap)))
             else:
-                heterogeneity_scope = self._heterogeneity_scope_for_cell(cell, config)
+                heterogeneity_scope = self._heterogeneity_scope_for_cell(cell)
                 if heterogeneity_scope is not None:
                     feature_sign = feature_shift_sign(
                         NBAIOT_DOMAIN_ORDER[0],
@@ -5264,10 +5244,10 @@ class ProtocolCellExecutor(CellExecutor):
     def _execute_opening_cell(
         self,
         cell: ScientificCell,
-        config: ScientificConfig,
         evidence: PreparedEvidenceCounts,
         screen_predicate_variant: AblationVariant | None = None,
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         opening_mode = _opening_mode_for_cell(cell)
         entry = start_claim(opening_mode)
         if entry.direct_production_weight != 0.0:
@@ -5277,9 +5257,9 @@ class ProtocolCellExecutor(CellExecutor):
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY.value,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
         )
-        contract_passes = _opening_identity(config).contract_passes
+        contract_passes = _opening_identity().contract_passes
         source_domain = _source_domain_for_cell(cell)
-        real_anchor = self._real_anchor(config, cell.master_seed)
+        real_anchor = self._real_anchor(cell.master_seed)
         source_training_function = (
             train_generic_hard_supported_examples_delta
             if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES.value
@@ -5429,7 +5409,7 @@ class ProtocolCellExecutor(CellExecutor):
                 opening_mode, screen_results, config.protocol.claim_opening
             )
         if state is ClaimState.CLAIM_OPEN:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         false_launch_result = false_launch_rate(
             false_launch_count=1
@@ -5475,8 +5455,9 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _advance_protocol(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> ClaimState:
+        config = current_application_context().scientific_config
         self._pending_real_report = None
         evidence_minima = config.capability_claim.evidence_minima
         if not reproduction_evidence_is_adequate(
@@ -5485,7 +5466,7 @@ class ProtocolCellExecutor(CellExecutor):
             evidence_minima,
         ):
             return ClaimState.DORMANT
-        training_entries = _training_entry_points(evidence, config)
+        training_entries = _training_entry_points(evidence)
         if not training_entries:
             return ClaimState.DORMANT
         source_domain = _source_domain_for_cell(cell)
@@ -5572,15 +5553,14 @@ class ProtocolCellExecutor(CellExecutor):
                 and cell.method == SourceExclusionMethod.FULL_FEDSIRA.value
             )
             single_verifier_active = False
-        row_requirement = _row_requirement(cell, config, self._resolved_core)
+        row_requirement = _row_requirement(cell, self._resolved_core)
         if single_verifier_active:
             progression_state, attempts, commitment_hashes = _single_verifier_progression(
-                cell, config, source_domain
+                cell, source_domain
             )
         else:
             progression_state, attempts, commitment_hashes = _reproduction_progression(
                 cell,
-                config,
                 evidence,
                 external_verification_active,
                 row_requirement,
@@ -5594,7 +5574,7 @@ class ProtocolCellExecutor(CellExecutor):
                         continue
                     if same_context_verification_active:
                         panel = self._same_context_verifier_panel(
-                            source_domain, NBaiotDomain(attempt.domain), config
+                            source_domain, NBaiotDomain(attempt.domain)
                         )
                     else:
                         panel = _verifier_panel(
@@ -5633,9 +5613,8 @@ class ProtocolCellExecutor(CellExecutor):
                 )
         if progression_state is ClaimState.SYNTHESIS_PENDING:
             state, self._pending_real_report = _final_gate_decision(
-                config,
                 evidence,
-                _opening_identity(config).claim_identity,
+                _opening_identity().claim_identity,
                 source_domain,
                 tuple(NBaiotDomain(attempt.domain) for attempt in attempts),
                 commitment_hashes,
@@ -5656,12 +5635,12 @@ class ProtocolCellExecutor(CellExecutor):
                 opening_mode=_opening_mode_for_cell(cell, self._resolved_core),
                 prepared_root=self._prepared_root,
                 master_seed=cell.master_seed,
-                anchor=self._real_anchor(config, cell.master_seed),
+                anchor=self._real_anchor(cell.master_seed),
                 coordinate_median_active=coordinate_median_active,
                 no_final_synthesis_gate_active=no_final_synthesis_gate_active,
                 use_source_delta_for_source_domain=no_origin_exclusion_active,
                 force_first_row_to_source_delta=byzantine_reproducer_copies_source_active,
-                heterogeneity_scope=self._heterogeneity_scope_for_cell(cell, config),
+                heterogeneity_scope=self._heterogeneity_scope_for_cell(cell),
             )
         else:
             state = progression_state
@@ -5670,9 +5649,9 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_plurality_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
-        state = self._advance_protocol(cell, config, evidence)
+        state = self._advance_protocol(cell, evidence)
         condition = cell.condition
         source_copy_condition = PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value
         has_legitimate = condition != source_copy_condition
@@ -5697,35 +5676,31 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_source_exclusion_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
         method = cell.method
         full_fedsira = SourceExclusionMethod.FULL_FEDSIRA.value
         validate_source_excluded_production_weight(0.0)
         if method in (full_fedsira, SourceExclusionMethod.ONE_INDEPENDENT_RETRAIN.value):
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
             krum_input_excludes_source(
                 candidate_row_ids=("reproducer-a", "reproducer-b", "reproducer-c"),
                 source_row_id=None,
             )
         elif method == SourceExclusionMethod.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value:
-            state = self._client_review_outcome(cell, config)
+            state = self._client_review_outcome(cell)
         elif method == SourceExclusionMethod.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value:
             discard_source = client_review_then_retrain_should_discard_source_weights(
-                self._client_review_outcome(cell, config)
+                self._client_review_outcome(cell)
             )
-            state = (
-                self._advance_protocol(cell, config, evidence)
-                if discard_source
-                else ClaimState.DORMANT
-            )
+            state = self._advance_protocol(cell, evidence) if discard_source else ClaimState.DORMANT
         else:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         extra: list[MetricObservation] = []
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value:
-            real_anchor = self._real_anchor(config, cell.master_seed)
+            real_anchor = self._real_anchor(cell.master_seed)
             source_domain = _source_domain_for_cell(cell)
-            backdoor_scope = self._backdoor_scope_for_cell(cell, config)
+            backdoor_scope = self._backdoor_scope_for_cell(cell)
             if (
                 real_anchor is not None
                 and source_domain is not None
@@ -5758,9 +5733,9 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_external_verification_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
-        state = self._advance_protocol(cell, config, evidence)
+        state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         condition = cell.condition
         has_malicious = condition in (
@@ -5777,87 +5752,85 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_primary_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
         scenario = cell.condition
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             if scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value:
-                state = self._advance_protocol(cell, config, evidence)
+                state = self._advance_protocol(cell, evidence)
             else:
                 state = ClaimState.DORMANT
             metrics = _metrics_from_state(state, self._pending_real_report)
             return (state, metrics)
-        return self._execute_baseline_cell(cell, config, evidence)
+        return self._execute_baseline_cell(cell, evidence)
 
     def _execute_baseline_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         method = cell.method
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell))
         state: ClaimState
         if method == BaselineIdentity.LOCAL_ONLY_REFERENCE.value:
-            state = self._local_only_reference_outcome(cell, config)
+            state = self._local_only_reference_outcome(cell)
         elif method == BaselineIdentity.CENTRALIZED_REFERENCE.value:
-            state = self._centralized_reference_outcome(cell, config, evidence)
+            state = self._centralized_reference_outcome(cell, evidence)
         elif method == BaselineIdentity.FEDAVG_REFERENCE.value:
             standard_fl_anchor_rounds()
-            state = self._fedavg_reference_outcome(cell, config, evidence)
+            state = self._fedavg_reference_outcome(cell, evidence)
         elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value:
             one_independent_retrain_local_epochs()
             candidate_free_full_path_opening_mode()
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
             client_review_direct_admission_production_is_source(
                 ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
             )
-            state = self._client_review_outcome(cell, config)
+            state = self._client_review_outcome(cell)
         elif method == BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             client_review_then_retrain_local_epochs()
             discard_source = client_review_then_retrain_should_discard_source_weights(
-                self._client_review_outcome(cell, config)
+                self._client_review_outcome(cell)
             )
-            state = (
-                self._advance_protocol(cell, config, evidence)
-                if discard_source
-                else ClaimState.DORMANT
-            )
+            state = self._advance_protocol(cell, evidence) if discard_source else ClaimState.DORMANT
         elif method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value:
             direct_krum_committee_rows((), (), config.protocol.synthesis.committee_size)
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         elif method == BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value:
-            state = self._multiple_model_certified_ensemble_outcome(cell, config)
+            state = self._multiple_model_certified_ensemble_outcome(cell)
         elif method == BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value:
-            state = self._update_reconstruction_filter_outcome(cell, config, evidence)
+            state = self._update_reconstruction_filter_outcome(cell, evidence)
         elif method == BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value:
-            state = self._density_cluster_trimmed_mean_outcome(cell, config, evidence)
+            state = self._density_cluster_trimmed_mean_outcome(cell, evidence)
         elif method == BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value:
-            state = self._secure_continual_assessment_outcome(cell, config, evidence)
+            state = self._secure_continual_assessment_outcome(cell, evidence)
         elif method == BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value:
-            state = self._recovery_after_source_admission_outcome(cell, config, evidence)
+            state = self._recovery_after_source_admission_outcome(cell, evidence)
         elif method == BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value:
-            state = self._source_update_sanitization_outcome(cell, config, evidence)
+            state = self._source_update_sanitization_outcome(cell, evidence)
         elif method == BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value:
-            state = self._independent_local_reference_outcome(cell, config)
+            state = self._independent_local_reference_outcome(cell)
         elif method == BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value:
-            state = self._krum_reference_outcome(cell, config, evidence)
+            state = self._krum_reference_outcome(cell, evidence)
         elif method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE.value:
             validate_three_row_coordinate_median_committee_size(
                 config.baselines.three_row_coordinate_median.row_count,
                 config.baselines.three_row_coordinate_median,
             )
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         else:
             state = ClaimState.DORMANT
         metrics = _metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_reproducer_robustness_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         condition = cell.condition
         compromised_count = _compromised_reproducer_count(condition)
         attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
@@ -5880,7 +5853,7 @@ class ProtocolCellExecutor(CellExecutor):
                 attack_seed,
             )
         if compromised_count == 0:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         else:
             selected = select_compromised_reproducers(
                 _reproducer_order(cell), frozenset(NBAIOT_DOMAIN_ORDER), compromised_count
@@ -5891,10 +5864,9 @@ class ProtocolCellExecutor(CellExecutor):
                 else frozenset()
             )
             source_domain = _source_domain_for_cell(cell)
-            row_requirement = _row_requirement(cell, config)
+            row_requirement = _row_requirement(cell)
             progression_state, attempts, commitment_hashes = _reproduction_progression(
                 cell,
-                config,
                 evidence,
                 external_verification_active=False,
                 row_requirement=row_requirement,
@@ -5904,9 +5876,8 @@ class ProtocolCellExecutor(CellExecutor):
                 len(attempts), config.protocol.synthesis.maximum_byzantine_reproduction_rows
             ):
                 state, self._pending_real_report = _final_gate_decision(
-                    config,
                     evidence,
-                    _opening_identity(config).claim_identity,
+                    _opening_identity().claim_identity,
                     source_domain,
                     tuple(NBaiotDomain(attempt.domain) for attempt in attempts),
                     commitment_hashes,
@@ -5914,7 +5885,7 @@ class ProtocolCellExecutor(CellExecutor):
                     opening_mode=_opening_mode_for_cell(cell),
                     prepared_root=self._prepared_root,
                     master_seed=cell.master_seed,
-                    anchor=self._real_anchor(config, cell.master_seed),
+                    anchor=self._real_anchor(cell.master_seed),
                 )
             else:
                 state = ClaimState.DORMANT
@@ -5923,8 +5894,9 @@ class ProtocolCellExecutor(CellExecutor):
         return (state, metrics)
 
     def _execute_verifier_robustness_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         condition = cell.condition
         profile = cell.method
         is_deterministic = profile == VerifierProfile.DETERMINISTIC_BOUND.value
@@ -6039,43 +6011,44 @@ class ProtocolCellExecutor(CellExecutor):
         return (state, metrics)
 
     def _execute_byzantine_bound_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
         condition = BoundCondition(cell.condition)
         if condition is BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND:
             reproducer_cell = replace(
                 cell, condition=ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value
             )
-            return self._execute_reproducer_robustness_cell(reproducer_cell, config, evidence)
+            return self._execute_reproducer_robustness_cell(reproducer_cell, evidence)
         if condition is BoundCondition.TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND:
             reproducer_cell = replace(
                 cell, condition=ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS.value
             )
-            return self._execute_reproducer_robustness_cell(reproducer_cell, config, evidence)
+            return self._execute_reproducer_robustness_cell(reproducer_cell, evidence)
         if condition is BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND:
             verifier_cell = replace(
                 cell,
                 method=VerifierProfile.DETERMINISTIC_BOUND.value,
                 condition=VerifierCondition.ONE_FALSE_POSITIVE.value,
             )
-            return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+            return self._execute_verifier_robustness_cell(verifier_cell, evidence)
         verifier_cell = replace(
             cell,
             method=VerifierProfile.DETERMINISTIC_BOUND.value,
             condition=VerifierCondition.TWO_FALSE_POSITIVES.value,
         )
-        return self._execute_verifier_robustness_cell(verifier_cell, config, evidence)
+        return self._execute_verifier_robustness_cell(verifier_cell, evidence)
 
     def _execute_secondary_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
-        state = self._advance_protocol(cell, config, evidence)
+        state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_evidence_scarcity_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         schedule = EvidenceArrivalSchedule(cell.condition)
         horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
         candidate_cycles = tuple(range(horizon))
@@ -6107,7 +6080,7 @@ class ProtocolCellExecutor(CellExecutor):
             state = resume_dormant_claim(DormantOrigin.REPRODUCTION_PENDING, False)
             metrics = _metrics_from_state(state, self._pending_real_report)
             return (state, (*metrics, ("evidence-arrival-cycle", float(tau_k))))
-        state = self._advance_protocol(cell, config, evidence)
+        state = self._advance_protocol(cell, evidence)
         metrics = _metrics_from_state(state, self._pending_real_report)
         delay_decomposition = AdmissionDelayDecomposition(
             logical_information_arrival_cycles=tau_k,
@@ -6132,8 +6105,9 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_admission_delay_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
+        config = current_application_context().scientific_config
         schedule = EvidenceArrivalSchedule(cell.condition)
         horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
         candidate_cycles = tuple(range(horizon))
@@ -6154,11 +6128,11 @@ class ProtocolCellExecutor(CellExecutor):
         )
         timer = ElapsedTimer()
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
             metrics = _metrics_from_state(state, self._pending_real_report)
         else:
-            state, metrics = self._execute_baseline_cell(cell, config, evidence)
+            state, metrics = self._execute_baseline_cell(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
         return (
             state,
@@ -6171,7 +6145,7 @@ class ProtocolCellExecutor(CellExecutor):
         )
 
     def _execute_efficiency_cell(
-        self, cell: ScientificCell, config: ScientificConfig, evidence: PreparedEvidenceCounts
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[ClaimState, tuple[MetricObservation, ...]]:
         model_size_bytes = 115 * 256 * 4
         envelopes: list[bytes] = []
@@ -6212,9 +6186,9 @@ class ProtocolCellExecutor(CellExecutor):
         reset_peak_gpu_memory_counter()
         protocol_timer = ElapsedTimer()
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
-            state = self._advance_protocol(cell, config, evidence)
+            state = self._advance_protocol(cell, evidence)
         else:
-            state, _baseline_metrics = self._execute_baseline_cell(cell, config, evidence)
+            state, _baseline_metrics = self._execute_baseline_cell(cell, evidence)
         post_evidence_seconds = protocol_timer.elapsed_seconds()
         delay_decomposition = AdmissionDelayDecomposition(
             logical_information_arrival_cycles=0,

@@ -6,7 +6,7 @@ from fedsira.config.loading import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
 )
-from fedsira.config.schema import ScientificConfig, TestFixtureConfig
+from fedsira.config.schema import TestFixtureConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
@@ -15,6 +15,7 @@ from fedsira.domain.records import (
     BooleanValue,
     ExperimentName,
     FrozenDomainModel,
+    OverwriteExisting,
     ScenarioName,
     SchemaVersion,
     ScientificCellSemanticKey,
@@ -194,7 +195,8 @@ def validate_cell_terminal_record(
         )
 
 
-def _data_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
+def _data_invariants() -> tuple[SmokeCheckResult, ...]:
+    config = current_application_context().scientific_config
     role_intervals = config.datasets.primary.role_intervals
     sampling_caps = config.datasets.primary.sampling_caps_per_domain
     stream_row_count = sampling_caps.reproduction_target
@@ -238,7 +240,8 @@ _REQUIRED_CELL_PHASE_SEQUENCE: tuple[ScientificCellPhase, ...] = (
 )
 
 
-def _protocol_invariants(config: ScientificConfig) -> tuple[SmokeCheckResult, ...]:
+def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
+    config = current_application_context().scientific_config
     source_not_verifier = not verifier_is_eligible(_DANMINI, _DANMINI, _ENNIO)
     required_phase_sequence_valid = False
     try:
@@ -301,12 +304,11 @@ def _mathematical_invariants(
     )
 
 
-def run_smoke_suite(overwrite: BooleanValue = False) -> SmokeSuiteResult:
-    config = current_application_context().scientific_config
+def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:
     fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     checks = (
-        *_data_invariants(config),
-        *_protocol_invariants(config),
+        *_data_invariants(),
+        *_protocol_invariants(),
         *_mathematical_invariants(fixture_config),
     )
     result = SmokeSuiteResult(checks=checks)
@@ -314,7 +316,7 @@ def run_smoke_suite(overwrite: BooleanValue = False) -> SmokeSuiteResult:
     return result
 
 
-def _persist_smoke_record(result: SmokeSuiteResult, overwrite: BooleanValue) -> None:
+def _persist_smoke_record(result: SmokeSuiteResult, overwrite: OverwriteExisting) -> None:
     record_path = smoke_record_path()
     if record_path.exists() and not overwrite:
         return

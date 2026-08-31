@@ -8,16 +8,27 @@ from fedsira.config.schema import (
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 from fedsira.domain.records import (
     BooleanValue,
+    ClusterSize,
     DeterministicInteger,
+    DomainCount,
+    FederatedRoundCount,
     FiniteFloat,
     FrozenDomainModel,
     MetricValue,
     NonNegativeFloat,
     NonNegativeInt,
+    NumericalEpsilon,
+    OptionalParameterSimilarity,
+    PairwiseDistanceMatrix,
     Percentage,
     PositiveInt,
     Probability,
+    ReconstructionError,
+    ReconstructionErrorSeries,
+    ReconstructionThreshold,
     TensorDomainModel,
+    TrimCount,
+    VerifierCount,
 )
 from fedsira.evaluation.aggregation import quantile_type7
 from fedsira.evaluation.records import MetricResult
@@ -41,7 +52,7 @@ class DensityCluster(FrozenDomainModel):
 def reconstruction_error(
     submitted_update: torch.Tensor,
     reconstructed_update: torch.Tensor,
-    normalization_epsilon: NonNegativeFloat,
+    normalization_epsilon: NumericalEpsilon,
 ) -> NonNegativeFloat:
     squared_l2_distance = float(torch.sum((submitted_update - reconstructed_update) ** 2))
     submitted_squared_norm = float(torch.sum(submitted_update**2))
@@ -49,14 +60,14 @@ def reconstruction_error(
 
 
 def reconstruction_filter_calibration_error_count(
-    anchor_round_count: PositiveInt,
-    domain_count: PositiveInt,
+    anchor_round_count: FederatedRoundCount,
+    domain_count: DomainCount,
 ) -> PositiveInt:
     return anchor_round_count * domain_count
 
 
 def reconstruction_rejection_threshold(
-    calibration_errors: tuple[NonNegativeFloat, ...],
+    calibration_errors: ReconstructionErrorSeries,
     calibration_percentile: Percentage,
 ) -> NonNegativeFloat:
     return quantile_type7(
@@ -66,8 +77,8 @@ def reconstruction_rejection_threshold(
 
 
 def reconstruction_filter_accepts(
-    error: NonNegativeFloat,
-    rejection_threshold: NonNegativeFloat,
+    error: ReconstructionError,
+    rejection_threshold: ReconstructionThreshold,
 ) -> BooleanValue:
     return error <= rejection_threshold
 
@@ -113,7 +124,7 @@ def cosine_distance_matrix(
 
 
 def _validate_distance_matrix(
-    distance_matrix: tuple[tuple[NonNegativeFloat, ...], ...],
+    distance_matrix: PairwiseDistanceMatrix,
 ) -> None:
     size = len(distance_matrix)
     if any(len(row) != size for row in distance_matrix):
@@ -122,7 +133,7 @@ def _validate_distance_matrix(
 
 def _dbscan_neighbors(
     point_index: NonNegativeInt,
-    distance_matrix: tuple[tuple[NonNegativeFloat, ...], ...],
+    distance_matrix: PairwiseDistanceMatrix,
     epsilon: NonNegativeFloat,
 ) -> tuple[NonNegativeInt, ...]:
     return tuple(
@@ -133,7 +144,7 @@ def _dbscan_neighbors(
 
 
 def density_cluster_labels(
-    distance_matrix: tuple[tuple[NonNegativeFloat, ...], ...],
+    distance_matrix: PairwiseDistanceMatrix,
     config: DensityClusterTrimmedMeanConfig,
 ) -> tuple[DeterministicInteger, ...]:
     _validate_distance_matrix(distance_matrix)
@@ -171,7 +182,7 @@ def density_cluster_labels(
 
 def _mean_within_cluster_distance(
     indices: tuple[NonNegativeInt, ...],
-    distance_matrix: tuple[tuple[NonNegativeFloat, ...], ...],
+    distance_matrix: PairwiseDistanceMatrix,
 ) -> NonNegativeFloat:
     if len(indices) < 2:
         return 0.0
@@ -205,7 +216,7 @@ def _ordered_cluster_domains(
 def select_largest_density_cluster(
     domains: tuple[NBaiotDomain, ...],
     labels: tuple[DeterministicInteger, ...],
-    distance_matrix: tuple[tuple[NonNegativeFloat, ...], ...],
+    distance_matrix: PairwiseDistanceMatrix,
 ) -> tuple[NBaiotDomain, ...] | None:
     if len(domains) != len(labels) or len(labels) != len(distance_matrix):
         raise ValueError("domains, labels, and distance matrix must have matching sizes")
@@ -232,8 +243,8 @@ def select_largest_density_cluster(
 
 def trimmed_mean_aggregate(
     raw_updates: tuple[torch.Tensor, ...],
-    minimum_cluster_size_for_trimming: PositiveInt,
-    trim_each_tail_count: NonNegativeInt,
+    minimum_cluster_size_for_trimming: ClusterSize,
+    trim_each_tail_count: TrimCount,
 ) -> torch.Tensor:
     if not raw_updates:
         raise ValueError("trimmed mean requires at least one update")
@@ -312,7 +323,7 @@ def parameter_similarity(
 
 
 def parameter_similarity_certifies(
-    similarity: FiniteFloat | None,
+    similarity: OptionalParameterSimilarity,
     minimum_cosine_similarity: Probability,
 ) -> BooleanValue:
     return similarity is not None and similarity >= minimum_cosine_similarity
@@ -343,7 +354,7 @@ def parameter_similarity_certification_row_results(
 def same_context_verifier_panel(
     reproducer_feature_mean: torch.Tensor,
     eligible_verifier_feature_means: tuple[DomainFeatureMean, ...],
-    panel_size: PositiveInt,
+    panel_size: VerifierCount,
 ) -> tuple[NBaiotDomain, ...]:
     ranked = sorted(
         eligible_verifier_feature_means,

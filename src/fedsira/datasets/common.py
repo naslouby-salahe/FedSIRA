@@ -9,12 +9,12 @@ from fedsira.domain.records import (
     ArtifactDigest,
     BooleanValue,
     FrozenDomainModel,
-    NonNegativeInt,
     RelativePathText,
     RoleBoundary,
     RolePosition,
     RoleToken,
     SampleIdPrefix,
+    SourceRowIndex,
 )
 from fedsira.runtime.determinism import framed_bytes
 
@@ -122,7 +122,7 @@ def compute_sample_id(
     sample_id_prefix: SampleIdPrefix,
     normalized_relative_csv_path: RelativePathText,
     file_sha256: ArtifactDigest,
-    zero_based_original_row_index: NonNegativeInt,
+    zero_based_original_row_index: SourceRowIndex,
 ) -> ArtifactDigest:
     return hashlib.sha256(
         framed_bytes(

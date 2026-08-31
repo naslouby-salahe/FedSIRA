@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Literal, Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -271,6 +272,43 @@ CellCompletionStatus = BooleanValue
 ConfigurationLoadable = BooleanValue
 DeterministicExecutionReady = BooleanValue
 ArtifactReuseDecision = BooleanValue
+RarArchivesPresent = BooleanValue
+KeepGradients = BooleanValue
+SourceAvailable = BooleanValue
+TargetBearingMemberPresent = BooleanValue
+NonAbstainingReproduction = BooleanValue
+TriggeredSampleMask = BooleanValue
+BinaryLabelMask = BooleanValue
+PredicateSatisfied = BooleanValue
+ScopedContractActive = BooleanValue
+NewlyAdequateEvidenceExists = BooleanValue
+UnderlyingVoteIsPositive = BooleanValue
+AllowSourceAsVerifier = BooleanValue
+AdmissionIndicator = BooleanValue
+ModelInputWidth = PositiveInt
+ModelOutputWidth = PositiveInt
+TrainableParameterCount = PositiveInt
+ParticipantCount = PositiveInt
+ClaimDefinitionCount = NonNegativeInt
+VerifierReportCount = NonNegativeInt
+ReproductionOpportunityCount = NonNegativeInt
+FalseCertificationCount = NonNegativeInt
+LengthPrefixBytes = PositiveInt
+ReconstructionError = NonNegativeFloat
+ReconstructionThreshold = NonNegativeFloat
+PairwiseDistance = NonNegativeFloat
+ParameterSimilarity = FiniteFloat
+MonotonicTimestamp = PositiveFloat
+ReconstructionErrorSeries: TypeAlias = tuple[ReconstructionError, ...]
+PairwiseDistanceMatrix: TypeAlias = tuple[tuple[PairwiseDistance, ...], ...]
+EvidenceArrivalCycleSequence: TypeAlias = tuple[EvidenceArrivalCycleIndex, ...]
+AdmissionIndicatorSeries: TypeAlias = Sequence[AdmissionIndicator]
+TriggeredSampleMaskSeries: TypeAlias = Sequence[TriggeredSampleMask]
+BinaryLabelMaskSeries: TypeAlias = Sequence[BinaryLabelMask]
+NonAbstainingReproductionSeries: TypeAlias = Sequence[NonAbstainingReproduction]
+ClassSupportCounts: TypeAlias = Mapping[DatasetClassToken, ExampleCount]
+OptionalParameterSimilarity: TypeAlias = ParameterSimilarity | None
+OptionalTriggeredSampleMaskSeries: TypeAlias = TriggeredSampleMaskSeries | None
 
 
 class FrozenDomainModel(BaseModel):

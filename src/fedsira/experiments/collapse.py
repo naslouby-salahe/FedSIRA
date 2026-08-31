@@ -24,6 +24,7 @@ from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOp
 from fedsira.domain.records import (
     ArtifactDigest,
     BooleanValue,
+    CollapseDecisionPassed,
     FrozenDomainModel,
     MaterialThreshold,
     MetricDifference,
@@ -120,9 +121,9 @@ class CollapseEvaluationInput(FrozenDomainModel):
 
 
 def resolve_core_mapping(
-    proposal_survives: BooleanValue,
-    plurality_survives: BooleanValue,
-    external_verification_survives: BooleanValue,
+    proposal_survives: CollapseDecisionPassed,
+    plurality_survives: CollapseDecisionPassed,
+    external_verification_survives: CollapseDecisionPassed,
 ) -> ResolvedCore:
     opening_mode = (
         ClaimOpeningMode.PROPOSAL_ASSISTED if proposal_survives else ClaimOpeningMode.CANDIDATE_FREE

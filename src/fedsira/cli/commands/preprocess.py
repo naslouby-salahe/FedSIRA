@@ -18,7 +18,6 @@ from fedsira.artifacts.records import (
 )
 from fedsira.artifacts.storage import publish_or_reuse_artifact_payload
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
 from fedsira.datasets.ciciot2023.schema import (
@@ -62,10 +61,10 @@ DATASET_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
 
 def _publish_dataset_manifest(
     dataset: DatasetId,
-    config: ScientificConfig,
     dataset_split_view_identities: DatasetManifestDigest,
     payload: DatasetManifestPayload,
 ) -> ArtifactReuseDecision:
+    config = current_application_context().scientific_config
     entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
     specification = producer_fingerprint_specification(
         ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
@@ -126,7 +125,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         validate_all_predictors_finite(item.absolute_path, reference_header)
     reused = _publish_dataset_manifest(
         DatasetId.N_BAIOT,
-        config,
         manifest_hash,
         NBaiotDatasetManifestPayload(
             dataset_file_manifest_hash=manifest_hash,
@@ -171,7 +169,6 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     )
     reused = _publish_dataset_manifest(
         DatasetId.CICIOT2023,
-        config,
         summary.dataset_manifest_hash,
         CICIoT2023DatasetManifestPayload(
             dataset_file_manifest_hash=summary.dataset_manifest_hash,

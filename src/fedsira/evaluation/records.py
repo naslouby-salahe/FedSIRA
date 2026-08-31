@@ -11,6 +11,7 @@ from fedsira.domain.records import (
     ByteCount,
     FiniteFloat,
     FrozenDomainModel,
+    LengthPrefixBytes,
     MasterSeed,
     MessageEndpoint,
     ModelTransmissionCount,
@@ -142,7 +143,7 @@ def _wire_bytes(model: FrozenDomainModel) -> EncodedBytes:
     return model.model_dump_json().encode("utf-8")
 
 
-def length_prefixed_bytes(payload: EncodedBytes, prefix_bytes: PositiveInt) -> EncodedBytes:
+def length_prefixed_bytes(payload: EncodedBytes, prefix_bytes: LengthPrefixBytes) -> EncodedBytes:
     return len(payload).to_bytes(prefix_bytes, byteorder="big", signed=False) + payload
 
 

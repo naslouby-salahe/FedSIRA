@@ -5,13 +5,26 @@ from dataclasses import dataclass
 from fedsira.analysis.comparisons import ComparisonMetric
 from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
 from fedsira.domain.records import (
+    AdmissionCount,
+    AdmissionIndicatorSeries,
+    BinaryLabelMaskSeries,
     BooleanValue,
+    ClassSupportCounts,
     DatasetClassToken,
+    DomainCount,
+    ExampleCount,
+    FalseCertificationCount,
     MetricName,
     MetricValue,
     NonNegativeInt,
-    PositiveInt,
+    OptionalTriggeredSampleMaskSeries,
+    PredicateSatisfied,
     Probability,
+    ReproductionOpportunityCount,
+    RowCount,
+    ScopedContractActive,
+    TriggeredSampleMaskSeries,
+    VerifierReportCount,
 )
 from fedsira.evaluation.aggregation import minimum_defined_domain_count
 from fedsira.evaluation.records import (
@@ -74,7 +87,7 @@ def compute_confusion_counts_by_class(
 
 def accuracy(
     confusion_counts_by_class: Mapping[DatasetClassToken, ConfusionCounts],
-    sample_count: NonNegativeInt,
+    sample_count: ExampleCount,
 ) -> MetricResult:
     if sample_count == 0:
         return MetricResult(value=None, denominator=0)
@@ -145,7 +158,7 @@ def macro_f1(f1_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricRes
 
 def weighted_f1(
     f1_by_class: Mapping[DatasetClassToken, MetricResult],
-    support_by_class: Mapping[DatasetClassToken, NonNegativeInt],
+    support_by_class: ClassSupportCounts,
 ) -> MetricResult:
     weighted_sum = 0.0
     total_support = 0
@@ -219,7 +232,7 @@ def benign_false_alarm_rate_increase(
 def attack_success_rate_within_domain(
     true_labels: Sequence[DatasetClassToken],
     predicted_labels: Sequence[DatasetClassToken],
-    triggered_mask: Sequence[BooleanValue],
+    triggered_mask: TriggeredSampleMaskSeries,
     triggered_source_class_token: DatasetClassToken,
     benign_class_token: DatasetClassToken,
 ) -> MetricResult:
@@ -243,8 +256,8 @@ def clean_proposal_oracle_label(
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
-    defined_domain_count: NonNegativeInt,
-    expected_domain_count: PositiveInt,
+    defined_domain_count: DomainCount,
+    expected_domain_count: DomainCount,
     generic_defined_domain_fraction_minimum: Probability,
     capability_claim_config: CapabilityClaimConfig,
 ) -> ProposalOracleLabel:
@@ -272,7 +285,7 @@ def clean_proposal_oracle_label(
 
 
 def false_launch_rate(
-    false_launch_count: NonNegativeInt, adequate_defined_oracle_count: NonNegativeInt
+    false_launch_count: AdmissionCount, adequate_defined_oracle_count: DomainCount
 ) -> MetricResult:
     if adequate_defined_oracle_count == 0:
         return MetricResult(value=None, denominator=0)
@@ -290,7 +303,7 @@ def reproduction_attempt_count(
 
 
 def malicious_admission_rate(
-    malicious_admission_indicators: Sequence[BooleanValue],
+    malicious_admission_indicators: AdmissionIndicatorSeries,
 ) -> MetricResult:
     denominator = len(malicious_admission_indicators)
     if denominator == 0:
@@ -301,7 +314,7 @@ def malicious_admission_rate(
 
 
 def legitimate_admission_rate(
-    legitimate_admission_indicators: Sequence[BooleanValue],
+    legitimate_admission_indicators: AdmissionIndicatorSeries,
 ) -> MetricResult:
     denominator = len(legitimate_admission_indicators)
     if denominator == 0:
@@ -312,7 +325,8 @@ def legitimate_admission_rate(
 
 
 def verifier_abstention_rate(
-    abstaining_verifier_report_count: NonNegativeInt, assigned_verifier_report_count: NonNegativeInt
+    abstaining_verifier_report_count: VerifierReportCount,
+    assigned_verifier_report_count: VerifierReportCount,
 ) -> MetricResult:
     if assigned_verifier_report_count == 0:
         return MetricResult(value=None, denominator=0)
@@ -323,8 +337,8 @@ def verifier_abstention_rate(
 
 
 def reproduction_abstention_rate(
-    evidence_insufficient_opportunity_count: NonNegativeInt,
-    assigned_reproduction_opportunity_count: NonNegativeInt,
+    evidence_insufficient_opportunity_count: ReproductionOpportunityCount,
+    assigned_reproduction_opportunity_count: ReproductionOpportunityCount,
 ) -> MetricResult:
     if assigned_reproduction_opportunity_count == 0:
         return MetricResult(value=None, denominator=0)
@@ -335,7 +349,7 @@ def reproduction_abstention_rate(
 
 
 def dormant_claim_rate(
-    dormant_claim_count: NonNegativeInt, eligible_claim_count: NonNegativeInt
+    dormant_claim_count: AdmissionCount, eligible_claim_count: AdmissionCount
 ) -> MetricResult:
     if eligible_claim_count == 0:
         return MetricResult(value=None, denominator=0)
@@ -345,7 +359,7 @@ def dormant_claim_rate(
 
 
 def auroc_one_vs_rest(
-    true_binary: Sequence[BooleanValue], scores: Sequence[MetricValue]
+    true_binary: BinaryLabelMaskSeries, scores: Sequence[MetricValue]
 ) -> MetricResult:
     positive_count = sum(true_binary)
     negative_count = len(true_binary) - positive_count
@@ -375,7 +389,7 @@ def auroc_one_vs_rest(
 
 
 def auprc_one_vs_rest(
-    true_binary: Sequence[BooleanValue], scores: Sequence[MetricValue]
+    true_binary: BinaryLabelMaskSeries, scores: Sequence[MetricValue]
 ) -> MetricResult:
     positive_count = sum(true_binary)
     if positive_count == 0:
@@ -434,15 +448,15 @@ def clean_oracle_degradation_is_material(
 
 
 def is_false_same_capability_certification(
-    a_scoped_predicate_passes: BooleanValue, b_scoped_predicate_passes: BooleanValue
+    a_scoped_predicate_passes: PredicateSatisfied, b_scoped_predicate_passes: PredicateSatisfied
 ) -> BooleanValue:
     return a_scoped_predicate_passes != b_scoped_predicate_passes
 
 
 def false_same_capability_certification_rate(
-    false_certification_count: NonNegativeInt,
-    broad_certified_row_count: NonNegativeInt,
-    is_scoped_contract: BooleanValue,
+    false_certification_count: FalseCertificationCount,
+    broad_certified_row_count: RowCount,
+    is_scoped_contract: ScopedContractActive,
 ) -> tuple[MetricResult, FalseSameCapabilityReason | None]:
     if is_scoped_contract:
         return (
@@ -468,11 +482,11 @@ def boundary_metric_set(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     clean_oracle_materiality_config: CleanOracleMaterialityConfig,
-    false_certification_count: NonNegativeInt = 0,
-    broad_certified_row_count: NonNegativeInt = 0,
-    is_scoped_contract: BooleanValue = False,
-    a_scoped_predicate_passes: BooleanValue = False,
-    b_scoped_predicate_passes: BooleanValue = False,
+    false_certification_count: FalseCertificationCount = 0,
+    broad_certified_row_count: RowCount = 0,
+    is_scoped_contract: ScopedContractActive = False,
+    a_scoped_predicate_passes: PredicateSatisfied = False,
+    b_scoped_predicate_passes: PredicateSatisfied = False,
 ) -> BoundaryMetricSet:
     auroc_by_class = OrderedDict(
         (
@@ -526,7 +540,7 @@ def report_metric_set(
     anchor_target_f1: MetricResult | None = None,
     anchor_supported_macro_f1: MetricResult | None = None,
     anchor_benign_far: MetricResult | None = None,
-    triggered_mask: Sequence[BooleanValue] | None = None,
+    triggered_mask: OptionalTriggeredSampleMaskSeries = None,
     triggered_source_class_token: DatasetClassToken | None = None,
 ) -> tuple[tuple[MetricName, MetricResult], ...]:
     validate_metric_class_membership(

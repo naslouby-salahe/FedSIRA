@@ -9,12 +9,14 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
-    BooleanValue,
     ClassIndex,
+    GroupCount,
     NamespaceSeed,
     NonNegativeInt,
     PositiveInt,
     Probability,
+    RowCount,
+    TargetBearingMemberPresent,
 )
 
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
@@ -25,7 +27,7 @@ def certified_ensemble_post_reference_rounds(baselines_config: BaselinesConfig) 
 
 
 def certified_ensemble_domain_groups(
-    domain_partition_namespace_seed: NamespaceSeed, group_count: PositiveInt
+    domain_partition_namespace_seed: NamespaceSeed, group_count: GroupCount
 ) -> tuple[tuple[NBaiotDomain, ...], ...]:
     ordered = deterministic_domain_order(
         NBAIOT_DOMAIN_ORDER, DOMAIN_PARTITION_SEPARATOR, domain_partition_namespace_seed
@@ -38,7 +40,7 @@ def certified_ensemble_domain_groups(
 
 
 def validate_group_without_target_member_uses_supported_only(
-    has_target_bearing_member: BooleanValue, group_target_row_count: NonNegativeInt
+    has_target_bearing_member: TargetBearingMemberPresent, group_target_row_count: RowCount
 ) -> None:
     if not has_target_bearing_member and group_target_row_count != 0:
         raise ValueError(

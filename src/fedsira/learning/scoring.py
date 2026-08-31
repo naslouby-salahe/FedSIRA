@@ -4,11 +4,11 @@ import torch
 from torch import nn
 from torch.nn import functional as torch_functional
 
-from fedsira.domain.records import BooleanValue
+from fedsira.domain.records import KeepGradients
 
 
 def logits_for_samples(
-    model: nn.Module, features: torch.Tensor, keep_gradients: BooleanValue = False
+    model: nn.Module, features: torch.Tensor, keep_gradients: KeepGradients = False
 ) -> torch.Tensor:
     if keep_gradients:
         model.train()

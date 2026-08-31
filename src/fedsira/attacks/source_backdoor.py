@@ -8,6 +8,7 @@ from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     ArtifactDigest,
+    ExampleCount,
     FeatureIndex,
     NamespaceSeed,
     NonNegativeInt,
@@ -20,7 +21,7 @@ ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
 
 
 def fraction_to_attack_count(
-    fraction: Probability, eligible_population_size: NonNegativeInt
+    fraction: Probability, eligible_population_size: ExampleCount
 ) -> NonNegativeInt:
     return math.floor(fraction * eligible_population_size)
 

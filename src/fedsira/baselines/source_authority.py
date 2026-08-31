@@ -6,7 +6,13 @@ from fedsira.baselines.registry import POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOC
 from fedsira.config.schema import BaselinesConfig, MaterialityConfig
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import BooleanValue, PositiveInt, Probability, ReviewerCount
+from fedsira.domain.records import (
+    BooleanValue,
+    CapabilityContractSatisfied,
+    PositiveInt,
+    Probability,
+    ReviewerCount,
+)
 
 CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.CANDIDATE_SCREEN,
@@ -51,7 +57,7 @@ def client_review_then_retrain_local_epochs() -> PositiveInt:
 
 
 def independent_local_reference_reviewer_is_positive(
-    source_satisfies_capability_contract: BooleanValue,
+    source_satisfies_capability_contract: CapabilityContractSatisfied,
     source_supported_macro_f1: Probability,
     local_reference_supported_macro_f1: Probability,
     source_benign_false_alarm_rate: Probability,

@@ -5,6 +5,7 @@ import numpy
 from fedsira.config.schema import BootstrapConfig
 from fedsira.domain.records import (
     ConfidenceIntervalBound,
+    DomainCount,
     MasterSeed,
     MetricValue,
     NonNegativeInt,
@@ -20,7 +21,7 @@ SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR: SeedDerivationLabel = "SINGLE_METHOD_MEA
 
 
 def minimum_defined_domain_count(
-    expected_domain_count: PositiveInt,
+    expected_domain_count: DomainCount,
     generic_defined_domain_fraction_minimum: Probability,
 ) -> PositiveInt:
     return math.ceil(expected_domain_count * generic_defined_domain_fraction_minimum)
@@ -98,7 +99,7 @@ def match_nearest_within_decile(
 
 def equal_weight_domain_mean(
     domain_results: tuple[MetricResult, ...],
-    minimum_defined_domains: PositiveInt,
+    minimum_defined_domains: DomainCount,
 ) -> MetricResult:
     defined_values = tuple(result.value for result in domain_results if result.value is not None)
     if len(defined_values) < minimum_defined_domains:

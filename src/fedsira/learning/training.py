@@ -8,9 +8,9 @@ from fedsira.domain.records import (
     BatchSize,
     DerivedSeed,
     EpochIndex,
+    LearningRate,
     LocalEpochCount,
     NonNegativeFloat,
-    PositiveFloat,
     SampleId,
 )
 from fedsira.models.mlp import FedSIRAClassifier
@@ -31,7 +31,7 @@ def build_loss_function() -> nn.CrossEntropyLoss:
 
 def build_optimizer(
     model: FedSIRAClassifier,
-    learning_rate: PositiveFloat,
+    learning_rate: LearningRate,
     optimizer_config: OptimizerConfig,
 ) -> optim.AdamW:
     return optim.AdamW(

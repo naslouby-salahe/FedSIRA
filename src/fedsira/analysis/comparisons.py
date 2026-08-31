@@ -9,7 +9,7 @@ from fedsira.analysis.statistics import (
     holm_adjusted_p_values,
 )
 from fedsira.baselines.registry import BaselineIdentity
-from fedsira.config.schema import BootstrapConfig, MultiplicityConfig, ScientificConfig
+from fedsira.config.schema import BootstrapConfig, MultiplicityConfig
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.records import (
     ComparisonMargin,
@@ -496,9 +496,8 @@ REPRODUCER_COMPARATORS: tuple[MethodName, ...] = tuple(
 )
 
 
-def _proposal_screen_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
@@ -585,9 +584,8 @@ def _proposal_screen_comparisons(
     return tuple(definitions)
 
 
-def _plurality_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _plurality_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return _matrix(
         ClaimFamily.PLURALITY_NECESSITY,
@@ -613,9 +611,8 @@ def _plurality_comparisons(
     )
 
 
-def _source_exclusion_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _source_exclusion_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return (
         _definition(
@@ -633,9 +630,8 @@ def _source_exclusion_comparisons(
     )
 
 
-def _external_verification_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _external_verification_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return _matrix(
         ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
@@ -663,9 +659,9 @@ def _external_verification_comparisons(
 
 
 def _primary_templates(
-    config: ScientificConfig,
     scenario: PrimaryScenario,
 ) -> tuple[ComparisonTemplate, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     templates: list[ComparisonTemplate] = [
         _superiority(
@@ -707,9 +703,7 @@ def _primary_templates(
     return tuple(templates)
 
 
-def _primary_baseline_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _primary_baseline_comparisons() -> tuple[ComparisonDefinition, ...]:
     return tuple(
         _definition(
             ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
@@ -721,13 +715,12 @@ def _primary_baseline_comparisons(
         )
         for comparator in PRIMARY_COMPARATORS
         for scenario in PrimaryScenario
-        for template in _primary_templates(config, scenario)
+        for template in _primary_templates(scenario)
     )
 
 
-def _reproducer_attack_templates(
-    config: ScientificConfig,
-) -> tuple[ComparisonTemplate, ...]:
+def _reproducer_attack_templates() -> tuple[ComparisonTemplate, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return (
         _superiority(
@@ -748,9 +741,8 @@ def _reproducer_attack_templates(
     )
 
 
-def _reproducer_robustness_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _reproducer_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     definitions: list[ComparisonDefinition] = []
     for condition in ReproducerCondition:
@@ -768,7 +760,7 @@ def _reproducer_robustness_comparisons(
                 ),
             )
         else:
-            templates = _reproducer_attack_templates(config)
+            templates = _reproducer_attack_templates()
         definitions.extend(
             _matrix(
                 ClaimFamily.REPRODUCER_ROBUSTNESS,
@@ -782,9 +774,8 @@ def _reproducer_robustness_comparisons(
     return tuple(definitions)
 
 
-def _verifier_robustness_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     definitions: list[ComparisonDefinition] = []
     for profile in VerifierProfile:
@@ -875,10 +866,10 @@ def _ablation_metric(
 
 
 def _ablation_threshold(
-    config: ScientificConfig,
     variant: AblationVariant,
     metric: ComparisonMetric,
 ) -> MaterialThreshold:
+    config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     if metric is ComparisonMetric.ATTACK_SUCCESS_RATE:
         return materiality.source_exclusion_asr_reduction_minimum
@@ -900,9 +891,7 @@ def _ablation_threshold(
     raise ValueError(f"no material threshold for ablation metric {metric}")
 
 
-def _ablation_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _ablation_comparisons() -> tuple[ComparisonDefinition, ...]:
     definitions: list[ComparisonDefinition] = []
     for variant in AblationVariant:
         if variant is AblationVariant.FULL_FEDSIRA:
@@ -927,7 +916,7 @@ def _ablation_comparisons(
                 _superiority(
                     metric,
                     orientation,
-                    _ablation_threshold(config, variant, metric),
+                    _ablation_threshold(variant, metric),
                     effect_scale=effect_scale,
                     materiality_direction=MaterialityDirection.DETERIORATION_AT_LEAST,
                 ),
@@ -936,9 +925,8 @@ def _ablation_comparisons(
     return tuple(definitions)
 
 
-def _shared_epistemic_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _shared_epistemic_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     clean_materiality = config.attacks_and_boundaries.clean_oracle_materiality
     templates = (
         _superiority(
@@ -977,9 +965,8 @@ def _shared_epistemic_comparisons(
     )
 
 
-def _capability_boundary_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _capability_boundary_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     granularity_thresholds = config.claim_support_thresholds.capability_granularity_boundary
     threshold = granularity_thresholds.false_same_capability_certification_rate_minimum
     return tuple(
@@ -1000,9 +987,8 @@ def _capability_boundary_comparisons(
     )
 
 
-def _heterogeneity_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     boundary = config.claim_support_thresholds.heterogeneity_boundary
     methods = (
         CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
@@ -1048,9 +1034,8 @@ def _heterogeneity_comparisons(
     return tuple(definitions)
 
 
-def _secondary_generalization_comparisons(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def _secondary_generalization_comparisons() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     boundary = config.claim_support_thresholds.secondary_generalization
     references = (
         BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
@@ -1092,18 +1077,17 @@ def _secondary_generalization_comparisons(
 
 
 def build_comparison_registry() -> tuple[ComparisonDefinition, ...]:
-    config = current_application_context().scientific_config
     return (
-        *_proposal_screen_comparisons(config),
-        *_plurality_comparisons(config),
-        *_source_exclusion_comparisons(config),
-        *_external_verification_comparisons(config),
-        *_primary_baseline_comparisons(config),
-        *_reproducer_robustness_comparisons(config),
-        *_verifier_robustness_comparisons(config),
-        *_ablation_comparisons(config),
-        *_shared_epistemic_comparisons(config),
-        *_capability_boundary_comparisons(config),
-        *_heterogeneity_comparisons(config),
-        *_secondary_generalization_comparisons(config),
+        *_proposal_screen_comparisons(),
+        *_plurality_comparisons(),
+        *_source_exclusion_comparisons(),
+        *_external_verification_comparisons(),
+        *_primary_baseline_comparisons(),
+        *_reproducer_robustness_comparisons(),
+        *_verifier_robustness_comparisons(),
+        *_ablation_comparisons(),
+        *_shared_epistemic_comparisons(),
+        *_capability_boundary_comparisons(),
+        *_heterogeneity_comparisons(),
+        *_secondary_generalization_comparisons(),
     )

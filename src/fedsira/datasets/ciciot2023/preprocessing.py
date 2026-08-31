@@ -14,7 +14,7 @@ from typing import Annotated, Protocol, TypeAlias, cast
 
 from pydantic import Field
 
-from fedsira.config.schema import SamplingCapsPerDomain, ScientificConfig
+from fedsira.config.schema import SamplingCapsPerDomain
 from fedsira.datasets.ciciot2023.acquisition import (
     SecondaryCsvFile,
     compute_dataset_manifest_hash,
@@ -82,6 +82,7 @@ from fedsira.domain.records import (
     SampleIdPrefix,
     SamplingCap,
     SchemaVersion,
+    SourceRowIndex,
     TextValue,
 )
 from fedsira.runtime.determinism import framed_bytes
@@ -247,7 +248,7 @@ class _ScalerMetadata(FrozenDomainModel):
 def compute_stable_row_id(
     normalized_relative_csv_path: RelativePathText,
     file_sha256: ArtifactDigest,
-    zero_based_original_row_index: NonNegativeInt,
+    zero_based_original_row_index: SourceRowIndex,
 ) -> ArtifactDigest:
     return hashlib.sha256(
         framed_bytes(
@@ -732,9 +733,9 @@ def _assign_group_role(
     store: SecondaryPreparationStore,
     group: _GroupIdentity,
     role: Role,
-    config: ScientificConfig,
     dataset_manifest_hash: DatasetManifestDigest,
 ) -> None:
+    config = current_application_context().scientific_config
     group_size = store.group_size(group)
     if group_size == 0:
         return
@@ -804,20 +805,19 @@ def assign_roles(
     store: SecondaryPreparationStore,
     dataset_manifest_hash: DatasetManifestDigest,
 ) -> None:
-    config = current_application_context().scientific_config
     for group in store.groups():
         ordered_roles = (
             TARGET_ROLE_ORDER if group.normalized_label == TARGET_LABEL else SUPPORTED_ROLE_ORDER
         )
         for role in ordered_roles:
-            _assign_group_role(store, group, role, config, dataset_manifest_hash)
+            _assign_group_role(store, group, role, dataset_manifest_hash)
 
 
 def _fit_secondary_scaler(
     store: SecondaryPreparationStore,
     predictor_columns: tuple[DatasetColumnName, ...],
-    config: ScientificConfig,
 ) -> FeatureMoments:
+    config = current_application_context().scientific_config
     statistics = accumulate_feature_statistics(
         predictor_columns,
         store.iter_anchor_train_features(),
@@ -894,9 +894,9 @@ def _write_prepared_views(
     store: SecondaryPreparationStore,
     predictor_columns: tuple[DatasetColumnName, ...],
     scaler: FeatureMoments,
-    config: ScientificConfig,
     prepared_root: Path,
 ) -> tuple[SecondaryPreparedViewSummary, ...]:
+    config = current_application_context().scientific_config
     prepared_root.mkdir(parents=True, exist_ok=True)
     summaries: list[SecondaryPreparedViewSummary] = []
     for identity in store.assigned_views():
@@ -1131,8 +1131,8 @@ def _persist_complete_case_batch(
     label_column: DatasetColumnName,
     predictor_columns: tuple[DatasetColumnName, ...],
     dataset_manifest_hash: DatasetManifestDigest,
-    config: ScientificConfig,
 ) -> None:
+    config = current_application_context().scientific_config
     retained, exclusions = parse_complete_case_rows(
         raw_batch,
         header=header,
@@ -1202,7 +1202,6 @@ def materialize_ciciot2023_prepared_views(
     cache_root: Path,
     overwrite: OverwriteExisting = False,
 ) -> SecondaryMaterializationSummary:
-    config = current_application_context().scientific_config
     if not discovered:
         raise ValueError("CICIoT2023 materialization requires discovered CSV shards")
     dataset_manifest_hash = compute_dataset_manifest_hash(discovered)
@@ -1270,7 +1269,6 @@ def materialize_ciciot2023_prepared_views(
                             label_column,
                             predictor_columns,
                             dataset_manifest_hash,
-                            config,
                         )
                         raw_batch.clear()
                 if raw_batch:
@@ -1282,15 +1280,14 @@ def materialize_ciciot2023_prepared_views(
                         label_column,
                         predictor_columns,
                         dataset_manifest_hash,
-                        config,
                     )
         validate_label_collisions(frozenset(raw_labels))
         normalized_labels = frozenset(normalize_label(label) for label in raw_labels)
         validate_target_label_present(normalized_labels)
         class_registry = build_class_registry(normalized_labels)
         assign_roles(store, dataset_manifest_hash)
-        scaler = _fit_secondary_scaler(store, predictor_columns, config)
-        views = _write_prepared_views(store, predictor_columns, scaler, config, prepared_root)
+        scaler = _fit_secondary_scaler(store, predictor_columns)
+        views = _write_prepared_views(store, predictor_columns, scaler, prepared_root)
         metadata_root.mkdir(parents=True, exist_ok=True)
         _write_exclusions(store, metadata_root / "dataset_exclusions.parquet")
         _write_role_manifest(store, metadata_root / "ciciot2023_role_manifest.parquet")

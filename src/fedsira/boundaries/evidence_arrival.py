@@ -2,7 +2,16 @@ from enum import StrEnum
 
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import NamespaceSeed, NonNegativeInt, PositiveInt
+from fedsira.domain.records import (
+    AdequateFinalGateDomainCount,
+    DomainCount,
+    EvidenceArrivalCycleSequence,
+    EvidenceCycleIndex,
+    MinimumEligibleEvidenceHolderCount,
+    NamespaceSeed,
+    NonNegativeInt,
+    RequiredReproductionRowCount,
+)
 from fedsira.protocol.theory import first_cycle_with_minimum_eligible_evidence_holders
 
 REPRODUCER_ORDER_SEPARATOR = SeedNamespace.REPRODUCER_ORDER.value
@@ -36,8 +45,8 @@ def reproducer_order(
 
 def holder_count_at_cycle(
     schedule: EvidenceArrivalSchedule,
-    cycle: NonNegativeInt,
-    eligible_domain_count: NonNegativeInt,
+    cycle: EvidenceCycleIndex,
+    eligible_domain_count: DomainCount,
 ) -> NonNegativeInt:
     if schedule is EvidenceArrivalSchedule.PERMANENT_SINGLETON:
         return 0
@@ -54,7 +63,7 @@ def holder_count_at_cycle(
 
 def holders_at_cycle(
     schedule: EvidenceArrivalSchedule,
-    cycle: NonNegativeInt,
+    cycle: EvidenceCycleIndex,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
 ) -> tuple[NBaiotDomain, ...]:
     count = holder_count_at_cycle(schedule, cycle, len(target_capable_reproducer_order))
@@ -65,7 +74,7 @@ def first_holder_cycle_for_domain(
     schedule: EvidenceArrivalSchedule,
     domain: NBaiotDomain,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
-    candidate_cycles: tuple[NonNegativeInt, ...],
+    candidate_cycles: EvidenceArrivalCycleSequence,
 ) -> NonNegativeInt | None:
     for cycle in sorted(candidate_cycles):
         if domain in holders_at_cycle(schedule, cycle, target_capable_reproducer_order):
@@ -76,7 +85,7 @@ def first_holder_cycle_for_domain(
 def _holder_counts_by_cycle(
     schedule: EvidenceArrivalSchedule,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
-    candidate_cycles: tuple[NonNegativeInt, ...],
+    candidate_cycles: EvidenceArrivalCycleSequence,
 ) -> tuple[NonNegativeInt, ...]:
     return tuple(
         holder_count_at_cycle(schedule, cycle, len(target_capable_reproducer_order))
@@ -87,8 +96,8 @@ def _holder_counts_by_cycle(
 def cycle_when_requirement_met(
     schedule: EvidenceArrivalSchedule,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
-    candidate_cycles: tuple[NonNegativeInt, ...],
-    requirement_count: PositiveInt,
+    candidate_cycles: EvidenceArrivalCycleSequence,
+    requirement_count: MinimumEligibleEvidenceHolderCount,
 ) -> NonNegativeInt | None:
     counts = _holder_counts_by_cycle(schedule, target_capable_reproducer_order, candidate_cycles)
     index = first_cycle_with_minimum_eligible_evidence_holders(counts, requirement_count)
@@ -100,9 +109,9 @@ def cycle_when_requirement_met(
 def compute_t_evidence(
     schedule: EvidenceArrivalSchedule,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
-    candidate_cycles: tuple[NonNegativeInt, ...],
-    reproduction_row_requirement: PositiveInt,
-    final_gate_domain_requirement: PositiveInt,
+    candidate_cycles: EvidenceArrivalCycleSequence,
+    reproduction_row_requirement: RequiredReproductionRowCount,
+    final_gate_domain_requirement: AdequateFinalGateDomainCount,
 ) -> NonNegativeInt | None:
     t_reproduction_evidence = cycle_when_requirement_met(
         schedule,

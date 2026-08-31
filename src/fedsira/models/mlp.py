@@ -1,11 +1,11 @@
 import torch
 from torch import nn
 
-from fedsira.domain.records import PositiveInt
+from fedsira.domain.records import ModelInputWidth, ModelOutputWidth, PositiveInt
 
 
 class FedSIRAClassifier(nn.Module):
-    def __init__(self, input_width: PositiveInt, output_width: PositiveInt) -> None:
+    def __init__(self, input_width: ModelInputWidth, output_width: ModelOutputWidth) -> None:
         super().__init__()
         self.input_width = input_width
         self.output_width = output_width

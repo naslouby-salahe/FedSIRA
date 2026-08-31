@@ -1,5 +1,10 @@
 from fedsira.config.schema import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
-from fedsira.domain.records import PositiveFloat, PositiveInt
+from fedsira.domain.records import (
+    LearningRate,
+    ModelInputWidth,
+    ModelOutputWidth,
+    PositiveInt,
+)
 from fedsira.learning.aggregation import ModelState, load_model_state
 from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
 from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
@@ -13,10 +18,10 @@ def _model_state_parameter_count(state: ModelState) -> PositiveInt:
 
 
 def run_anchor_fedavg_training(
-    input_width: PositiveInt,
-    output_width: PositiveInt,
+    input_width: ModelInputWidth,
+    output_width: ModelOutputWidth,
     initial_state: ModelState,
-    learning_rate: PositiveFloat,
+    learning_rate: LearningRate,
     optimizer_config: OptimizerConfig,
     training_config: TrainingConfig,
     anchor_config: AnchorFedAvgConfig,

@@ -1,6 +1,12 @@
 from fedsira.config.schema import ResourceHorizonConfig
 from fedsira.domain.enums import ClaimState, DormantOrigin, TernaryOutcome
-from fedsira.domain.records import BooleanValue, NonNegativeInt
+from fedsira.domain.records import (
+    BooleanValue,
+    EvidenceAdequate,
+    EvidenceCycleIndex,
+    NewlyAdequateEvidenceExists,
+    UnderlyingVoteIsPositive,
+)
 
 TERMINAL_CLAIM_STATES = frozenset(
     {ClaimState.ADMITTED, ClaimState.REJECTED_CLAIM, ClaimState.EXPIRED}
@@ -13,7 +19,7 @@ def is_terminal_state(state: ClaimState) -> BooleanValue:
 
 def apply_logical_cycle_expiry(
     state: ClaimState,
-    logical_cycle: NonNegativeInt,
+    logical_cycle: EvidenceCycleIndex,
     resource_horizon_config: ResourceHorizonConfig,
 ) -> ClaimState:
     if is_terminal_state(state):
@@ -38,7 +44,7 @@ def _dormant_resume_state(dormant_origin: DormantOrigin) -> ClaimState:
 
 
 def resume_dormant_claim(
-    dormant_origin: DormantOrigin, newly_adequate_evidence_exists: BooleanValue
+    dormant_origin: DormantOrigin, newly_adequate_evidence_exists: NewlyAdequateEvidenceExists
 ) -> ClaimState:
     if not newly_adequate_evidence_exists:
         return ClaimState.DORMANT
@@ -46,7 +52,7 @@ def resume_dormant_claim(
 
 
 def resolve_ternary_outcome(
-    is_evidence_adequate: BooleanValue, underlying_vote_is_positive: BooleanValue
+    is_evidence_adequate: EvidenceAdequate, underlying_vote_is_positive: UnderlyingVoteIsPositive
 ) -> TernaryOutcome:
     if not is_evidence_adequate:
         return TernaryOutcome.ABSTAIN

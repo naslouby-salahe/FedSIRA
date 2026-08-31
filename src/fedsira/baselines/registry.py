@@ -8,8 +8,10 @@ from fedsira.domain.records import (
     BaselineFullParticipationAllowed,
     DomainId,
     FrozenDomainModel,
-    NonNegativeInt,
+    ObservedPositiveReportCount,
     PositiveInt,
+    ReviewerCount,
+    VerifierCount,
 )
 from fedsira.protocol.reproduction import next_reproducer_domain
 
@@ -183,10 +185,10 @@ def single_fresh_verifier_outcome(
 
 
 def review_style_baseline_outcome(
-    adequate_reviewer_count: NonNegativeInt,
-    positive_report_count: NonNegativeInt,
-    panel_size: PositiveInt,
-    required_positive_reports: PositiveInt,
+    adequate_reviewer_count: ReviewerCount,
+    positive_report_count: ObservedPositiveReportCount,
+    panel_size: VerifierCount,
+    required_positive_reports: VerifierCount,
 ) -> ClaimState:
     if adequate_reviewer_count < panel_size:
         return ClaimState.DORMANT

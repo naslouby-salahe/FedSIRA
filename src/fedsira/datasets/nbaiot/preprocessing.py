@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas
 
-from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain, ScientificConfig
+from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
@@ -325,10 +325,10 @@ def _sample_id_for_row(
 
 def _accumulate_anchor_train_statistics(
     item: DiscoveredCsvFile,
-    config: ScientificConfig,
     feature_names: tuple[DatasetColumnName, ...],
     existing: tuple[FeatureStatistic, ...] | None,
 ) -> tuple[FeatureStatistic, ...]:
+    config = current_application_context().scientific_config
     row_count = count_csv_data_rows(item.absolute_path)
     assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256=item.file_sha256,
@@ -414,7 +414,6 @@ def materialize_nbaiot_prepared_views(
             continue
         pooled_statistics = _accumulate_anchor_train_statistics(
             item,
-            config,
             feature_names,
             pooled_statistics,
         )

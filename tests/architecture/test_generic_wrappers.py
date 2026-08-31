@@ -51,31 +51,14 @@ def generic_wrapper_violations(tree: ast.Module) -> list[str]:
     return found
 
 
-APPLICATION_BOUNDARY_RELATIVE = frozenset(
-    {
-        "cli/main.py",
-        "cli/commands/doctor.py",
-        "cli/commands/preprocess.py",
-        "cli/commands/plan.py",
-        "cli/commands/smoke.py",
-        "cli/commands/run.py",
-        "cli/commands/report.py",
-        "runtime/state.py",
-        "config/loading.py",
-        "config/validation.py",
-    }
-)
-
-
 def test_public_production_apis_do_not_use_generic_numeric_wrappers() -> None:
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
-        relative = path.relative_to(SRC_ROOT).as_posix()
-        if relative not in APPLICATION_BOUNDARY_RELATIVE:
+        if path.name == "records.py" and path.parent.name == "domain":
             continue
         for violation in generic_wrapper_violations(parse(path)):
             offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
-    assert not offenders, f"Generic primitive wrappers on public application APIs: {offenders}"
+    assert not offenders, f"Generic primitive wrappers on public APIs: {offenders}"
 
 
 def test_violation_detected_for_generic_wrapper_parameter() -> None:

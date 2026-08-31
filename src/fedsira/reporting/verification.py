@@ -5,9 +5,9 @@ from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     BooleanValue,
     CheckpointIdentity,
+    ClaimDefinitionCount,
     ExperimentName,
     FrozenDomainModel,
-    NonNegativeInt,
     ReportVerificationFailure,
     ScientificCellCount,
 )
@@ -115,7 +115,7 @@ def verify_no_stale_ancestors(
 
 def verify_claim_states_derivable(
     claim_states: tuple[ClaimStateResult, ...],
-    expected_claim_count: NonNegativeInt,
+    expected_claim_count: ClaimDefinitionCount,
 ) -> CompletenessVerificationResult:
     failures: list[ReportVerificationFailure] = []
     if len(claim_states) != expected_claim_count:

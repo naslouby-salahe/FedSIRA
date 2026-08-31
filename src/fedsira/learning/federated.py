@@ -3,8 +3,10 @@ import torch
 from fedsira.config.schema import OptimizerConfig, TrainingConfig
 from fedsira.domain.records import (
     DerivedSeed,
+    LearningRate,
     LocalEpochCount,
-    PositiveFloat,
+    ModelInputWidth,
+    ModelOutputWidth,
     PositiveInt,
     SampleId,
     TensorDomainModel,
@@ -42,9 +44,9 @@ def _validate_client_rows(client: LocalTrainingClient) -> PositiveInt:
 
 def train_one_client_locally(
     global_state: ModelState,
-    input_width: PositiveInt,
-    output_width: PositiveInt,
-    learning_rate: PositiveFloat,
+    input_width: ModelInputWidth,
+    output_width: ModelOutputWidth,
+    learning_rate: LearningRate,
     optimizer_config: OptimizerConfig,
     training_config: TrainingConfig,
     local_epochs: LocalEpochCount,
@@ -74,9 +76,9 @@ def train_one_client_locally(
 
 def run_fedavg_round(
     global_state: ModelState,
-    input_width: PositiveInt,
-    output_width: PositiveInt,
-    learning_rate: PositiveFloat,
+    input_width: ModelInputWidth,
+    output_width: ModelOutputWidth,
+    learning_rate: LearningRate,
     optimizer_config: OptimizerConfig,
     training_config: TrainingConfig,
     local_epochs: LocalEpochCount,

@@ -10,12 +10,12 @@ import torch
 
 from fedsira.config.schema import ReferenceEnvironmentConfig
 from fedsira.domain.records import (
-    BooleanValue,
     ByteCount,
     DeterministicExecutionReady,
     EnvironmentText,
     FrozenDomainModel,
     MasterSeed,
+    RarArchivesPresent,
 )
 from fedsira.runtime.state import current_application_context
 
@@ -227,7 +227,7 @@ def check_hardware_resources(workspace_path: Path) -> tuple[EnvironmentMismatch,
 
 
 def check_unrar_availability(
-    rar_archives_present: BooleanValue,
+    rar_archives_present: RarArchivesPresent,
 ) -> tuple[EnvironmentMismatch, ...]:
     if not rar_archives_present:
         return ()
@@ -271,7 +271,7 @@ def configure_deterministic_backend() -> None:
 
 def collect_environment_mismatches(
     workspace_path: Path,
-    rar_archives_present: BooleanValue,
+    rar_archives_present: RarArchivesPresent,
 ) -> tuple[EnvironmentMismatch, ...]:
     return (
         check_operating_system()
@@ -285,6 +285,6 @@ def collect_environment_mismatches(
 
 def deterministic_execution_available(
     workspace_path: Path,
-    rar_archives_present: BooleanValue,
+    rar_archives_present: RarArchivesPresent,
 ) -> DeterministicExecutionReady:
     return not collect_environment_mismatches(workspace_path, rar_archives_present)

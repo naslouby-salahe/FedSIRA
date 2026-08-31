@@ -7,11 +7,12 @@ from fedsira.attacks.source_backdoor import select_fractional_attack_rows
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
 from fedsira.domain.records import (
     ArtifactDigest,
+    DeltaScale,
+    LossWeight,
     NamespaceSeed,
     NonNegativeFloat,
-    PositiveFloat,
-    PositiveInt,
     Probability,
+    TrainableParameterCount,
 )
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
 from fedsira.learning.training import clip_gradients, step_optimizer
@@ -34,7 +35,7 @@ def select_model_replacement_carrier_rows(
     )
 
 
-def scale_model_replacement_delta(delta: torch.Tensor, delta_scale: PositiveFloat) -> torch.Tensor:
+def scale_model_replacement_delta(delta: torch.Tensor, delta_scale: DeltaScale) -> torch.Tensor:
     return delta * delta_scale
 
 
@@ -49,11 +50,11 @@ def verifier_aware_training_step(
     clean_labels: torch.Tensor,
     is_supported: torch.Tensor,
     anchor_flat_parameters: torch.Tensor,
-    trainable_parameter_count: PositiveInt,
+    trainable_parameter_count: TrainableParameterCount,
     triggered_carrier_features: torch.Tensor,
     triggered_carrier_labels: torch.Tensor,
     carrier_row_mask_in_batch: torch.Tensor,
-    triggered_backdoor_loss_weight: NonNegativeFloat,
+    triggered_backdoor_loss_weight: LossWeight,
 ) -> NonNegativeFloat:
     current_model.train()
     optimizer.zero_grad(set_to_none=True)

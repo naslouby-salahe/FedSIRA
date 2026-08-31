@@ -7,10 +7,11 @@ from torch.nn import functional as torch_functional
 from fedsira.config.schema import PostReferenceConfig, TrainingConfig
 from fedsira.domain.records import (
     DerivedSeed,
+    LocalEpochCount,
     NonNegativeFloat,
-    PositiveFloat,
-    PositiveInt,
     SampleId,
+    Temperature,
+    TrainableParameterCount,
 )
 from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
@@ -22,7 +23,7 @@ from fedsira.models.mlp import (
 
 
 def compute_stability_kl(
-    anchor_logits: torch.Tensor, current_logits: torch.Tensor, temperature: PositiveFloat
+    anchor_logits: torch.Tensor, current_logits: torch.Tensor, temperature: Temperature
 ) -> torch.Tensor:
     anchor_probs = probabilities_for_samples(anchor_logits / temperature)
     current_log_probs = torch_functional.log_softmax(current_logits / temperature, dim=-1)
@@ -49,7 +50,7 @@ def post_reference_training_step(
     labels: torch.Tensor,
     is_supported: torch.Tensor,
     anchor_flat_parameters: torch.Tensor,
-    trainable_parameter_count: PositiveInt,
+    trainable_parameter_count: TrainableParameterCount,
 ) -> NonNegativeFloat:
     current_model.train()
     optimizer.zero_grad(set_to_none=True)
@@ -96,7 +97,7 @@ def run_post_reference_training(
     is_supported: torch.Tensor,
     sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
-    local_epochs: PositiveInt,
+    local_epochs: LocalEpochCount,
 ) -> tuple[NonNegativeFloat, ...]:
     anchor_flat_parameters = flatten_trainable_parameters(anchor_model).detach()
     parameter_count = trainable_parameter_count(current_model)
