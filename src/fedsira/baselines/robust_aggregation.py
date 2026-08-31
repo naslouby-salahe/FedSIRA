@@ -6,10 +6,10 @@ from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     CommitteeSize,
     DerivedSeed,
+    FederatedRoundCount,
     MasterSeed,
     NonAbstainingReproductionSeries,
     ParticipantCount,
-    PositiveInt,
     RoundIndex,
 )
 from fedsira.protocol.synthesis import CertifiedReproductionRow
@@ -55,7 +55,7 @@ def coordinate_wise_median_synthesis(
     return torch.median(stacked, dim=0).values
 
 
-def krum_reference_post_reference_rounds(baselines_config: BaselinesConfig) -> PositiveInt:
+def krum_reference_post_reference_rounds(baselines_config: BaselinesConfig) -> FederatedRoundCount:
     return baselines_config.krum_robust_aggregation_post_reference_rounds
 
 

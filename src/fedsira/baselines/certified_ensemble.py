@@ -10,10 +10,10 @@ from fedsira.datasets.nbaiot.schema import (
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     ClassIndex,
+    FederatedRoundCount,
     GroupCount,
     NamespaceSeed,
     NonNegativeInt,
-    PositiveInt,
     Probability,
     RowCount,
     TargetBearingMemberPresent,
@@ -22,7 +22,9 @@ from fedsira.domain.records import (
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 
 
-def certified_ensemble_post_reference_rounds(baselines_config: BaselinesConfig) -> PositiveInt:
+def certified_ensemble_post_reference_rounds(
+    baselines_config: BaselinesConfig,
+) -> FederatedRoundCount:
     return baselines_config.multiple_model_certified_ensemble_post_reference_rounds
 
 

@@ -19,7 +19,6 @@ from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
-    EXPERIMENT_REGISTRY,
     MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
@@ -28,6 +27,7 @@ from fedsira.experiments.registry import (
     ExperimentDefinition,
     ablation_scenario_for_variant,
     baseline_validation_fixture_for_method,
+    experiment_registry,
 )
 
 
@@ -281,7 +281,7 @@ def build_plan(
         smoke_seed = smoke_seed or seeds.smoke_seed
     decision_states = tuple(collapse_decision_states or ())
     planned: list[PlannedExperiment] = []
-    for definition in EXPERIMENT_REGISTRY:
+    for definition in experiment_registry():
         item = _planned_experiment(definition, master_seeds, smoke_seed)
         if item.resolved_core_dependent and not resolved_core_complete:
             item = _with_lifecycle_state(item, ExperimentLifecycleState.BLOCKED)

@@ -75,10 +75,10 @@ from fedsira.baselines.references import (
     local_only_reference_evaluation_is_domain_local,
     local_only_reference_local_epochs,
     local_only_reference_training_role,
+    post_reference_retrain_maximum_local_epochs,
     standard_fl_anchor_rounds,
 )
 from fedsira.baselines.registry import (
-    POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS,
     BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
@@ -186,12 +186,15 @@ from fedsira.domain.records import (
     ConditionName,
     DatasetClassToken,
     DerivedSeed,
+    DomainCount,
     DomainId,
+    ExampleCount,
     ExecutionSchemaVersion,
     ExperimentName,
     FailureMessage,
     FeatureCount,
     FeatureIndex,
+    FeatureMoment,
     FeatureName,
     FiniteFloat,
     FoldIndex,
@@ -209,6 +212,7 @@ from fedsira.domain.records import (
     OverwriteExisting,
     PairedDifference,
     PositiveInt,
+    PreparedEvidencePresent,
     PreparedReproductionTargetCount,
     PreparedScreenTargetCount,
     PreparedSupportedReplayCount,
@@ -274,10 +278,12 @@ from fedsira.experiments.planning import (
 )
 from fedsira.experiments.registry import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+    DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
@@ -285,6 +291,7 @@ from fedsira.experiments.registry import (
     MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    PROTOCOL_INVARIANT_VALIDATION_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
@@ -307,6 +314,8 @@ from fedsira.experiments.registry import (
 )
 from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
+    run_data_and_domain_evidence_validation,
+    run_protocol_invariant_validation,
     validate_cell_terminal_record,
     validate_condition_vocabulary,
     validate_experiment_prerequisites_met,
@@ -1177,11 +1186,11 @@ CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN.value
 @dataclass(frozen=True)
 class PreparedRows:
     sample_ids: tuple[ArtifactDigest, ...]
-    features: tuple[tuple[FiniteFloat, ...], ...]
+    features: tuple[tuple[FeatureMoment, ...], ...]
     labels: tuple[ClassLabel, ...]
 
     @property
-    def row_count(self) -> NonNegativeInt:
+    def row_count(self) -> ExampleCount:
         return len(self.sample_ids)
 
 
@@ -1405,7 +1414,7 @@ def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> Prepar
     return f"{nbaiot_domain_hash_token(domain)}_{class_id.value}_{role_hash_token(role)}"
 
 
-def real_evidence_available(prepared_root: Path) -> BooleanValue:
+def real_evidence_available(prepared_root: Path) -> PreparedEvidencePresent:
     return prepared_root.exists() and any(prepared_root.glob("*.parquet"))
 
 
@@ -1668,7 +1677,7 @@ def anchor_round_calibration_updates(
 
 def anchor_round_reconstruction_calibration_errors(
     prepared_root: Path, master_seed: MasterSeed, anchor: RealAnchor
-) -> tuple[FiniteFloat, ...]:
+) -> tuple[FeatureMoment, ...]:
     config = current_application_context().scientific_config
     errors: list[FiniteFloat] = []
     expected_maximum_count = reconstruction_filter_calibration_error_count(
@@ -1747,7 +1756,7 @@ def train_update_reconstruction_filter_delta(
     load_flat_trainable_parameters(model, anchor.flat_parameters)
     state = model_state_from_classifier(model)
     any_round_trained = False
-    for round_index in range(POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS):
+    for round_index in range(post_reference_retrain_maximum_local_epochs()):
         current_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
         accepted_states: list[WeightedModelState] = []
         for domain in participants:
@@ -2372,7 +2381,7 @@ def train_recovery_after_source_admission_delta(
         master_seed,
         anchor,
         source_domain,
-        POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS,
+        post_reference_retrain_maximum_local_epochs(),
         RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
         exclude_source_from_participants=True,
     )
@@ -2801,7 +2810,7 @@ def train_density_cluster_trimmed_mean_delta(
     load_flat_trainable_parameters(model, anchor.flat_parameters)
     state = model_state_from_classifier(model)
     any_round_trained = False
-    for round_index in range(POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS):
+    for round_index in range(post_reference_retrain_maximum_local_epochs()):
         current_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
         contributing_domains: list[NBaiotDomain] = []
         raw_updates: list[torch.Tensor] = []
@@ -3146,7 +3155,7 @@ def compute_screen_differential(
 
 @dataclass(frozen=True)
 class CapabilityUnderSpecificationSummary:
-    defined_domain_count: NonNegativeInt
+    defined_domain_count: DomainCount
     aggregate_target_f1: MetricResult
     target_f1_gain: MetricResult
     supported_macro_f1_drop: MetricResult
@@ -3301,7 +3310,7 @@ def _diagnostic_marker_for_domain(
 
 @dataclass(frozen=True)
 class SharedEpistemicFailureSummary:
-    defined_domain_count: NonNegativeInt
+    defined_domain_count: DomainCount
     aggregate_target_f1: MetricResult
     target_f1_gain: MetricResult
     supported_macro_f1_drop: MetricResult
@@ -4827,20 +4836,28 @@ class ProtocolCellExecutor(CellExecutor):
         else:
             prepared_root = self._prepared_root
             target_class_token = NBaiotClass.GAFGYT_COMBO.value
-        evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
-        if evidence is None:
-            return CellExecutionOutcome(
-                cell=cell,
-                terminal_state=ExperimentLifecycleState.INVALID,
-                failure=FailureDetail(
-                    failure_class=FailureClass.EVIDENCE_INSUFFICIENT,
-                    message=(
-                        "prepared evidence is not materialized for this cell; "
-                        "run fedsira preprocess first"
-                    ),
-                    cell_phase=ScientificCellPhase.PREPARE,
-                ),
+        if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
+            evidence = PreparedEvidenceCounts(
+                screen_target_count=0,
+                reproduction_target_count=0,
+                reproduction_supported_count=0,
+                final_gate_adequate_domain_count=0,
             )
+        else:
+            evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
+            if evidence is None:
+                return CellExecutionOutcome(
+                    cell=cell,
+                    terminal_state=ExperimentLifecycleState.INVALID,
+                    failure=FailureDetail(
+                        failure_class=FailureClass.EVIDENCE_INSUFFICIENT,
+                        message=(
+                            "prepared evidence is not materialized for this cell; "
+                            "run fedsira preprocess first"
+                        ),
+                        cell_phase=ScientificCellPhase.PREPARE,
+                    ),
+                )
         try:
             _state, metrics = self._execute_cell_protocol(cell, evidence)
         except ValueError as error:
@@ -4895,6 +4912,18 @@ class ProtocolCellExecutor(CellExecutor):
             return self._execute_boundary_cell(cell, evidence)
         if cell.experiment == MECHANISM_ABLATION_NAME:
             return self._execute_ablation_cell(cell, evidence)
+        if cell.experiment == DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME:
+            run_data_and_domain_evidence_validation(
+                evidence.reproduction_target_count,
+                evidence.reproduction_supported_count,
+                evidence.final_gate_adequate_domain_count,
+            )
+            return (ClaimState.ADMITTED, _metrics_from_state(ClaimState.ADMITTED))
+        if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
+            run_protocol_invariant_validation()
+            return (ClaimState.ADMITTED, _metrics_from_state(ClaimState.ADMITTED))
+        if cell.experiment == BASELINE_IMPLEMENTATION_VALIDATION_NAME:
+            return self._execute_baseline_cell(cell, evidence)
         return (ClaimState.DORMANT, _metrics_from_state(ClaimState.DORMANT))
 
     def _execute_ablation_cell(

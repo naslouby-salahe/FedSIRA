@@ -12,10 +12,13 @@ from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.domain.records import (
-    BooleanValue,
+    AdequateFinalGateDomainCount,
     ExperimentName,
     FrozenDomainModel,
+    InvariantChecksPassed,
     OverwriteExisting,
+    PreparedReproductionTargetCount,
+    PreparedSupportedReplayCount,
     ScenarioName,
     SchemaVersion,
     ScientificCellSemanticKey,
@@ -68,7 +71,7 @@ TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
 
 class SmokeCheckResult(FrozenDomainModel):
     name: SmokeCheckName
-    passed: BooleanValue
+    passed: InvariantChecksPassed
     detail: SmokeCheckDetail | None = None
 
 
@@ -76,13 +79,13 @@ class SmokeSuiteResult(FrozenDomainModel):
     checks: tuple[SmokeCheckResult, ...]
 
     @property
-    def passed(self) -> BooleanValue:
+    def passed(self) -> InvariantChecksPassed:
         return all(check.passed for check in self.checks)
 
 
 class PersistedSmokeRecord(FrozenDomainModel):
     schema_version: SchemaVersion
-    passed: BooleanValue
+    passed: InvariantChecksPassed
     checks: tuple[SmokeCheckResult, ...]
 
 
@@ -302,6 +305,41 @@ def _mathematical_invariants(
         ),
         SmokeCheckResult(name="Holm adjustment matches hand fixture", passed=holm_matches),
     )
+
+
+def run_data_and_domain_evidence_validation(
+    reproduction_target_count: PreparedReproductionTargetCount,
+    reproduction_supported_count: PreparedSupportedReplayCount,
+    final_gate_adequate_domain_count: AdequateFinalGateDomainCount,
+) -> None:
+    config = current_application_context().scientific_config
+    failed = tuple(check.name for check in _data_invariants() if not check.passed)
+    if failed:
+        raise ValueError(f"data and domain evidence validation failed: {', '.join(failed)}")
+    minima = config.capability_claim.evidence_minima
+    if reproduction_target_count < minima.reproduction_target_examples:
+        raise ValueError(
+            "reproduction-target evidence is below the configured minimum "
+            f"{minima.reproduction_target_examples}"
+        )
+    if reproduction_supported_count < minima.reproduction_supported_control_examples:
+        raise ValueError(
+            "reproduction supported-control evidence is below the configured minimum "
+            f"{minima.reproduction_supported_control_examples}"
+        )
+    required_final_gate_domains = config.protocol.final_gate.minimum_adequate_non_source_domains
+    if final_gate_adequate_domain_count < required_final_gate_domains:
+        raise ValueError(
+            "final-gate adequate non-source domain count is below the configured minimum "
+            f"{required_final_gate_domains}"
+        )
+
+
+def run_protocol_invariant_validation() -> None:
+    result = run_smoke_suite()
+    if not result.passed:
+        failed = tuple(check.name for check in result.checks if not check.passed)
+        raise ValueError(f"protocol invariant validation failed: {', '.join(failed)}")
 
 
 def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from fedsira.artifacts.graph import ArtifactGraph
@@ -47,6 +49,33 @@ def test_mark_stale_descendants_only_affects_downstream() -> None:
     assert graph.is_active("d" * 64)
     assert graph.get("b" * 64).lifecycle_state is ArtifactLifecycleState.STALE
     assert graph.get("c" * 64).lifecycle_state is ArtifactLifecycleState.STALE
+
+
+def test_load_published_artifact_graph_walks_manifests_and_reports_stale(
+    tmp_path: Path,
+) -> None:
+    from fedsira.artifacts.graph import (
+        load_published_artifact_graph,
+        stale_artifact_identities,
+    )
+    from fedsira.artifacts.storage import ARTIFACT_MANIFEST_SUFFIX
+
+    parent = complete_manifest("a" * 64)
+    child = complete_manifest("b" * 64, upstream=("a" * 64,))
+    (tmp_path / f"{parent.identity}{ARTIFACT_MANIFEST_SUFFIX}").write_text(parent.model_dump_json())
+    stale_child = ArtifactManifest(
+        family=child.family,
+        identity=child.identity,
+        checksum=child.checksum,
+        lifecycle_state=ArtifactLifecycleState.STALE,
+        upstream_identities=child.upstream_identities,
+    )
+    (tmp_path / f"{stale_child.identity}{ARTIFACT_MANIFEST_SUFFIX}").write_text(
+        stale_child.model_dump_json()
+    )
+    graph, unresolved = load_published_artifact_graph((tmp_path,))
+    assert not unresolved
+    assert stale_artifact_identities(graph) == (stale_child.identity,)
 
 
 def test_mark_stale_descendants_is_transitive_only_downstream() -> None:

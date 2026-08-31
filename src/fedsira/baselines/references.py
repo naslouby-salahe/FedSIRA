@@ -2,17 +2,19 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.baselines.registry import (
-    STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND,
-    STANDARD_FL_BASELINE_ROUNDS,
-)
 from fedsira.config.schema import BaselinesConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.domain.records import BooleanValue, PositiveInt, SourceAvailable
+from fedsira.domain.records import (
+    DomainLocalEvaluation,
+    FederatedRoundCount,
+    LocalEpochCount,
+    SourceAvailable,
+)
+from fedsira.runtime.state import current_application_context
 
 
-def local_only_reference_local_epochs(baselines_config: BaselinesConfig) -> PositiveInt:
+def local_only_reference_local_epochs(baselines_config: BaselinesConfig) -> LocalEpochCount:
     return baselines_config.local_only_reference_epochs
 
 
@@ -22,11 +24,11 @@ def local_only_reference_training_role() -> Role:
 
 def local_only_reference_evaluation_is_domain_local(
     checkpoint_domain: NBaiotDomain, evaluation_domain: NBaiotDomain
-) -> BooleanValue:
+) -> DomainLocalEvaluation:
     return checkpoint_domain == evaluation_domain
 
 
-def centralized_reference_local_epochs(baselines_config: BaselinesConfig) -> PositiveInt:
+def centralized_reference_local_epochs(baselines_config: BaselinesConfig) -> LocalEpochCount:
     return baselines_config.centralized_reference_epochs
 
 
@@ -43,16 +45,24 @@ def centralized_reference_pooled_rows(
     return pool_domain_rows(ordered_domains, domain_rows)
 
 
-def fedavg_reference_post_reference_rounds(baselines_config: BaselinesConfig) -> PositiveInt:
+def fedavg_reference_post_reference_rounds(
+    baselines_config: BaselinesConfig,
+) -> FederatedRoundCount:
     return baselines_config.fedavg_post_reference_rounds
 
 
-def standard_fl_anchor_rounds() -> PositiveInt:
-    return STANDARD_FL_BASELINE_ROUNDS
+def standard_fl_anchor_rounds() -> FederatedRoundCount:
+    return current_application_context().scientific_config.model.anchor_fedavg.rounds
 
 
-def fedavg_reference_post_reference_local_epochs() -> PositiveInt:
-    return STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND
+def fedavg_reference_post_reference_local_epochs() -> LocalEpochCount:
+    return (
+        current_application_context().scientific_config.model.anchor_fedavg.local_epochs_per_round
+    )
+
+
+def post_reference_retrain_maximum_local_epochs() -> LocalEpochCount:
+    return current_application_context().scientific_config.model.post_reference.local_epochs
 
 
 def fedavg_reference_post_reference_participants(

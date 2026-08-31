@@ -9,10 +9,9 @@ from fedsira.analysis.claims import (
     derive_claim_states,
 )
 from fedsira.analysis.comparisons import ComparisonFamilyResult
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
-    BooleanValue,
     ExperimentName,
     FigureName,
     FrozenDomainModel,
@@ -21,6 +20,7 @@ from fedsira.domain.records import (
     SchemaVersion,
     ScientificCellCount,
     TableName,
+    VerificationPassed,
 )
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.execution import ExperimentExecutionResult
@@ -37,6 +37,7 @@ from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
 )
+from fedsira.runtime.state import current_application_context
 
 EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
 
@@ -52,7 +53,7 @@ class ExperimentReportSummary(FrozenDomainModel):
 class ProjectReproducibilitySummary(FrozenDomainModel):
     schema_version: SchemaVersion
     experiment_states: tuple[ExperimentLifecycleRecord, ...]
-    verification_passed: BooleanValue
+    verification_passed: VerificationPassed
     verification_failures: tuple[ReportVerificationFailure, ...]
     mandatory_tables: tuple[TableName, ...]
     materialized_tables: tuple[TableName, ...]
@@ -74,6 +75,11 @@ def _results_root() -> Path:
     return Path("results")
 
 
+def _publication_rounding() -> PublicationRoundingConfig:
+    statistics = current_application_context().scientific_config.metrics_and_statistics
+    return statistics.publication_rounding
+
+
 def _write_table(root: Path, table: RenderedTable) -> Path:
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
@@ -82,9 +88,8 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
 
 def derive_claim_states_for_export(
     claim_evidence: tuple[ClaimEvidenceRecord, ...] = (),
-    config_path: Path = PRODUCTION_CONFIG_PATH,
 ) -> tuple[ClaimStateResult, ...]:
-    config = load_scientific_config(config_path)
+    config = current_application_context().scientific_config
     return derive_claim_states(
         claim_evidence,
         config.claim_support_thresholds,
@@ -95,7 +100,6 @@ def derive_claim_states_for_export(
 
 def export_experiment_report(
     result: ExperimentExecutionResult,
-    config_path: Path,
     experiment_root: Path,
 ) -> ReportExportResult:
     if result.lifecycle_state is not ExperimentLifecycleState.COMPLETED:
@@ -109,8 +113,7 @@ def export_experiment_report(
             verification=verification,
         )
 
-    config = load_scientific_config(config_path)
-    rounding = config.metrics_and_statistics.publication_rounding
+    rounding = _publication_rounding()
     tables_root = experiment_root / "tables" / "main"
     metrics_root = experiment_root / "metrics" / "primary"
     tables_root.mkdir(parents=True, exist_ok=True)
@@ -158,7 +161,6 @@ def export_project_summary(
     plan: ExperimentPlan,
     claim_states: tuple[ClaimStateResult, ...],
     lifecycle_states: tuple[ExperimentLifecycleRecord, ...],
-    config_path: Path,
     verification: CompletenessVerificationResult,
     collapse_decisions: tuple[CollapseDecision, ...] | None = None,
     resolved_core: ResolvedCore | None = None,
@@ -173,8 +175,7 @@ def export_project_summary(
             verification=verification,
         )
 
-    config = load_scientific_config(config_path)
-    rounding = config.metrics_and_statistics.publication_rounding
+    rounding = _publication_rounding()
     project_root = _results_root() / "project_summary"
     tables_root = project_root / "tables" / "main"
     claims_root = project_root / "claims"

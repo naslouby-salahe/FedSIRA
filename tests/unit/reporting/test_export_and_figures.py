@@ -77,7 +77,7 @@ def test_render_claim_support_table_uses_typed_state() -> None:
 
 
 def test_derive_claim_states_for_export_no_evidence_is_not_tested() -> None:
-    states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
+    states = derive_claim_states_for_export(())
     assert all(state.state is FinalClaimState.NOT_TESTED for state in states)
 
 
@@ -139,13 +139,12 @@ def test_export_project_summary_records_missing_mandatory_material(
 ) -> None:
     plan = build_plan(resolved_core_complete=True)
     verification = CompletenessVerificationResult(passed=True, failures=())
-    claim_states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
+    claim_states = derive_claim_states_for_export(())
     _override_results_root(tmp_path, monkeypatch)
     result = export_project_summary(
         plan,
         claim_states,
         _lifecycle_records(),
-        PRODUCTION_CONFIG_PATH,
         verification,
     )
     assert isinstance(result, ReportExportResult)
@@ -162,7 +161,7 @@ def test_export_project_summary_with_collapse_decisions_records_typed_core(
 ) -> None:
     plan = build_plan(resolved_core_complete=True)
     verification = CompletenessVerificationResult(passed=True, failures=())
-    claim_states = derive_claim_states_for_export((), PRODUCTION_CONFIG_PATH)
+    claim_states = derive_claim_states_for_export(())
     resolved_core = ResolvedCore(
         proposal_assistance_survives=True,
         plurality_survives=True,
@@ -178,7 +177,6 @@ def test_export_project_summary_with_collapse_decisions_records_typed_core(
         plan,
         claim_states,
         _lifecycle_records(),
-        PRODUCTION_CONFIG_PATH,
         verification,
         collapse_decisions=_collapse_decisions(),
         resolved_core=resolved_core,

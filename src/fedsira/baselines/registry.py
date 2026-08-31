@@ -9,7 +9,6 @@ from fedsira.domain.records import (
     DomainId,
     FrozenDomainModel,
     ObservedPositiveReportCount,
-    PositiveInt,
     ReviewerCount,
     VerifierCount,
 )
@@ -116,10 +115,6 @@ if frozenset(identity for identity, _fixture in BASELINE_VALIDATION_FIXTURE_MAP)
 ):
     raise AssertionError("every registered baseline must have exactly one predeclared fixture")
 
-
-STANDARD_FL_BASELINE_ROUNDS: Final[PositiveInt] = 20
-STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND: Final[PositiveInt] = 1
-POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS: Final[PositiveInt] = 5
 
 TUNING_FORBIDDEN_ROLES: Final[frozenset[Role]] = frozenset({Role.REPORT_TEST, Role.FINAL_GATE})
 

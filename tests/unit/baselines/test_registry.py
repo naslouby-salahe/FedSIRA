@@ -1,10 +1,12 @@
 import pytest
 
+from fedsira.baselines.references import (
+    fedavg_reference_post_reference_local_epochs,
+    post_reference_retrain_maximum_local_epochs,
+    standard_fl_anchor_rounds,
+)
 from fedsira.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
-    POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS,
-    STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND,
-    STANDARD_FL_BASELINE_ROUNDS,
     domain_target_view,
     domain_without_target_view_may_participate,
     first_eligible_non_source_reproducer,
@@ -21,10 +23,15 @@ SOURCE = NBAIOT_DOMAIN_ORDER[0]
 NON_SOURCE = NBAIOT_DOMAIN_ORDER[1]
 
 
-def test_standard_fl_baseline_budget_constants() -> None:
-    assert STANDARD_FL_BASELINE_ROUNDS == 20
-    assert STANDARD_FL_BASELINE_LOCAL_EPOCHS_PER_ROUND == 1
-    assert POST_REFERENCE_RETRAIN_MAXIMUM_LOCAL_EPOCHS == 5
+def test_standard_fl_baseline_budget_reads_yaml() -> None:
+    from fedsira.runtime.state import current_application_context
+
+    model = current_application_context().scientific_config.model
+    assert standard_fl_anchor_rounds() == model.anchor_fedavg.rounds
+    assert (
+        fedavg_reference_post_reference_local_epochs() == model.anchor_fedavg.local_epochs_per_round
+    )
+    assert post_reference_retrain_maximum_local_epochs() == model.post_reference.local_epochs
 
 
 def test_domain_target_view_uses_source_proposal_for_source_and_reproduction_otherwise() -> None:

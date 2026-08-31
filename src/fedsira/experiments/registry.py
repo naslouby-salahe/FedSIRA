@@ -18,6 +18,7 @@ from fedsira.domain.records import (
     ScientificCellCount,
     SeedCount,
 )
+from fedsira.runtime.state import current_application_context
 
 
 class ClaimFamily(StrEnum):
@@ -233,8 +234,12 @@ POST_CORE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     SECONDARY_DATASET_GENERALIZATION_NAME,
 )
 
-_MASTER_SEED_COUNT: SeedCount = 10
 _SMOKE_SEED_COUNT: SeedCount = 1
+
+
+def _confirmatory_seed_count() -> SeedCount:
+    seeds = current_application_context().scientific_config.seeds_and_determinism
+    return seeds.confirmatory_seed_count
 
 
 def _unique(values: Iterable[ConditionName]) -> tuple[ConditionName, ...]:
@@ -315,260 +320,263 @@ _BASELINE_METHODS = tuple(method for method, _fixture in _BASELINE_FIXTURE_BY_ME
 _BASELINE_FIXTURES = _unique(fixture for _method, fixture in _BASELINE_FIXTURE_BY_METHOD)
 _ABLATION_SCENARIOS = _unique(ablation_scenario_for_variant(variant) for variant in AblationVariant)
 
-EXPERIMENT_REGISTRY: tuple[ExperimentDefinition, ...] = (
-    ExperimentDefinition(
-        name=DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
-        experiment_class=ExperimentClass.VALIDATION,
-        methods=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-        conditions=("primary",),
-        seed_count=_SMOKE_SEED_COUNT,
-        nominal_cell_count=1,
-        claim_family=None,
-        prerequisites=(),
-    ),
-    ExperimentDefinition(
-        name=PROTOCOL_INVARIANT_VALIDATION_NAME,
-        experiment_class=ExperimentClass.VALIDATION,
-        methods=(PROTOCOL_INVARIANT_VALIDATION_NAME,),
-        conditions=("aggregate",),
-        seed_count=_SMOKE_SEED_COUNT,
-        nominal_cell_count=1,
-        claim_family=None,
-        prerequisites=(),
-    ),
-    ExperimentDefinition(
-        name=BASELINE_IMPLEMENTATION_VALIDATION_NAME,
-        experiment_class=ExperimentClass.VALIDATION,
-        methods=_BASELINE_METHODS,
-        conditions=_BASELINE_FIXTURES,
-        seed_count=_SMOKE_SEED_COUNT,
-        nominal_cell_count=17,
-        claim_family=None,
-        prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
-        experiment_class=ExperimentClass.EXPLORATORY,
-        methods=tuple(mode.value for mode in OpeningMode),
-        conditions=tuple(episode.value for episode in ProposalEpisode),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=80,
-        claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
-        prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=SINGLE_REPRODUCTION_NECESSITY_NAME,
-        experiment_class=ExperimentClass.EXPLORATORY,
-        methods=(
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            CoreMethodIdentity.FULL_PLURALITY_PATH.value,
+
+def experiment_registry() -> tuple[ExperimentDefinition, ...]:
+    confirmatory_seed_count = _confirmatory_seed_count()
+    return (
+        ExperimentDefinition(
+            name=DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+            experiment_class=ExperimentClass.VALIDATION,
+            methods=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            conditions=("primary",),
+            seed_count=_SMOKE_SEED_COUNT,
+            nominal_cell_count=1,
+            claim_family=None,
+            prerequisites=(),
         ),
-        conditions=tuple(condition.value for condition in PluralityCondition),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=60,
-        claim_family=ClaimFamily.PLURALITY_NECESSITY,
-        prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-        experiment_class=ExperimentClass.EXPLORATORY,
-        methods=tuple(method.value for method in SourceExclusionMethod),
-        conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=60,
-        claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
-        prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=EXTERNAL_VERIFICATION_NECESSITY_NAME,
-        experiment_class=ExperimentClass.EXPLORATORY,
-        methods=(
-            SourceExclusionMethod.FULL_FEDSIRA.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ExperimentDefinition(
+            name=PROTOCOL_INVARIANT_VALIDATION_NAME,
+            experiment_class=ExperimentClass.VALIDATION,
+            methods=(PROTOCOL_INVARIANT_VALIDATION_NAME,),
+            conditions=("aggregate",),
+            seed_count=_SMOKE_SEED_COUNT,
+            nominal_cell_count=1,
+            claim_family=None,
+            prerequisites=(),
         ),
-        conditions=tuple(condition.value for condition in ExternalVerificationCondition),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=80,
-        claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
-        prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-        experiment_class=ExperimentClass.CONFIRMATORY,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.FEDAVG_REFERENCE.value,
-            BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
-            BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-            BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
-            BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
-            BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value,
-            BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
-            BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
-            BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
-            BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
-            BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+        ExperimentDefinition(
+            name=BASELINE_IMPLEMENTATION_VALIDATION_NAME,
+            experiment_class=ExperimentClass.VALIDATION,
+            methods=_BASELINE_METHODS,
+            conditions=_BASELINE_FIXTURES,
+            seed_count=_SMOKE_SEED_COUNT,
+            nominal_cell_count=17,
+            claim_family=None,
+            prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
-        conditions=tuple(scenario.value for scenario in PrimaryScenario),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=420,
-        claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
-        prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
-    ),
-    ExperimentDefinition(
-        name=MECHANISM_ABLATION_NAME,
-        experiment_class=ExperimentClass.ABLATION,
-        methods=tuple(variant.value for variant in AblationVariant),
-        conditions=_ABLATION_SCENARIOS,
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=180,
-        claim_family=ClaimFamily.MECHANISM_ABLATION,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-        experiment_class=ExperimentClass.ROBUSTNESS,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-            BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+        ExperimentDefinition(
+            name=PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+            experiment_class=ExperimentClass.EXPLORATORY,
+            methods=tuple(mode.value for mode in OpeningMode),
+            conditions=tuple(episode.value for episode in ProposalEpisode),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=80,
+            claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+            prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
-        conditions=tuple(condition.value for condition in ReproducerCondition),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=280,
-        claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
-        experiment_class=ExperimentClass.ROBUSTNESS,
-        methods=tuple(profile.value for profile in VerifierProfile),
-        conditions=tuple(condition.value for condition in VerifierCondition),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=100,
-        claim_family=ClaimFamily.VERIFIER_ROBUSTNESS,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=BYZANTINE_BOUND_VIOLATION_NAME,
-        experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ExperimentDefinition(
+            name=SINGLE_REPRODUCTION_NECESSITY_NAME,
+            experiment_class=ExperimentClass.EXPLORATORY,
+            methods=(
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                CoreMethodIdentity.FULL_PLURALITY_PATH.value,
+            ),
+            conditions=tuple(condition.value for condition in PluralityCondition),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=60,
+            claim_family=ClaimFamily.PLURALITY_NECESSITY,
+            prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
-        conditions=tuple(condition.value for condition in BoundCondition),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=80,
-        claim_family=None,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
-        experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
-        conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=40,
-        claim_family=None,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-        experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
-        conditions=tuple(
-            f"{failure_type.value}|{strength}"
-            for failure_type in EpistemicFailureType
-            for strength in epistemic_strength_tokens(failure_type)
+        ExperimentDefinition(
+            name=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+            experiment_class=ExperimentClass.EXPLORATORY,
+            methods=tuple(method.value for method in SourceExclusionMethod),
+            conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=60,
+            claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+            prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=90,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-        experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-        methods=tuple(granularity.value for granularity in CapabilityContractGranularity),
-        conditions=tuple(mixture.value for mixture in RootCauseMixture),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=60,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-        experiment_class=ExperimentClass.ROBUSTNESS,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-            BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+        ExperimentDefinition(
+            name=EXTERNAL_VERIFICATION_NECESSITY_NAME,
+            experiment_class=ExperimentClass.EXPLORATORY,
+            methods=(
+                SourceExclusionMethod.FULL_FEDSIRA.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+            ),
+            conditions=tuple(condition.value for condition in ExternalVerificationCondition),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=80,
+            claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+            prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
-        conditions=tuple(regime.value for regime in HeterogeneityRegime),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=160,
-        claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=ADMISSION_DELAY_DECOMPOSITION_NAME,
-        experiment_class=ExperimentClass.DIAGNOSTIC,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+        ExperimentDefinition(
+            name=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+            experiment_class=ExperimentClass.CONFIRMATORY,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.FEDAVG_REFERENCE.value,
+                BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+                BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE.value,
+                BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION.value,
+                BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER.value,
+                BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN.value,
+                BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE.value,
+                BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION.value,
+                BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
+                BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+            ),
+            conditions=tuple(scenario.value for scenario in PrimaryScenario),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=420,
+            claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
+            prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
         ),
-        conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=120,
-        claim_family=None,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=EFFICIENCY_MEASUREMENT_NAME,
-        experiment_class=ExperimentClass.DIAGNOSTIC,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-            BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+        ExperimentDefinition(
+            name=MECHANISM_ABLATION_NAME,
+            experiment_class=ExperimentClass.ABLATION,
+            methods=tuple(variant.value for variant in AblationVariant),
+            conditions=_ABLATION_SCENARIOS,
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=180,
+            claim_family=ClaimFamily.MECHANISM_ABLATION,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
-        conditions=("timed",),
-        seed_count=3,
-        nominal_cell_count=60,
-        claim_family=None,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-    ),
-    ExperimentDefinition(
-        name=SECONDARY_DATASET_GENERALIZATION_NAME,
-        experiment_class=ExperimentClass.GENERALIZATION,
-        methods=(
-            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
-            BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
-            BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
-            BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
-            BaselineIdentity.FEDAVG_REFERENCE.value,
+        ExperimentDefinition(
+            name=COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+            experiment_class=ExperimentClass.ROBUSTNESS,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+            ),
+            conditions=tuple(condition.value for condition in ReproducerCondition),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=280,
+            claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
-        conditions=tuple(scenario.value for scenario in SecondaryScenario),
-        seed_count=_MASTER_SEED_COUNT,
-        nominal_cell_count=100,
-        claim_family=ClaimFamily.SECONDARY_GENERALIZATION,
-        prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-        dataset=DatasetId.CICIOT2023,
-    ),
-)
+        ExperimentDefinition(
+            name=COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+            experiment_class=ExperimentClass.ROBUSTNESS,
+            methods=tuple(profile.value for profile in VerifierProfile),
+            conditions=tuple(condition.value for condition in VerifierCondition),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=100,
+            claim_family=ClaimFamily.VERIFIER_ROBUSTNESS,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=BYZANTINE_BOUND_VIOLATION_NAME,
+            experiment_class=ExperimentClass.FAILURE_BOUNDARY,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+            ),
+            conditions=tuple(condition.value for condition in BoundCondition),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=80,
+            claim_family=None,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+            experiment_class=ExperimentClass.FAILURE_BOUNDARY,
+            methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
+            conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=40,
+            claim_family=None,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+            experiment_class=ExperimentClass.FAILURE_BOUNDARY,
+            methods=(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,),
+            conditions=tuple(
+                f"{failure_type.value}|{strength}"
+                for failure_type in EpistemicFailureType
+                for strength in epistemic_strength_tokens(failure_type)
+            ),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=90,
+            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+            experiment_class=ExperimentClass.FAILURE_BOUNDARY,
+            methods=tuple(granularity.value for granularity in CapabilityContractGranularity),
+            conditions=tuple(mixture.value for mixture in RootCauseMixture),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=60,
+            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+            experiment_class=ExperimentClass.ROBUSTNESS,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE.value,
+            ),
+            conditions=tuple(regime.value for regime in HeterogeneityRegime),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=160,
+            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=ADMISSION_DELAY_DECOMPOSITION_NAME,
+            experiment_class=ExperimentClass.DIAGNOSTIC,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+            ),
+            conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=120,
+            claim_family=None,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=EFFICIENCY_MEASUREMENT_NAME,
+            experiment_class=ExperimentClass.DIAGNOSTIC,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+            ),
+            conditions=("timed",),
+            seed_count=3,
+            nominal_cell_count=60,
+            claim_family=None,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+        ),
+        ExperimentDefinition(
+            name=SECONDARY_DATASET_GENERALIZATION_NAME,
+            experiment_class=ExperimentClass.GENERALIZATION,
+            methods=(
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
+                BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
+                BaselineIdentity.FEDAVG_REFERENCE.value,
+            ),
+            conditions=tuple(scenario.value for scenario in SecondaryScenario),
+            seed_count=confirmatory_seed_count,
+            nominal_cell_count=100,
+            claim_family=ClaimFamily.SECONDARY_GENERALIZATION,
+            prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.CICIOT2023,
+        ),
+    )
 
 
 def experiment_by_name(name: ExperimentName) -> ExperimentDefinition:
-    for definition in EXPERIMENT_REGISTRY:
+    for definition in experiment_registry():
         if definition.name == name:
             return definition
     raise KeyError(f"unknown experiment {name!r}")
 
 
 def experiment_names() -> tuple[ExperimentName, ...]:
-    return tuple(definition.name for definition in EXPERIMENT_REGISTRY)
+    return tuple(definition.name for definition in experiment_registry())

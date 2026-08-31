@@ -1,7 +1,8 @@
 from pathlib import Path
 
+from fedsira.artifacts.graph import load_published_artifact_graph, stale_artifact_identities
+from fedsira.artifacts.paths import OUTPUTS_ROOT, RESULTS_ROOT, preprocessing_root
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH
 from fedsira.domain.records import ExperimentName, OverwriteExisting
 from fedsira.experiments.collapse import (
     CollapseDecision,
@@ -78,7 +79,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
             for child in experiment_root.rglob("*"):
                 if child.is_file():
                     child.unlink()
-        export = export_experiment_report(result, PRODUCTION_CONFIG_PATH, experiment_root)
+        export = export_experiment_report(result, experiment_root)
         for path in export.exported_paths:
             print(f"exported {path}")
         if not export.verification.passed:
@@ -112,7 +113,16 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     )
     claim_states = derive_claim_states_for_export()
     claim_verification = verify_claim_states_derivable(claim_states, claim_definition_count())
-    stale_ancestor_verification = verify_no_stale_ancestors(())
+    artifact_roots = (
+        REPOSITORY_ROOT / preprocessing_root(),
+        REPOSITORY_ROOT / OUTPUTS_ROOT / "artifacts",
+        REPOSITORY_ROOT / OUTPUTS_ROOT / "experiments",
+        REPOSITORY_ROOT / RESULTS_ROOT,
+    )
+    artifact_graph, unresolved_identities = load_published_artifact_graph(artifact_roots)
+    stale_ancestor_verification = verify_no_stale_ancestors(
+        (*stale_artifact_identities(artifact_graph), *unresolved_identities)
+    )
     failures = (
         *count_verification.failures,
         *completion_verification.failures,
@@ -126,7 +136,6 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         plan,
         claim_states,
         lifecycle_records,
-        PRODUCTION_CONFIG_PATH,
         verification,
         collapse_decisions=collapse_decisions,
         resolved_core=materialize_resolved_core(collapse_decisions)
