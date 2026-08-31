@@ -157,7 +157,7 @@ class _ParquetModule(Protocol):
 
 
 class SecondaryRawRow(FrozenDomainModel):
-    original_row_index: NonNegativeInt
+    original_row_index: SourceRowIndex
     values: tuple[RawCsvValue, ...]
 
 
@@ -165,7 +165,7 @@ class SecondaryRetainedRow(FrozenDomainModel):
     stable_row_id: ArtifactDigest
     file_sha256: ArtifactDigest
     relative_path: RelativePathText
-    original_row_index: NonNegativeInt
+    original_row_index: SourceRowIndex
     normalized_label: DatasetClassToken
     pseudo_domain: CICIoT2023PseudoDomain
     features: FeatureVector
@@ -175,7 +175,7 @@ class SecondaryExcludedRow(FrozenDomainModel):
     stable_row_id: ArtifactDigest
     file_sha256: ArtifactDigest
     relative_path: RelativePathText
-    original_row_index: NonNegativeInt
+    original_row_index: SourceRowIndex
     reason: DatasetExclusionReason
 
 

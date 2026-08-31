@@ -7,27 +7,31 @@ from fedsira.config.schema import (
 )
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 from fedsira.domain.records import (
-    BooleanValue,
+    CalibrationErrorCount,
     ClusterSize,
     DeterministicInteger,
     DomainCount,
     FederatedRoundCount,
-    FiniteFloat,
     FrozenDomainModel,
+    MemberIndex,
     MetricValue,
     NonNegativeFloat,
     NonNegativeInt,
     NumericalEpsilon,
     OptionalParameterSimilarity,
+    PairwiseDistance,
     PairwiseDistanceMatrix,
+    ParameterSimilarityCertified,
     Percentage,
-    PositiveInt,
     Probability,
+    ReconstructionAccepted,
     ReconstructionError,
     ReconstructionErrorSeries,
     ReconstructionThreshold,
+    RecoveryRollbackTriggered,
     TensorDomainModel,
     TrimCount,
+    VectorNorm,
     VerifierCount,
 )
 from fedsira.evaluation.aggregation import quantile_type7
@@ -46,14 +50,14 @@ class DomainFeatureMean(TensorDomainModel):
 
 class DensityCluster(FrozenDomainModel):
     label: DeterministicInteger
-    member_indices: tuple[NonNegativeInt, ...]
+    member_indices: tuple[MemberIndex, ...]
 
 
 def reconstruction_error(
     submitted_update: torch.Tensor,
     reconstructed_update: torch.Tensor,
     normalization_epsilon: NumericalEpsilon,
-) -> NonNegativeFloat:
+) -> ReconstructionError:
     squared_l2_distance = float(torch.sum((submitted_update - reconstructed_update) ** 2))
     submitted_squared_norm = float(torch.sum(submitted_update**2))
     return squared_l2_distance / (submitted_squared_norm + normalization_epsilon)
@@ -62,14 +66,14 @@ def reconstruction_error(
 def reconstruction_filter_calibration_error_count(
     anchor_round_count: FederatedRoundCount,
     domain_count: DomainCount,
-) -> PositiveInt:
+) -> CalibrationErrorCount:
     return anchor_round_count * domain_count
 
 
 def reconstruction_rejection_threshold(
     calibration_errors: ReconstructionErrorSeries,
     calibration_percentile: Percentage,
-) -> NonNegativeFloat:
+) -> ReconstructionThreshold:
     return quantile_type7(
         tuple(sorted(calibration_errors)),
         calibration_percentile / 100.0,
@@ -79,7 +83,7 @@ def reconstruction_rejection_threshold(
 def reconstruction_filter_accepts(
     error: ReconstructionError,
     rejection_threshold: ReconstructionThreshold,
-) -> BooleanValue:
+) -> ReconstructionAccepted:
     return error <= rejection_threshold
 
 
@@ -91,7 +95,7 @@ def reconstruction_filter_reweight(
     return federated_averaging(accepted_states)
 
 
-def vector_l2_norm(vector: torch.Tensor) -> NonNegativeFloat:
+def vector_l2_norm(vector: torch.Tensor) -> VectorNorm:
     return float(torch.sqrt(torch.sum(vector**2)))
 
 
@@ -103,7 +107,7 @@ def l2_normalize(update_vectors: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor
     return tuple(normalized)
 
 
-def cosine_distance(first: torch.Tensor, second: torch.Tensor) -> NonNegativeFloat:
+def cosine_distance(first: torch.Tensor, second: torch.Tensor) -> PairwiseDistance:
     first_norm = vector_l2_norm(first)
     second_norm = vector_l2_norm(second)
     if first_norm == 0.0 and second_norm == 0.0:
@@ -116,7 +120,7 @@ def cosine_distance(first: torch.Tensor, second: torch.Tensor) -> NonNegativeFlo
 
 def cosine_distance_matrix(
     update_vectors: tuple[torch.Tensor, ...],
-) -> tuple[tuple[NonNegativeFloat, ...], ...]:
+) -> PairwiseDistanceMatrix:
     return tuple(
         tuple(cosine_distance(first, second) for second in update_vectors)
         for first in update_vectors
@@ -270,7 +274,7 @@ def recovery_rollback_is_triggered(
     triggered_to_benign_rate: MetricResult,
     materiality_config: MaterialityConfig,
     alarm_threshold: MetricValue,
-) -> BooleanValue:
+) -> RecoveryRollbackTriggered:
     if (
         supported_macro_f1_drop.value is not None
         and supported_macro_f1_drop.value
@@ -314,7 +318,7 @@ def clip_source_update(
 def parameter_similarity(
     row_vector: torch.Tensor,
     other_rows_mean_vector: torch.Tensor,
-) -> FiniteFloat | None:
+) -> OptionalParameterSimilarity:
     row_norm = vector_l2_norm(row_vector)
     mean_norm = vector_l2_norm(other_rows_mean_vector)
     if row_norm == 0.0 or mean_norm == 0.0:
@@ -325,20 +329,20 @@ def parameter_similarity(
 def parameter_similarity_certifies(
     similarity: OptionalParameterSimilarity,
     minimum_cosine_similarity: Probability,
-) -> BooleanValue:
+) -> ParameterSimilarityCertified:
     return similarity is not None and similarity >= minimum_cosine_similarity
 
 
 def parameter_similarity_certification_row_results(
     committed_rows: tuple[CertifiedReproductionRow, ...],
     config: ParameterSimilarityConfig,
-) -> tuple[BooleanValue, ...]:
+) -> tuple[ParameterSimilarityCertified, ...]:
     if len(committed_rows) < config.required_committed_rows:
         raise ValueError(
             f"parameter-similarity certification requires at least "
             f"{config.required_committed_rows} committed rows, got {len(committed_rows)}"
         )
-    results: list[BooleanValue] = []
+    results: list[ParameterSimilarityCertified] = []
     for index, row in enumerate(committed_rows):
         other_vectors = tuple(
             other.update_vector

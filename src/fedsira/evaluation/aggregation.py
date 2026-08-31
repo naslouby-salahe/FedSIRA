@@ -5,11 +5,12 @@ import numpy
 from fedsira.config.schema import BootstrapConfig
 from fedsira.domain.records import (
     ConfidenceIntervalBound,
+    DecileBinIndex,
     DomainCount,
     MasterSeed,
     MetricValue,
+    MinimumDefinedDomainCount,
     NonNegativeInt,
-    PositiveInt,
     Probability,
     SampleId,
     SeedDerivationLabel,
@@ -23,7 +24,7 @@ SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR: SeedDerivationLabel = "SINGLE_METHOD_MEA
 def minimum_defined_domain_count(
     expected_domain_count: DomainCount,
     generic_defined_domain_fraction_minimum: Probability,
-) -> PositiveInt:
+) -> MinimumDefinedDomainCount:
     return math.ceil(expected_domain_count * generic_defined_domain_fraction_minimum)
 
 
@@ -57,7 +58,7 @@ def decile_boundaries(
 def decile_bin(
     value: MetricValue,
     boundaries: tuple[MetricValue, ...],
-) -> NonNegativeInt:
+) -> DecileBinIndex:
     bin_index: NonNegativeInt = 0
     for boundary in boundaries:
         if value <= boundary:

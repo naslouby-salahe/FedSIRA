@@ -24,13 +24,17 @@ from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOp
 from fedsira.domain.records import (
     ArtifactDigest,
     BooleanValue,
+    ClaimReason,
     CollapseDecisionPassed,
+    FinalGateRequired,
     FrozenDomainModel,
+    MaterialityDecision,
     MaterialThreshold,
     MetricDifference,
     MetricName,
     PValue,
-    TextValue,
+    ResolvedCoreIdentity,
+    SourceExcludedFromKrum,
 )
 from fedsira.experiments.registry import ClaimFamily
 
@@ -68,27 +72,27 @@ class ProductionUpdateRule(StrEnum):
 
 class CollapseDecision(FrozenDomainModel):
     kind: CollapseDecisionKind
-    survives: BooleanValue
+    survives: CollapseDecisionPassed
     primary_material_effect: MetricName | None
     adjusted_p_value: PValue | None
-    constraint_passes: BooleanValue
-    reason: TextValue
+    constraint_passes: MaterialityDecision
+    reason: ClaimReason
 
 
 class ResolvedCore(FrozenDomainModel):
-    proposal_assistance_survives: BooleanValue
-    plurality_survives: BooleanValue
-    direct_source_exclusion_survives: BooleanValue
-    external_verification_survives: BooleanValue
+    proposal_assistance_survives: CollapseDecisionPassed
+    plurality_survives: CollapseDecisionPassed
+    direct_source_exclusion_survives: CollapseDecisionPassed
+    external_verification_survives: CollapseDecisionPassed
     opening_mode: ClaimOpeningMode
     reproduction_row_requirement: ReproductionRowRequirement
     row_verification_mode: RowVerificationMode
     production_update_rule: ProductionUpdateRule
-    final_gate_required: BooleanValue = True
-    source_excluded: BooleanValue = True
+    final_gate_required: FinalGateRequired = True
+    source_excluded: SourceExcludedFromKrum = True
 
     @property
-    def decision_identity(self) -> TextValue:
+    def decision_identity(self) -> ResolvedCoreIdentity:
         return "|".join(
             (
                 "proposal-assisted" if self.proposal_assistance_survives else "candidate-free",
@@ -103,9 +107,9 @@ class ResolvedCore(FrozenDomainModel):
 
 
 class ResolvedCoreCase(FrozenDomainModel):
-    proposal_survives: BooleanValue
-    plurality_survives: BooleanValue
-    external_verification_survives: BooleanValue
+    proposal_survives: CollapseDecisionPassed
+    plurality_survives: CollapseDecisionPassed
+    external_verification_survives: CollapseDecisionPassed
     core: ResolvedCore
 
 

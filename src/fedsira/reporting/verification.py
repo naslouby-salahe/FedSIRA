@@ -3,13 +3,13 @@ from __future__ import annotations
 from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
-    BooleanValue,
     CheckpointIdentity,
     ClaimDefinitionCount,
     ExperimentName,
     FrozenDomainModel,
     ReportVerificationFailure,
     ScientificCellCount,
+    VerificationPassed,
 )
 from fedsira.experiments.execution import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
@@ -26,7 +26,7 @@ class ExperimentLifecycleRecord(FrozenDomainModel):
 
 
 class CompletenessVerificationResult(FrozenDomainModel):
-    passed: BooleanValue
+    passed: VerificationPassed
     failures: tuple[ReportVerificationFailure, ...]
 
 

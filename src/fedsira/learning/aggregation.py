@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.domain.records import ParameterName, PositiveInt, TensorDomainModel
+from fedsira.domain.records import ExampleCount, ParameterName, TensorDomainModel
 from fedsira.models.mlp import FedSIRAClassifier
 
 
@@ -15,7 +15,7 @@ class ModelState(TensorDomainModel):
 
 class WeightedModelState(TensorDomainModel):
     state: ModelState
-    example_count: PositiveInt
+    example_count: ExampleCount
 
 
 def model_state_from_classifier(model: FedSIRAClassifier) -> ModelState:

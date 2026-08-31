@@ -12,7 +12,7 @@ from fedsira.domain.enums import (
     FailureClass,
     ScientificCellPhase,
 )
-from fedsira.domain.records import BooleanValue, FailureMessage, FrozenDomainModel
+from fedsira.domain.records import AutomaticallyRetriable, FailureMessage, FrozenDomainModel
 
 CELL_PHASE_TRANSITIONS: tuple[tuple[CellPhaseState, frozenset[CellPhaseState]], ...] = (
     (CellPhaseState.PLANNED, frozenset({CellPhaseState.RUNNING})),
@@ -129,5 +129,5 @@ def validate_experiment_lifecycle_transition(
         )
 
 
-def is_automatically_retriable(failure_class: FailureClass) -> BooleanValue:
+def is_automatically_retriable(failure_class: FailureClass) -> AutomaticallyRetriable:
     return failure_class in AUTOMATICALLY_RETRIABLE_FAILURE_CLASSES

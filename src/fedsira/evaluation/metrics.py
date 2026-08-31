@@ -8,18 +8,19 @@ from fedsira.domain.records import (
     AdmissionCount,
     AdmissionIndicatorSeries,
     BinaryLabelMaskSeries,
-    BooleanValue,
     ClassSupportCounts,
+    CleanOracleDegradationMaterial,
     DatasetClassToken,
     DomainCount,
     ExampleCount,
     FalseCertificationCount,
+    FalseSameEquivalenceCheck,
     MetricName,
     MetricValue,
-    NonNegativeInt,
     OptionalTriggeredSampleMaskSeries,
     PredicateSatisfied,
     Probability,
+    ReproductionAttemptCount,
     ReproductionOpportunityCount,
     RowCount,
     ScopedContractActive,
@@ -40,10 +41,10 @@ from fedsira.evaluation.validation import validate_metric_class_membership
 class BoundaryMetricSet:
     macro_auroc: MetricResult
     macro_auprc: MetricResult
-    clean_oracle_degradation_is_material: BooleanValue | None
+    clean_oracle_degradation_is_material: CleanOracleDegradationMaterial | None
     false_same_capability_rate: MetricResult
     false_same_capability_reason: FalseSameCapabilityReason | None
-    false_same_equivalence_check: BooleanValue
+    false_same_equivalence_check: FalseSameEquivalenceCheck
 
 
 def compute_confusion_counts(
@@ -298,7 +299,7 @@ def false_launch_rate(
 def reproduction_attempt_count(
     domains_with_training_start: frozenset[DatasetClassToken],
     evidence_inadequate_domains: frozenset[DatasetClassToken],
-) -> NonNegativeInt:
+) -> ReproductionAttemptCount:
     return len(domains_with_training_start - evidence_inadequate_domains)
 
 
@@ -429,7 +430,7 @@ def clean_oracle_degradation_is_material(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     clean_oracle_materiality_config: CleanOracleMaterialityConfig,
-) -> BooleanValue:
+) -> CleanOracleDegradationMaterial:
     if (
         target_f1_delta.value is not None
         and target_f1_delta.value <= -clean_oracle_materiality_config.target_f1_decrease
@@ -449,7 +450,7 @@ def clean_oracle_degradation_is_material(
 
 def is_false_same_capability_certification(
     a_scoped_predicate_passes: PredicateSatisfied, b_scoped_predicate_passes: PredicateSatisfied
-) -> BooleanValue:
+) -> FalseSameEquivalenceCheck:
     return a_scoped_predicate_passes != b_scoped_predicate_passes
 
 

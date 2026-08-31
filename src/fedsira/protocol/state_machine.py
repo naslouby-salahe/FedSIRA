@@ -1,7 +1,7 @@
 from fedsira.config.schema import ResourceHorizonConfig
 from fedsira.domain.enums import ClaimState, DormantOrigin, TernaryOutcome
 from fedsira.domain.records import (
-    BooleanValue,
+    ClaimStateIsTerminal,
     EvidenceAdequate,
     EvidenceCycleIndex,
     NewlyAdequateEvidenceExists,
@@ -13,7 +13,7 @@ TERMINAL_CLAIM_STATES = frozenset(
 )
 
 
-def is_terminal_state(state: ClaimState) -> BooleanValue:
+def is_terminal_state(state: ClaimState) -> ClaimStateIsTerminal:
     return state in TERMINAL_CLAIM_STATES
 
 

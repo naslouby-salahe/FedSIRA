@@ -5,15 +5,18 @@ from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
 from fedsira.domain.records import (
     AllowSourceAsVerifier,
     ArtifactDigest,
-    BooleanValue,
     ByzantineDomainCount,
     DerivedSeed,
     DomainId,
     MonotonicTimestamp,
     NamespaceSeed,
     ObservedPositiveReportCount,
+    OneVotePerDomain,
+    ReproductionRowCertified,
     ResolvedRowRequirementReached,
+    TimestampValid,
     VerifierCount,
+    VerifierEligible,
     VerifierReportCount,
 )
 from fedsira.runtime.determinism import derive_uint32, deterministic_order
@@ -28,7 +31,7 @@ def verifier_is_eligible(
     source_domain: DomainId | None,
     reproducer_domain: DomainId,
     allow_source_as_verifier: AllowSourceAsVerifier = False,
-) -> BooleanValue:
+) -> VerifierEligible:
     if verifier_domain == reproducer_domain:
         return False
     if allow_source_as_verifier:
@@ -39,11 +42,11 @@ def verifier_is_eligible(
 def verifier_assignment_timestamp_is_valid(
     verifier_assignment_timestamp: MonotonicTimestamp,
     reproduction_commitment_timestamp: MonotonicTimestamp,
-) -> BooleanValue:
+) -> TimestampValid:
     return verifier_assignment_timestamp > reproduction_commitment_timestamp
 
 
-def panel_votes_are_one_per_domain(panel_domain_votes: Sequence[DomainId]) -> BooleanValue:
+def panel_votes_are_one_per_domain(panel_domain_votes: Sequence[DomainId]) -> OneVotePerDomain:
     return len(panel_domain_votes) == len(set(panel_domain_votes))
 
 
@@ -102,7 +105,7 @@ def reproduction_row_is_certified(
     panel_reports: Sequence[TernaryOutcome],
     panel_size: VerifierCount,
     required_positive_reports: VerifierCount,
-) -> BooleanValue:
+) -> ReproductionRowCertified:
     if len(panel_reports) < panel_size:
         return False
     positive_count = sum(1 for report in panel_reports if report is TernaryOutcome.POSITIVE)

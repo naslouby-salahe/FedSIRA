@@ -2,7 +2,7 @@ import json
 import logging
 from typing import ClassVar
 
-from fedsira.domain.records import RuntimeComponentName, TextValue
+from fedsira.domain.records import LogRecordText, RuntimeComponentName
 
 LOGGER_NAME_PREFIX = "fedsira"
 
@@ -12,7 +12,7 @@ class StructuredJsonFormatter(logging.Formatter):
         logging.LogRecord("", 0, "", 0, "", (), None).__dict__
     )
 
-    def format(self, record: logging.LogRecord) -> TextValue:
+    def format(self, record: logging.LogRecord) -> LogRecordText:
         payload = record.__dict__.copy()
         for reserved_key in self.RESERVED_ATTRIBUTES:
             payload.pop(reserved_key, None)

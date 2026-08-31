@@ -15,9 +15,11 @@ from fedsira.analysis.comparisons import (
 )
 from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.records import (
+    FormattedStatisticText,
     FrozenDomainModel,
     MetricValue,
     PValue,
+    TableCsvText,
     TableName,
     TextValue,
 )
@@ -55,7 +57,7 @@ MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
 
 class RenderedTable(FrozenDomainModel):
     name: TableName
-    csv_text: TextValue
+    csv_text: TableCsvText
 
 
 def _csv_text(
@@ -72,7 +74,7 @@ def _csv_text(
 def format_metric_value(
     value: MetricValue | None,
     rounding: PublicationRoundingConfig,
-) -> TextValue:
+) -> FormattedStatisticText:
     if value is None:
         return "NA"
     return f"{value:.{rounding.f1_accuracy_rates_decimals}f}"
@@ -81,7 +83,7 @@ def format_metric_value(
 def format_p_value(
     value: PValue | None,
     rounding: PublicationRoundingConfig,
-) -> TextValue:
+) -> FormattedStatisticText:
     if value is None:
         return "NA"
     if value < rounding.p_value_display_floor:

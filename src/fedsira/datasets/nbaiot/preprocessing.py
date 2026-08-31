@@ -39,9 +39,8 @@ from fedsira.domain.records import (
     DatasetClassToken,
     DatasetColumnName,
     DomainId,
-    FiniteFloat,
+    FeatureMoment,
     FrozenDomainModel,
-    NonNegativeInt,
     OverwriteExisting,
     PredictorCount,
     PreparedViewKey,
@@ -50,6 +49,7 @@ from fedsira.domain.records import (
     SampleIdPrefix,
     SamplingCap,
     SchemaVersion,
+    SourceRowIndex,
 )
 from fedsira.runtime.state import current_application_context
 
@@ -67,7 +67,7 @@ class RoleSamplingCap(FrozenDomainModel):
 class RoleAssignment(FrozenDomainModel):
     sample_id: ArtifactDigest
     role: Role
-    original_row_index: NonNegativeInt
+    original_row_index: SourceRowIndex
 
 
 class PreparedView(FrozenDomainModel):
@@ -94,8 +94,8 @@ class PreparedViewMetadata(FrozenDomainModel):
 class ScalerMetadata(FrozenDomainModel):
     schema_version: SchemaVersion
     feature_names: tuple[DatasetColumnName, ...]
-    means: tuple[FiniteFloat, ...]
-    standard_deviations: tuple[FiniteFloat, ...]
+    means: tuple[FeatureMoment, ...]
+    standard_deviations: tuple[FeatureMoment, ...]
     training_row_count: RowCount
 
 
@@ -315,7 +315,7 @@ def assign_stream_roles_and_sample_ids(
 
 def _sample_id_for_row(
     assignments: tuple[RoleAssignment, ...],
-    original_row_index: NonNegativeInt,
+    original_row_index: SourceRowIndex,
 ) -> ArtifactDigest:
     for assignment in assignments:
         if assignment.original_row_index == original_row_index:

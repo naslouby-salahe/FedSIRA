@@ -8,11 +8,13 @@ from pydantic import model_validator
 
 from fedsira.config.schema import ScalingConfig
 from fedsira.domain.records import (
+    FeatureAccumulator,
+    FeatureMoment,
     FeatureName,
     FiniteFloat,
     FrozenDomainModel,
-    NonNegativeFloat,
-    NonNegativeInt,
+    RowCount,
+    SquaredFeatureAccumulator,
 )
 
 FeatureVector = tuple[FiniteFloat, ...]
@@ -20,16 +22,16 @@ FeatureMatrix = tuple[FeatureVector, ...]
 
 
 class FeatureStatistic(FrozenDomainModel):
-    count: NonNegativeInt
-    total: FiniteFloat
-    total_squared: NonNegativeFloat
+    count: RowCount
+    total: FeatureAccumulator
+    total_squared: SquaredFeatureAccumulator
 
 
 class FeatureMoments(FrozenDomainModel):
     feature_names: tuple[FeatureName, ...]
-    means: tuple[FiniteFloat, ...]
-    standard_deviations: tuple[FiniteFloat, ...]
-    training_row_count: NonNegativeInt
+    means: tuple[FeatureMoment, ...]
+    standard_deviations: tuple[FeatureMoment, ...]
+    training_row_count: RowCount
 
     @model_validator(mode="after")
     def _validate_consistency(self) -> Self:
@@ -88,7 +90,7 @@ def fit_feature_moments(
         raise ValueError("feature name count must match statistics count")
     means: list[FiniteFloat] = []
     standard_deviations: list[FiniteFloat] = []
-    row_count: NonNegativeInt = 0
+    row_count: RowCount = 0
     for feature_index, feature_name in enumerate(feature_names):
         statistic = statistics[feature_index]
         if statistic.count <= 0:

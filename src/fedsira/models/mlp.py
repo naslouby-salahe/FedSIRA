@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from fedsira.domain.records import ModelInputWidth, ModelOutputWidth, PositiveInt
+from fedsira.domain.records import ModelInputWidth, ModelOutputWidth, TrainableParameterCount
 
 
 class FedSIRAClassifier(nn.Module):
@@ -43,7 +43,7 @@ class FedSIRAClassifier(nn.Module):
         return self.output(hidden)
 
 
-def trainable_parameter_count(model: FedSIRAClassifier) -> PositiveInt:
+def trainable_parameter_count(model: FedSIRAClassifier) -> TrainableParameterCount:
     return sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.domain.records import ArtifactDigest, ArtifactReuseDecision, BooleanValue
+from fedsira.domain.records import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
@@ -106,7 +106,7 @@ def read_published_manifest(
 def is_artifact_complete_and_valid(
     published_directory: Path,
     identity: ArtifactDigest,
-) -> BooleanValue:
+) -> ArtifactComplete:
     manifest = read_published_manifest(published_directory, identity)
     if manifest is None or manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
         return False

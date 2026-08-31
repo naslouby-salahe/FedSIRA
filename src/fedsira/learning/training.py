@@ -10,8 +10,8 @@ from fedsira.domain.records import (
     EpochIndex,
     LearningRate,
     LocalEpochCount,
-    NonNegativeFloat,
     SampleId,
+    TrainingLoss,
 )
 from fedsira.models.mlp import FedSIRAClassifier
 from fedsira.runtime.determinism import minibatch_order
@@ -74,11 +74,11 @@ def train_one_epoch(
     loss_function: nn.CrossEntropyLoss,
     training_config: TrainingConfig,
     batches: tuple[tuple[torch.Tensor, torch.Tensor], ...],
-) -> NonNegativeFloat:
+) -> TrainingLoss:
     if not batches:
         raise ValueError("local training requires at least one minibatch")
     model.train()
-    total_loss: NonNegativeFloat = 0.0
+    total_loss: TrainingLoss = 0.0
     for features, labels in batches:
         optimizer.zero_grad(set_to_none=True)
         logits = model(features)
@@ -139,8 +139,8 @@ def train_epochs_with_deterministic_batch_order(
     sample_ids: tuple[SampleId, ...],
     training_seed: DerivedSeed,
     local_epochs: LocalEpochCount,
-) -> tuple[NonNegativeFloat, ...]:
-    epoch_losses: list[NonNegativeFloat] = []
+) -> tuple[TrainingLoss, ...]:
+    epoch_losses: list[TrainingLoss] = []
     for epoch in range(local_epochs):
         batches = build_epoch_batches(
             features,

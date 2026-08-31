@@ -3,7 +3,7 @@ from pathlib import Path
 from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
-from fedsira.domain.records import ExperimentName, OverwriteExisting, TextValue
+from fedsira.domain.records import ExperimentName, OverwriteExisting, RunRenderText
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -40,8 +40,8 @@ _COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
 )
 
 
-def render_result(result: ExperimentExecutionResult) -> TextValue:
-    lines: list[TextValue] = [
+def render_result(result: ExperimentExecutionResult) -> RunRenderText:
+    lines: list[RunRenderText] = [
         f"FedSIRA run: {result.experiment}",
         f"experiment state: {result.lifecycle_state.value}",
         f"cells: {result.cell_completion_count}/{len(result.outcomes)} completed",

@@ -1,7 +1,7 @@
 from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily
-from fedsira.domain.records import ResolvedCoreComplete, TextValue
+from fedsira.domain.records import PlanRenderText, ResolvedCoreComplete
 from fedsira.experiments.collapse import read_resolved_core
 from fedsira.experiments.planning import (
     ExperimentPlan,
@@ -21,7 +21,7 @@ def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> Experi
     return plan
 
 
-def render_plan(plan: ExperimentPlan) -> TextValue:
+def render_plan(plan: ExperimentPlan) -> PlanRenderText:
     lines: list[str] = []
     lines.append("FedSIRA experiment plan")
     lines.append("")

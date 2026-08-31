@@ -7,12 +7,12 @@ from pydantic import model_validator
 from fedsira.domain.enums import Role
 from fedsira.domain.records import (
     ArtifactDigest,
-    BooleanValue,
     FrozenDomainModel,
     RelativePathText,
     RoleBoundary,
     RolePosition,
     RoleToken,
+    RoleWindowContainsSample,
     SampleIdPrefix,
     SourceRowIndex,
 )
@@ -71,7 +71,7 @@ class RoleWindow(FrozenDomainModel):
             )
         return self
 
-    def contains(self, normalized_position: RolePosition) -> BooleanValue:
+    def contains(self, normalized_position: RolePosition) -> RoleWindowContainsSample:
         return self.lower_inclusive <= normalized_position < self.upper_exclusive
 
 

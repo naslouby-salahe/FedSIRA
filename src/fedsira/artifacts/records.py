@@ -5,10 +5,12 @@ from fedsira.domain.records import (
     ArtifactDigest,
     DatasetClassToken,
     DatasetManifestDigest,
+    DomainCount,
+    FileCount,
     FrozenDomainModel,
-    NonNegativeInt,
-    PositiveInt,
+    PredictorCount,
     PredictorCountMatchesOfficial,
+    RowCount,
 )
 
 ArtifactPayloadBytes: TypeAlias = bytes
@@ -41,15 +43,15 @@ class NBaiotDatasetManifestPayload(FrozenDomainModel):
 
 class CICIoT2023DatasetManifestPayload(FrozenDomainModel):
     dataset_file_manifest_hash: DatasetManifestDigest
-    file_count: PositiveInt
-    raw_row_count: NonNegativeInt
-    retained_row_count: NonNegativeInt
-    excluded_row_count: NonNegativeInt
-    predictor_count: PositiveInt
-    official_expected_predictor_count: PositiveInt
+    file_count: FileCount
+    raw_row_count: RowCount
+    retained_row_count: RowCount
+    excluded_row_count: RowCount
+    predictor_count: PredictorCount
+    official_expected_predictor_count: PredictorCount
     predictor_count_matches_official: PredictorCountMatchesOfficial
     class_registry: tuple[DatasetClassToken, ...]
-    pseudo_domain_count: PositiveInt
+    pseudo_domain_count: DomainCount
 
 
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload

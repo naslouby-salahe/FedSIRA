@@ -7,42 +7,45 @@ from pydantic import Field
 
 from fedsira.domain.records import (
     ArtifactDigest,
-    BooleanValue,
     ByteCount,
-    FiniteFloat,
+    ConfusionCount,
+    ExampleCount,
     FrozenDomainModel,
     LengthPrefixBytes,
+    LogicalEvidenceCycleCount,
     MasterSeed,
     MessageEndpoint,
+    MetricValue,
     ModelTransmissionCount,
-    NonNegativeFloat,
-    NonNegativeInt,
+    ModelTransmissionPresent,
     ParameterName,
-    PositiveInt,
     RoundIndex,
     SchemaVersion,
+    TensorAxisSize,
     TensorName,
+    TensorPayloadCount,
+    WallClockSeconds,
 )
 
 COMMUNICATION_SCHEMA: SchemaVersion = "FEDSIRA_COMM_V1"
 SERVER_ID: MessageEndpoint = "SERVER"
-METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
-TENSOR_METADATA_LENGTH_PREFIX_BYTES: PositiveInt = 8
+METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
+TENSOR_METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
 TENSOR_DTYPE: SchemaVersion = "float32"
 
 EncodedBytes = Annotated[bytes, Field()]
 
 
 class MetricResult(FrozenDomainModel):
-    value: FiniteFloat | None
-    denominator: NonNegativeInt
+    value: MetricValue | None
+    denominator: ExampleCount
 
 
 class ConfusionCounts(FrozenDomainModel):
-    true_positive: NonNegativeInt
-    false_positive: NonNegativeInt
-    false_negative: NonNegativeInt
-    true_negative: NonNegativeInt
+    true_positive: ConfusionCount
+    false_positive: ConfusionCount
+    false_negative: ConfusionCount
+    true_negative: ConfusionCount
 
 
 class ProposalOracleLabel(StrEnum):
@@ -56,14 +59,14 @@ class FalseSameCapabilityReason(StrEnum):
 
 
 class AdmissionDelayDecomposition(FrozenDomainModel):
-    logical_information_arrival_cycles: NonNegativeInt
-    assignment_seconds: NonNegativeFloat
-    reproduce_seconds: NonNegativeFloat
-    verify_seconds: NonNegativeFloat
-    synthesize_seconds: NonNegativeFloat
+    logical_information_arrival_cycles: LogicalEvidenceCycleCount
+    assignment_seconds: WallClockSeconds
+    reproduce_seconds: WallClockSeconds
+    verify_seconds: WallClockSeconds
+    synthesize_seconds: WallClockSeconds
 
     @property
-    def post_evidence_wall_clock_seconds(self) -> NonNegativeFloat:
+    def post_evidence_wall_clock_seconds(self) -> WallClockSeconds:
         return (
             self.assignment_seconds
             + self.reproduce_seconds
@@ -100,12 +103,12 @@ class CommunicationMessageMetadata(FrozenDomainModel):
     sender: MessageEndpoint
     receiver: MessageEndpoint
     claim_contract_hash: ArtifactDigest | None
-    payload_tensor_count: NonNegativeInt
+    payload_tensor_count: TensorPayloadCount
 
 
 class TensorPayloadMetadata(FrozenDomainModel):
     name: TensorName
-    shape: tuple[PositiveInt, ...]
+    shape: tuple[TensorAxisSize, ...]
     nbytes: ByteCount
     dtype: SchemaVersion = TENSOR_DTYPE
 
@@ -120,7 +123,7 @@ class _CommunicationMetadataWire(FrozenDomainModel):
     dataset_manifest_hash: ArtifactDigest
     master_seed: MasterSeed
     message_type: CommunicationMessageType
-    payload_tensor_count: NonNegativeInt
+    payload_tensor_count: TensorPayloadCount
     receiver: MessageEndpoint
     round_index: RoundIndex | None
     schema_version: SchemaVersion
@@ -132,7 +135,7 @@ class _TensorMetadataWire(FrozenDomainModel):
     dtype: SchemaVersion
     name: TensorName
     nbytes: ByteCount
-    shape: tuple[PositiveInt, ...]
+    shape: tuple[TensorAxisSize, ...]
 
 
 def parameter_tensor_name(kind: TensorParameterKind, parameter_name: ParameterName) -> TensorName:
@@ -193,7 +196,7 @@ def encode_message_envelope(
     return bytes(envelope)
 
 
-def is_model_transmission(metadata: CommunicationMessageMetadata) -> BooleanValue:
+def is_model_transmission(metadata: CommunicationMessageMetadata) -> ModelTransmissionPresent:
     return metadata.payload_tensor_count > 0
 
 

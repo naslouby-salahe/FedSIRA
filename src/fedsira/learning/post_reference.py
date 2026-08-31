@@ -8,10 +8,10 @@ from fedsira.config.schema import PostReferenceConfig, TrainingConfig
 from fedsira.domain.records import (
     DerivedSeed,
     LocalEpochCount,
-    NonNegativeFloat,
     SampleId,
     Temperature,
     TrainableParameterCount,
+    TrainingLoss,
 )
 from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
@@ -51,7 +51,7 @@ def post_reference_training_step(
     is_supported: torch.Tensor,
     anchor_flat_parameters: torch.Tensor,
     trainable_parameter_count: TrainableParameterCount,
-) -> NonNegativeFloat:
+) -> TrainingLoss:
     current_model.train()
     optimizer.zero_grad(set_to_none=True)
 
@@ -98,12 +98,12 @@ def run_post_reference_training(
     sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
     local_epochs: LocalEpochCount,
-) -> tuple[NonNegativeFloat, ...]:
+) -> tuple[TrainingLoss, ...]:
     anchor_flat_parameters = flatten_trainable_parameters(anchor_model).detach()
     parameter_count = trainable_parameter_count(current_model)
-    epoch_losses: list[NonNegativeFloat] = []
+    epoch_losses: list[TrainingLoss] = []
     for epoch in range(local_epochs):
-        batch_losses: list[NonNegativeFloat] = []
+        batch_losses: list[TrainingLoss] = []
         for indices in ordered_batch_indices(
             tuple(sample_ids), training_seed, epoch, training_config.batch_size
         ):

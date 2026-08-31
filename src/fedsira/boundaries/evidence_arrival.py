@@ -5,6 +5,7 @@ from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
     AdequateFinalGateDomainCount,
     DomainCount,
+    EligibleEvidenceHolderCount,
     EvidenceArrivalCycleSequence,
     EvidenceCycleIndex,
     MinimumEligibleEvidenceHolderCount,
@@ -47,7 +48,7 @@ def holder_count_at_cycle(
     schedule: EvidenceArrivalSchedule,
     cycle: EvidenceCycleIndex,
     eligible_domain_count: DomainCount,
-) -> NonNegativeInt:
+) -> EligibleEvidenceHolderCount:
     if schedule is EvidenceArrivalSchedule.PERMANENT_SINGLETON:
         return 0
     if schedule is EvidenceArrivalSchedule.ONE_HONEST_HOLDER:
@@ -75,7 +76,7 @@ def first_holder_cycle_for_domain(
     domain: NBaiotDomain,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
     candidate_cycles: EvidenceArrivalCycleSequence,
-) -> NonNegativeInt | None:
+) -> EvidenceCycleIndex | None:
     for cycle in sorted(candidate_cycles):
         if domain in holders_at_cycle(schedule, cycle, target_capable_reproducer_order):
             return cycle
@@ -98,7 +99,7 @@ def cycle_when_requirement_met(
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
     candidate_cycles: EvidenceArrivalCycleSequence,
     requirement_count: MinimumEligibleEvidenceHolderCount,
-) -> NonNegativeInt | None:
+) -> EvidenceCycleIndex | None:
     counts = _holder_counts_by_cycle(schedule, target_capable_reproducer_order, candidate_cycles)
     index = first_cycle_with_minimum_eligible_evidence_holders(counts, requirement_count)
     if index is None:
@@ -112,7 +113,7 @@ def compute_t_evidence(
     candidate_cycles: EvidenceArrivalCycleSequence,
     reproduction_row_requirement: RequiredReproductionRowCount,
     final_gate_domain_requirement: AdequateFinalGateDomainCount,
-) -> NonNegativeInt | None:
+) -> EvidenceCycleIndex | None:
     t_reproduction_evidence = cycle_when_requirement_met(
         schedule,
         target_capable_reproducer_order,

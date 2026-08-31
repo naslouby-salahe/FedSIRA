@@ -10,9 +10,9 @@ from fedsira.domain.records import (
     DeltaScale,
     LossWeight,
     NamespaceSeed,
-    NonNegativeFloat,
     Probability,
     TrainableParameterCount,
+    TrainingLoss,
 )
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
 from fedsira.learning.training import clip_gradients, step_optimizer
@@ -55,7 +55,7 @@ def verifier_aware_training_step(
     triggered_carrier_labels: torch.Tensor,
     carrier_row_mask_in_batch: torch.Tensor,
     triggered_backdoor_loss_weight: LossWeight,
-) -> NonNegativeFloat:
+) -> TrainingLoss:
     current_model.train()
     optimizer.zero_grad(set_to_none=True)
 
