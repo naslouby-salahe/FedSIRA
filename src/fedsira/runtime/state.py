@@ -1,3 +1,11 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from pathlib import Path
+from typing import Self
+
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config.schema import ScientificConfig
 from fedsira.domain.enums import (
     CellPhaseState,
     ExperimentLifecycleState,
@@ -48,6 +56,43 @@ class FailureDetail(FrozenDomainModel):
     failure_class: FailureClass
     message: FailureMessage
     cell_phase: ScientificCellPhase | None
+
+
+class ApplicationContext(FrozenDomainModel):
+    scientific_config: ScientificConfig
+    repository_root: Path
+
+    @classmethod
+    def load(cls: type[Self], repository_root: Path, config_path: Path | None = None) -> Self:
+        resolved_path = (
+            config_path if config_path is not None else repository_root / PRODUCTION_CONFIG_PATH
+        )
+        return cls(
+            scientific_config=load_scientific_config(resolved_path),
+            repository_root=repository_root,
+        )
+
+
+_APPLICATION_CONTEXT: ContextVar[ApplicationContext | None] = ContextVar(
+    "fedsira_application_context",
+    default=None,
+)
+
+
+@contextmanager
+def bound_application_context(context: ApplicationContext) -> Iterator[ApplicationContext]:
+    token = _APPLICATION_CONTEXT.set(context)
+    try:
+        yield context
+    finally:
+        _APPLICATION_CONTEXT.reset(token)
+
+
+def current_application_context() -> ApplicationContext:
+    context = _APPLICATION_CONTEXT.get()
+    if context is None:
+        raise RuntimeError("application context is not bound")
+    return context
 
 
 def _allowed_cell_phase_targets(current: CellPhaseState) -> frozenset[CellPhaseState]:

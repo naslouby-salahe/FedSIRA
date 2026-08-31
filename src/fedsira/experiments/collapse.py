@@ -18,6 +18,7 @@ from fedsira.artifacts.storage import (
     read_published_manifest,
     stage_payload,
 )
+from fedsira.artifacts.validation import validate_artifact_lifecycle_readable
 from fedsira.config.schema import MaterialityConfig
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOpeningMode
 from fedsira.domain.records import (
@@ -423,6 +424,7 @@ def read_resolved_core(published_directory: Path) -> ResolvedCore | None:
     )
     if manifest is None:
         return None
+    validate_artifact_lifecycle_readable(manifest)
     payload_path, _manifest_path = published_artifact_paths(
         published_directory,
         manifest.identity,

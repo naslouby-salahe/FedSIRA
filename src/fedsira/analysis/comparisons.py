@@ -60,6 +60,7 @@ from fedsira.experiments.registry import (
     ablation_scenario_for_variant,
     epistemic_strength_tokens,
 )
+from fedsira.runtime.state import current_application_context
 
 
 class ComparisonTestKind(StrEnum):
@@ -1090,9 +1091,8 @@ def _secondary_generalization_comparisons(
     return tuple(definitions)
 
 
-def build_comparison_registry(
-    config: ScientificConfig,
-) -> tuple[ComparisonDefinition, ...]:
+def build_comparison_registry() -> tuple[ComparisonDefinition, ...]:
+    config = current_application_context().scientific_config
     return (
         *_proposal_screen_comparisons(config),
         *_plurality_comparisons(config),

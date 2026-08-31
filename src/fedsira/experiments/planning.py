@@ -274,11 +274,11 @@ def build_plan(
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:
     if master_seeds is None or smoke_seed is None:
-        from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+        from fedsira.runtime.state import current_application_context
 
-        config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-        master_seeds = master_seeds or config.seeds_and_determinism.master_seeds
-        smoke_seed = smoke_seed or config.seeds_and_determinism.smoke_seed
+        seeds = current_application_context().scientific_config.seeds_and_determinism
+        master_seeds = master_seeds or seeds.master_seeds
+        smoke_seed = smoke_seed or seeds.smoke_seed
     decision_states = tuple(collapse_decision_states or ())
     planned: list[PlannedExperiment] = []
     for definition in EXPERIMENT_REGISTRY:

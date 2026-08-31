@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.cli.commands import REPOSITORY_ROOT
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH
 from fedsira.domain.records import ExperimentName, OverwriteExisting
 from fedsira.experiments.collapse import (
     CollapseDecision,
@@ -21,11 +22,7 @@ from fedsira.experiments.planning import (
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.experiments.registry import (
-    COLLAPSE_EXPERIMENT_NAMES,
-    ClaimFamily,
-    experiment_by_name,
-)
+from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily, experiment_by_name
 from fedsira.reporting.export import (
     claim_definition_count,
     derive_claim_states_for_export,
@@ -43,7 +40,12 @@ from fedsira.reporting.verification import (
     verify_no_stale_ancestors,
     verify_planned_cell_count_satisfied,
 )
-from fedsira.runtime.state import FailureDetail
+from fedsira.runtime.state import (
+    ApplicationContext,
+    FailureDetail,
+    bound_application_context,
+    current_application_context,
+)
 
 _COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
     ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
@@ -54,19 +56,34 @@ _COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
 
 
 def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
-    del overwrite
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    store = ExecutionRecordStore(Path(config.runtime.repository_layout.execution_workspace))
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        _execute_bound(name, overwrite)
+
+
+def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
+    config = current_application_context().scientific_config
+    store = ExecutionRecordStore(
+        REPOSITORY_ROOT / Path(config.runtime.repository_layout.execution_workspace)
+    )
     if name is not None:
         result = _load_experiment_result(name, store)
-        experiment_root = Path("results") / "experiments" / name
+        experiment_root = (
+            REPOSITORY_ROOT
+            / Path(config.runtime.repository_layout.manuscript_results)
+            / "experiments"
+            / name
+        )
+        if overwrite and experiment_root.exists():
+            for child in experiment_root.rglob("*"):
+                if child.is_file():
+                    child.unlink()
         export = export_experiment_report(result, PRODUCTION_CONFIG_PATH, experiment_root)
         for path in export.exported_paths:
             print(f"exported {path}")
         if not export.verification.passed:
             raise SystemExit(1)
         return
-
     plan = build_plan(resolved_core_complete=True)
     validate_planned_cell_count_invariant(plan)
     terminal_counts: list[ExperimentTerminalCount] = []
@@ -88,12 +105,10 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
     terminal_count_records = tuple(terminal_counts)
     lifecycle_records = tuple(lifecycle_states)
     experiment_names = tuple(planned.definition.name for planned in plan.experiments)
-
     count_verification = verify_planned_cell_count_satisfied(plan, terminal_count_records)
     completion_verification = verify_experiments_completed(lifecycle_records, experiment_names)
     terminal_verification = verify_experiments_reached_terminal_state(
-        lifecycle_records,
-        experiment_names,
+        lifecycle_records, experiment_names
     )
     claim_states = derive_claim_states_for_export()
     claim_verification = verify_claim_states_derivable(claim_states, claim_definition_count())
@@ -114,11 +129,9 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
         PRODUCTION_CONFIG_PATH,
         verification,
         collapse_decisions=collapse_decisions,
-        resolved_core=(
-            materialize_resolved_core(collapse_decisions)
-            if collapse_decisions is not None
-            else None
-        ),
+        resolved_core=materialize_resolved_core(collapse_decisions)
+        if collapse_decisions is not None
+        else None,
     )
     for path in export.exported_paths:
         print(f"exported {path}")
@@ -130,10 +143,8 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
 
 
 def _load_experiment_result(
-    name: ExperimentName,
-    store: ExecutionRecordStore,
+    name: ExperimentName, store: ExecutionRecordStore
 ) -> ExperimentExecutionResult:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     definition = experiment_by_name(name)
     plan = build_plan(resolved_core_complete=True)
     records = store.read_all_outcomes(name)
@@ -151,13 +162,7 @@ def _load_experiment_result(
         )
         for record in records
     )
-    comparisons = comparison_results_for_experiment(
-        name,
-        definition.dataset,
-        outcomes,
-        config,
-        store,
-    )
+    comparisons = comparison_results_for_experiment(name, definition.dataset, outcomes, store)
     return ExperimentExecutionResult(
         experiment=name,
         lifecycle_state=derive_experiment_lifecycle(plan.experiment(name), records),
@@ -166,28 +171,22 @@ def _load_experiment_result(
     )
 
 
-def _to_failure_detail(
-    failure: PersistedFailureDetail | None,
-) -> FailureDetail | None:
+def _to_failure_detail(failure: PersistedFailureDetail | None) -> FailureDetail | None:
     if failure is None:
         return None
     return FailureDetail(
-        failure_class=failure.failure_class,
-        message=failure.message,
-        cell_phase=failure.cell_phase,
+        failure_class=failure.failure_class, message=failure.message, cell_phase=failure.cell_phase
     )
 
 
-def _load_collapse_decisions(
-    store: ExecutionRecordStore,
-) -> tuple[CollapseDecision, ...] | None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecision, ...] | None:
+    config = current_application_context().scientific_config
     decisions: list[CollapseDecision] = []
     for experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(experiment)
         if not records:
             return None
-        evaluation = collapse_evaluation_from_records(experiment, records, config)
+        evaluation = collapse_evaluation_from_records(experiment, records)
         if evaluation is None:
             return None
         outcomes = tuple(
@@ -206,11 +205,7 @@ def _load_collapse_decisions(
         )
         definition = experiment_by_name(experiment)
         comparison_results = comparison_results_for_experiment(
-            experiment,
-            definition.dataset,
-            outcomes,
-            config,
-            store,
+            experiment, definition.dataset, outcomes, store
         )
         matched_family = next(
             (result.family for result in comparison_results if result.family in _COLLAPSE_FAMILIES),

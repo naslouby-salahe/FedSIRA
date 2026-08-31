@@ -22,15 +22,21 @@ from fedsira.runtime.recovery import (
     validate_recovered_checkpoint_lineage,
 )
 from fedsira.runtime.state import (
+    ApplicationContext,
     FailureDetail,
+    bound_application_context,
+    current_application_context,
     is_automatically_retriable,
     validate_cell_phase_transition,
     validate_experiment_lifecycle_transition,
 )
 
 __all__ = [
+    "ApplicationContext",
     "EnvironmentMismatch",
     "FailureDetail",
+    "bound_application_context",
+    "current_application_context",
     "automatic_recovery_permitted",
     "collect_environment_mismatches",
     "configure_deterministic_backend",

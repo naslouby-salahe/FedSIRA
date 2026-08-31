@@ -28,6 +28,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_domain_hash_token,
 )
+from fedsira.runtime.state import current_application_context
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 ROLE_INTERVALS = CONFIG.datasets.primary.role_intervals
@@ -304,13 +305,11 @@ def test_prepared_view_row_count() -> None:
 
 
 def test_materialization_runs_and_writes_artifacts(tmp_path: Path) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
     prepared_root, scaler_root = _storage(tmp_path)
     views, moments = materialize_nbaiot_prepared_views(
         (_discovered_csv(csv_path),),
-        config,
         prepared_root,
         scaler_root,
         overwrite=True,
@@ -321,14 +320,12 @@ def test_materialization_runs_and_writes_artifacts(tmp_path: Path) -> None:
 
 
 def test_materialization_is_deterministic(tmp_path: Path) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
     prepared_root, scaler_root = _storage(tmp_path)
     discovered = (_discovered_csv(csv_path),)
     views_one, moments_one = materialize_nbaiot_prepared_views(
         discovered,
-        config,
         prepared_root,
         scaler_root,
         overwrite=True,
@@ -336,7 +333,6 @@ def test_materialization_is_deterministic(tmp_path: Path) -> None:
     prepared_two = tmp_path / "prepared_two"
     views_two, moments_two = materialize_nbaiot_prepared_views(
         discovered,
-        config,
         prepared_two,
         scaler_root,
         overwrite=True,
@@ -349,13 +345,11 @@ def test_materialization_is_deterministic(tmp_path: Path) -> None:
 
 
 def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
     prepared_root, scaler_root = _storage(tmp_path)
     views, moments = materialize_nbaiot_prepared_views(
         (_discovered_csv(csv_path),),
-        config,
         prepared_root,
         scaler_root,
         overwrite=True,
@@ -379,20 +373,19 @@ def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) ->
 
 
 def test_materialization_standardized_features_are_finite_and_clipped(tmp_path: Path) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
     prepared_root, scaler_root = _storage(tmp_path)
     views, _moments = materialize_nbaiot_prepared_views(
         (_discovered_csv(csv_path),),
-        config,
         prepared_root,
         scaler_root,
         overwrite=True,
     )
     assert views
-    clip_max = config.datasets.primary.scaling.clip_max
-    clip_min = config.datasets.primary.scaling.clip_min
+    scaling = current_application_context().scientific_config.datasets.primary.scaling
+    clip_max = scaling.clip_max
+    clip_min = scaling.clip_min
     for view in views:
         for row in view.features:
             assert all(clip_min <= value <= clip_max for value in row)

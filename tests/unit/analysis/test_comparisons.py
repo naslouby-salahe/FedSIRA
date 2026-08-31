@@ -20,16 +20,15 @@ from fedsira.experiments.registry import (
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
-REGISTRY = build_comparison_registry(CONFIG)
 
 
 def test_registry_has_all_ten_claim_families() -> None:
-    families = frozenset(definition.family for definition in REGISTRY)
+    families = frozenset(definition.family for definition in build_comparison_registry())
     assert families == frozenset(ClaimFamily)
 
 
 def test_registry_has_unique_comparison_names() -> None:
-    names = tuple(definition.comparison_name for definition in REGISTRY)
+    names = tuple(definition.comparison_name for definition in build_comparison_registry())
     assert len(names) == len(frozenset(names))
 
 
@@ -54,7 +53,7 @@ def test_comparison_name_follows_section_18_9_pattern() -> None:
 def test_source_exclusion_family_has_only_asr_superiority() -> None:
     definitions = tuple(
         definition
-        for definition in REGISTRY
+        for definition in build_comparison_registry()
         if definition.family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
     )
     assert len(definitions) == 1
@@ -65,7 +64,7 @@ def test_source_exclusion_family_has_only_asr_superiority() -> None:
 def test_primary_family_contains_only_structurally_applicable_metrics() -> None:
     definitions = tuple(
         definition
-        for definition in REGISTRY
+        for definition in build_comparison_registry()
         if definition.family is ClaimFamily.PRIMARY_BASELINE_SUPERIORITY
     )
     legitimate = tuple(
@@ -113,7 +112,7 @@ def test_primary_family_contains_only_structurally_applicable_metrics() -> None:
 def test_model_replacement_reproducer_conditions_include_asr() -> None:
     definitions = tuple(
         definition
-        for definition in REGISTRY
+        for definition in build_comparison_registry()
         if definition.family is ClaimFamily.REPRODUCER_ROBUSTNESS
         and definition.scientific_scenario
         in (
@@ -134,7 +133,7 @@ def test_model_replacement_reproducer_conditions_include_asr() -> None:
 def test_shared_epistemic_comparisons_use_primary_clean_reference() -> None:
     definitions = tuple(
         definition
-        for definition in REGISTRY
+        for definition in build_comparison_registry()
         if definition.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME
     )
     assert definitions
@@ -148,7 +147,7 @@ def test_shared_epistemic_comparisons_use_primary_clean_reference() -> None:
 def test_capability_granularity_ablation_treats_false_certification_as_harm() -> None:
     definition = next(
         definition
-        for definition in REGISTRY
+        for definition in build_comparison_registry()
         if definition.family is ClaimFamily.MECHANISM_ABLATION
         and definition.method == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value
     )
@@ -158,7 +157,7 @@ def test_capability_granularity_ablation_treats_false_certification_as_harm() ->
 
 def test_evaluate_comparison_zero_pairs_is_undefined() -> None:
     result = evaluate_comparison(
-        REGISTRY[0],
+        build_comparison_registry()[0],
         (),
         CONFIG.metrics_and_statistics.bootstrap,
         CONFIG.seeds_and_determinism.analysis_seed,
@@ -170,7 +169,7 @@ def test_evaluate_comparison_zero_pairs_is_undefined() -> None:
 
 def test_evaluate_comparison_strong_consistent_effect() -> None:
     result = evaluate_comparison(
-        REGISTRY[0],
+        build_comparison_registry()[0],
         (1.0,) * 10,
         CONFIG.metrics_and_statistics.bootstrap,
         CONFIG.seeds_and_determinism.analysis_seed,
@@ -183,13 +182,13 @@ def test_evaluate_comparison_strong_consistent_effect() -> None:
 
 def test_holm_adjustment_marks_passed_and_failed() -> None:
     passing = evaluate_comparison(
-        REGISTRY[0],
+        build_comparison_registry()[0],
         (1.0,) * 10,
         CONFIG.metrics_and_statistics.bootstrap,
         CONFIG.seeds_and_determinism.analysis_seed,
     )
     failing = evaluate_comparison(
-        REGISTRY[1],
+        build_comparison_registry()[1],
         (0.0,) * 10,
         CONFIG.metrics_and_statistics.bootstrap,
         CONFIG.seeds_and_determinism.analysis_seed,

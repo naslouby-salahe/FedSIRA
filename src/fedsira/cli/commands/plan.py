@@ -1,4 +1,8 @@
+from fedsira.artifacts.paths import workspace_root_for_family
+from fedsira.cli.commands import REPOSITORY_ROOT
+from fedsira.domain.enums import ArtifactFamily
 from fedsira.domain.records import ResolvedCoreComplete, TextValue
+from fedsira.experiments.collapse import read_resolved_core
 from fedsira.experiments.planning import (
     ExperimentPlan,
     build_plan,
@@ -8,6 +12,7 @@ from fedsira.experiments.registry import (
     COLLAPSE_EXPERIMENT_NAMES,
     POST_CORE_EXPERIMENT_NAMES,
 )
+from fedsira.runtime.state import ApplicationContext, bound_application_context
 
 
 def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> ExperimentPlan:
@@ -37,5 +42,10 @@ def render_plan(plan: ExperimentPlan) -> TextValue:
 
 
 def execute() -> None:
-    plan = resolve_plan()
-    print(render_plan(plan))
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        resolved_core = read_resolved_core(
+            REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
+        )
+        plan = resolve_plan(resolved_core_complete=resolved_core is not None)
+        print(render_plan(plan))

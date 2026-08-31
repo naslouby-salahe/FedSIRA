@@ -23,6 +23,10 @@ def test_doctor_exits_zero_when_environment_and_config_are_valid(
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     assert "project progress" in result.stdout
+    assert "project stage:" in result.stdout
+    assert "configuration: valid" in result.stdout
+    assert "no artifacts published yet" not in result.stdout
+    assert "no experiments started yet" not in result.stdout
 
 
 def test_no_args_shows_help() -> None:
@@ -60,6 +64,7 @@ def test_plan_prints_section_31_counts() -> None:
     assert "total cells: 1989" in result.stdout
     assert "pre-core cells: 299" in result.stdout
     assert "post-core cells: 1690" in result.stdout
+    assert "FedSIRA experiment plan" in result.stdout
 
 
 def test_smoke_runs_and_passes() -> None:

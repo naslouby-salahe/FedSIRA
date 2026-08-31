@@ -32,7 +32,7 @@ MATERIALITY = CONFIG.metrics_and_statistics.materiality
 def _definition(family: ClaimFamily, metric: ComparisonMetric):
     return next(
         definition
-        for definition in build_comparison_registry(CONFIG)
+        for definition in build_comparison_registry()
         if definition.family is family and definition.metric is metric
     )
 

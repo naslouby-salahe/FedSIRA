@@ -98,9 +98,7 @@ def _prepare_real_evidence(root: Path, classes: tuple[NBaiotClass, ...] = CLASSE
             )
     prepared_root = root / "prepared"
     scaler_root = root / "scaler"
-    materialize_nbaiot_prepared_views(
-        tuple(discovered), CONFIG, prepared_root, scaler_root, overwrite=True
-    )
+    materialize_nbaiot_prepared_views(tuple(discovered), prepared_root, scaler_root, overwrite=True)
     return prepared_root
 
 
@@ -111,7 +109,7 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def anchor(prepared_root: Path) -> RealAnchor:
-    result = train_anchor(prepared_root, CONFIG, master_seed=1)
+    result = train_anchor(prepared_root, master_seed=1)
     assert result is not None
     return result
 
@@ -124,7 +122,7 @@ def prepared_root_with_udp(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def anchor_with_udp(prepared_root_with_udp: Path) -> RealAnchor:
-    result = train_anchor(prepared_root_with_udp, CONFIG, master_seed=1)
+    result = train_anchor(prepared_root_with_udp, master_seed=1)
     assert result is not None
     return result
 
@@ -148,7 +146,7 @@ def test_train_anchor_produces_a_flat_parameter_vector_of_the_expected_shape(
 
 
 def test_train_anchor_returns_none_without_prepared_data(tmp_path: Path) -> None:
-    assert train_anchor(tmp_path, CONFIG, master_seed=1) is None
+    assert train_anchor(tmp_path, master_seed=1) is None
 
 
 def test_domain_anchor_train_feature_mean_is_finite_and_distinct_per_domain(
@@ -174,7 +172,7 @@ def test_train_domain_reproduction_delta_is_nonzero_and_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_domain_reproduction_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, domain=DOMAINS[0]
+        prepared_root, master_seed=1, anchor=anchor, domain=DOMAINS[0]
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -186,7 +184,7 @@ def test_train_domain_reproduction_delta_is_none_without_target_rows(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_domain_reproduction_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, domain=NBaiotDomain.SAMSUNG_WEBCAM
+        prepared_root, master_seed=1, anchor=anchor, domain=NBaiotDomain.SAMSUNG_WEBCAM
     )
     assert delta is None
 
@@ -195,7 +193,7 @@ def test_train_generic_hard_supported_examples_delta_is_nonzero_and_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_generic_hard_supported_examples_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        prepared_root, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -207,7 +205,7 @@ def test_train_generic_hard_supported_examples_delta_returns_none_without_prepar
     tmp_path: Path, anchor: RealAnchor
 ) -> None:
     delta = train_generic_hard_supported_examples_delta(
-        tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        tmp_path, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is None
 
@@ -230,14 +228,12 @@ def test_train_source_candidate_delta_with_backdoor_scope_is_finite_and_differs_
     scope = _backdoor_scope(prepared_root_with_udp)
     clean_delta = train_source_candidate_delta(
         prepared_root_with_udp,
-        CONFIG,
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
     )
     poisoned_delta = train_source_candidate_delta(
         prepared_root_with_udp,
-        CONFIG,
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
@@ -255,7 +251,6 @@ def test_compute_source_backdoor_asr_is_a_defined_rate(
     scope = _backdoor_scope(prepared_root_with_udp)
     delta = train_source_candidate_delta(
         prepared_root_with_udp,
-        CONFIG,
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
@@ -328,11 +323,10 @@ def test_train_domain_reproduction_delta_with_heterogeneity_scope_differs_from_n
 ) -> None:
     scope = _heterogeneity_scope(prepared_root, shift_magnitude=1.0)
     natural_delta = train_domain_reproduction_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, domain=DOMAINS[0]
+        prepared_root, master_seed=1, anchor=anchor, domain=DOMAINS[0]
     )
     shifted_delta = train_domain_reproduction_delta(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -415,7 +409,6 @@ def test_train_domain_reproduction_delta_with_balanced_selection_seed_is_finite(
     )
     delta = train_domain_reproduction_delta(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -433,7 +426,6 @@ def test_train_domain_reproduction_delta_with_root_cause_scope_is_finite(
     scope = _root_cause_scope(feature_names, CapabilityContractScope.BROAD_TARGET_ONLY)
     delta = train_domain_reproduction_delta(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -469,7 +461,6 @@ def test_compute_capability_under_specification_summary_is_genuinely_computed(
     scope = _root_cause_scope(feature_names, CapabilityContractScope.BROAD_TARGET_ONLY)
     summary = compute_capability_under_specification_summary(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -502,7 +493,6 @@ def test_train_domain_reproduction_delta_with_shared_label_error_scope_is_finite
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
     delta = train_domain_reproduction_delta(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -520,7 +510,6 @@ def test_compute_shared_epistemic_failure_summary_for_label_error_is_genuinely_c
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
     summary = compute_shared_epistemic_failure_summary(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -539,7 +528,6 @@ def test_compute_shared_epistemic_failure_summary_for_spurious_feature_reports_d
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_SPURIOUS_FEATURE)
     summary = compute_shared_epistemic_failure_summary(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -559,7 +547,6 @@ def test_compute_shared_epistemic_failure_summary_for_common_context_reports_dia
     )
     summary = compute_shared_epistemic_failure_summary(
         prepared_root,
-        CONFIG,
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -573,7 +560,7 @@ def test_train_fedavg_reference_delta_is_finite_and_nonzero(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_fedavg_reference_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        prepared_root, master_seed=1, anchor=anchor, source_domain=None
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -585,9 +572,7 @@ def test_train_fedavg_reference_delta_returns_none_without_prepared_data(
     tmp_path: Path, anchor: RealAnchor
 ) -> None:
     assert (
-        train_fedavg_reference_delta(
-            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
-        )
+        train_fedavg_reference_delta(tmp_path, master_seed=1, anchor=anchor, source_domain=None)
         is None
     )
 
@@ -597,7 +582,7 @@ def test_train_krum_reference_delta_returns_none_with_fewer_than_committee_size_
 ) -> None:
     assert CONFIG.protocol.synthesis.committee_size > len(DOMAINS)
     delta = train_krum_reference_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        prepared_root, master_seed=1, anchor=anchor, source_domain=None
     )
     assert delta is None
 
@@ -606,9 +591,7 @@ def test_train_krum_reference_delta_returns_none_without_prepared_data(
     tmp_path: Path, anchor: RealAnchor
 ) -> None:
     assert (
-        train_krum_reference_delta(
-            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
-        )
+        train_krum_reference_delta(tmp_path, master_seed=1, anchor=anchor, source_domain=None)
         is None
     )
 
@@ -617,7 +600,7 @@ def test_train_density_cluster_trimmed_mean_delta_is_finite_and_nonzero(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_density_cluster_trimmed_mean_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        prepared_root, master_seed=1, anchor=anchor, source_domain=None
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -629,7 +612,7 @@ def test_train_density_cluster_trimmed_mean_delta_returns_none_without_prepared_
 ) -> None:
     assert (
         train_density_cluster_trimmed_mean_delta(
-            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+            tmp_path, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )
@@ -638,7 +621,7 @@ def test_train_density_cluster_trimmed_mean_delta_returns_none_without_prepared_
 def test_anchor_round_calibration_updates_are_finite_and_match_expected_count(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
-    updates = anchor_round_calibration_updates(prepared_root, CONFIG, master_seed=1, anchor=anchor)
+    updates = anchor_round_calibration_updates(prepared_root, master_seed=1, anchor=anchor)
     assert len(updates) > 0
     assert len(anchor.round_start_flat_parameters) == CONFIG.model.anchor_fedavg.rounds
     for update in updates:
@@ -650,7 +633,7 @@ def test_train_source_update_sanitization_delta_is_finite_and_clipped(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_source_update_sanitization_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        prepared_root, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is not None
     assert torch.isfinite(delta).all()
@@ -661,7 +644,7 @@ def test_train_source_update_sanitization_delta_returns_none_without_source_doma
 ) -> None:
     assert (
         train_source_update_sanitization_delta(
-            prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+            prepared_root, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )
@@ -671,7 +654,7 @@ def test_anchor_round_reconstruction_calibration_errors_are_within_expected_coun
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     errors = anchor_round_reconstruction_calibration_errors(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor
+        prepared_root, master_seed=1, anchor=anchor
     )
     assert len(errors) > 0
     assert len(errors) <= len(anchor.round_start_flat_parameters) * len(DOMAINS)
@@ -683,7 +666,7 @@ def test_train_update_reconstruction_filter_delta_is_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_update_reconstruction_filter_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        prepared_root, master_seed=1, anchor=anchor, source_domain=None
     )
     assert delta is not None
     assert torch.isfinite(delta).all()
@@ -694,7 +677,7 @@ def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_
 ) -> None:
     assert (
         train_update_reconstruction_filter_delta(
-            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+            tmp_path, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )
@@ -703,9 +686,7 @@ def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_
 def test_recovery_backdoor_alarm_threshold_is_a_finite_rate(
     prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
 ) -> None:
-    threshold = recovery_backdoor_alarm_threshold(
-        prepared_root_with_udp, CONFIG, anchor=anchor_with_udp
-    )
+    threshold = recovery_backdoor_alarm_threshold(prepared_root_with_udp, anchor=anchor_with_udp)
     assert threshold is not None
     assert 0.0 <= threshold <= 1.0
 
@@ -730,7 +711,7 @@ def test_train_recovery_after_source_admission_delta_excludes_the_source_domain(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_recovery_after_source_admission_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        prepared_root, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is not None
     assert torch.isfinite(delta).all()
@@ -739,13 +720,13 @@ def test_train_recovery_after_source_admission_delta_excludes_the_source_domain(
 def test_train_certified_ensemble_group_checkpoints_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert train_certified_ensemble_group_checkpoints(tmp_path, CONFIG, master_seed=1) is None
+    assert train_certified_ensemble_group_checkpoints(tmp_path, master_seed=1) is None
 
 
 def test_train_certified_ensemble_group_checkpoints_reflects_partial_domain_coverage(
     prepared_root: Path,
 ) -> None:
-    checkpoints = train_certified_ensemble_group_checkpoints(prepared_root, CONFIG, master_seed=1)
+    checkpoints = train_certified_ensemble_group_checkpoints(prepared_root, master_seed=1)
     assert checkpoints is None or all(torch.isfinite(c.flat_parameters).all() for c in checkpoints)
 
 
@@ -753,7 +734,7 @@ def test_train_secure_continual_assessment_delta_is_finite_and_nonzero(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_secure_continual_assessment_delta(
-        prepared_root, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+        prepared_root, master_seed=1, anchor=anchor, source_domain=None
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -766,7 +747,7 @@ def test_train_secure_continual_assessment_delta_returns_none_without_prepared_d
 ) -> None:
     assert (
         train_secure_continual_assessment_delta(
-            tmp_path, CONFIG, master_seed=1, anchor=anchor, source_domain=None
+            tmp_path, master_seed=1, anchor=anchor, source_domain=None
         )
         is None
     )
@@ -775,12 +756,8 @@ def test_train_secure_continual_assessment_delta_returns_none_without_prepared_d
 def test_train_local_only_reference_checkpoint_is_finite_and_distinct_per_domain(
     prepared_root: Path,
 ) -> None:
-    first = train_local_only_reference_checkpoint(
-        prepared_root, CONFIG, master_seed=1, domain=DOMAINS[0]
-    )
-    second = train_local_only_reference_checkpoint(
-        prepared_root, CONFIG, master_seed=1, domain=DOMAINS[1]
-    )
+    first = train_local_only_reference_checkpoint(prepared_root, master_seed=1, domain=DOMAINS[0])
+    second = train_local_only_reference_checkpoint(prepared_root, master_seed=1, domain=DOMAINS[1])
     assert first is not None
     assert second is not None
     assert torch.isfinite(first).all()
@@ -791,14 +768,11 @@ def test_train_local_only_reference_checkpoint_is_finite_and_distinct_per_domain
 def test_train_local_only_reference_checkpoint_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert (
-        train_local_only_reference_checkpoint(tmp_path, CONFIG, master_seed=1, domain=DOMAINS[0])
-        is None
-    )
+    assert train_local_only_reference_checkpoint(tmp_path, master_seed=1, domain=DOMAINS[0]) is None
 
 
 def test_train_centralized_reference_checkpoint_is_finite(prepared_root: Path) -> None:
-    checkpoint = train_centralized_reference_checkpoint(prepared_root, CONFIG, master_seed=1)
+    checkpoint = train_centralized_reference_checkpoint(prepared_root, master_seed=1)
     assert checkpoint is not None
     assert torch.isfinite(checkpoint).all()
 
@@ -806,4 +780,4 @@ def test_train_centralized_reference_checkpoint_is_finite(prepared_root: Path) -
 def test_train_centralized_reference_checkpoint_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert train_centralized_reference_checkpoint(tmp_path, CONFIG, master_seed=1) is None
+    assert train_centralized_reference_checkpoint(tmp_path, master_seed=1) is None

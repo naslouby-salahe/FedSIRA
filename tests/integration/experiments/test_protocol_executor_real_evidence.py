@@ -100,9 +100,7 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
                 )
             )
     prepared = root / "prepared"
-    materialize_nbaiot_prepared_views(
-        tuple(discovered), CONFIG, prepared, root / "scaler", overwrite=True
-    )
+    materialize_nbaiot_prepared_views(tuple(discovered), prepared, root / "scaler", overwrite=True)
     return prepared
 
 
@@ -119,7 +117,7 @@ def test_primary_cell_executes_and_reports_a_valid_terminal_state(prepared_root:
     executor = ProtocolCellExecutor(
         primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
     )
-    outcome = executor.execute_cell(_primary_cell(1), CONFIG)
+    outcome = executor.execute_cell(_primary_cell(1))
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -131,7 +129,7 @@ def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
     executor = ProtocolCellExecutor(
         primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
     )
-    outcome = executor.execute_cell(_primary_cell(4), CONFIG)
+    outcome = executor.execute_cell(_primary_cell(4))
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] != 0.0
     assert metrics["target-f1"] is not None
@@ -140,7 +138,7 @@ def test_reached_final_gate_cells_report_real_not_fabricated_target_f1(
 
 def test_resolved_core_cell_is_dormant_without_a_resolved_core(prepared_root: Path) -> None:
     executor = ProtocolCellExecutor(primary_prepared_root=prepared_root)
-    outcome = executor.execute_cell(_primary_cell(1), CONFIG)
+    outcome = executor.execute_cell(_primary_cell(1))
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] == 0.0
@@ -151,7 +149,7 @@ def test_resolved_core_without_plurality_uses_single_row_requirement(prepared_ro
     executor = ProtocolCellExecutor(
         primary_prepared_root=prepared_root, resolved_core=single_row_core
     )
-    outcome = executor.execute_cell(_primary_cell(20), CONFIG)
+    outcome = executor.execute_cell(_primary_cell(20))
     assert outcome.terminal_state == "Completed"
 
 
@@ -159,15 +157,15 @@ def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) ->
     executor = ProtocolCellExecutor(
         primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
     )
-    first = executor.execute_cell(_primary_cell(2), CONFIG)
-    second = executor.execute_cell(_primary_cell(2), CONFIG)
+    first = executor.execute_cell(_primary_cell(2))
+    second = executor.execute_cell(_primary_cell(2))
     assert first.terminal_state == second.terminal_state
     assert first.metrics == second.metrics
 
 
 def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_root: Path) -> None:
     master_seed = 3
-    anchor = train_anchor(prepared_root, CONFIG, master_seed)
+    anchor = train_anchor(prepared_root, master_seed)
     assert anchor is not None
     source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
     source_order = source_selection_order(NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed)
@@ -204,7 +202,7 @@ def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root:
         primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
     )
     outcome = executor.execute_cell(
-        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 5), CONFIG
+        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 5)
     )
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
@@ -218,7 +216,7 @@ def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
         primary_prepared_root=prepared_root, resolved_core=RESOLVED_CORE
     )
     outcome = executor.execute_cell(
-        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6), CONFIG
+        _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6)
     )
     metrics = dict(outcome.metrics)
     assert metrics["claim-contract-passes"] in {0.0, 1.0}
@@ -234,7 +232,7 @@ def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -
         condition="Useful Backdoored Source — 5%",
         master_seed=7,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -252,7 +250,7 @@ def test_client_review_then_retrain_baseline_executes_without_crashing(
         condition="Useful Backdoored Source — 5%",
         master_seed=8,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -270,7 +268,7 @@ def test_client_review_then_retrain_uses_single_verifier_progression_when_review
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=31,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -289,7 +287,7 @@ def test_source_exclusion_necessity_does_not_hardcode_admission_for_every_method
             condition="Useful Backdoored Source — 5%",
             master_seed=9,
         )
-        outcome = executor.execute_cell(cell, CONFIG)
+        outcome = executor.execute_cell(cell)
         assert outcome.terminal_state == "Completed"
         terminal_states.add(dict(outcome.metrics)["terminal-state"])
     assert terminal_states != {1.0}
@@ -306,7 +304,7 @@ def test_every_primary_baseline_method_executes_without_crashing(prepared_root: 
             condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
             master_seed=10,
         )
-        outcome = executor.execute_cell(cell, CONFIG)
+        outcome = executor.execute_cell(cell)
         assert outcome.terminal_state == "Completed", (method.value, outcome.failure)
 
 
@@ -323,7 +321,7 @@ def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=21,
     )
-    core_outcome = executor.execute_cell(core_cell, CONFIG)
+    core_outcome = executor.execute_cell(core_cell)
     assert core_outcome.terminal_state == "Completed"
     direct_krum_cell = ScientificCell(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
@@ -331,7 +329,7 @@ def test_direct_krum_baseline_skips_verification_and_uses_krum_synthesis(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=21,
     )
-    direct_krum_outcome = executor.execute_cell(direct_krum_cell, CONFIG)
+    direct_krum_outcome = executor.execute_cell(direct_krum_cell)
     assert direct_krum_outcome.terminal_state == "Completed"
     assert dict(direct_krum_outcome.metrics)["terminal-state"] != 0.0
 
@@ -348,7 +346,7 @@ def test_three_row_coordinate_median_baseline_is_routed_and_uses_median_synthesi
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=22,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -365,7 +363,7 @@ def test_one_independent_retrain_baseline_uses_single_verifier_progression(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=23,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -377,7 +375,7 @@ def test_resolved_core_single_row_path_admits_via_single_verifier_progression(
     executor = ProtocolCellExecutor(
         primary_prepared_root=prepared_root, resolved_core=single_row_core
     )
-    outcome = executor.execute_cell(_primary_cell(24), CONFIG)
+    outcome = executor.execute_cell(_primary_cell(24))
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -394,7 +392,7 @@ def test_fedavg_reference_baseline_trains_and_evaluates_a_real_fedavg_model(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=25,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -411,7 +409,7 @@ def test_krum_reference_baseline_trains_and_evaluates_a_real_krum_synthesized_mo
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=26,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -428,7 +426,7 @@ def test_density_cluster_trimmed_mean_baseline_trains_and_evaluates_a_real_model
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=32,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -445,7 +443,7 @@ def test_source_update_sanitization_baseline_clips_and_reviews_the_source_candid
         condition="Useful Backdoored Source — 5%",
         master_seed=33,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -463,7 +461,7 @@ def test_update_reconstruction_filter_baseline_trains_and_evaluates_a_real_model
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=34,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -480,7 +478,7 @@ def test_recovery_after_source_admission_baseline_evaluates_the_rollback_decisio
         condition="Useful Backdoored Source — 5%",
         master_seed=35,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -498,7 +496,7 @@ def test_multiple_model_certified_ensemble_baseline_trains_three_group_models(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=36,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -515,7 +513,7 @@ def test_secure_continual_assessment_baseline_trains_after_the_reviewer_gate(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=27,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -532,7 +530,7 @@ def test_independent_local_reference_baseline_evaluates_real_reviewer_votes(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=28,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -549,7 +547,7 @@ def test_local_only_reference_baseline_evaluates_real_per_domain_checkpoints(
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=29,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -566,7 +564,7 @@ def test_centralized_reference_baseline_trains_and_evaluates_a_real_pooled_model
         condition=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY.value,
         master_seed=30,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     assert dict(outcome.metrics)["terminal-state"] != 0.0
 
@@ -583,7 +581,7 @@ def test_admission_delay_decomposition_is_routed_and_executes_without_crashing(
         condition="Permanent Singleton",
         master_seed=11,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["post-evidence-wall-clock-seconds"] is not None
@@ -602,7 +600,7 @@ def test_efficiency_cell_measures_real_post_evidence_wall_clock_time(
         condition="x",
         master_seed=12,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["post-evidence-wall-clock-seconds"] is not None
@@ -627,7 +625,7 @@ def test_byzantine_bound_violation_is_routed_and_executes_without_crashing(
                 condition=condition.value,
                 master_seed=13,
             )
-            outcome = executor.execute_cell(cell, CONFIG)
+            outcome = executor.execute_cell(cell)
             assert outcome.terminal_state == "Completed", (method, condition.value, outcome.failure)
 
 
@@ -643,7 +641,7 @@ def test_capability_under_specification_boundary_reports_a_real_oracle_label(
         condition="x",
         master_seed=14,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["proposal-oracle-label"] is not None
@@ -669,7 +667,7 @@ def test_shared_epistemic_failure_boundary_reports_real_metrics(
         condition=f"{failure_type.value}|0.5",
         master_seed=15,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["defined-domain-count"] is not None
@@ -693,7 +691,7 @@ def test_parameter_similarity_certification_ablation_reports_real_committed_rows
         condition="Ablation",
         master_seed=16,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -713,7 +711,7 @@ def test_multiple_reproductions_without_cross_verification_ablation_uses_real_kr
         condition="Ablation",
         master_seed=17,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -731,7 +729,7 @@ def test_same_context_verification_only_ablation_uses_a_real_feature_mean_panel(
         condition="Ablation",
         master_seed=18,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -749,7 +747,7 @@ def test_generic_three_row_threshold_ablation_uses_real_coordinate_median_synthe
         condition="Ablation",
         master_seed=19,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -768,7 +766,7 @@ def test_direct_krum_of_retrains_ablation_uses_real_krum_synthesis_without_verif
         condition="Ablation",
         master_seed=20,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -784,7 +782,7 @@ def test_no_proposal_screen_ablation_uses_the_full_downstream_path(prepared_root
         condition="Ablation",
         master_seed=21,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -802,7 +800,7 @@ def test_candidate_free_reproduction_ablation_uses_the_full_downstream_path(
         condition="Ablation",
         master_seed=22,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -820,7 +818,7 @@ def test_one_independent_reproduction_ablation_uses_single_verifier_progression(
         condition="Ablation",
         master_seed=23,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -838,7 +836,7 @@ def test_no_final_synthesis_gate_ablation_admits_immediately_after_krum(
         condition="Ablation",
         master_seed=24,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] == 1.0
@@ -857,7 +855,7 @@ def test_random_committee_profile_ablation_delegates_to_verifier_robustness_mech
         condition="Ablation",
         master_seed=25,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -875,7 +873,7 @@ def test_raw_target_f1_screen_only_ablation_ignores_the_matched_differential(
         condition="Ablation",
         master_seed=26,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -893,7 +891,7 @@ def test_no_matched_control_ablation_uses_the_unmatched_differential(
         condition="Ablation",
         master_seed=27,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -911,7 +909,7 @@ def test_no_origin_exclusion_ablation_lets_source_occupy_the_first_reproduction_
         condition="Ablation",
         master_seed=28,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -929,7 +927,7 @@ def test_byzantine_reproducer_copies_source_ablation_forces_the_first_row(
         condition="Ablation",
         master_seed=29,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -947,7 +945,7 @@ def test_source_release_after_peer_review_ablation_admits_via_client_review(
         condition="Ablation",
         master_seed=30,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -965,7 +963,7 @@ def test_source_release_after_full_external_check_ablation_uses_a_real_verifier_
         condition="Ablation",
         master_seed=33,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -983,7 +981,7 @@ def test_capability_contract_granularity_ablation_reports_real_certification_rat
         condition="Ablation",
         master_seed=35,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -1002,7 +1000,7 @@ def test_krum_robust_aggregation_reference_under_heterogeneous_boundary_uses_rea
         condition=HeterogeneityRegime.NATURAL.value,
         master_seed=36,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
@@ -1020,7 +1018,7 @@ def test_feature_shift_heterogeneity_boundary_applies_real_shift_to_training_and
         condition=HeterogeneityRegime.FEATURE_SHIFT_0_5.value,
         master_seed=37,
     )
-    outcome = executor.execute_cell(cell, CONFIG)
+    outcome = executor.execute_cell(cell)
     assert outcome.terminal_state == "Completed"
     metrics = dict(outcome.metrics)
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}

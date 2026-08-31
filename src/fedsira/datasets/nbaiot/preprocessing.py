@@ -51,6 +51,7 @@ from fedsira.domain.records import (
     SamplingCap,
     SchemaVersion,
 )
+from fedsira.runtime.state import current_application_context
 
 NBAIOT_PRIMARY_PREDICTOR_COUNT: PredictorCount = 115
 NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"
@@ -396,11 +397,11 @@ def _write_metadata(
 
 def materialize_nbaiot_prepared_views(
     discovered: tuple[DiscoveredCsvFile, ...],
-    config: ScientificConfig,
     prepared_root: Path,
     scaler_root: Path,
     overwrite: OverwriteExisting = False,
 ) -> tuple[tuple[PreparedView, ...], FeatureMoments]:
+    config = current_application_context().scientific_config
     if not discovered:
         raise ValueError("N-BaIoT discovery produced no CSV files")
     feature_names = read_predictor_header(discovered[0].absolute_path)

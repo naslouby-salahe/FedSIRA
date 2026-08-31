@@ -3,8 +3,6 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.config.schema import ScientificConfig
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.experiments.execution import (
     TERMINAL_EXPERIMENT_STATES,
@@ -22,8 +20,6 @@ from fedsira.experiments.validation import (
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
 )
-
-CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
 
 def _cell(experiment: str, method: str, condition: str, master_seed: int) -> ScientificCell:
@@ -149,11 +145,7 @@ def test_validate_cell_terminal_record_accepts_terminal_states_only() -> None:
 
 def test_execute_experiment_rejects_missing_prerequisite() -> None:
     class NeverExecutor:
-        def execute_cell(
-            self,
-            cell: ScientificCell,
-            config: ScientificConfig,
-        ) -> CellExecutionOutcome:
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
             raise AssertionError(f"unexpected execution of {cell.semantic_key}")
 
     incomplete = (
@@ -166,7 +158,6 @@ def test_execute_experiment_rejects_missing_prerequisite() -> None:
         execute_experiment(
             "Proposal-Assisted Opening Necessity",
             NeverExecutor(),
-            config=CONFIG,
             prerequisite_states=incomplete,
         )
 
@@ -179,36 +170,27 @@ def test_execute_experiment_reuses_completed_records_without_reexecution(
         def __init__(self) -> None:
             self.executions = 0
 
-        def execute_cell(
-            self,
-            cell: ScientificCell,
-            config: ScientificConfig,
-        ) -> CellExecutionOutcome:
-            del config
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
             self.executions += 1
             return _completed_outcome(cell)
 
     _override_workspace_root(tmp_path, monkeypatch)
     executor = CountingExecutor()
-    result = execute_experiment("Protocol Invariant Validation", executor, config=CONFIG)
+    result = execute_experiment("Protocol Invariant Validation", executor)
     assert executor.executions == 1
     assert result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-    second = execute_experiment("Protocol Invariant Validation", executor, config=CONFIG)
+    second = execute_experiment("Protocol Invariant Validation", executor)
     assert executor.executions == 1
     assert second.lifecycle_state is ExperimentLifecycleState.COMPLETED
 
 
 def test_execute_experiment_unknown_name_rejected() -> None:
     class NeverExecutor:
-        def execute_cell(
-            self,
-            cell: ScientificCell,
-            config: ScientificConfig,
-        ) -> CellExecutionOutcome:
-            raise AssertionError(f"unexpected execution of {cell.semantic_key}: {config}")
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
+            raise AssertionError(f"unexpected execution of {cell.semantic_key}")
 
     with pytest.raises(KeyError):
-        execute_experiment("Not-A-Registered-Experiment", NeverExecutor(), config=CONFIG)
+        execute_experiment("Not-A-Registered-Experiment", NeverExecutor())
 
 
 def test_execute_experiment_invalid_outcome_yields_invalid_lifecycle(
@@ -216,12 +198,7 @@ def test_execute_experiment_invalid_outcome_yields_invalid_lifecycle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class InvalidExecutor:
-        def execute_cell(
-            self,
-            cell: ScientificCell,
-            config: ScientificConfig,
-        ) -> CellExecutionOutcome:
-            del config
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
             return CellExecutionOutcome(
                 cell=cell,
                 terminal_state=ExperimentLifecycleState.INVALID,
@@ -230,7 +207,7 @@ def test_execute_experiment_invalid_outcome_yields_invalid_lifecycle(
             )
 
     _override_workspace_root(tmp_path, monkeypatch)
-    result = execute_experiment("Protocol Invariant Validation", InvalidExecutor(), config=CONFIG)
+    result = execute_experiment("Protocol Invariant Validation", InvalidExecutor())
     assert result.lifecycle_state is ExperimentLifecycleState.INVALID
 
 
@@ -239,12 +216,7 @@ def test_execute_experiment_failed_outcome_yields_failed_lifecycle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FailedExecutor:
-        def execute_cell(
-            self,
-            cell: ScientificCell,
-            config: ScientificConfig,
-        ) -> CellExecutionOutcome:
-            del config
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
             return CellExecutionOutcome(
                 cell=cell,
                 terminal_state=ExperimentLifecycleState.FAILED,
@@ -253,5 +225,5 @@ def test_execute_experiment_failed_outcome_yields_failed_lifecycle(
             )
 
     _override_workspace_root(tmp_path, monkeypatch)
-    result = execute_experiment("Protocol Invariant Validation", FailedExecutor(), config=CONFIG)
+    result = execute_experiment("Protocol Invariant Validation", FailedExecutor())
     assert result.lifecycle_state is ExperimentLifecycleState.FAILED

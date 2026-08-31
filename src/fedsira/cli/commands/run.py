@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.artifacts.paths import workspace_root_for_family
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.records import ExperimentName, OverwriteExisting, TextValue
 from fedsira.experiments.collapse import (
@@ -21,16 +21,17 @@ from fedsira.experiments.execution import (
     execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.registry import (
-    COLLAPSE_EXPERIMENT_NAMES,
-    ClaimFamily,
-    experiment_by_name,
+from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily, experiment_by_name
+from fedsira.runtime.environment import configure_deterministic_backend
+from fedsira.runtime.state import (
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
 )
 
 RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 )
-
 _COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
     ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
     ClaimFamily.PLURALITY_NECESSITY,
@@ -77,8 +78,10 @@ def _collapse_family_for_experiment(experiment: ExperimentName) -> ClaimFamily |
 def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
-    store = ExecutionRecordStore(Path(config.runtime.repository_layout.execution_workspace))
+    config = current_application_context().scientific_config
+    store = ExecutionRecordStore(
+        REPOSITORY_ROOT / Path(config.runtime.repository_layout.execution_workspace)
+    )
     decisions: list[CollapseDecision] = []
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(collapse_experiment)
@@ -100,20 +103,12 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
         )
         definition = experiment_by_name(collapse_experiment)
         comparison_results = comparison_results_for_experiment(
-            collapse_experiment,
-            definition.dataset,
-            outcomes,
-            config,
-            store,
+            collapse_experiment, definition.dataset, outcomes, store
         )
         family = _collapse_family_for_experiment(collapse_experiment)
         if family is None:
             return
-        evaluation = collapse_evaluation_from_records(
-            collapse_experiment,
-            records,
-            config,
-        )
+        evaluation = collapse_evaluation_from_records(collapse_experiment, records)
         if evaluation is None:
             return
         decisions.append(
@@ -127,12 +122,19 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
         return
     core = materialize_resolved_core(tuple(decisions))
-    publish_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
+    publish_resolved_core(REPOSITORY_ROOT / RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
     print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 
 def execute(name: ExperimentName, overwrite: OverwriteExisting) -> None:
-    resolved_core = read_resolved_core(RESOLVED_CORE_PUBLISHED_DIRECTORY)
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        configure_deterministic_backend()
+        _execute_bound(name, overwrite)
+
+
+def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
+    resolved_core = read_resolved_core(REPOSITORY_ROOT / RESOLVED_CORE_PUBLISHED_DIRECTORY)
     result = execute_experiment(
         name,
         ProtocolCellExecutor(resolved_core=resolved_core),
@@ -142,7 +144,7 @@ def execute(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     print(render_result(result))
     if (
         result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-        and not overwrite
+        and (not overwrite)
         and result.execution_digest
     ):
         print(f"already-completed: execution digest {result.execution_digest}")

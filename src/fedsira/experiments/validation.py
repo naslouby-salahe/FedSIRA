@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fedsira.analysis.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
 from fedsira.artifacts.paths import smoke_record_path
 from fedsira.config.loading import (
-    PRODUCTION_CONFIG_PATH,
     TEST_FIXTURE_CONFIG_PATH,
-    load_scientific_config,
     load_test_fixture_config,
 )
 from fedsira.config.schema import ScientificConfig, TestFixtureConfig
@@ -40,6 +36,7 @@ from fedsira.protocol.theory import (
     minimum_honest_positive_count,
 )
 from fedsira.protocol.verification import verifier_is_eligible
+from fedsira.runtime.state import current_application_context
 
 SmokeCheckName = TextValue
 SmokeCheckDetail = TextValue
@@ -304,11 +301,8 @@ def _mathematical_invariants(
     )
 
 
-def run_smoke_suite(
-    config_path: Path = PRODUCTION_CONFIG_PATH,
-    overwrite: BooleanValue = False,
-) -> SmokeSuiteResult:
-    config = load_scientific_config(config_path)
+def run_smoke_suite(overwrite: BooleanValue = False) -> SmokeSuiteResult:
+    config = current_application_context().scientific_config
     fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     checks = (
         *_data_invariants(config),

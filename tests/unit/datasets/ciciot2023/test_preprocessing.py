@@ -136,7 +136,7 @@ def test_assign_roles_uses_target_windows_for_the_target_label(tmp_path: Path) -
     store = _store_with_rows(
         tmp_path / "target.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
     )
-    assign_roles(store, CONFIG, "b" * 64)
+    assign_roles(store, "b" * 64)
     roles_seen = frozenset(_roles_by_stable_row_id(store).values())
     assert roles_seen.issubset(
         frozenset(
@@ -160,7 +160,7 @@ def test_assign_roles_uses_supported_windows_for_other_labels(tmp_path: Path) ->
         CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
         1000,
     )
-    assign_roles(store, CONFIG, "b" * 64)
+    assign_roles(store, "b" * 64)
     roles_seen = frozenset(_roles_by_stable_row_id(store).values())
     assert roles_seen.issubset(
         frozenset(
@@ -181,7 +181,7 @@ def test_assign_roles_has_guard_gap_at_boundary(tmp_path: Path) -> None:
     store = _store_with_rows(
         tmp_path / "guard-gap.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
     )
-    assign_roles(store, CONFIG, "b" * 64)
+    assign_roles(store, "b" * 64)
     roles = _roles_by_stable_row_id(store)
     assert f"{145:064x}" not in roles
     assert roles[f"{144:064x}"] is Role.SOURCE_PROPOSAL
@@ -195,8 +195,8 @@ def test_assign_roles_is_deterministic(tmp_path: Path) -> None:
     second_store = _store_with_rows(
         tmp_path / "second.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200
     )
-    assign_roles(first_store, CONFIG, "b" * 64)
-    assign_roles(second_store, CONFIG, "b" * 64)
+    assign_roles(first_store, "b" * 64)
+    assign_roles(second_store, "b" * 64)
     assert _roles_by_stable_row_id(first_store) == _roles_by_stable_row_id(second_store)
 
 
@@ -206,7 +206,7 @@ def test_assign_roles_respects_sampling_cap_and_assigns_each_row_at_most_once(
     store = _store_with_rows(
         tmp_path / "capped.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 20000
     )
-    assign_roles(store, CONFIG, "b" * 64)
+    assign_roles(store, "b" * 64)
     roles = _roles_by_stable_row_id(store)
     candidate_screen_ids = tuple(
         stable_row_id for stable_row_id, role in roles.items() if role is Role.CANDIDATE_SCREEN

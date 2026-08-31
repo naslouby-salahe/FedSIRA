@@ -65,6 +65,23 @@ class ExperimentLifecycleState(StrEnum):
     INVALID = "Invalid"
 
 
+class ProjectStage(StrEnum):
+    DOCTOR_READINESS = "doctor readiness diagnosis"
+    PREPROCESSING_AND_DATA_VALIDATION = "preprocessing and data/domain validation"
+    PROTOCOL_INVARIANT_SMOKE = "protocol/invariant smoke"
+    BASELINE_IMPLEMENTATION_VALIDATION = "baseline implementation validation"
+    MECHANISM_COLLAPSE = "four mechanism-collapse experiments"
+    RESOLVED_CORE_DERIVATION = "resolved-core derivation"
+    PRIMARY_CONFIRMATORY_EVALUATION = "primary confirmatory evaluation"
+    MECHANISM_ABLATIONS = "mechanism ablations"
+    BYZANTINE_ROBUSTNESS = "Byzantine robustness and bound violations"
+    EVIDENCE_AND_FAILURE_BOUNDARIES = "evidence and scientific failure boundaries"
+    DELAY_AND_EFFICIENCY = "delay and efficiency"
+    SECONDARY_GENERALIZATION = "secondary generalization"
+    STATISTICAL_CLAIM_COMPLETION = "project statistical/claim completion"
+    REPORT_EXPORT = "report project verification and export"
+
+
 class ScientificCellPhase(StrEnum):
     PREPARE = "PREPARE"
     TRAIN = "TRAIN"

@@ -18,7 +18,6 @@ from fedsira.artifacts.records import (
 )
 from fedsira.artifacts.storage import publish_or_reuse_artifact_payload
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.config.schema import ScientificConfig
 from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
@@ -52,6 +51,11 @@ from fedsira.domain.records import (
     Probability,
     SchemaVersion,
 )
+from fedsira.runtime.state import (
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
+)
 
 DATASET_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
 
@@ -67,12 +71,10 @@ def _publish_dataset_manifest(
         ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
     )
     producer_fingerprint = compute_producer_component_fingerprint(
-        entry_modules,
-        schema_version=DATASET_MANIFEST_SCHEMA_VERSION,
+        entry_modules, schema_version=DATASET_MANIFEST_SCHEMA_VERSION
     )
     external_fingerprint = compute_external_dependency_fingerprint(
-        entry_modules,
-        specification.relevant_external_import_names,
+        entry_modules, specification.relevant_external_import_names
     )
     fingerprint_payload: FingerprintPayload = dataset.value
     identity: ArtifactDigest = compute_artifact_dependency_fingerprint(
@@ -88,21 +90,18 @@ def _publish_dataset_manifest(
         family=ArtifactFamily.DATASET_MANIFEST,
         identity=identity,
         payload=payload.model_dump_json().encode("utf-8"),
-        published_directory=(
-            REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST)
-        ),
-        staging_root=(
-            REPOSITORY_ROOT
-            / config.runtime.repository_layout.execution_workspace
-            / "cache"
-            / "staging"
-        ),
+        published_directory=REPOSITORY_ROOT
+        / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST),
+        staging_root=REPOSITORY_ROOT
+        / config.runtime.repository_layout.execution_workspace
+        / "cache"
+        / "staging",
     )
     return reused
 
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    config = current_application_context().scientific_config
     raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
     extraction_cache_root = (
         REPOSITORY_ROOT
@@ -113,7 +112,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
     validate_target_holder_feasibility(
         discovered,
-        minimum_target_holding_domains=(config.datasets.primary.minimum_target_holding_domains),
+        minimum_target_holding_domains=config.datasets.primary.minimum_target_holding_domains,
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
     unavailable_classes: tuple[DatasetClassToken, ...] = tuple(
@@ -125,7 +124,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         observed_header = read_predictor_header(item.absolute_path)
         validate_consistent_predictor_schema(reference_header, observed_header)
         validate_all_predictors_finite(item.absolute_path, reference_header)
-
     reused = _publish_dataset_manifest(
         DatasetId.N_BAIOT,
         config,
@@ -137,7 +135,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     )
     views, moments = materialize_nbaiot_prepared_views(
         discovered,
-        config,
         REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT),
         REPOSITORY_ROOT / prepared_feature_root(),
         overwrite,
@@ -153,7 +150,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
 
 
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
-    config = load_scientific_config(PRODUCTION_CONFIG_PATH)
+    config = current_application_context().scientific_config
     csv_root = (
         REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
     )
@@ -166,7 +163,6 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     )
     summary = materialize_ciciot2023_prepared_views(
         discovered,
-        config,
         REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023),
         REPOSITORY_ROOT / prepared_feature_root(),
         REPOSITORY_ROOT / preprocessing_metadata_root(),
@@ -210,6 +206,12 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
 
 
 def execute(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        _execute_bound(dataset, overwrite)
+
+
+def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
     selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
     for selected_dataset in selected_datasets:
         if selected_dataset is DatasetId.N_BAIOT:

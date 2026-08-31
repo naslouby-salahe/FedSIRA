@@ -85,6 +85,7 @@ from fedsira.domain.records import (
     TextValue,
 )
 from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime.state import current_application_context
 
 RawCsvValue = Annotated[str, Field(strict=True)]
 FeaturePayloadBytes = Annotated[bytes, Field(min_length=8)]
@@ -801,9 +802,9 @@ def _assign_group_role(
 
 def assign_roles(
     store: SecondaryPreparationStore,
-    config: ScientificConfig,
     dataset_manifest_hash: DatasetManifestDigest,
 ) -> None:
+    config = current_application_context().scientific_config
     for group in store.groups():
         ordered_roles = (
             TARGET_ROLE_ORDER if group.normalized_label == TARGET_LABEL else SUPPORTED_ROLE_ORDER
@@ -1195,13 +1196,13 @@ def resolve_row_identifier_columns(
 
 def materialize_ciciot2023_prepared_views(
     discovered: tuple[SecondaryCsvFile, ...],
-    config: ScientificConfig,
     prepared_root: Path,
     scaler_root: Path,
     metadata_root: Path,
     cache_root: Path,
     overwrite: OverwriteExisting = False,
 ) -> SecondaryMaterializationSummary:
+    config = current_application_context().scientific_config
     if not discovered:
         raise ValueError("CICIoT2023 materialization requires discovered CSV shards")
     dataset_manifest_hash = compute_dataset_manifest_hash(discovered)
@@ -1287,7 +1288,7 @@ def materialize_ciciot2023_prepared_views(
         normalized_labels = frozenset(normalize_label(label) for label in raw_labels)
         validate_target_label_present(normalized_labels)
         class_registry = build_class_registry(normalized_labels)
-        assign_roles(store, config, dataset_manifest_hash)
+        assign_roles(store, dataset_manifest_hash)
         scaler = _fit_secondary_scaler(store, predictor_columns, config)
         views = _write_prepared_views(store, predictor_columns, scaler, config, prepared_root)
         metadata_root.mkdir(parents=True, exist_ok=True)
