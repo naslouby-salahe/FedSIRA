@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.config.schema import BaselinesConfig, ThreeRowCoordinateMedianConfig
+from fedsira.config.schema import ThreeRowCoordinateMedianConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.records import (
@@ -14,6 +14,7 @@ from fedsira.domain.records import (
 )
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 from fedsira.runtime.determinism import derive_uint32
+from fedsira.runtime.state import current_application_context
 
 CLIENT_SAMPLING_SEPARATOR = SeedNamespace.CLIENT_SAMPLING.value
 
@@ -55,8 +56,9 @@ def coordinate_wise_median_synthesis(
     return torch.median(stacked, dim=0).values
 
 
-def krum_reference_post_reference_rounds(baselines_config: BaselinesConfig) -> FederatedRoundCount:
-    return baselines_config.krum_robust_aggregation_post_reference_rounds
+def krum_reference_post_reference_rounds() -> FederatedRoundCount:
+    baselines = current_application_context().scientific_config.baselines
+    return baselines.krum_robust_aggregation_post_reference_rounds
 
 
 def client_sampling_round_seed(master_seed: MasterSeed, round_index: RoundIndex) -> DerivedSeed:

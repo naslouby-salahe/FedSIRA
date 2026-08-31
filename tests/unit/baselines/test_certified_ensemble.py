@@ -15,7 +15,7 @@ BASELINES_CONFIG = CONFIG.baselines
 
 def test_certified_ensemble_post_reference_rounds_uses_governed_config() -> None:
     assert (
-        certified_ensemble_post_reference_rounds(BASELINES_CONFIG)
+        certified_ensemble_post_reference_rounds()
         == BASELINES_CONFIG.multiple_model_certified_ensemble_post_reference_rounds
     )
 

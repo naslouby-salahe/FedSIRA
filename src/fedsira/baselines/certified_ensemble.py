@@ -1,7 +1,6 @@
 from collections import OrderedDict
 from collections.abc import Sequence
 
-from fedsira.config.schema import BaselinesConfig
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBaiotDomain,
@@ -18,14 +17,14 @@ from fedsira.domain.records import (
     RowCount,
     TargetBearingMemberPresent,
 )
+from fedsira.runtime.state import current_application_context
 
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 
 
-def certified_ensemble_post_reference_rounds(
-    baselines_config: BaselinesConfig,
-) -> FederatedRoundCount:
-    return baselines_config.multiple_model_certified_ensemble_post_reference_rounds
+def certified_ensemble_post_reference_rounds() -> FederatedRoundCount:
+    baselines = current_application_context().scientific_config.baselines
+    return baselines.multiple_model_certified_ensemble_post_reference_rounds
 
 
 def certified_ensemble_domain_groups(

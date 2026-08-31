@@ -3,7 +3,7 @@ from typing import Final
 import torch
 
 from fedsira.baselines.references import post_reference_retrain_maximum_local_epochs
-from fedsira.config.schema import BaselinesConfig, MaterialityConfig
+from fedsira.config.schema import MaterialityConfig
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState
 from fedsira.domain.records import (
@@ -16,6 +16,7 @@ from fedsira.domain.records import (
     ReviewerPositiveDecision,
     SourceIsProductionUpdate,
 )
+from fedsira.runtime.state import current_application_context
 
 CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.CANDIDATE_SCREEN,
@@ -82,7 +83,6 @@ def independent_local_reference_reviewer_is_positive(
     )
 
 
-def secure_continual_assessment_post_reference_rounds(
-    baselines_config: BaselinesConfig,
-) -> FederatedRoundCount:
-    return baselines_config.secure_continual_assessment_post_reference_rounds
+def secure_continual_assessment_post_reference_rounds() -> FederatedRoundCount:
+    baselines = current_application_context().scientific_config.baselines
+    return baselines.secure_continual_assessment_post_reference_rounds

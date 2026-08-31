@@ -14,7 +14,7 @@ SYNTHESIS_CONFIG = CONFIG.protocol.synthesis
 
 def test_krum_reference_post_reference_rounds_uses_governed_config() -> None:
     assert (
-        krum_reference_post_reference_rounds(BASELINES_CONFIG)
+        krum_reference_post_reference_rounds()
         == BASELINES_CONFIG.krum_robust_aggregation_post_reference_rounds
     )
 

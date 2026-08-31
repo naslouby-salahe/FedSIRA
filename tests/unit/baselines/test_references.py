@@ -21,10 +21,7 @@ SOURCE = NBAIOT_DOMAIN_ORDER[0]
 
 
 def test_local_only_reference_uses_governed_epoch_count_and_anchor_train_role() -> None:
-    assert (
-        local_only_reference_local_epochs(BASELINES_CONFIG)
-        == BASELINES_CONFIG.local_only_reference_epochs
-    )
+    assert local_only_reference_local_epochs() == BASELINES_CONFIG.local_only_reference_epochs
     assert local_only_reference_training_role() is Role.ANCHOR_TRAIN
 
 
@@ -34,10 +31,7 @@ def test_local_only_reference_evaluation_is_domain_local() -> None:
 
 
 def test_centralized_reference_uses_governed_epoch_count() -> None:
-    assert (
-        centralized_reference_local_epochs(BASELINES_CONFIG)
-        == BASELINES_CONFIG.centralized_reference_epochs
-    )
+    assert centralized_reference_local_epochs() == BASELINES_CONFIG.centralized_reference_epochs
 
 
 def test_centralized_reference_pooled_rows_concatenates_in_canonical_domain_order() -> None:
@@ -52,11 +46,11 @@ def test_centralized_reference_pooled_rows_concatenates_in_canonical_domain_orde
 
 
 def test_fedavg_reference_post_reference_budget() -> None:
+    assert fedavg_reference_post_reference_rounds() == BASELINES_CONFIG.fedavg_post_reference_rounds
     assert (
-        fedavg_reference_post_reference_rounds(BASELINES_CONFIG)
-        == BASELINES_CONFIG.fedavg_post_reference_rounds
+        fedavg_reference_post_reference_local_epochs()
+        == CONFIG.model.anchor_fedavg.local_epochs_per_round
     )
-    assert fedavg_reference_post_reference_local_epochs() == 1
 
 
 def test_fedavg_reference_post_reference_participants_includes_source_when_available() -> None:

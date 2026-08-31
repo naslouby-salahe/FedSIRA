@@ -11,7 +11,14 @@ BOOTSTRAP_RELATIVE = frozenset(
         "runtime/state.py",
     }
 )
-FORBIDDEN_TYPE_NAMES = frozenset({"ScientificConfig"})
+FORBIDDEN_TYPE_NAMES = frozenset(
+    {
+        "ScientificConfig",
+        "PublicationRoundingConfig",
+        "BaselinesConfig",
+        "TestFixtureConfig",
+    }
+)
 
 
 def _annotation_names(annotation: ast.expr | None) -> set[str]:

@@ -1895,7 +1895,7 @@ def train_local_only_reference_checkpoint(
         config.model.optimizer.anchor_and_standard_fl_learning_rate,
         config.model.optimizer,
         config.model.training,
-        local_only_reference_local_epochs(config.baselines),
+        local_only_reference_local_epochs(),
         LocalTrainingClient(
             features=features, labels=labels, sample_ids=sample_ids, training_seed=training_seed
         ),
@@ -1966,7 +1966,7 @@ def train_centralized_reference_checkpoint(
         config.model.optimizer.anchor_and_standard_fl_learning_rate,
         config.model.optimizer,
         config.model.training,
-        centralized_reference_local_epochs(config.baselines),
+        centralized_reference_local_epochs(),
         LocalTrainingClient(
             features=pooled_features,
             labels=pooled_labels,
@@ -2342,13 +2342,12 @@ def train_fedavg_reference_delta(
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
 ) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
     return _train_ordinary_fedavg_delta(
         prepared_root,
         master_seed,
         anchor,
         source_domain,
-        fedavg_reference_post_reference_rounds(config.baselines),
+        fedavg_reference_post_reference_rounds(),
         FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
     )
 
@@ -2359,13 +2358,12 @@ def train_secure_continual_assessment_delta(
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
 ) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
     return _train_ordinary_fedavg_delta(
         prepared_root,
         master_seed,
         anchor,
         source_domain,
-        secure_continual_assessment_post_reference_rounds(config.baselines),
+        secure_continual_assessment_post_reference_rounds(),
         SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN,
     )
 
@@ -2556,7 +2554,7 @@ def train_certified_ensemble_group_checkpoints(
         model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
         load_flat_trainable_parameters(model, group_anchor.flat_parameters)
         state = model_state_from_classifier(model)
-        for round_index in range(certified_ensemble_post_reference_rounds(config.baselines)):
+        for round_index in range(certified_ensemble_post_reference_rounds()):
             round_clients = _group_post_reference_round_clients(
                 prepared_root, master_seed, group_domains, group_index, round_index
             )
@@ -2728,7 +2726,7 @@ def train_krum_reference_delta(
     load_flat_trainable_parameters(model, anchor.flat_parameters)
     state = model_state_from_classifier(model)
     participant_count = config.protocol.synthesis.committee_size
-    for round_index in range(krum_reference_post_reference_rounds(config.baselines)):
+    for round_index in range(krum_reference_post_reference_rounds()):
         round_order = client_sampling_round_order(eligible_domains, master_seed, round_index)
         participants = krum_reference_round_participants(round_order, None, participant_count)
         if participants is None:

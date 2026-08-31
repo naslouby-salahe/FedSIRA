@@ -2,7 +2,6 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.config.schema import BaselinesConfig
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 from fedsira.domain.records import (
@@ -14,8 +13,8 @@ from fedsira.domain.records import (
 from fedsira.runtime.state import current_application_context
 
 
-def local_only_reference_local_epochs(baselines_config: BaselinesConfig) -> LocalEpochCount:
-    return baselines_config.local_only_reference_epochs
+def local_only_reference_local_epochs() -> LocalEpochCount:
+    return current_application_context().scientific_config.baselines.local_only_reference_epochs
 
 
 def local_only_reference_training_role() -> Role:
@@ -28,8 +27,8 @@ def local_only_reference_evaluation_is_domain_local(
     return checkpoint_domain == evaluation_domain
 
 
-def centralized_reference_local_epochs(baselines_config: BaselinesConfig) -> LocalEpochCount:
-    return baselines_config.centralized_reference_epochs
+def centralized_reference_local_epochs() -> LocalEpochCount:
+    return current_application_context().scientific_config.baselines.centralized_reference_epochs
 
 
 def pool_domain_rows(
@@ -45,10 +44,8 @@ def centralized_reference_pooled_rows(
     return pool_domain_rows(ordered_domains, domain_rows)
 
 
-def fedavg_reference_post_reference_rounds(
-    baselines_config: BaselinesConfig,
-) -> FederatedRoundCount:
-    return baselines_config.fedavg_post_reference_rounds
+def fedavg_reference_post_reference_rounds() -> FederatedRoundCount:
+    return current_application_context().scientific_config.baselines.fedavg_post_reference_rounds
 
 
 def standard_fl_anchor_rounds() -> FederatedRoundCount:

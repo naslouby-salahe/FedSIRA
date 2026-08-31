@@ -11,7 +11,7 @@ BASELINES_CONFIG = CONFIG.baselines
 
 def test_secure_continual_assessment_post_reference_rounds_uses_governed_config() -> None:
     assert (
-        secure_continual_assessment_post_reference_rounds(BASELINES_CONFIG)
+        secure_continual_assessment_post_reference_rounds()
         == BASELINES_CONFIG.secure_continual_assessment_post_reference_rounds
     )
 
