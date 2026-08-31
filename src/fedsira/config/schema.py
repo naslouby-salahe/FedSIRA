@@ -37,6 +37,7 @@ from fedsira.domain.records import (
     Doi,
     DomainCount,
     DurationToleranceSeconds,
+    EnvironmentText,
     EvidenceCycleIndex,
     FamilyWiseAlpha,
     FeatureCount,
@@ -44,6 +45,8 @@ from fedsira.domain.records import (
     FederatedRoundCount,
     FixtureCaseName,
     FoldCount,
+    GigabyteCount,
+    GpuCount,
     GradientL2Clip,
     GroupCount,
     HashModulus,
@@ -650,6 +653,20 @@ class TimingConfig(FrozenConfigModel):
     warmup_forward_passes: WarmupPassCount
 
 
+class ReferenceEnvironmentConfig(FrozenConfigModel):
+    os_name: EnvironmentText
+    os_version_id: EnvironmentText
+    python_version: EnvironmentText
+    cuda_runtime_version: EnvironmentText
+    gpu_name: EnvironmentText
+    gpu_vram_gigabytes: GigabyteCount
+    minimum_cpu_ram_gigabytes: GigabyteCount
+    minimum_free_storage_gigabytes: GigabyteCount
+    required_gpu_count: GpuCount
+    unrar_version: EnvironmentText
+    cublas_workspace_config: EnvironmentText
+
+
 class RuntimeConfig(FrozenConfigModel):
     repository_layout: RepositoryLayoutConfig
     data_loader: DataLoaderConfig
@@ -657,6 +674,7 @@ class RuntimeConfig(FrozenConfigModel):
     automatic_infrastructure_retries_per_cell_phase: RetryCount
     timing: TimingConfig
     same_environment_absolute_metric_tolerance: MetricTolerance
+    reference_environment: ReferenceEnvironmentConfig
 
 
 class ByzantineOperatingRegionConfig(FrozenConfigModel):

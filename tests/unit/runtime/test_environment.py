@@ -4,9 +4,7 @@ from pathlib import Path
 import torch
 
 from fedsira.runtime.environment import (
-    CUBLAS_WORKSPACE_CONFIG_VALUE,
     PREPROCESSING_OR_REPORT_ONLY_HASHSEED,
-    REFERENCE_UNRAR_VERSION,
     check_hardware_resources,
     check_installed_package_versions,
     check_operating_system,
@@ -18,6 +16,7 @@ from fedsira.runtime.environment import (
     pythonhashseed_for_preprocessing_or_report_subprocess,
     pythonhashseed_for_smoke_subprocess,
 )
+from fedsira.runtime.state import current_application_context
 
 
 def test_pythonhashseed_for_master_seed_subprocess_is_decimal_of_the_seed() -> None:
@@ -71,12 +70,18 @@ def test_check_unrar_availability_reports_a_mismatch_when_version_absent_or_wron
     mismatches = check_unrar_availability(rar_archives_present=True)
     assert isinstance(mismatches, tuple)
     for mismatch in mismatches:
-        assert mismatch.expected == REFERENCE_UNRAR_VERSION
+        expected = (
+            current_application_context().scientific_config.runtime.reference_environment.unrar_version
+        )
+        assert mismatch.expected == expected
 
 
 def test_configure_deterministic_backend_sets_cublas_workspace_config() -> None:
     configure_deterministic_backend()
-    assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == CUBLAS_WORKSPACE_CONFIG_VALUE
+    expected_workspace = (
+        current_application_context().scientific_config.runtime.reference_environment.cublas_workspace_config
+    )
+    assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == expected_workspace
     assert torch.backends.cudnn.deterministic is True
     assert torch.backends.cudnn.benchmark is False
     torch.use_deterministic_algorithms(False)

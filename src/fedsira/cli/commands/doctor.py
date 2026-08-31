@@ -85,13 +85,12 @@ class DoctorReport(FrozenDomainModel):
 def diagnose(config_path: Path | None = None) -> DoctorReport:
     raw_data_path = REPOSITORY_ROOT / "data" / "raw"
     rar_archives_present = raw_data_path.exists() and any(raw_data_path.rglob("*.rar"))
-    environment_mismatches = collect_environment_mismatches(REPOSITORY_ROOT, rar_archives_present)
     try:
         context = ApplicationContext.load(REPOSITORY_ROOT, config_path)
     except ValueError as error:
         _LOGGER.info("configuration load failed")
         return DoctorReport(
-            environment_mismatches=environment_mismatches,
+            environment_mismatches=(),
             configuration_loadable=False,
             configuration_error=str(error),
             dataset_readiness=ExperimentLifecycleState.NOT_STARTED,
@@ -102,6 +101,9 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
     with bound_application_context(context):
+        environment_mismatches = collect_environment_mismatches(
+            REPOSITORY_ROOT, rar_archives_present
+        )
         return _diagnose_bound(context, environment_mismatches)
 
 

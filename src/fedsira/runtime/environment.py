@@ -8,28 +8,23 @@ from typing import Protocol, cast
 
 import torch
 
+from fedsira.config.schema import ReferenceEnvironmentConfig
 from fedsira.domain.records import (
     BooleanValue,
+    ByteCount,
     DeterministicExecutionReady,
     EnvironmentText,
     FrozenDomainModel,
     MasterSeed,
-    PositiveInt,
 )
+from fedsira.runtime.state import current_application_context
 
-REFERENCE_OS_NAME: EnvironmentText = "Ubuntu"
-REFERENCE_OS_VERSION_ID: EnvironmentText = "24.04"
-REFERENCE_PYTHON_VERSION: EnvironmentText = "3.11.9"
-REFERENCE_CUDA_RUNTIME_VERSION: EnvironmentText = "12.8"
-REFERENCE_GPU_NAME: EnvironmentText = "NVIDIA GeForce RTX 5060 Ti"
-REFERENCE_GPU_VRAM_GIGABYTES: PositiveInt = 16
-MINIMUM_CPU_RAM_GIGABYTES: PositiveInt = 32
-MINIMUM_FREE_STORAGE_GIGABYTES: PositiveInt = 100
-REQUIRED_GPU_COUNT: PositiveInt = 1
-BYTES_PER_GIGABYTE: PositiveInt = 1_073_741_824
-REFERENCE_UNRAR_VERSION: EnvironmentText = "1:7.0.7-1build1"
-CUBLAS_WORKSPACE_CONFIG_VALUE: EnvironmentText = ":4096:8"
+BYTES_PER_GIGABYTE: ByteCount = 1_073_741_824
 PREPROCESSING_OR_REPORT_ONLY_HASHSEED: EnvironmentText = "0"
+
+
+def _reference_environment() -> ReferenceEnvironmentConfig:
+    return current_application_context().scientific_config.runtime.reference_environment
 
 
 class PackageVersionRequirement(FrozenDomainModel):
@@ -79,11 +74,12 @@ def check_python_version() -> tuple[EnvironmentMismatch, ...]:
     actual: EnvironmentText = (
         f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     )
-    if actual != REFERENCE_PYTHON_VERSION:
+    expected = _reference_environment().python_version
+    if actual != expected:
         return (
             EnvironmentMismatch(
                 component="python",
-                expected=REFERENCE_PYTHON_VERSION,
+                expected=expected,
                 actual=actual,
             ),
         )
@@ -117,6 +113,7 @@ def check_installed_package_versions() -> tuple[EnvironmentMismatch, ...]:
 
 def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
     mismatches: list[EnvironmentMismatch] = []
+    reference = _reference_environment()
     if not torch.cuda.is_available():
         return (
             EnvironmentMismatch(
@@ -126,39 +123,39 @@ def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
             ),
         )
     device_count = torch.cuda.device_count()
-    if device_count != REQUIRED_GPU_COUNT:
+    if device_count != reference.required_gpu_count:
         mismatches.append(
             EnvironmentMismatch(
                 component="gpu_count",
-                expected=str(REQUIRED_GPU_COUNT),
+                expected=str(reference.required_gpu_count),
                 actual=str(device_count),
             )
         )
     cuda_version = torch.version.cuda
-    if cuda_version != REFERENCE_CUDA_RUNTIME_VERSION:
+    if cuda_version != reference.cuda_runtime_version:
         mismatches.append(
             EnvironmentMismatch(
                 component="cuda_runtime_version",
-                expected=REFERENCE_CUDA_RUNTIME_VERSION,
+                expected=reference.cuda_runtime_version,
                 actual=str(cuda_version),
             )
         )
     device_name = torch.cuda.get_device_name(0)
-    if device_name != REFERENCE_GPU_NAME:
+    if device_name != reference.gpu_name:
         mismatches.append(
             EnvironmentMismatch(
                 component="gpu_name",
-                expected=REFERENCE_GPU_NAME,
+                expected=reference.gpu_name,
                 actual=device_name,
             )
         )
     _, total_memory_bytes = torch.cuda.mem_get_info(0)
     vram_gigabytes = total_memory_bytes / BYTES_PER_GIGABYTE
-    if round(vram_gigabytes) < REFERENCE_GPU_VRAM_GIGABYTES:
+    if round(vram_gigabytes) < reference.gpu_vram_gigabytes:
         mismatches.append(
             EnvironmentMismatch(
                 component="gpu_vram_gigabytes",
-                expected=f">={REFERENCE_GPU_VRAM_GIGABYTES}",
+                expected=f">={reference.gpu_vram_gigabytes}",
                 actual=f"{vram_gigabytes:.1f}",
             )
         )
@@ -178,7 +175,8 @@ def _os_release_field(
 
 def check_operating_system() -> tuple[EnvironmentMismatch, ...]:
     os_release_path = Path("/etc/os-release")
-    expected: EnvironmentText = f"{REFERENCE_OS_NAME} {REFERENCE_OS_VERSION_ID}"
+    reference = _reference_environment()
+    expected: EnvironmentText = f"{reference.os_name} {reference.os_version_id}"
     if not os_release_path.exists():
         return (
             EnvironmentMismatch(
@@ -191,7 +189,7 @@ def check_operating_system() -> tuple[EnvironmentMismatch, ...]:
     observed_name = _os_release_field(lines, "NAME")
     observed_version = _os_release_field(lines, "VERSION_ID")
     actual: EnvironmentText = f"{observed_name or ''} {observed_version or ''}".strip()
-    if observed_name != REFERENCE_OS_NAME or observed_version != REFERENCE_OS_VERSION_ID:
+    if observed_name != reference.os_name or observed_version != reference.os_version_id:
         return (
             EnvironmentMismatch(
                 component="operating_system",
@@ -207,20 +205,21 @@ def check_hardware_resources(workspace_path: Path) -> tuple[EnvironmentMismatch,
     total_ram_gigabytes = (
         os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     ) / BYTES_PER_GIGABYTE
-    if total_ram_gigabytes < MINIMUM_CPU_RAM_GIGABYTES:
+    reference = _reference_environment()
+    if total_ram_gigabytes < reference.minimum_cpu_ram_gigabytes:
         mismatches.append(
             EnvironmentMismatch(
                 component="cpu_ram_gigabytes",
-                expected=f">={MINIMUM_CPU_RAM_GIGABYTES}",
+                expected=f">={reference.minimum_cpu_ram_gigabytes}",
                 actual=f"{total_ram_gigabytes:.1f}",
             )
         )
     free_storage_gigabytes = shutil.disk_usage(workspace_path).free / BYTES_PER_GIGABYTE
-    if free_storage_gigabytes < MINIMUM_FREE_STORAGE_GIGABYTES:
+    if free_storage_gigabytes < reference.minimum_free_storage_gigabytes:
         mismatches.append(
             EnvironmentMismatch(
                 component="free_storage_gigabytes",
-                expected=f">={MINIMUM_FREE_STORAGE_GIGABYTES}",
+                expected=f">={reference.minimum_free_storage_gigabytes}",
                 actual=f"{free_storage_gigabytes:.1f}",
             )
         )
@@ -232,6 +231,7 @@ def check_unrar_availability(
 ) -> tuple[EnvironmentMismatch, ...]:
     if not rar_archives_present:
         return ()
+    expected = _reference_environment().unrar_version
     try:
         result = subprocess.run(
             ["dpkg-query", "--showformat=${Version}", "--show", "unrar"],
@@ -243,16 +243,16 @@ def check_unrar_availability(
         return (
             EnvironmentMismatch(
                 component="unrar_version",
-                expected=REFERENCE_UNRAR_VERSION,
+                expected=expected,
                 actual="not installed",
             ),
         )
     actual_version: EnvironmentText = result.stdout.strip() or "not installed"
-    if result.returncode != 0 or actual_version != REFERENCE_UNRAR_VERSION:
+    if result.returncode != 0 or actual_version != expected:
         return (
             EnvironmentMismatch(
                 component="unrar_version",
-                expected=REFERENCE_UNRAR_VERSION,
+                expected=expected,
                 actual=actual_version,
             ),
         )
@@ -260,7 +260,7 @@ def check_unrar_availability(
 
 
 def configure_deterministic_backend() -> None:
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = CUBLAS_WORKSPACE_CONFIG_VALUE
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = _reference_environment().cublas_workspace_config
     torch.use_deterministic_algorithms(True, warn_only=False)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False

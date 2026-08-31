@@ -303,6 +303,18 @@ runtime:
   timing:
     warmup_forward_passes: 1
   same_environment_absolute_metric_tolerance: 1.0e-06
+  reference_environment:
+    os_name: Ubuntu
+    os_version_id: "24.04"
+    python_version: "3.11.9"
+    cuda_runtime_version: "12.8"
+    gpu_name: NVIDIA GeForce RTX 5060 Ti
+    gpu_vram_gigabytes: 16
+    minimum_cpu_ram_gigabytes: 32
+    minimum_free_storage_gigabytes: 100
+    required_gpu_count: 1
+    unrar_version: "1:7.0.7-1build1"
+    cublas_workspace_config: ":4096:8"
 claim_support_thresholds:
   byzantine_operating_region:
     maximum_malicious_admissions_within_bound: 0
