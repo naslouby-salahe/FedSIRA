@@ -70,17 +70,14 @@ def test_check_unrar_availability_reports_a_mismatch_when_version_absent_or_wron
     mismatches = check_unrar_availability(rar_archives_present=True)
     assert isinstance(mismatches, tuple)
     for mismatch in mismatches:
-        expected = (
-            current_application_context().scientific_config.runtime.reference_environment.unrar_version
-        )
-        assert mismatch.expected == expected
+        reference = current_application_context().scientific_config.runtime
+        assert mismatch.expected == reference.reference_environment.unrar_version
 
 
 def test_configure_deterministic_backend_sets_cublas_workspace_config() -> None:
     configure_deterministic_backend()
-    expected_workspace = (
-        current_application_context().scientific_config.runtime.reference_environment.cublas_workspace_config
-    )
+    reference = current_application_context().scientific_config.runtime
+    expected_workspace = reference.reference_environment.cublas_workspace_config
     assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == expected_workspace
     assert torch.backends.cudnn.deterministic is True
     assert torch.backends.cudnn.benchmark is False
