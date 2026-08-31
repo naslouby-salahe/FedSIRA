@@ -234,6 +234,7 @@ AdmissionRateChange = Probability
 TargetF1Change = Probability
 AtLeastTwoByzantineProbability = Probability
 Percentile = Percentage
+QuantileProbability = Probability
 RoleBoundary = Probability
 RolePosition = Probability
 

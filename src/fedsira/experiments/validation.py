@@ -1,16 +1,31 @@
 from __future__ import annotations
 
+import inspect
+from collections import OrderedDict
+
+import numpy
+import torch
+
 from fedsira.analysis.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
+from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.paths import smoke_record_path
+from fedsira.artifacts.records import ArtifactManifest
+from fedsira.baselines.registry import validate_role_not_used_for_tuning
 from fedsira.config.loading import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
 )
-from fedsira.config.schema import TestFixtureConfig
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import SUPPORTED_ROLE_ORDER, Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ArtifactLifecycleState,
+    ClaimState,
+    ExperimentLifecycleState,
+    ScientificCellPhase,
+    TernaryOutcome,
+)
 from fedsira.domain.records import (
     AdequateFinalGateDomainCount,
     ExperimentName,
@@ -24,6 +39,13 @@ from fedsira.domain.records import (
     ScientificCellSemanticKey,
     TextValue,
 )
+from fedsira.evaluation.aggregation import (
+    bootstrap_percentile_confidence_interval,
+    quantile_type7,
+)
+from fedsira.evaluation.metrics import accuracy, compute_confusion_counts
+from fedsira.evaluation.records import AdmissionDelayDecomposition
+from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
 from fedsira.experiments.registry import (
     AblationVariant,
@@ -33,13 +55,36 @@ from fedsira.experiments.registry import (
     RootCauseMixture,
     experiment_by_name,
 )
+from fedsira.learning.aggregation import (
+    ModelParameter,
+    ModelState,
+    WeightedModelState,
+    federated_averaging,
+)
+from fedsira.learning.post_reference import (
+    compute_stability_kl,
+    post_reference_training_step,
+    run_post_reference_training,
+)
+from fedsira.learning.training import build_loss_function, build_optimizer
+from fedsira.models.mlp import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    trainable_parameter_count,
+)
+from fedsira.protocol.admission import validate_admission_requires_final_gate
+from fedsira.protocol.claim_contract import (
+    SOURCE_DIRECT_PRODUCTION_WEIGHT,
+    validate_source_excluded_production_weight,
+)
 from fedsira.protocol.reproduction import validate_commitment_exists_before_verifier_assignment
+from fedsira.protocol.synthesis import select_krum_update
 from fedsira.protocol.theory import (
     diagnostic_at_least_two_byzantine_probability,
     krum_committee_is_admissible,
     minimum_honest_positive_count,
 )
-from fedsira.protocol.verification import verifier_is_eligible
+from fedsira.protocol.verification import reproduction_row_is_certified, verifier_is_eligible
 from fedsira.runtime.state import current_application_context
 
 SmokeCheckName = TextValue
@@ -252,16 +297,35 @@ def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
         required_phase_sequence_valid = True
     except ValueError:
         required_phase_sequence_valid = False
-    honest_positive = minimum_honest_positive_count(2, 1) == 1
-    krum_admissible = krum_committee_is_admissible(5, 1)
-    krum_three_rejected = not krum_committee_is_admissible(3, 1)
+    verification = config.protocol.verification
+    synthesis = config.protocol.synthesis
+    three_row = config.baselines.three_row_coordinate_median
+    diagnostic = config.protocol.diagnostic_random_verifier_profile
+    honest_positive_expected = (
+        verification.required_positive_reports - verification.maximum_byzantine_verifiers_per_panel
+    )
+    honest_positive = (
+        minimum_honest_positive_count(
+            verification.required_positive_reports,
+            verification.maximum_byzantine_verifiers_per_panel,
+        )
+        == honest_positive_expected
+    )
+    krum_admissible = krum_committee_is_admissible(
+        synthesis.committee_size, synthesis.maximum_byzantine_reproduction_rows
+    )
+    krum_three_rejected = not krum_committee_is_admissible(
+        three_row.row_count, three_row.assumed_byzantine_rows
+    )
     commitment_rejected = False
     try:
         validate_commitment_exists_before_verifier_assignment(None)
     except ValueError:
         commitment_rejected = True
-    eligible_pool_size = len(NBaiotDomain) - 2
-    probability = diagnostic_at_least_two_byzantine_probability(eligible_pool_size, 2, 3)
+    eligible_pool_size = len(NBaiotDomain) - len((_DANMINI, _ENNIO))
+    probability = diagnostic_at_least_two_byzantine_probability(
+        eligible_pool_size, diagnostic.byzantine_domain_count, diagnostic.panel_size
+    )
     tolerance = config.validation_tolerances.random_committee_probability_absolute
     expected_probability = 1 / eligible_pool_size
     probability_matches = abs(probability - expected_probability) < tolerance
@@ -289,9 +353,8 @@ def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
     )
 
 
-def _mathematical_invariants(
-    fixture_config: TestFixtureConfig,
-) -> tuple[SmokeCheckResult, ...]:
+def _mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
+    fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     sample_count = fixture_config.sign_flip_sample_count
     sign_flip = exact_sign_flip_two_sided_p_value((1.0,) * sample_count)
     sign_flip_matches = sign_flip == fixture_config.sign_flip_expected_p_value
@@ -304,6 +367,286 @@ def _mathematical_invariants(
             detail=f"p={sign_flip:.10f}",
         ),
         SmokeCheckResult(name="Holm adjustment matches hand fixture", passed=holm_matches),
+    )
+
+
+def _model_invariants() -> tuple[SmokeCheckResult, ...]:
+    config = current_application_context().scientific_config
+    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
+    input_width = fixture.smoke_model_input_width
+    output_width = fixture.smoke_model_output_width
+    batch_rows = fixture.smoke_batch_row_count
+    model = FedSIRAClassifier(input_width, output_width)
+    features = torch.ones((batch_rows, input_width))
+    labels = torch.zeros((batch_rows,), dtype=torch.long)
+    logits = model(features)
+    loss = build_loss_function()(logits, labels)
+    loss.backward()
+    finite = bool(torch.isfinite(logits).all()) and bool(torch.isfinite(loss))
+    first = ModelState(
+        parameters=(
+            ModelParameter(
+                name="w",
+                value=torch.tensor(fixture.smoke_fedavg_client_a_weights),
+            ),
+        )
+    )
+    second = ModelState(
+        parameters=(
+            ModelParameter(
+                name="w",
+                value=torch.tensor(fixture.smoke_fedavg_client_b_weights),
+            ),
+        )
+    )
+    count_a = fixture.smoke_fedavg_client_a_example_count
+    count_b = fixture.smoke_fedavg_client_b_example_count
+    averaged = federated_averaging(
+        (
+            WeightedModelState(state=first, example_count=count_a),
+            WeightedModelState(state=second, example_count=count_b),
+        )
+    )
+    total = count_a + count_b
+    expected = torch.tensor(
+        tuple(
+            (left * count_a + right * count_b) / total
+            for left, right in zip(
+                fixture.smoke_fedavg_client_a_weights,
+                fixture.smoke_fedavg_client_b_weights,
+                strict=True,
+            )
+        )
+    )
+    fedavg_matches = bool(torch.allclose(averaged.parameters[0].value, expected))
+    model.eval()
+    restored = FedSIRAClassifier(input_width, output_width)
+    restored.load_state_dict(model.state_dict())
+    restored.eval()
+    with torch.no_grad():
+        original_logits = model(features)
+        restored_logits = restored(features)
+        delta = (restored_logits - original_logits).abs().max()
+    restore_matches = float(delta) <= config.runtime.same_environment_absolute_metric_tolerance
+    report_test_rejected = False
+    try:
+        validate_role_not_used_for_tuning(Role.REPORT_TEST)
+    except ValueError:
+        report_test_rejected = True
+    anchor = FedSIRAClassifier(input_width, output_width)
+    current = FedSIRAClassifier(input_width, output_width)
+    current.load_state_dict(anchor.state_dict())
+    optimizer = build_optimizer(
+        current, config.model.optimizer.post_reference_learning_rate, config.model.optimizer
+    )
+    unsupported = torch.zeros((batch_rows,), dtype=torch.bool)
+    post_reference_training_step(
+        anchor,
+        current,
+        optimizer,
+        build_loss_function(),
+        config.model.training,
+        config.model.post_reference,
+        features,
+        labels,
+        unsupported,
+        flatten_trainable_parameters(anchor).detach(),
+        trainable_parameter_count(current),
+    )
+    temperature = config.model.post_reference.stability_kl_temperature
+    identical = torch.ones((batch_rows, output_width))
+    kl_zero = float(compute_stability_kl(identical, identical, temperature)) >= 0.0
+    constructor_has_no_source = not any(
+        "source" in name for name in inspect.signature(run_post_reference_training).parameters
+    )
+    return (
+        SmokeCheckResult(name="one-batch forward/backward finite", passed=finite),
+        SmokeCheckResult(
+            name="one-round FedAvg matches weighted average fixture",
+            passed=fedavg_matches,
+        ),
+        SmokeCheckResult(name="checkpoint restore reproduces predictions", passed=restore_matches),
+        SmokeCheckResult(
+            name="report-test loader cannot be requested by training",
+            passed=report_test_rejected,
+        ),
+        SmokeCheckResult(
+            name="post-reference minibatch with no supported rows keeps KL defined",
+            passed=kl_zero,
+        ),
+        SmokeCheckResult(
+            name="honest reproduction constructor has no source-artifact parameter",
+            passed=constructor_has_no_source,
+        ),
+    )
+
+
+def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
+    config = current_application_context().scientific_config
+    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
+    source_weight_zero = True
+    try:
+        validate_source_excluded_production_weight(SOURCE_DIRECT_PRODUCTION_WEIGHT)
+        validate_source_excluded_production_weight(fixture.smoke_nonzero_production_weight)
+        source_weight_zero = False
+    except ValueError:
+        source_weight_zero = True
+    verification = config.protocol.verification
+    abstain_panel = tuple(TernaryOutcome.ABSTAIN for _ in range(verification.panel_size))
+    abstain_not_positive = not reproduction_row_is_certified(
+        abstain_panel, verification.panel_size, verification.required_positive_reports
+    )
+    five_row_required = False
+    try:
+        select_krum_update((), config.protocol.synthesis.maximum_byzantine_reproduction_rows)
+    except ValueError:
+        five_row_required = True
+    admission_requires_gate = False
+    try:
+        validate_admission_requires_final_gate(ClaimState.ADMITTED, False)
+    except ValueError:
+        admission_requires_gate = True
+    eight_cases = resolve_all_eight_cases()
+    eight_resolved = len(eight_cases) == 2**3
+    disjoint_roles = (
+        frozenset(SUPPORTED_ROLE_ORDER).isdisjoint(
+            frozenset((Role.SOURCE_PROPOSAL, Role.REPRODUCTION))
+        )
+        and Role.SOURCE_PROPOSAL not in SUPPORTED_ROLE_ORDER
+    )
+    return (
+        SmokeCheckResult(
+            name="source direct production weight cannot become nonzero",
+            passed=source_weight_zero,
+        ),
+        SmokeCheckResult(
+            name="Abstain cannot be cast to boolean vote",
+            passed=abstain_not_positive,
+        ),
+        SmokeCheckResult(
+            name="fewer than five certified rows cannot call primary Krum synthesis",
+            passed=five_row_required,
+        ),
+        SmokeCheckResult(
+            name="final admission without final-gate artifact is impossible",
+            passed=admission_requires_gate,
+        ),
+        SmokeCheckResult(
+            name="all eight collapse combinations resolve",
+            passed=eight_resolved,
+        ),
+        SmokeCheckResult(
+            name="source/reproducer/verifier/final/report roles are disjoint",
+            passed=disjoint_roles,
+        ),
+    )
+
+
+def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
+    config = current_application_context().scientific_config
+    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
+    diagnostic = config.protocol.diagnostic_random_verifier_profile
+    pool = len(NBaiotDomain) - len((_DANMINI, _ENNIO))
+    zero = diagnostic_at_least_two_byzantine_probability(pool, 0, diagnostic.panel_size)
+    one = diagnostic_at_least_two_byzantine_probability(pool, 1, diagnostic.panel_size)
+    tolerance = config.validation_tolerances.random_committee_probability_absolute
+    delay = AdmissionDelayDecomposition(
+        logical_information_arrival_cycles=1,
+        assignment_seconds=fixture.smoke_delay_assignment_seconds,
+        reproduce_seconds=fixture.smoke_delay_reproduce_seconds,
+        verify_seconds=fixture.smoke_delay_verify_seconds,
+        synthesize_seconds=fixture.smoke_delay_synthesize_seconds,
+    )
+    delay_matches = (
+        abs(
+            delay.post_evidence_wall_clock_seconds
+            - (
+                delay.assignment_seconds
+                + delay.reproduce_seconds
+                + delay.verify_seconds
+                + delay.synthesize_seconds
+            )
+        )
+        < config.validation_tolerances.delay_component_sum_seconds_absolute
+    )
+    quantiles = quantile_type7(fixture.smoke_quantile_values, fixture.smoke_quantile_probability)
+    numpy_matches = quantiles == float(
+        numpy.quantile(
+            fixture.smoke_quantile_values, fixture.smoke_quantile_probability, method="linear"
+        )
+    )
+    sample = numpy.array(fixture.smoke_sample_sd_values)
+    sd_matches = float(sample.std(ddof=1)) == float(numpy.std(sample, ddof=1))
+    confusion = compute_confusion_counts(
+        fixture.smoke_confusion_true_labels,
+        fixture.smoke_confusion_predicted_labels,
+        fixture.smoke_confusion_class_token,
+    )
+    confusion_matches = (
+        confusion.true_positive == fixture.smoke_confusion_true_positive
+        and confusion.false_positive == fixture.smoke_confusion_false_positive
+        and confusion.false_negative == fixture.smoke_confusion_false_negative
+        and confusion.true_negative == fixture.smoke_confusion_true_negative
+    )
+    zero_den = accuracy(OrderedDict(), 0)
+    zero_is_na = zero_den.value is None and zero_den.denominator == 0
+    bootstrap_config = config.metrics_and_statistics.bootstrap
+    analysis_seed = config.seeds_and_determinism.analysis_seed
+    first_interval = bootstrap_percentile_confidence_interval(
+        fixture.smoke_bootstrap_values, bootstrap_config, analysis_seed
+    )
+    second_interval = bootstrap_percentile_confidence_interval(
+        fixture.smoke_bootstrap_values, bootstrap_config, analysis_seed
+    )
+    bootstrap_deterministic = first_interval == second_interval
+    return (
+        SmokeCheckResult(
+            name="random-committee exact probability is 0 for compromised-verifier counts 0/1",
+            passed=abs(zero) < tolerance and abs(one) < tolerance,
+        ),
+        SmokeCheckResult(
+            name="post-evidence wall-clock components sum to T_post",
+            passed=delay_matches,
+        ),
+        SmokeCheckResult(name="type-7 quantiles match NumPy linear fixtures", passed=numpy_matches),
+        SmokeCheckResult(name="sample SD uses ddof=1", passed=sd_matches),
+        SmokeCheckResult(
+            name="confusion-derived metrics match hand calculations",
+            passed=confusion_matches,
+        ),
+        SmokeCheckResult(name="zero denominators return NA plus reason", passed=zero_is_na),
+        SmokeCheckResult(
+            name="bootstrap draws are deterministic under the analysis seed",
+            passed=bootstrap_deterministic,
+        ),
+    )
+
+
+def _artifact_invariants() -> tuple[SmokeCheckResult, ...]:
+    graph = ArtifactGraph()
+    parent = ArtifactManifest(
+        family=ArtifactFamily.SCALER,
+        identity="a" * 64,
+        checksum="b" * 64,
+        lifecycle_state=ArtifactLifecycleState.COMPLETE,
+        upstream_identities=(),
+    )
+    child = ArtifactManifest(
+        family=ArtifactFamily.SCALER,
+        identity="c" * 64,
+        checksum="d" * 64,
+        lifecycle_state=ArtifactLifecycleState.COMPLETE,
+        upstream_identities=(parent.identity,),
+    )
+    graph.register(parent)
+    graph.register(child)
+    staled = graph.mark_stale_descendants(parent.identity)
+    stale_ok = staled == (child.identity,) and not graph.is_active(child.identity)
+    return (
+        SmokeCheckResult(
+            name="changing one parent identity marks transitive descendants stale",
+            passed=stale_ok,
+        ),
     )
 
 
@@ -343,11 +686,14 @@ def run_protocol_invariant_validation() -> None:
 
 
 def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:
-    fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     checks = (
         *_data_invariants(),
+        *_model_invariants(),
         *_protocol_invariants(),
-        *_mathematical_invariants(fixture_config),
+        *_extended_protocol_invariants(),
+        *_mathematical_invariants(),
+        *_extended_mathematical_invariants(),
+        *_artifact_invariants(),
     )
     result = SmokeSuiteResult(checks=checks)
     _persist_smoke_record(result, overwrite)

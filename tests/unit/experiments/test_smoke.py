@@ -16,6 +16,20 @@ def test_smoke_suite_passes_on_production_config() -> None:
     assert isinstance(result, SmokeSuiteResult)
     assert result.passed
     assert result.checks
+    names = frozenset(check.name for check in result.checks)
+    required = (
+        "no target sample in anchor roles",
+        "one-batch forward/backward finite",
+        "source cannot be verifier",
+        "source direct production weight cannot become nonzero",
+        "exact sign-flip test enumerates all assignments",
+        "confusion-derived metrics match hand calculations",
+        "changing one parent identity marks transitive descendants stale",
+        "all eight collapse combinations resolve",
+        "bootstrap draws are deterministic under the analysis seed",
+    )
+    for name in required:
+        assert name in names
 
 
 def test_smoke_suite_check_names_are_populated() -> None:

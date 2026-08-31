@@ -26,6 +26,7 @@ from fedsira.domain.records import (
     CommitteeSize,
     ConfidenceLevel,
     ConfigFormatVersion,
+    ConfusionCount,
     ContaminationRisk,
     CosineSimilarity,
     DatasetClassToken,
@@ -39,6 +40,7 @@ from fedsira.domain.records import (
     DurationToleranceSeconds,
     EnvironmentText,
     EvidenceCycleIndex,
+    ExampleCount,
     FamilyWiseAlpha,
     FeatureCount,
     FeatureShiftMagnitude,
@@ -58,8 +60,11 @@ from fedsira.domain.records import (
     MasterSeed,
     MatchedControlCount,
     MetricTolerance,
+    MetricValue,
     MinimumCompletePairCount,
     MinimumExampleCount,
+    ModelInputWidth,
+    ModelOutputWidth,
     NumericalEpsilon,
     OptimizerBeta,
     OptimizerEpsilon,
@@ -69,8 +74,10 @@ from fedsira.domain.records import (
     PinMemoryEnabled,
     PoisonFraction,
     ProbabilityTolerance,
+    ProductionWeight,
     PValue,
     PValueDisplayFloor,
+    QuantileProbability,
     RateMargin,
     RateReduction,
     RateWorsening,
@@ -93,6 +100,7 @@ from fedsira.domain.records import (
     TrimCount,
     UciDatasetId,
     VerifierCount,
+    WallClockSeconds,
     WarmupPassCount,
     WeightDecay,
     WorkerCount,
@@ -732,6 +740,29 @@ class TestFixtureConfig(FrozenConfigModel):
     holm_fixture_adjusted_p_values: tuple[tuple[FixtureCaseName, PValue], ...]
     sign_flip_sample_count: MinimumExampleCount
     sign_flip_expected_p_value: PValue
+    smoke_model_input_width: ModelInputWidth
+    smoke_model_output_width: ModelOutputWidth
+    smoke_batch_row_count: ExampleCount
+    smoke_fedavg_client_a_example_count: ExampleCount
+    smoke_fedavg_client_b_example_count: ExampleCount
+    smoke_fedavg_client_a_weights: tuple[MetricValue, ...]
+    smoke_fedavg_client_b_weights: tuple[MetricValue, ...]
+    smoke_quantile_values: tuple[MetricValue, ...]
+    smoke_quantile_probability: QuantileProbability
+    smoke_sample_sd_values: tuple[MetricValue, ...]
+    smoke_delay_assignment_seconds: WallClockSeconds
+    smoke_delay_reproduce_seconds: WallClockSeconds
+    smoke_delay_verify_seconds: WallClockSeconds
+    smoke_delay_synthesize_seconds: WallClockSeconds
+    smoke_bootstrap_values: tuple[MetricValue, ...]
+    smoke_confusion_true_labels: tuple[DatasetClassToken, ...]
+    smoke_confusion_predicted_labels: tuple[DatasetClassToken, ...]
+    smoke_confusion_class_token: DatasetClassToken
+    smoke_confusion_true_positive: ConfusionCount
+    smoke_confusion_false_positive: ConfusionCount
+    smoke_confusion_false_negative: ConfusionCount
+    smoke_confusion_true_negative: ConfusionCount
+    smoke_nonzero_production_weight: ProductionWeight
 
 
 class SmokeConfig(FrozenConfigModel):

@@ -15,3 +15,48 @@ holm_fixture_adjusted_p_values:
   - 0.06
 sign_flip_sample_count: 10
 sign_flip_expected_p_value: 0.001953125
+smoke_model_input_width: 4
+smoke_model_output_width: 2
+smoke_batch_row_count: 2
+smoke_fedavg_client_a_example_count: 1
+smoke_fedavg_client_b_example_count: 3
+smoke_fedavg_client_a_weights:
+- 0.0
+- 1.0
+smoke_fedavg_client_b_weights:
+- 4.0
+- 5.0
+smoke_quantile_values:
+- 0.0
+- 1.0
+- 2.0
+- 3.0
+smoke_quantile_probability: 0.5
+smoke_sample_sd_values:
+- 1.0
+- 2.0
+- 3.0
+smoke_delay_assignment_seconds: 1.0
+smoke_delay_reproduce_seconds: 2.0
+smoke_delay_verify_seconds: 3.0
+smoke_delay_synthesize_seconds: 4.0
+smoke_bootstrap_values:
+- 1.0
+- 2.0
+- 3.0
+smoke_confusion_true_labels:
+- a
+- b
+- a
+- a
+smoke_confusion_predicted_labels:
+- a
+- a
+- a
+- b
+smoke_confusion_class_token: a
+smoke_confusion_true_positive: 2
+smoke_confusion_false_positive: 1
+smoke_confusion_false_negative: 1
+smoke_confusion_true_negative: 0
+smoke_nonzero_production_weight: 1.0
