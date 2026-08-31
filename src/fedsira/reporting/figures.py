@@ -14,6 +14,7 @@ from fedsira.domain.records import (
     MetricName,
     MetricValue,
     Probability,
+    TextValue,
 )
 
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
@@ -184,3 +185,171 @@ def render_efficiency_profile(
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
+
+
+def _save_empty_plot(
+    destination: Path, title: FigureName, xlabel: TextValue, ylabel: TextValue
+) -> Path:
+    figure = Figure(figsize=(8, 5))
+    axis = figure.add_subplot(1, 1, 1)
+    axis.text(0.5, 0.5, "no evidence", ha="center", va="center")
+    axis.set_title(title)
+    axis.set_xlabel(xlabel)
+    axis.set_ylabel(ylabel)
+    figure.tight_layout()
+    figure.savefig(destination, dpi=150)
+    return destination
+
+
+def render_useful_backdoored_source(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination, "Useful Backdoored Source", "post-production ASR", "target F1"
+    )
+
+
+def render_collapse_decision_effects(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Collapse Decision Effects",
+        "primary material effect / threshold",
+        "mechanism",
+    )
+
+
+def render_compromised_reproducer_boundary(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Compromised-Reproducer Boundary",
+        "compromised reproducer count",
+        "malicious admission rate",
+    )
+
+
+def render_compromised_verifier_boundary(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Compromised-Verifier Boundary",
+        "compromised verifier count",
+        "admission rate",
+    )
+
+
+def render_shared_epistemic_failure(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Shared Epistemic Failure",
+        "corruption strength",
+        "clean-oracle error / admission",
+    )
+
+
+def render_capability_granularity_boundary(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Capability-Granularity Boundary",
+        "Capability Claim Contract granularity",
+        "false same-capability certification rate",
+    )
+
+
+def render_heterogeneity_synthesis_boundary(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Heterogeneity Synthesis Boundary",
+        "heterogeneity regime",
+        "legitimate admission / worst-domain target F1",
+    )
+
+
+def render_admission_delay_decomposition(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Admission-Delay Decomposition",
+        "method x evidence schedule",
+        "wall-clock seconds",
+    )
+
+
+def render_secondary_generalization(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    destination: Path,
+) -> Path:
+    return _save_empty_plot(
+        destination,
+        "Secondary Generalization",
+        "target-F1 effect vs comparator",
+        "comparison",
+    )
+
+
+def render_mandatory_figures(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    figures_root: Path,
+    evidence_trajectory: tuple[EvidenceStateFraction, ...] | None = None,
+    telemetry: tuple[EfficiencyMetricObservation, ...] | None = None,
+) -> tuple[Path, ...]:
+    schematic = figures_root / "FedSIRA Protocol Schematic.png"
+    render_protocol_schematic(schematic)
+    tradeoff = figures_root / "Primary Security-Utility Tradeoff.png"
+    render_security_utility_tradeoff(comparison_results, tradeoff)
+    trajectory = figures_root / "Evidence-Arrival State Trajectory.png"
+    render_evidence_arrival_trajectory(evidence_trajectory or (), trajectory)
+    efficiency = figures_root / "Efficiency Profile.png"
+    render_efficiency_profile(telemetry or (), "elapsed-seconds-per-cell", efficiency)
+    return (
+        schematic,
+        tradeoff,
+        render_useful_backdoored_source(
+            comparison_results, figures_root / "Useful Backdoored Source.png"
+        ),
+        render_collapse_decision_effects(
+            comparison_results, figures_root / "Collapse Decision Effects.png"
+        ),
+        render_compromised_reproducer_boundary(
+            comparison_results, figures_root / "Compromised-Reproducer Boundary.png"
+        ),
+        render_compromised_verifier_boundary(
+            comparison_results, figures_root / "Compromised-Verifier Boundary.png"
+        ),
+        trajectory,
+        render_shared_epistemic_failure(
+            comparison_results, figures_root / "Shared Epistemic Failure.png"
+        ),
+        render_capability_granularity_boundary(
+            comparison_results, figures_root / "Capability-Granularity Boundary.png"
+        ),
+        render_heterogeneity_synthesis_boundary(
+            comparison_results, figures_root / "Heterogeneity Synthesis Boundary.png"
+        ),
+        render_admission_delay_decomposition(
+            comparison_results, figures_root / "Admission-Delay Decomposition.png"
+        ),
+        efficiency,
+        render_secondary_generalization(
+            comparison_results, figures_root / "Secondary Generalization.png"
+        ),
+    )

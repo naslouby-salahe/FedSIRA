@@ -9,7 +9,6 @@ from fedsira.analysis.claims import (
     derive_claim_states,
 )
 from fedsira.analysis.comparisons import ComparisonFamilyResult
-from fedsira.config.schema import PublicationRoundingConfig
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.records import (
     ExperimentName,
@@ -25,14 +24,14 @@ from fedsira.domain.records import (
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.execution import ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
-from fedsira.reporting import figures as figure_renderers
 from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
+    render_mandatory_figures,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.tables import MANUSCRIPT_TABLE_NAMES, RenderedTable
+from fedsira.reporting.tables import MANUSCRIPT_TABLE_NAMES, RenderedTable, render_mandatory_tables
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
@@ -75,11 +74,6 @@ def _results_root() -> Path:
     return Path("results")
 
 
-def _publication_rounding() -> PublicationRoundingConfig:
-    statistics = current_application_context().scientific_config.metrics_and_statistics
-    return statistics.publication_rounding
-
-
 def _write_table(root: Path, table: RenderedTable) -> Path:
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
@@ -113,7 +107,6 @@ def export_experiment_report(
             verification=verification,
         )
 
-    rounding = _publication_rounding()
     tables_root = experiment_root / "tables" / "main"
     metrics_root = experiment_root / "metrics" / "primary"
     tables_root.mkdir(parents=True, exist_ok=True)
@@ -123,7 +116,6 @@ def export_experiment_report(
     if result.comparison_results:
         statistical_table = table_renderers.render_statistical_summary_table(
             result.comparison_results,
-            rounding,
         )
         exported.append(_write_table(tables_root, statistical_table))
 
@@ -175,7 +167,6 @@ def export_project_summary(
             verification=verification,
         )
 
-    rounding = _publication_rounding()
     project_root = _results_root() / "project_summary"
     tables_root = project_root / "tables" / "main"
     claims_root = project_root / "claims"
@@ -187,55 +178,27 @@ def export_project_summary(
     exported: list[Path] = []
     materialized_tables: list[TableName] = []
 
-    plan_table = table_renderers.render_experiment_plan_table(plan)
-    exported.append(_write_table(tables_root, plan_table))
-    materialized_tables.append(plan_table.name)
+    for table in render_mandatory_tables(
+        plan,
+        claim_states,
+        collapse_decisions=collapse_decisions,
+        resolved_core=resolved_core,
+        comparison_results=comparison_results,
+    ):
+        if table.name == "Claim Support":
+            exported.append(_write_table(claims_root, table))
+        else:
+            exported.append(_write_table(tables_root, table))
+        materialized_tables.append(table.name)
 
-    if collapse_decisions is not None and resolved_core is not None:
-        collapse_table = table_renderers.render_collapse_decisions_table(
-            collapse_decisions,
-            resolved_core,
-            rounding,
-        )
-        exported.append(_write_table(tables_root, collapse_table))
-        materialized_tables.append(collapse_table.name)
-
-    if comparison_results:
-        statistics_table = table_renderers.render_statistical_summary_table(
+    exported.extend(
+        render_mandatory_figures(
             comparison_results,
-            rounding,
+            figures_root,
+            evidence_trajectory=evidence_trajectory,
+            telemetry=telemetry,
         )
-        exported.append(_write_table(tables_root, statistics_table))
-        materialized_tables.append(statistics_table.name)
-
-    claim_table = table_renderers.render_claim_support_table(claim_states)
-    exported.append(_write_table(claims_root, claim_table))
-    materialized_tables.append(claim_table.name)
-
-    schematic_path = figures_root / "FedSIRA Protocol Schematic.png"
-    figure_renderers.render_protocol_schematic(schematic_path)
-    exported.append(schematic_path)
-
-    security_utility_path = figures_root / "Primary Security-Utility Tradeoff.png"
-    figure_renderers.render_security_utility_tradeoff(comparison_results, security_utility_path)
-    exported.append(security_utility_path)
-
-    if evidence_trajectory is not None:
-        evidence_trajectory_path = figures_root / "Evidence-Arrival State Trajectory.png"
-        figure_renderers.render_evidence_arrival_trajectory(
-            evidence_trajectory,
-            evidence_trajectory_path,
-        )
-        exported.append(evidence_trajectory_path)
-
-    if telemetry is not None:
-        efficiency_path = figures_root / "Efficiency Profile.png"
-        figure_renderers.render_efficiency_profile(
-            telemetry,
-            "elapsed-seconds-per-cell",
-            efficiency_path,
-        )
-        exported.append(efficiency_path)
+    )
 
     pending_tables = tuple(
         name for name in MANUSCRIPT_TABLE_NAMES if name not in materialized_tables

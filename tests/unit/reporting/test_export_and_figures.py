@@ -26,6 +26,7 @@ from fedsira.reporting.figures import (
     validate_mandatory_figures_covered,
 )
 from fedsira.reporting.tables import (
+    MANUSCRIPT_TABLE_NAMES,
     format_metric_value,
     format_p_value,
     render_claim_support_table,
@@ -41,16 +42,16 @@ CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
 def test_format_metric_value_na_and_rounding() -> None:
     rounding = CONFIG.metrics_and_statistics.publication_rounding
-    assert format_metric_value(None, rounding) == "NA"
-    assert format_metric_value(0.5, rounding) == f"{0.5:.{rounding.f1_accuracy_rates_decimals}f}"
+    assert format_metric_value(None) == "NA"
+    assert format_metric_value(0.5) == f"{0.5:.{rounding.f1_accuracy_rates_decimals}f}"
 
 
 def test_format_p_value_floor_and_rounding() -> None:
     rounding = CONFIG.metrics_and_statistics.publication_rounding
-    assert format_p_value(None, rounding) == "NA"
-    assert format_p_value(rounding.p_value_display_floor / 2, rounding).startswith("<")
+    assert format_p_value(None) == "NA"
+    assert format_p_value(rounding.p_value_display_floor / 2).startswith("<")
     value = rounding.p_value_display_floor + 0.01
-    assert format_p_value(value, rounding) == f"{value:.{rounding.p_value_significant_digits}g}"
+    assert format_p_value(value) == f"{value:.{rounding.p_value_significant_digits}g}"
 
 
 def test_render_experiment_plan_table_is_csv() -> None:
@@ -73,7 +74,8 @@ def test_render_claim_support_table_uses_typed_state() -> None:
     )
     table = render_claim_support_table(states)
     assert table.name == "Claim Support"
-    assert "x,s,Supported" in table.csv_text
+    assert table.csv_text.splitlines()[1].startswith("x,s,")
+    assert "Supported" in table.csv_text
 
 
 def test_derive_claim_states_for_export_no_evidence_is_not_tested() -> None:
@@ -133,7 +135,7 @@ def _override_results_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("fedsira.reporting.export._results_root", lambda: tmp_path)
 
 
-def test_export_project_summary_records_missing_mandatory_material(
+def test_export_project_summary_materializes_mandatory_tables_and_figures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -149,8 +151,12 @@ def test_export_project_summary_records_missing_mandatory_material(
     )
     assert isinstance(result, ReportExportResult)
     assert result.exported_paths
-    assert not result.verification.passed
-    assert any("mandatory" in failure for failure in result.verification.failures)
+    assert result.verification.passed
+    exported_stems = frozenset(Path(path).stem for path in result.exported_paths)
+    for name in MANUSCRIPT_TABLE_NAMES:
+        assert name in exported_stems
+    for name in MANDATORY_FIGURE_NAMES:
+        assert name in exported_stems
     for exported_path in result.exported_paths:
         assert Path(exported_path).exists()
 
@@ -182,7 +188,7 @@ def test_export_project_summary_with_collapse_decisions_records_typed_core(
         resolved_core=resolved_core,
     )
     assert result.exported_paths
-    assert not result.verification.passed
+    assert result.verification.passed
 
 
 def test_render_security_utility_tradeoff_empty_is_no_evidence(tmp_path: Path) -> None:
