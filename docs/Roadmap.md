@@ -54,7 +54,7 @@ For every claim instance FedSIRA must enforce:
 
 ## 1.4 Safe manuscript claims
 
-The manuscript may make only the claims below, and only when the Section 35 claim registry marks the corresponding canonical claim state as supported within its stated scope.
+The manuscript may make only the claims below, and only when the Section 35 claim-support rules mark the corresponding canonical claim state as supported within its stated scope.
 
 | Claim | Exact claim boundary |
 | --- | --- |
@@ -569,7 +569,7 @@ Canonical device-directory mapping is exact after normalizing path separators on
 
 Within a recognized device directory, `benign_traffic.csv` maps to `BENIGN`. A CSV inside an archive/directory whose canonical attack-family token is `gafgyt` maps by basename token `combo`, `junk`, `scan`, `tcp`, or `udp` to `GAFGYT_COMBO`, `GAFGYT_JUNK`, `GAFGYT_SCAN`, `GAFGYT_TCP`, or `GAFGYT_UDP`. A CSV inside an archive/directory whose canonical attack-family token is `mirai` maps by basename token `ack`, `scan`, `syn`, `udp`, or `udpplain` to `MIRAI_ACK`, `MIRAI_SCAN`, `MIRAI_SYN`, `MIRAI_UDP`, or `MIRAI_UDPPLAIN`. Case is ignored only for these path tokens; punctuation/whitespace is normalized to `_` before token comparison.
 
-RAR archives are extracted read-only into `outputs/cache/preprocessing/` using the Ubuntu 24.04 `unrar` package (`1:7.0.7-1build1`) invoked non-interactively with overwrite disabled. `fedsira doctor` must verify the executable/version before preprocessing whenever a RAR archive is present. The archive SHA-256 is retained as an upstream identity and extracted bytes are separately checksummed. Extraction order never defines scientific order; an already-extracted semantically equivalent layout does not require `unrar`. Unknown device directories, ambiguous attack-family ancestry, unknown attack basenames, duplicate conflicting label mappings, encrypted/corrupt archives, or CSVs whose headers are incompatible with the validated primary predictor schema are `Data Invalid`.
+RAR archives are extracted read-only into a temporary location under `outputs/` using the Ubuntu 24.04 `unrar` package (`1:7.0.7-1build1`) invoked non-interactively with overwrite disabled. `fedsira doctor` must verify the executable/version before preprocessing whenever a RAR archive is present. The archive SHA-256 is retained as an upstream identity and extracted bytes are separately checksummed. Extraction order never defines scientific order; an already-extracted semantically equivalent layout does not require `unrar`. Unknown device directories, ambiguous attack-family ancestry, unknown attack basenames, duplicate conflicting label mappings, encrypted/corrupt archives, or CSVs whose headers are incompatible with the validated primary predictor schema are `Data Invalid`.
 
 If the acquired release contains more than one CSV shard for one canonical `(domain, class)`, the shards form one canonical class stream ordered by normalized relative path ascending; rows retain original file order inside each shard. If an expected class is absent, it is structurally unavailable. The implementation never fabricates a missing class or silently substitutes an alternate subtype. This rule allows the implementation to adapt to the actual official/raw release while preserving the fixed class contract.
 
@@ -809,7 +809,7 @@ All non-label columns are candidate predictors. A canonical header token uses th
 
 The canonical output-class registry is deterministic: `BENIGN` first, `BACKDOOR_MALWARE` second, then all remaining observed canonical labels in lexicographically ascending UTF-8 order. The model input dimension is the validated predictor count; the output dimension is the registry length. Both are derived facts.
 
-Before role construction, every predictor is parsed to float64 for validation. Any row containing NaN, positive/negative infinity, or a value that cannot be parsed as a finite number is excluded by deterministic complete-case deletion. Its `stable_row_id`, file identity, original row index, and exclusion reason are written to `outputs/preprocessing/metadata/dataset_exclusions.parquet`; exclusion counts/rates are reported. No imputation, finite-value replacement, feature dropping based on outcomes, or silent schema repair is allowed.
+Before role construction, every predictor is parsed to float64 for validation. Any row containing NaN, positive/negative infinity, or a value that cannot be parsed as a finite number is excluded by deterministic complete-case deletion. Its `stable_row_id`, file identity, original row index, and exclusion reason are written to a machine-readable exclusion record under `outputs/`; exclusion counts/rates are reported. No imputation, finite-value replacement, feature dropping based on outcomes, or silent schema repair is allowed.
 
 `stable_row_id` is `SHA256(canonical_bytes("CICIOT2023_SAMPLE_ID_V1", normalized_relative_csv_path, file_sha256, zero_based_original_row_index))`. Duplicate feature rows are retained as separate observations because their stable identities differ.
 
@@ -1994,7 +1994,7 @@ Otherwise cross-verification/external reproduction verification is removed from 
 
 ### Mechanical resolved-core construction
 
-After all four collapse decision artifacts exist, `experiments/collapse.py` creates one deterministic `Resolved FedSIRA Core` artifact. There is no operator choice and no outcome-dependent redesign. The direct source-exclusion gate controls the support state of the central source-exclusion claims but **does not authorize source deployment**; the resolved FedSIRA characterization path remains source-excluded even when that central claim is `Not Supported`.
+After all four collapse decision records exist, `experiments/definitions.py` derives one deterministic `Resolved FedSIRA Core` record. There is no operator choice and no outcome-dependent redesign. The direct source-exclusion gate controls the support state of the central source-exclusion claims but **does not authorize source deployment**; the resolved FedSIRA characterization path remains source-excluded even when that central claim is `Not Supported`.
 
 Let `P` be proposal-assistance survival, `R` plurality survival, and `V` external-verification survival. The resolved procedure is exactly:
 
@@ -2112,7 +2112,7 @@ Decision rules always use full-precision values.
 
 # 19. Failure, null-result, and completion semantics
 
-**Configuration authority:** runtime timeouts come from `runtime.timeouts_seconds`, the automatic infrastructure retry count comes from `runtime.automatic_infrastructure_retries_per_cell_phase`, and logical evidence-cycle limits come from `protocol.resource_horizon`. Failure meanings, retry eligibility, publication semantics, and recovery behavior are fixed by this section.
+**Configuration authority:** execution timeouts come from `execution.timeouts_seconds`, the automatic infrastructure retry count comes from `execution.automatic_infrastructure_retries_per_cell_phase`, and logical evidence-cycle limits come from `protocol.resource_horizon`. Failure meanings, retry eligibility, publication semantics, and recovery behavior are fixed by this section.
 
 Execution state and scientific protocol outcome are distinct. A valid experiment that falsifies its hypothesis is scientifically complete; `Admitted`, `Dormant`, `Rejected Claim`, `Expired`, and `Abstain` remain protocol outcomes rather than software failure states.
 
@@ -2150,7 +2150,7 @@ STATISTICAL_ANALYSIS
 * `METRIC_AGGREGATION`: domain/seed metric construction and adequacy/NA validation.
 * `STATISTICAL_ANALYSIS`: experiment-level paired tests, CIs, effects, multiplicity, materiality, collapse/core-resolution decisions, and claim-state inputs after all required seed cells are present.
 
-A timeout/retry applies to one phase instance only. `fedsira report` is not a scientific cell phase; its export operation uses `runtime.timeouts_seconds.experiment_analysis_or_report` and never triggers scientific recomputation.
+A timeout/retry applies to one phase instance only. `fedsira report` is not a scientific cell phase; its export operation uses `execution.timeouts_seconds.experiment_analysis_or_report` and never triggers scientific recomputation.
 
 Reference timeouts are 2 hours per dataset preprocessing operation, 2 hours per scientific cell phase, 30 minutes per experiment-level statistical analysis/report operation, and 30 minutes for project/export verification. Only `Infrastructure Interruption` permits an automatic same-artifact recovery attempt, at most once, using the identical semantic cell, phase, seeds, scientific configuration, and hash-valid checkpoint lineage. Scientific, numerical, data, or invariant failures are never automatically repeated until favorable.
 
@@ -2162,7 +2162,7 @@ No crashed or incomplete producer output is reusable. Payloads are written to st
 
 # 20. Reference software and hardware environment
 
-**Configuration authority:** `runtime.data_loader` supplies the small runtime loader settings and `runtime.same_environment_absolute_metric_tolerance` supplies the numerical reproducibility tolerance. The reference software versions, hardware class, deterministic backend behavior, and environment failure semantics below are fixed reproducibility requirements, not user-selectable YAML options.
+**Configuration authority:** `execution.data_loader` supplies the small execution loader settings and `execution.same_environment_absolute_metric_tolerance` supplies the numerical reproducibility tolerance. The reference software versions, hardware class, deterministic backend behavior, and environment failure semantics below are fixed reproducibility requirements, not user-selectable YAML options.
 
 The reproducibility reference environment is:
 
@@ -2210,496 +2210,173 @@ Determinism settings:
 * TF32 is disabled for confirmatory runs;
 * all RNG states are saved in hash-valid recovery checkpoints.
 
-There is no warning-only or nondeterministic fallback for claim-bearing cells. If the specified reference environment cannot execute the scientific graph under these deterministic settings, `fedsira doctor` blocks claim-bearing execution as `Configuration Invalid`. Same-environment smoke reproducibility must additionally remain within `runtime.same_environment_absolute_metric_tolerance`, fixed at `1e-6`.
+There is no warning-only or nondeterministic fallback for claim-bearing cells. If the specified reference environment cannot execute the scientific computation under these deterministic settings, `fedsira doctor` blocks claim-bearing execution as `Configuration Invalid`. Same-environment smoke reproducibility must additionally remain within `execution.same_environment_absolute_metric_tolerance`, fixed at `1e-6`.
 
 ---
 
 # Configuration YAML
 
-`configs/fedsira.yaml` is the single authoritative configuration-data file for the study. It contains only values that must be supplied to execution: dataset/target identifiers, numerical thresholds and budgets, sampling/split intervals, experiment-strength grids, actual seeds, paths, runtime limits, and a small number of genuine categorical grid/format selections. The implementation loads it through a typed, immutable schema. `configs/tests.yml` contains test-only fixture values, and `configs/smoke.yml` contains reduced deterministic smoke values; neither has scientific authority.
+`configs/fedsira.yaml` is the single authoritative configuration-data file for the study. It contains only values that must be supplied to execution: dataset/target identifiers, numerical thresholds and budgets, sampling/split intervals, experiment-strength grids, actual seeds, paths, execution limits, and a small number of genuine categorical grid/format selections. The implementation loads it through a typed, immutable schema. `configs/smoke.yaml` contains reduced deterministic smoke values and has no scientific authority.
 
-Presence in YAML does not authorize post-hoc tuning. Claim-bearing configuration values are governed by the authoritative roadmap contracts; experiment-grid categories may be traversed only where Section 30 declares them, and runtime/path values may vary only where the execution contract permits variation without changing scientific identity.
+Presence in YAML does not authorize post-hoc tuning. Claim-bearing configuration values are governed by the authoritative roadmap contracts; experiment-grid categories may be traversed only where Section 30 declares them, and execution/path values may vary only where the execution contract permits variation without changing scientific identity.
 
 The YAML is **not** the authority for fixed algorithms, architecture definitions, formulas, ordering/tie procedures, validation/failure semantics, baseline identities, experiment definitions, reporting requirements, claim wording/states, deterministic hash procedures, or provenance rules. Those are authoritative in the scientific/execution sections that define them. Fixed numerical literals that are intrinsic to such a definition may therefore appear only in that defining section; they are not hidden defaults and are not configurable merely because software must implement them.
 
 Derived values are computed from their primitive configured or observed inputs and are never represented by `*_from`, `reuse_*`, formula strings, or a YAML dependency language. Observed dataset/environment facts and generated provenance remain manifests or execution records rather than configuration. Fixed hash tokens and separators needed to preserve deterministic streams are defined explicitly in Sections 9–13 as implementation invariants rather than user-modifiable configuration.
 
-The implementation repository boundary is:
+The authoritative implementation repository tree is:
 
 ```text
-fedsira/
-│
-├── README.md                                      # Project overview, setup, scientific scope, reproducibility expectations, and public CLI usage.
-├── pyproject.toml                                 # Python package metadata, exact runtime requirements, tooling configuration, and `fedsira` CLI entry point.
-├── uv.lock                                        # Exact resolved Python dependency lock for the reference environment.
-├── noxfile.py                                     # Reproducible linting, typing, architecture-check, test, and validation sessions.
-├── Makefile                                       # Short developer-facing commands for common repository workflows.
-├── .gitignore                                     # Excludes generated computational workspace, caches, local environments, and transient files.
+FedSIRA/
+├── .github/
+│   └── workflows/
+│       └── quality.yml
 │
 ├── configs/
-│   ├── fedsira.yaml                               # Single authoritative roadmap-defined configuration-data file for scientific and runtime values.
-│   ├── tests.yml                                  # Test-only fixture/configuration values with no scientific authority.
-│   └── smoke.yml                                  # Reduced deterministic smoke configuration that never contributes manuscript evidence.
+│   ├── fedsira.yaml
+│   └── smoke.yaml
 │
 ├── data/
-│   └── raw -> /external/datasets                  # Immutable symlink to externally managed raw datasets; raw bytes are never modified.
-│
-├── outputs/                                       # Complete generated computational workspace; normally Git-ignored and permitted to contain large artifacts.
-│   │
-│   ├── preprocessing/
-│   │   ├── inventories/                           # Raw-file inventories, checksum inventories, observed schemas, labels, domains, and availability summaries.
-│   │   ├── validation/                            # Data-validity, feasibility, leakage, finite-value, exclusion, and deterministic-regeneration evidence.
-│   │   ├── prepared/                              # Deterministic role-specific prepared data views used by later computation.
-│   │   ├── splits/                                # Immutable role/split/sample manifests, guard-gap assignments, and pseudo-domain partitions.
-│   │   ├── features/                              # Fixed scaler artifacts, feature schemas, class registries, and feature-derived preparation products.
-│   │   └── metadata/                              # Dataset identities, exclusions, preparation fingerprints, and reusable preprocessing provenance.
-│   │
-│   ├── artifacts/                                 # Project-wide reusable scientific artifacts whose dependency fingerprints permit cross-experiment reuse.
-│   │   ├── models/                                # Shared anchors, round checkpoints, source candidates, reproductions, and other reusable model artifacts.
-│   │   ├── scores/                                # Reusable per-sample logits, probabilities, predictions, losses, and deterministic score shards.
-│   │   ├── fitted/                                # Reusable fitted scientific objects such as scalers and baseline calibration/threshold products.
-│   │   ├── baselines/                             # Reusable baseline checkpoints, update artifacts, calibration products, and shared baseline intermediates.
-│   │   └── derived/                               # Reusable commitments, verifier products, certificates, synthesis products, and other derived artifacts.
-│   │
-│   ├── experiments/
-│   │   └── <descriptive-experiment-name>/
-│   │       ├── artifacts/
-│   │       │   ├── fitted/                        # Experiment-specific fitted objects that are not scientifically reusable outside this experiment.
-│   │       │   ├── predictions/                   # Heavy experiment-specific prediction and score products retained for downstream evaluation.
-│   │       │   └── derived/                       # Experiment-specific assignments, certificates, synthesized updates, protocol states, and derived arrays.
-│   │       │
-│   │       ├── evaluations/
-│   │       │   ├── records/                       # Detailed protocol/domain/sample evaluation records and terminal scientific outcomes.
-│   │       │   ├── comparisons/                   # Computational comparison inputs and paired method/condition evaluation records.
-│   │       │   └── aggregates/                    # Domain-, condition-, and seed-level evaluated aggregates used by metric/statistical producers.
-│   │       │
-│   │       ├── metrics/
-│   │       │   ├── per_seed/                      # Authoritative seed-level metrics used as inferential units.
-│   │       │   ├── per_condition/                 # Condition-level metric collections and completeness/adequacy records.
-│   │       │   └── aggregate/                     # Computed experiment-wide metric summaries retained as computational evidence.
-│   │       │
-│   │       ├── statistics/
-│   │       │   ├── tests/                         # Exact paired sign-flip and non-inferiority test artifacts.
-│   │       │   ├── confidence_intervals/          # Bootstrap resampling results and confidence-interval artifacts.
-│   │       │   ├── effects/                       # Mean/median differences, paired effect sizes, and materiality calculations.
-│   │       │   └── multiplicity/                  # Holm-family inputs, adjusted p-values, and deterministic multiplicity decisions.
-│   │       │
-│   │       ├── checkpoints/
-│   │       │   ├── training/                      # Recoverable model, optimizer, RNG, sampler, and completed-epoch/round training states.
-│   │       │   └── execution/                     # Experiment/cell-phase recovery boundaries and resumable execution state.
-│   │       │
-│   │       ├── diagnostics/
-│   │       │   ├── scientific/                    # Invariant, evidence-sufficiency, claim-contract, boundary, and protocol diagnostics.
-│   │       │   ├── numerical/                     # NaN/Inf, deterministic-tolerance, metric, and numerical-stability diagnostics.
-│   │       │   └── runtime/                       # Timing, memory, communication, storage, hardware, and execution-performance diagnostics.
-│   │       │
-│   │       ├── logs/
-│   │       │   ├── execution/                     # Structured execution logs used only for diagnosis, never as scientific result storage.
-│   │       │   └── failures/                      # Structured technical failure, timeout, interruption, and invalidation logs.
-│   │       │
-│   │       └── provenance/
-│   │           ├── configuration/                 # Fixed configuration subsets and resolved scientific configuration identities.
-│   │           ├── data/                          # Dataset, split, prepared-view, scaler, and upstream data identities.
-│   │           ├── seeds/                         # Master-seed bundles, namespace seeds, deterministic assignments, and phase identities.
-│   │           ├── code/                          # Producer-component fingerprints and reconstruction commit metadata.
-│   │           ├── environment/                   # Hardware, OS, CUDA, runtime, determinism, and execution-environment records.
-│   │           └── dependencies/                  # Relevant producer dependency fingerprints plus full reconstruction dependency-snapshot identity.
-│   │
-│   └── cache/
-│       ├── preprocessing/                          # Non-authoritative acceleration cache for deterministic preprocessing work.
-│       ├── models/                                 # Non-authoritative reusable model-loading or transformation cache.
-│       ├── evaluation/                             # Non-authoritative evaluation/scoring acceleration cache.
-│       ├── analysis/                               # Non-authoritative statistical or rendering-preparation cache.
-│       └── staging/                                # Temporary atomic-write staging; incomplete/staged content is never reusable evidence, validated content is promoted to canonical locations, and abandoned content is disposable.
-│
-├── results/                                       # Compact verified manuscript-facing evidence; never used as computational input.
-│   │
-│   ├── experiments/
-│   │   └── <descriptive-experiment-name>/
-│   │       ├── figures/
-│   │       │   ├── main/                          # Main-paper figures derived only from verified completed evidence.
-│   │       │   └── supplementary/                 # Compact supplementary figures derived from verified completed evidence.
-│   │       │
-│   │       ├── tables/
-│   │       │   ├── main/                          # Main-paper tables generated from verified scientific artifacts.
-│   │       │   └── supplementary/                 # Supplementary manuscript tables and compact supporting evidence.
-│   │       │
-│   │       ├── metrics/
-│   │       │   ├── primary/                       # Compact verified primary metric summaries used by the manuscript.
-│   │       │   ├── secondary/                     # Compact verified secondary/descriptive metric summaries.
-│   │       │   └── summary/                       # Compact experiment-level metric summaries and completeness counts.
-│   │       │
-│   │       └── statistics/
-│   │           ├── tests/                         # Compact verified raw and adjusted inferential test results.
-│   │           ├── confidence_intervals/          # Final manuscript-facing confidence-interval summaries.
-│   │           ├── effects/                       # Final paired effect-size and materiality summaries.
-│   │           └── multiplicity/                  # Final Holm-adjustment and claim-family decision summaries.
-│   │
-│   └── project_summary/
-│       ├── figures/
-│       │   ├── main/                              # Cross-experiment main-paper figures required by the roadmap.
-│       │   └── supplementary/                     # Cross-experiment supplementary figures.
-│       │
-│       ├── tables/
-│       │   ├── main/                              # Cross-experiment protocol, result, statistical, and claim-support tables.
-│       │   └── supplementary/                     # Compact supplementary project-wide tables.
-│       │
-│       ├── metrics/
-│       │   ├── primary/                           # Final compact project-wide primary scientific metric summaries.
-│       │   └── summary/                           # Compact overall metric, completion, boundary, and evidence summaries.
-│       │
-│       ├── statistics/
-│       │   ├── comparisons/                       # Final cross-experiment paired-comparison and decision summaries.
-│       │   ├── confidence_intervals/              # Final cross-experiment confidence-interval summaries.
-│       │   ├── effects/                           # Final project-wide effect-size and materiality summaries.
-│       │   └── multiplicity/                      # Final claim-family Holm correction summaries.
-│       │
-│       ├── claim_registry/                        # Final manuscript-facing claim states, scopes, required evidence, and support decisions; never computational state.
-│       │
-│       └── reproducibility/
-│           ├── configuration/                     # Compact final fixed scientific configuration identities and dependency summaries.
-│           ├── datasets/                          # Compact dataset/checksum/schema/split identities needed for manuscript reproducibility.
-│           ├── seeds/                             # Final master-seed and deterministic-assignment summaries.
-│           ├── software/                          # Compact reference software, dependency-lock, and component-fingerprint summaries.
-│           └── execution/                         # Final experiment counts, cell completion, and artifact-validity summaries.
+│   └── raw -> <shared-dataset-root>
 │
 ├── docs/
-│   └── Roadmap.md                                 # Authoritative scientific, experimental, execution, reporting, and reproducibility specification.
+│   └── Roadmap.md
+│
+├── outputs/
+│   └── .gitkeep
+│
+├── results/
+│   └── .gitkeep
 │
 ├── src/
 │   └── fedsira/
-│       ├── __init__.py                            # Package identity and intentionally minimal public Python API.
+│       ├── __init__.py
 │       │
-│       ├── domain/
-│       │   ├── __init__.py                        # Exposes only stable cross-package FedSIRA domain concepts shared by multiple scientific subsystems.
-│       │   ├── enums.py                           # Defines shared roadmap-required identities and states such as protocol outcomes, execution phases, artifact lifecycle states, experiment states, and claim states.
-│       │   └── records.py                         # Defines stable cross-package identities/keys such as domain, experiment, capability, semantic-cell, and seed-bundle records without storage or package-specific behavior.
+│       ├── cli/
+│       │   ├── __init__.py
+│       │   ├── main.py
+│       │   └── commands/
+│       │       ├── __init__.py
+│       │       ├── doctor.py
+│       │       ├── preprocess.py
+│       │       ├── plan.py
+│       │       ├── smoke.py
+│       │       ├── run.py
+│       │       └── report.py
 │       │
 │       ├── config/
-│       │   ├── __init__.py                        # Exposes typed configuration objects and public configuration helpers.
-│       │   ├── schema.py                          # Immutable typed representation of values supplied by `configs/fedsira.yaml`.
-│       │   ├── loading.py                         # Loads `configs/fedsira.yaml` and constructs its typed immutable representation.
-│       │   └── validation.py                      # Enforces configuration ranges, consistency, and roadmap-defined cross-field constraints.
+│       │   ├── __init__.py
+│       │   ├── loading.py
+│       │   └── models.py
+│       │
+│       ├── domain/
+│       │   ├── __init__.py
+│       │   ├── enums.py
+│       │   ├── types.py
+│       │   ├── models.py
+│       │   └── errors.py
 │       │
 │       ├── datasets/
-│       │   ├── __init__.py                        # Exposes shared dataset contracts and concrete dataset packages.
-│       │   ├── common.py                          # Shared dataset/sample structures, canonical serialization rules, and data contracts that remain dataset-oriented.
-│       │   ├── roles.py                           # Implements supported/target role intervals, guard gaps, role eligibility, and role-access restrictions.
-│       │   ├── sampling.py                        # Implements immutable sample IDs, deterministic hash ordering, sampling caps, and transformation selection.
-│       │   ├── scaling.py                         # Fits and applies the supported-anchor-training-only global standardization contract.
+│       │   ├── __init__.py
+│       │   ├── common.py
+│       │   ├── sampling.py
+│       │   ├── scaling.py
 │       │   │
 │       │   ├── nbaiot/
-│       │   │   ├── __init__.py                    # Exposes the N-BaIoT dataset implementation.
-│       │   │   ├── acquisition.py                 # Discovers N-BaIoT raw files and records immutable file/checksum identity.
-│       │   │   ├── schema.py                      # Owns fixed N-BaIoT device proxies, class vocabulary, feature expectations, and path-label semantics.
-│       │   │   ├── preprocessing.py               # Parses N-BaIoT and materializes deterministic canonical role-specific prepared data.
-│       │   │   └── validation.py                  # Enforces primary schema, finite-value, target-holder, evidence-feasibility, and leakage requirements.
+│       │   │   ├── __init__.py
+│       │   │   ├── loading.py
+│       │   │   ├── preprocessing.py
+│       │   │   └── schema.py
 │       │   │
 │       │   └── ciciot2023/
-│       │       ├── __init__.py                    # Exposes the CICIoT2023 secondary-dataset implementation.
-│       │       ├── acquisition.py                 # Discovers official CICIoT2023 CSV files and records immutable file/checksum identity.
-│       │       ├── schema.py                      # Validates/derives predictor schema, canonical labels, target class, and non-predictive identifiers.
-│       │       ├── preprocessing.py               # Performs complete-case filtering, deterministic pseudo-domain partitioning, roles, and prepared views.
-│       │       └── validation.py                  # Enforces secondary schema consistency, exclusions, target validity, pseudo-domain, and leakage contracts.
-│       │
-│       ├── models/
-│       │   ├── __init__.py                        # Exposes the roadmap-defined model family.
-│       │   └── mlp.py                             # Implements the exact multiclass MLP architecture, initialization, and derived input/output dimensions.
+│       │       ├── __init__.py
+│       │       ├── loading.py
+│       │       ├── preprocessing.py
+│       │       └── schema.py
 │       │
 │       ├── learning/
-│       │   ├── __init__.py                        # Exposes shared centralized/federated training functionality.
-│       │   ├── training.py                        # Implements deterministic minibatching, AdamW, cross-entropy, regularization, clipping, and epoch mechanics.
-│       │   ├── federated.py                       # Implements sample-weighted FedAvg participation, local training, update collection, and aggregation rounds.
-│       │   ├── anchor.py                          # Owns supported-only 20-round anchor FedAvg training and authoritative final-round checkpoint selection.
-│       │   ├── post_reference.py                  # Implements source-candidate and honest-reproduction training from the fixed anchor.
-│       │   ├── aggregation.py                     # Implements FedAvg, Krum, coordinate median, trimmed mean, and shared aggregation mathematics.
-│       │   └── scoring.py                         # Produces reusable per-sample logits, probabilities, predictions, and losses from fixed model artifacts.
+│       │   ├── __init__.py
+│       │   ├── model.py
+│       │   ├── training.py
+│       │   ├── federated.py
+│       │   ├── aggregation.py
+│       │   ├── scoring.py
+│       │   └── anchor.py
 │       │
 │       ├── protocol/
-│       │   ├── __init__.py                        # Exposes the FedSIRA scientific admission protocol.
-│       │   ├── claim_contract.py                  # Constructs, hashes, validates immutability of, evaluates, and validates Capability Claim Contracts.
-│       │   ├── state_machine.py                   # Implements legal FedSIRA protocol transitions, dormancy, rejection, expiry, and transition invariants.
-│       │   ├── opening.py                         # Implements proposal-assisted screening and candidate-free claim opening.
-│       │   ├── reproduction.py                    # Controls deterministic reproducer assignment, source-independent training inputs, and immutable commitments.
-│       │   ├── verification.py                    # Implements post-commitment verifier selection, adequacy, voting, certification, and Byzantine verifier profiles.
-│       │   ├── synthesis.py                       # Constructs the five-certified-row certificate and performs source-excluded Krum synthesis.
-│       │   ├── admission.py                       # Implements the final fresh gate and authoritative admission/dormancy/rejection decision.
-│       │   └── theory.py                          # Implements executable mathematical checks corresponding to count, bound, delay, and non-interference obligations.
+│       │   ├── __init__.py
+│       │   ├── specification.py
+│       │   ├── proposal.py
+│       │   ├── reproduction.py
+│       │   ├── verification.py
+│       │   ├── synthesis.py
+│       │   └── admission.py
 │       │
 │       ├── attacks/
-│       │   ├── __init__.py                        # Exposes the roadmap-defined adversarial transformations while remaining distinct from failure-boundary fixtures.
-│       │   ├── source_backdoor.py                 # Implements useful hidden-backdoor source training, trigger construction, poisoning, and ASR evaluation transforms.
-│       │   ├── reproduction.py                    # Implements Source Copy, Model-Replacement Backdoor, and Verifier-Aware Backdoor reproduction attacks.
-│       │   └── verification.py                    # Implements False Positive and False Negative Byzantine verifier behavior.
-│       │
-│       ├── boundaries/
-│       │   ├── __init__.py                        # Exposes scientific failure-boundary and stress-test constructions separately from adversarial attack mechanisms.
-│       │   ├── epistemic_failure.py               # Implements shared label error, shared spurious feature, and attacker-induced common-context fixtures.
-│       │   ├── capability_granularity.py          # Implements A/B root-cause strata, scoped contracts, mixtures, and false-same-capability certification logic.
-│       │   ├── heterogeneity.py                   # Implements quantity skew and deterministic ±0.5/±1.0 feature-shift regimes.
-│       │   └── evidence_arrival.py                # Implements permanent-singleton, one-holder, gradual-quorum, and immediate-quorum schedules.
+│       │   ├── __init__.py
+│       │   ├── source.py
+│       │   ├── reproduction.py
+│       │   └── verification.py
 │       │
 │       ├── baselines/
-│       │   ├── __init__.py                        # Exposes all roadmap-defined comparison methods.
-│       │   ├── registry.py                        # Defines the fixed Section 16 baseline identities and mechanism contracts.
-│       │   ├── references.py                      # Implements local-only, centralized, FedAvg, continual-assessment, and other straightforward references.
-│       │   ├── independent_retraining.py          # Implements one-retrain, review-then-retrain, direct-Krum-retrain, and related constructive alternatives.
-│       │   ├── source_authority.py                 # Implements direct source review/admission, sanitization, independent-reference, and recovery baselines.
-│       │   ├── robust_aggregation.py              # Implements Krum reference, coordinate median, reconstruction filtering, and density-cluster trimmed mean.
-│       │   ├── certified_ensemble.py              # Implements deterministic three-group multiple-model certified ensemble behavior.
-│       │   └── calibration.py                     # Produces fixed pre-execution baseline calibration thresholds and parameter-similarity prerequisites.
+│       │   ├── __init__.py
+│       │   ├── source_model.py
+│       │   ├── independent_retraining.py
+│       │   ├── robust_aggregation.py
+│       │   └── certified_ensemble.py
 │       │
 │       ├── experiments/
-│       │   ├── __init__.py                        # Exposes experiment definitions, planning, execution, and collapse functionality.
-│       │   ├── registry.py                        # Defines the complete descriptive Section 30 experiment registry and all fixed matrices.
-│       │   ├── planning.py                        # Resolves canonical experiment order, prerequisites, semantic cells, phases, blocked cells, and count invariants.
-│       │   ├── execution.py                       # Executes planned cells through the artifact DAG with selective reuse, invalidation, recovery, and completion semantics.
-│       │   ├── collapse.py                        # Applies preregistered proposal, plurality, source-exclusion, and external-verification survival rules.
-│       │   └── validation.py                      # Validates experiment definitions, legal conditions, phase obligations, dependencies, counts, and completion.
+│       │   ├── __init__.py
+│       │   ├── definitions.py
+│       │   ├── planning.py
+│       │   ├── runner.py
+│       │   └── scenarios/
+│       │       ├── __init__.py
+│       │       ├── capability_granularity.py
+│       │       ├── evidence_scarcity.py
+│       │       ├── evidence_arrival.py
+│       │       └── heterogeneity.py
 │       │
 │       ├── evaluation/
-│       │   ├── __init__.py                        # Exposes metric records, metric computation, aggregation, and evaluation validation.
-│       │   ├── records.py                         # Defines evaluation-specific domain/seed/denominator/outcome/metric records that do not belong in the cross-cutting domain package.
-│       │   ├── metrics.py                         # Implements the complete classification, capability, security, distribution, delay, and efficiency metric registry.
-│       │   ├── aggregation.py                     # Implements equal-domain/equal-seed aggregation, adequacy rules, NA handling, and repeated-measure constraints.
-│       │   └── validation.py                      # Enforces role legality, denominator validity, protocol-specific sufficiency, and metric/evaluation invariants.
-│       │
-│       ├── analysis/
-│       │   ├── __init__.py                        # Exposes statistical comparison and claim-state analysis.
-│       │   ├── statistics.py                      # Implements exact sign-flip tests, non-inferiority tests, Holm adjustment, bootstrap CIs, effects, and type-7 quantiles.
-│       │   ├── comparisons.py                     # Executes predeclared method comparisons, pairing, materiality, completion, and collapse-support decisions.
-│       │   └── claims.py                          # Mechanically derives roadmap-defined final claim states and scopes from verified completed verified scientific evidence.
-│       │
-│       ├── artifacts/
-│       │   ├── __init__.py                        # Exposes the scientific artifact lifecycle and dependency-DAG infrastructure.
-│       │   ├── records.py                         # Defines artifact-specific manifests, checksums, dependency records, and storage metadata around shared domain identities/states.
-│       │   ├── paths.py                           # Maps computational artifact types only into `outputs/` and verified export products only into `results/`.
-│       │   ├── fingerprints.py                    # Computes stage-scoped dependency, producer-component, runtime, and upstream-identity fingerprints.
-│       │   ├── graph.py                           # Maintains artifact dependencies, cross-experiment reuse, stale descendants, and selective invalidation.
-│       │   ├── storage.py                         # Handles staging, checksum verification, atomic publication, replacement, retirement, and active artifact selection.
-│       │   ├── provenance.py                      # Captures configuration, data, seed, code, environment, dependency, and reconstruction lineage.
-│       │   └── validation.py                      # Rejects stale, corrupt, partial, incompatible, provenance-invalid, or phase-invalid computational artifacts.
-│       │
-│       ├── runtime/
-│       │   ├── __init__.py                        # Exposes deterministic execution, environment validation, recovery, state, logging, and timing helpers.
-│       │   ├── determinism.py                     # Implements seed namespaces, canonical hashing, batch ordering, RNG state, and fail-closed PyTorch determinism.
-│       │   ├── environment.py                     # Validates reference software, CUDA, hardware, storage, and deterministic-runtime requirements.
-│       │   ├── state.py                           # Manages runtime progress, failure details, project-stage progression, and resumable boundaries using shared lifecycle identities.
-│       │   ├── recovery.py                        # Restores hash-valid checkpoints and enforces the single permitted infrastructure recovery attempt.
-│       │   ├── timing.py                          # Measures monotonic/CUDA timings, memory, communication, transmissions, storage, and efficiency repetitions.
-│       │   └── logging.py                         # Provides structured diagnostic logging without making logs authoritative scientific evidence.
+│       │   ├── __init__.py
+│       │   ├── metrics.py
+│       │   ├── statistics.py
+│       │   ├── comparisons.py
+│       │   └── summaries.py
 │       │
 │       ├── reporting/
-│       │   ├── __init__.py                        # Exposes verified evidence materialization from `outputs/` into `results/`.
-│       │   ├── verification.py                    # Confirms that exports depend only on complete verified output artifacts and that `results/` is never an execution dependency.
-│       │   ├── tables.py                          # Renders mandatory roadmap tables from compact verified metric/statistical/claim inputs.
-│       │   ├── figures.py                         # Renders mandatory roadmap figures and the deterministic FedSIRA protocol schematic.
-│       │   └── export.py                          # Materializes compact manuscript-facing evidence into `results/` without scientific recomputation.
+│       │   ├── __init__.py
+│       │   ├── tables.py
+│       │   ├── figures.py
+│       │   └── export.py
 │       │
-│       └── cli/
-│           ├── __init__.py                        # Exposes the public CLI package.
-│           ├── main.py                            # Defines the Typer `fedsira` application and the fixed public command surface.
-│           └── commands/
-│               ├── __init__.py                    # Exposes the six public roadmap-defined CLI commands.
-│               ├── doctor.py                      # Read-only diagnosis of environment, data, artifacts, experiments, and next valid action.
-│               ├── preprocess.py                  # Executes deterministic dataset preparation and publishes reusable preprocessing artifacts under `outputs/`.
-│               ├── plan.py                        # Resolves and displays experiment matrices, dependencies, phases, blocked conditions, and exact plan counts.
-│               ├── smoke.py                       # Executes the deterministic protocol/invariant validation suite without creating manuscript evidence.
-│               ├── run.py                         # Executes one named experiment's scientific lifecycle and analysis.
-│               └── report.py                      # Exports verified compact evidence from `outputs/` to `results/` without rerunning scientific computation.
+│       └── io/
+│           ├── __init__.py
+│           ├── paths.py
+│           └── storage.py
 │
-└── tests/
-    ├── conftest.py
-    │
-    ├── architecture/
-    │   ├── test_dependency_boundaries.py
-    │   │   — Enforces allowed dependency directions between architectural layers and prevents architectural responsibility violations.
-    │   │
-    │   ├── test_public_type_boundaries.py
-    │   │   — Ensures public, domain, and application APIs use explicit meaningful types rather than loosely typed interfaces or inappropriate raw primitives.
-    │   │
-    │   ├── test_no_any_dict_object.py
-    │   │   — Rejects inappropriate use of Any, object, and anonymous dict-based domain/configuration/artifact payloads, except narrowly justified external-library boundaries.
-    │   │
-    │   ├── test_no_primitive_leaks.py
-    │   │   — Detects inappropriate str/int/float/bool/list/dict primitives crossing domain or architectural boundaries, including primitive public inputs and outputs where meaningful domain types should be used.
-    │   │
-    │   ├── test_no_hardcoded_values.py
-    │   │   — Detects hardcoded scientific, experimental, statistical, dataset, seed, threshold, algorithm, protocol, and other governed values outside their authoritative owner.
-    │   │
-    │   ├── test_configuration_ownership.py
-    │   │   — Ensures configuration values have one authoritative owner and are not repeated or copied into constants, implementation code, CLI defaults, tests, or parallel configuration structures.
-    │   │
-    │   ├── test_no_duplicate_constants.py
-    │   │   — Detects duplicate constants and equivalent independently maintained values across the repository.
-    │   │
-    │   ├── test_dead_code.py
-    │   │   — Detects dead, unused, unreachable, obsolete, and superseded production modules, classes, functions, methods, constants, and other symbols.
-    │   │
-    │   ├── test_enum_integrity.py
-    │   │   — Detects unused enums and ensures authoritative enums are actually used rather than being bypassed by equivalent free-form strings or duplicate identities.
-    │   │
-    │   ├── test_no_test_only_production_code.py
-    │   │   — Detects production code that exists or is referenced only for tests and has no legitimate production use.
-    │   │
-    │   ├── test_no_redirects_shims_reexports.py
-    │   │   — Rejects obsolete redirect modules, compatibility shims, legacy aliases, transitional wrappers, and unnecessary re-export-only modules.
-    │   │
-    │   ├── test_naming_policy.py
-    │   │   — Enforces descriptive names for modules, classes, functions, methods, variables, and parameters; rejects vague, generic, strange, misleading, or unjustifiably short names and abbreviations.
-    │   │
-    │   ├── test_canonical_vocabulary.py
-    │   │   — Enforces canonical project, scientific, algorithm, dataset, policy, experiment, artifact, and architectural terminology and rejects stale aliases, obsolete terminology, opaque names, and artificial version naming.
-    │   │
-    │   ├── test_no_comments_or_docstrings.py
-    │   │   — Rejects Python source comments and module/class/function/method docstrings.
-    │   │
-    │   ├── test_no_todos_or_temporary_code.py
-    │   │   — Rejects TODO, FIXME, HACK, XXX, commented-out implementations, temporary markers, unfinished code residue, and similar development leftovers.
-    │   │
-    │   ├── test_static_typing.py
-    │   │   — Runs repository-wide strict Pyright across production and tests so Pyright/Pylance-visible typing violations fail the test suite.
-    │   │
-    │   ├── test_code_quality.py
-    │   │   — Enforces Ruff formatting and linting so unformatted or lint-invalid Python code cannot remain in the repository.
-    │   │
-    │   └── test_dependency_hygiene.py
-    │       — Enforces dependency hygiene and detects unused, missing, or incorrectly declared dependencies.
-    │
-    ├── unit/
-    │   ├── domain/
-    │   │   ├── test_enums.py
-    │   │   └── test_records.py
-    │   │
-    │   ├── config/
-    │   │   ├── test_loading.py
-    │   │   └── test_validation.py
-    │   │
-    │   ├── datasets/
-    │   │   ├── test_roles.py
-    │   │   ├── test_sampling.py
-    │   │   ├── test_scaling.py
-    │   │   ├── nbaiot/
-    │   │   │   ├── test_schema.py
-    │   │   │   └── test_preprocessing.py
-    │   │   └── ciciot2023/
-    │   │       ├── test_schema.py
-    │   │       └── test_preprocessing.py
-    │   │
-    │   ├── models/
-    │   │   └── test_mlp.py
-    │   │
-    │   ├── learning/
-    │   │   ├── test_training.py
-    │   │   ├── test_federated.py
-    │   │   ├── test_anchor.py
-    │   │   ├── test_post_reference.py
-    │   │   ├── test_aggregation.py
-    │   │   └── test_scoring.py
-    │   │
-    │   ├── protocol/
-    │   │   ├── test_claim_contract.py
-    │   │   ├── test_state_machine.py
-    │   │   ├── test_opening.py
-    │   │   ├── test_reproduction.py
-    │   │   ├── test_verification.py
-    │   │   ├── test_synthesis.py
-    │   │   ├── test_admission.py
-    │   │   └── test_theory.py
-    │   │
-    │   ├── attacks/
-    │   │   ├── test_source_backdoor.py
-    │   │   ├── test_reproduction_attacks.py
-    │   │   └── test_verifier_attacks.py
-    │   │
-    │   ├── boundaries/
-    │   │   ├── test_epistemic_failure.py
-    │   │   ├── test_capability_granularity.py
-    │   │   ├── test_heterogeneity.py
-    │   │   └── test_evidence_arrival.py
-    │   │
-    │   ├── baselines/
-    │   │   ├── test_registry.py
-    │   │   ├── test_references.py
-    │   │   ├── test_source_authority.py
-    │   │   ├── test_independent_retraining.py
-    │   │   ├── test_robust_aggregation.py
-    │   │   ├── test_certified_ensemble.py
-    │   │   └── test_calibration.py
-    │   │
-    │   ├── experiments/
-    │   │   ├── test_registry.py
-    │   │   ├── test_planning.py
-    │   │   ├── test_execution.py
-    │   │   ├── test_collapse.py
-    │   │   └── test_validation.py
-    │   │
-    │   ├── evaluation/
-    │   │   ├── test_records.py
-    │   │   ├── test_metrics.py
-    │   │   ├── test_aggregation.py
-    │   │   └── test_validation.py
-    │   │
-    │   ├── analysis/
-    │   │   ├── test_statistics.py
-    │   │   ├── test_comparisons.py
-    │   │   └── test_claims.py
-    │   │
-    │   ├── artifacts/
-    │   │   ├── test_records.py
-    │   │   ├── test_paths.py
-    │   │   ├── test_fingerprints.py
-    │   │   ├── test_graph.py
-    │   │   ├── test_storage.py
-    │   │   ├── test_provenance.py
-    │   │   └── test_validation.py
-    │   │
-    │   ├── runtime/
-    │   │   ├── test_determinism.py
-    │   │   ├── test_environment.py
-    │   │   ├── test_state.py
-    │   │   ├── test_recovery.py
-    │   │   └── test_timing.py
-    │   │
-    │   ├── reporting/
-    │   │   ├── test_verification.py
-    │   │   ├── test_tables.py
-    │   │   ├── test_figures.py
-    │   │   └── test_export.py
-    │   │
-    │   └── cli/
-    │       └── test_commands.py
-    │
-    ├── scientific/
-    │   ├── test_data_invariants.py
-    │   ├── test_source_artifact_exclusion.py
-    │   ├── test_verification_and_certificate.py
-    │   ├── test_krum_contract.py
-    │   ├── test_statistical_contracts.py
-    │   ├── test_experiment_contracts.py
-    │   ├── test_claim_boundaries.py
-    │
-    ├── integration/
-    │   ├── datasets/
-    │   │   └── test_preprocessing_pipeline.py
-    │   ├── learning/
-    │   │   └── test_anchor_and_reproduction.py
-    │   ├── protocol/
-    │   │   └── test_fedsira_admission_path.py
-    │   ├── experiments/
-    │   │   └── test_plan_and_execution.py
-    │   ├── artifacts/
-    │   │   └── test_reuse_invalidation_recovery.py
-    │   └── reporting/
-    │       └── test_verified_materialization.py
-    │
-    ├── e2e/
-    │   ├── test_preprocess_plan_smoke.py
-    │   ├── test_run_status_report.py
-    │   ├── test_reuse_recovery_overwrite.py
-    │
-    └── smoke/
-        └── test_smoke.py
+├── tests/
+│   ├── _repo.py
+│   ├── architecture/
+│   │   ├── test_file_tree.py
+│   │   ├── test_dependency_boundaries.py
+│   │   ├── test_no_primitive_domain_io.py
+│   │   ├── test_no_magic_strings.py
+│   │   ├── test_no_compatibility_code.py
+│   │   ├── test_no_dead_code.py
+│   │   ├── test_no_test_only_production_code.py
+│   │   ├── test_no_unwired_modules.py
+│   │   └── test_config_ownership.py
+│   ├── unit/
+│   ├── integration/
+│   └── e2e/
+│
+├── .gitignore
+├── LICENSE
+├── Makefile
+├── README.md
+├── pyproject.toml
+└── uv.lock
 ```
 
 The complete configuration file is:
@@ -2986,7 +2663,7 @@ metrics_and_statistics:
     seconds_decimals: 2
     byte_units: IEC
     byte_decimals: 2
-runtime:
+execution:
   repository_layout:
     source: src/fedsira
     tests: tests
@@ -3030,75 +2707,11 @@ The typed loader may expose enums and immutable objects generated from this YAML
 
 # 22. `outputs/` execution workspace
 
-`outputs/` is the complete generated computational workspace used to resume, diagnose, validate, analyze, trace, and reproduce the study. Its repository-level structure is fixed by the project tree and has four structural scopes:
-
-* `outputs/preprocessing/` contains raw-file/schema inventories, preprocessing validation evidence, deterministic prepared role views, immutable split/sample manifests, fixed feature/scaler products, exclusions, dataset identities, preparation fingerprints, and preprocessing provenance.
-* `outputs/artifacts/` contains project-wide reusable scientific artifacts whose dependency fingerprints permit cross-experiment reuse: reusable models/checkpoints, score shards, fitted scientific objects, baseline intermediates, and derived protocol/certificate/synthesis products.
-* `outputs/experiments/<descriptive-experiment-name>/` contains experiment-specific artifacts, evaluations, metrics, statistics, checkpoints, diagnostics, logs, and provenance that are not promoted to a project-wide reusable location.
-* `outputs/cache/` contains only non-authoritative acceleration caches and `outputs/cache/staging/` for temporary atomic-write staging. Cache or staging content is never scientific evidence.
-
-Scientific artifacts are immutable after publication. A producer writes payloads to `outputs/cache/staging/`, verifies payload checksums and its manifest, and atomically publishes the validated artifact to its canonical `outputs/preprocessing/`, `outputs/artifacts/`, or `outputs/experiments/<descriptive-experiment-name>/` location as `Complete`. Only `Complete` artifacts may be selected for scientific reads. Staging, failed, partial, checksum-mismatched, `Stale`, or retired artifacts are excluded.
-
-Before any mutating command continues, it validates referenced artifact manifests and the dependency graph and removes stale descendants from active selection. Inactive diagnostic history may be retained only without making it selectable as scientific evidence. A stale descendant may never remain active beside a regenerated parent.
-
-Expensive artifacts are shared across experiments, methods, and semantic cells under `outputs/artifacts/` whenever their Section 26 dependency fingerprint is identical. Experiment-specific products remain under the owning `outputs/experiments/<descriptive-experiment-name>/` subtree. Filesystem path, experiment that first requested a reusable artifact, timestamp, run UUID, or repository commit alone does not prevent reuse.
-
-Structured execution logs belong under `outputs/experiments/<descriptive-experiment-name>/logs/execution/`; technical failure/interruption records belong under `outputs/experiments/<descriptive-experiment-name>/logs/failures/`; scientific, numerical, and runtime diagnostics belong under the corresponding `diagnostics/` subdirectories. Logs and diagnostics are never authoritative result storage. Scientific evaluations, metrics, and statistics are stored in their designated machine-readable experiment directories rather than reconstructed from logs.
+`outputs/` is the generated computational workspace used to validate, analyze, trace, and reproduce the study. Its internal layout is an implementation detail; the authoritative repository tree requires only the directory itself. Scientific outputs must be machine-readable, checksum-valid, and selected only when their declared material dependencies remain compatible. Logs and diagnostics are never authoritative result storage.
 
 # 23. `results/` manuscript-facing evidence
 
-`results/` contains only compact verified manuscript-facing evidence materialized by `fedsira report`. It is never a computational input to preprocessing, training, scoring, evaluation, metrics, statistics, claim decisions, or execution recovery.
-
-Its fixed structure is:
-
-```text
-results/
-├── experiments/
-│   └── <descriptive-experiment-name>/
-│       ├── figures/
-│       │   ├── main/
-│       │   └── supplementary/
-│       ├── tables/
-│       │   ├── main/
-│       │   └── supplementary/
-│       ├── metrics/
-│       │   ├── primary/
-│       │   ├── secondary/
-│       │   └── summary/
-│       └── statistics/
-│           ├── tests/
-│           ├── confidence_intervals/
-│           ├── effects/
-│           └── multiplicity/
-└── project_summary/
-    ├── figures/
-    │   ├── main/
-    │   └── supplementary/
-    ├── tables/
-    │   ├── main/
-    │   └── supplementary/
-    ├── metrics/
-    │   ├── primary/
-    │   └── summary/
-    ├── statistics/
-    │   ├── comparisons/
-    │   ├── confidence_intervals/
-    │   ├── effects/
-    │   └── multiplicity/
-    ├── claim_registry/
-    └── reproducibility/
-        ├── configuration/
-        ├── datasets/
-        ├── seeds/
-        ├── software/
-        └── execution/
-```
-
-Experiment-owned figures, tables, compact metric summaries, and compact statistical summaries are exported under `results/experiments/<descriptive-experiment-name>/`. Genuine cross-experiment figures, tables, metrics, statistics, final claim states, and reproducibility summaries are exported under `results/project_summary/`.
-
-Each materialized export records the exact completed `outputs/` artifact identities from which it was rendered. Reporting source-data products remain computational evidence under `outputs/`; `results/` contains only the compact export categories defined above. If any source identity changes, only the affected export and its reporting descendants become stale. A change to figure styling, table rendering, caption generation, or report layout does not invalidate training, scores, metrics, or statistics.
-
-The exact internal filenames are implementation choices unless Sections 33–35 require a named scientific table, figure, metric, statistic, claim, or reproducibility product. `results/` must exclude caches, debug logs, failed/invalid runs, stale exports, overwrite archives, temporary files, and incomplete scientific evidence.
+`results/` contains compact verified manuscript-facing evidence materialized by `fedsira report`; it is never a computational input. Its internal layout is an implementation detail. Each export records the completed `outputs/` identities from which it was rendered, and a reporting or formatting change does not invalidate training, scoring, metrics, or statistics.
 
 # 24. Public CLI contract
 
@@ -3118,11 +2731,11 @@ No public command exposes method, baseline, attack, seed, scientific cell-phase,
 Every mutating command follows the same execution rule:
 
 ```text
-validate existing artifacts
-→ reuse compatible artifacts
+validate existing outputs
+→ reuse compatible outputs
 → identify and deactivate stale descendants
 → recompute only missing/invalidated producers
-→ continue from the nearest valid artifact
+→ continue from the nearest valid output
 → atomically publish completed outputs
 ```
 
@@ -3130,7 +2743,7 @@ Dependency validity is stage-scoped as defined in Sections 25–27. No command t
 
 ## 24.1 `fedsira doctor`
 
-`doctor` is the authoritative read-only project, dataset, artifact, and experiment status command. It reports environment/configuration health; raw and preprocessed dataset readiness; artifact validity/stale-descendant status; each experiment's state, progress, nearest resumable boundary, blockers, failures/invalid cells, and report-export state; whether the four collapse decisions and `Resolved FedSIRA Core` artifact are complete; the current Section 29 project stage; and the next valid action. It writes no scientific artifact and does not repair or delete artifacts.
+`doctor` is the authoritative read-only project, dataset, output, and experiment status command. It reports environment/configuration health; raw and preprocessed dataset readiness; output validity/stale-descendant status; each experiment's state, progress, nearest resumable boundary, blockers, failures/invalid cells, and report-export state; whether the four collapse decisions and `Resolved FedSIRA Core` record are complete; the current Section 29 project stage; and the next valid action. It writes no scientific output and does not repair or delete outputs.
 
 ## 24.2 `fedsira preprocess ["N-BaIoT"|"CICIoT2023"]`
 
@@ -3168,7 +2781,7 @@ If every required artifact for the experiment is validly complete, `run` returns
 
 ## 24.6 `fedsira report [<experiment name>]`
 
-`report` performs no scientific training, scoring, metric computation, or inferential recomputation. With an experiment identity it verifies that experiment's required scientific artifacts and materializes the applicable Section 33–34 exports. Without an experiment identity it first performs project-completion verification: Section 31 nominal/completion counts, all required experiment terminal states, invariant/leakage checks, artifact-DAG validity, Section 18 statistical/multiplicity artifacts, and Section 35 claim states must be internally consistent before project-summary exports are produced.
+`report` performs no scientific training, scoring, metric computation, or inferential recomputation. With an experiment identity it verifies that experiment's required scientific outputs and materializes the applicable Section 33–34 exports. Without an experiment identity it first performs project-completion verification: Section 31 nominal/completion counts, all required experiment terminal states, invariant/leakage checks, declared dependency compatibility, Section 18 statistical/multiplicity outputs, and Section 35 claim states must be internally consistent before project-summary exports are produced.
 
 Matching exports are reused when their reporting dependency fingerprint matches. `--overwrite` rematerializes only reporting artifacts and never causes preprocessing, training, scoring, evaluation, metric, or statistical recomputation. A stale report descendant is removed from the active result set before replacement.
 
@@ -3198,7 +2811,7 @@ The producer-component fingerprint covers the local code units that implement th
 
 A producer's declared dependency scope is part of its artifact schema and is tested by Section 28. Changing that scope is itself a producer-schema change and invalidates artifacts of that type.
 
-Selective invalidation is transitive only downstream. When a complete parent artifact changes identity, the active artifact graph marks exactly its descendants stale before any new downstream read. Unrelated branches remain complete and reusable.
+Selective invalidation is transitive only downstream. When a complete parent output changes identity, its declared downstream consumers are marked stale before any new downstream read. Unrelated work remains complete and reusable.
 
 An infrastructure interruption may resume the same unchanged Section 19 scientific cell phase once from the nearest hash-valid recovery checkpoint. It does not create an additional seed or condition. After a genuine implementation correction, rerunning the same experiment is permitted under the unchanged scientific plan: the corrected producer-component fingerprint invalidates only affected artifacts and descendants, while compatible upstream science remains reusable.
 
@@ -3206,11 +2819,11 @@ An infrastructure interruption may resume the same unchanged Section 19 scientif
 
 Completed active metric stores contain at most one authoritative row per declared semantic key.
 
-# 26. Scientific artifact contract
+# 26. Scientific output contract
 
 Authoritative numeric result/statistical data are stored in machine-readable tabular form, preferably Parquet; JSON artifacts use typed schemas. The roadmap does not prescribe a general workflow engine or a field-by-field software manifest. It does require the following scientific artifact boundaries because they determine reuse, recovery, and invalidation.
 
-## 26.1 Scientific execution graph
+## 26.1 Scientific execution dependencies
 
 All experiments resolve onto this acyclic scientific graph:
 
@@ -3279,9 +2892,9 @@ Staging → Complete → Stale/Retired
 | Krum synthesized update/model                      | synthesis producer                       | five certified/noncertified input row identities as required by method, Krum config, synthesis component fingerprint                                                                          | final gate, report-test scoring                                                                                                                         |
 | Final-gate evaluation/decision                     | final-gate evaluator                     | synthesized/production model identity, exact final-gate score artifacts, domain adequacy, Capability Claim Contract/final-gate rules, evaluation component fingerprint                                              | admission outcome, metrics, claims                                                                                                                      |
 | Domain/seed metric artifact                        | metric registry                          | score/evaluation artifacts, exact metric definitions, aggregation rules, adequacy/NA rules, metric component fingerprint                                                                      | statistics, tables, figures; a metric-code change need not invalidate models or scores                                                                  |
-| Statistical comparison/gate artifact               | analysis producer                        | exact seed-level metrics, pairing set, comparison definition, test/sidedness, Holm family, bootstrap seed/resamples, materiality rule, analysis component fingerprint                         | claim registry, tables, figures                                                                                                                         |
+| Statistical comparison/gate artifact               | evaluation producer                      | exact seed-level metrics, pairing set, comparison definition, test/sidedness, Holm family, bootstrap seed/resamples, materiality rule, evaluation component fingerprint                       | claim-support decisions, tables, figures                                                                                                                 |
 | Claim-state artifact                               | claim-decision producer                  | mandatory statistical/gate artifacts and Section 35 rule                                                                                                                                      | project summary/report                                                                                                                                  |
-| Table/figure source data                           | reporting source-data producer           | exact verified metric/statistical/claim identities and table/figure data-selection spec                                                                                                       | renderers; stored as derived computational artifacts under `outputs/artifacts/derived/` or the owning `outputs/experiments/<descriptive-experiment-name>/artifacts/derived/` according to reuse scope                  |
+| Table/figure source data                           | reporting source-data producer           | exact verified metric/statistical/claim identities and table/figure data-selection spec                                                                                                       | renderers; stored under `outputs/` according to the producer's declared reuse scope                                                                    |
 | Table/figure/report export                         | `report`                                 | source-data identities, formatting/rendering specification, reporting component/dependency fingerprint                                                                                        | manuscript-facing `results/experiments/<descriptive-experiment-name>/` or `results/project_summary/` only                                                                                                            |
 
 A score artifact contains per-sample model outputs needed by downstream metrics, including logits/probabilities/predictions and losses when required by the screen/calibration definition. The implementation may shard large score artifacts deterministically; a complete score artifact is publishable only when every declared shard is complete and its aggregate manifest verifies.
@@ -3353,7 +2966,7 @@ The implementation must retain all scientifically meaningful objects needed by t
 
 # 27. Logging, provenance, and dependency fingerprints
 
-Logging is diagnostic and may use any structured format that preserves enough context to diagnose failures; exact event fields and filenames are implementation choices within `outputs/experiments/<descriptive-experiment-name>/logs/execution/` and `outputs/experiments/<descriptive-experiment-name>/logs/failures/`.
+Logging is diagnostic and may use any structured format that preserves enough context to diagnose failures; exact event fields and filenames under `outputs/` are implementation choices.
 
 Every manuscript-facing number must be reproducibly traceable to completed scientific evidence: the owning experiment/cell and producer/cell-phase identities, applicable configuration subset, dataset and split/domain identities, seeds, upstream artifact identities, producer-component fingerprints, relevant runtime/dependency signatures, and the statistical analysis that produced the reported value.
 
@@ -3361,21 +2974,21 @@ For reconstruction, each artifact also records the repository commit, full depen
 
 ## 27.1 Producer-component and external-dependency fingerprint construction
 
-Producer fingerprints are computed from executable scientific code semantics rather than whole-repository commits. For each artifact family, `artifacts/fingerprints.py` starts from the entry modules below and recursively includes every runtime `fedsira.*` module imported by those modules, excluding imports guarded solely by `TYPE_CHECKING`, tests, reporting-only modules not imported by the producer, and package `__init__.py` files that contain no executable statements beyond imports/version constants. Dynamic imports in scientific producer code are forbidden.
+Producer fingerprints are computed from executable scientific code semantics rather than whole-repository commits. For each output family, the responsible producer starts from the entry modules below and recursively includes every imported `fedsira.*` module, excluding imports guarded solely by `TYPE_CHECKING`, tests, reporting-only modules not imported by the producer, and package `__init__.py` files that contain no executable statements beyond imports/version constants. Dynamic imports in scientific producer code are forbidden.
 
 | Artifact family | Producer entry modules | Relevant external dependency identity |
 | --- | --- | --- |
-| raw/schema/exclusion manifest | dataset-specific `acquisition.py`, `schema.py`, `validation.py` | Python, pandas, NumPy, archive reader used for acquired format |
-| role/split/sample/prepared/scaler | `datasets/roles.py`, `sampling.py`, `scaling.py`, dataset-specific `preprocessing.py` | Python, pandas, NumPy, pyarrow |
-| anchor/FedAvg checkpoints | `models/mlp.py`, `learning/training.py`, `federated.py`, `anchor.py`, `runtime/determinism.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
-| source/reproduction checkpoints | `models/mlp.py`, `learning/training.py`, `post_reference.py`, applicable `attacks/*.py`, `runtime/determinism.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
-| baseline checkpoint/calibration | applicable `baselines/*.py`, shared `learning/*.py`, `runtime/determinism.py` | Python, PyTorch where trained, NumPy, SciPy/scikit-learn where used |
-| model scores | `models/mlp.py`, `learning/scoring.py` | Python, PyTorch, CUDA runtime identity, NumPy |
+| raw/schema/exclusion manifest | dataset-specific `loading.py`, `schema.py`, `preprocessing.py` | Python, pandas, NumPy, archive reader used for acquired format |
+| role/split/sample/prepared/scaler | `datasets/common.py`, `sampling.py`, `scaling.py`, dataset-specific `preprocessing.py` | Python, pandas, NumPy, pyarrow |
+| anchor/FedAvg checkpoints | `learning/model.py`, `learning/training.py`, `federated.py`, `anchor.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
+| source/reproduction checkpoints | `learning/model.py`, `learning/training.py`, applicable `attacks/*.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
+| baseline checkpoint/calibration | applicable `baselines/*.py`, shared `learning/*.py` | Python, PyTorch where trained, NumPy, SciPy/scikit-learn where used |
+| model scores | `learning/model.py`, `learning/scoring.py` | Python, PyTorch, CUDA runtime identity, NumPy |
 | opening/verifier/certificate/synthesis/final gate | applicable `protocol/*.py`, `evaluation/metrics.py`, `learning/aggregation.py` | Python, NumPy, SciPy/scikit-learn only when imported by the resolved producer |
-| boundary transformation | applicable `boundaries/*.py`, `attacks/*.py`, `datasets/sampling.py` | Python, NumPy, pandas/pyarrow for materialization |
-| metric artifact | `evaluation/metrics.py`, `evaluation/aggregation.py`, `evaluation/validation.py` | Python, NumPy, scikit-learn only for metrics actually using it |
-| statistical/comparison artifact | `analysis/statistics.py`, `analysis/comparisons.py` | Python, NumPy, SciPy, statsmodels where imported |
-| claim-state artifact | `analysis/claims.py`, `analysis/comparisons.py` | Python, NumPy |
+| boundary transformation | applicable `experiments/scenarios/*.py`, `attacks/*.py`, `datasets/sampling.py` | Python, NumPy, pandas/pyarrow for materialization |
+| metric artifact | `evaluation/metrics.py`, `evaluation/summaries.py` | Python, NumPy, scikit-learn only for metrics actually using it |
+| statistical/comparison artifact | `evaluation/statistics.py`, `evaluation/comparisons.py` | Python, NumPy, SciPy, statsmodels where imported |
+| claim-state artifact | `evaluation/summaries.py`, `evaluation/comparisons.py` | Python, NumPy |
 | report source/export | applicable `reporting/*.py` | Python, pandas, pyarrow, Matplotlib for figures |
 
 For every included Python source module, parse with the reference Python version, remove location metadata, remove module/class/function docstring expressions, and serialize `ast.dump(tree, annotate_fields=True, include_attributes=False)` as UTF-8. Comments and formatting never enter the AST. The component fingerprint is SHA-256 over canonical length-prefixed `(normalized_relative_path, normalized_ast_dump)` pairs sorted by relative path, plus the artifact producer-schema version. Consequently comments/docstrings/formatting do not invalidate science, while executable literals, imports, control flow, formulas, and dependency-scope changes do. Syntax-invalid or dynamically generated scientific source is `Configuration Invalid`.
@@ -3505,7 +3118,7 @@ The implementation-quality suite must additionally prove:
 | 11 | Delay and efficiency | logical evidence delay and post-evidence operational cost are measured with the specified methodology |
 | 12 | Secondary generalization | the resolved mechanism is evaluated without core retuning |
 | 13 | Project statistical/claim completion | every experiment's required metrics/tests/multiplicity/materiality artifacts exist and Section 35 claim states are mechanically derivable |
-| 14 | `report` project verification and export | Section 31 counts, invariants, provenance, artifact-DAG validity, claim states, and required Section 33–34 source products validate |
+| 14 | `report` project verification and export | Section 31 counts, invariants, provenance, declared dependency compatibility, claim states, and required Section 33–34 source products validate |
 
 The resolved-core artifact is a deterministic derived scientific artifact, not an operator-managed planning step. Once all four collapse experiments are complete, the next `fedsira run`/`doctor` resolution pass creates or validates it automatically from the four decision artifacts.
 
@@ -3879,7 +3492,7 @@ Two Byzantine Verifiers — Above Bound
 **Seeds:** 1103, 1217, 1321 only.
 **Timing repetitions:** 5 per method-seed cell on the same machine. Repetitions are not inferential seed units.
 
-Each timing repetition executes in a dedicated single-process timing worker and writes repetition-owned diagnostic payloads beneath `outputs/experiments/Efficiency Measurement/diagnostics/runtime/repetitions/<method>/<master-seed>/<repetition-index>/`; these payloads are never reusable scientific parents. `persistent storage bytes` for a repetition is the recursive sum of regular-file sizes in that repetition directory at completion, excluding symlinks/references to pre-existing shared inputs.
+Each timing repetition executes in a dedicated single-process timing worker and writes repetition-owned diagnostic payloads under `outputs/`; these payloads are never reusable scientific parents. `persistent storage bytes` for a repetition is the recursive sum of regular-file sizes in that repetition's diagnostic directory at completion, excluding symlinks/references to pre-existing shared inputs.
 
 Before each timed repetition:
 
@@ -4188,11 +3801,11 @@ Produce separate plots for:
 
 ---
 
-# 35. Claim-support registry
+# 35. Claim-support decisions
 
 **Configuration authority:** only additional quantitative claim-support boundaries that are not already shared statistical/materiality fields are in `claim_support_thresholds`. Claim-state vocabulary, evidence logic, scope, failure semantics, and forbidden extrapolations are fixed by this section rather than stored as YAML strings.
 
-The claim inventory in this section is the authoritative one-to-one implementation of the safe manuscript claims in Section 1.4. `analysis/claims.py` emits exactly these claim IDs and no additional scientific claim IDs.
+The claim inventory in this section is the authoritative one-to-one implementation of the safe manuscript claims in Section 1.4. `evaluation/summaries.py` emits exactly these claim IDs and no additional scientific claim IDs.
 
 Final claim states are exactly:
 
@@ -4377,7 +3990,7 @@ If any condition fails, project-summary reporting is `Blocked`; `fedsira doctor`
 
 The named tables in Section 33, figures in Section 34, and claim states in Section 35 are mandatory. They must be generated from authoritative machine-readable `outputs/` metric/statistical/claim evidence, never from manually transcribed values or parsed logs. Experiment-owned exports are materialized under `results/experiments/<descriptive-experiment-name>/`; cross-experiment products are generated once under `results/project_summary/` rather than duplicated across experiment exports. Final claim-state exports belong under `results/project_summary/claim_registry/`, and compact reconstruction summaries belong under the applicable `results/project_summary/reproducibility/` subdirectories.
 
-Table/figure source-data products remain computational artifacts under `outputs/artifacts/derived/` or the owning experiment's `outputs/experiments/<descriptive-experiment-name>/artifacts/derived/` location according to their reuse scope. `results/` contains only the compact verified render/export products defined in Section 23 and is never read back by scientific execution.
+Table/figure source-data products remain computational outputs under `outputs/` according to their declared reuse scope. `results/` contains only the compact verified render/export products defined in Section 23 and is never read back by scientific execution.
 
 Reporting artifacts have their own dependency fingerprints. A reporting-code or formatting change rematerializes only the affected table/figure/report descendants. It cannot invalidate the scientific metric/statistical artifacts from which they are rendered.
 
