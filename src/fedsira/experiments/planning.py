@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     CollapseDecisionPassed,
     ConditionName,
     ExperimentName,
@@ -14,7 +14,7 @@ from fedsira.domain.records import (
     ScientificCellCount,
     ScientificCellSemanticKey,
 )
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,

@@ -1,5 +1,5 @@
 from fedsira.domain.enums import FailureClass
-from fedsira.domain.records import ArtifactDigest, AutomaticRecoveryPermitted, RetryCount
+from fedsira.domain.types import ArtifactDigest, AutomaticRecoveryPermitted, RetryCount
 from fedsira.runtime.state import is_automatically_retriable
 
 

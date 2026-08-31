@@ -1,5 +1,5 @@
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.domain.records import OverwriteExisting
+from fedsira.domain.types import OverwriteExisting
 from fedsira.experiments.validation import render_smoke, run_smoke_suite
 from fedsira.runtime.environment import configure_deterministic_backend
 from fedsira.runtime.state import ApplicationContext, bound_application_context

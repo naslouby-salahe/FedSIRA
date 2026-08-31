@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
 from fedsira.datasets.nbaiot.validation import (
     classes_structurally_unavailable,

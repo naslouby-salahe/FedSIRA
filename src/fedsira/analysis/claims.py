@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from fedsira.analysis.comparisons import ComparisonMetric
-from fedsira.config.schema import ClaimSupportThresholdsConfig
-from fedsira.domain.records import (
+from fedsira.config.models import ClaimSupportThresholdsConfig
+from fedsira.domain.types import (
     AdmissionCount,
     CapabilityCertificationRate,
     ClaimGateDecision,
@@ -20,7 +19,8 @@ from fedsira.domain.records import (
     MinimumCompletePairCount,
     PValue,
 )
-from fedsira.experiments.registry import ClaimFamily
+from fedsira.evaluation.comparisons import ComparisonMetric
+from fedsira.experiments.definitions import ClaimFamily
 
 
 class FinalClaimState(StrEnum):

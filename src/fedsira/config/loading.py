@@ -5,13 +5,22 @@ from typing import TypeAlias
 import yaml
 from pydantic import ValidationError
 
-from fedsira.config.schema import ScientificConfig, SmokeConfig, TestFixtureConfig
-from fedsira.config.validation import validate_scientific_config
-from fedsira.domain.records import TextValue
+from fedsira.config.models import ScientificConfig, SmokeConfig, TestFixtureConfig
+from fedsira.domain.types import TextValue
 
 PRODUCTION_CONFIG_PATH = Path("configs/fedsira.yaml")
 TEST_FIXTURE_CONFIG_PATH = Path("configs/tests.yml")
-SMOKE_CONFIG_PATH = Path("configs/smoke.yml")
+SMOKE_CONFIG_PATH = Path("configs/smoke.yaml")
+
+
+def validate_scientific_config(config: ScientificConfig) -> None:
+    seeds = config.seeds_and_determinism
+    if seeds.smoke_seed in seeds.master_seeds or seeds.smoke_seed == seeds.analysis_seed:
+        raise ValueError(
+            "seeds_and_determinism.smoke_seed must not collide with another seed authority"
+        )
+    if seeds.analysis_seed in seeds.master_seeds:
+        raise ValueError("seeds_and_determinism.analysis_seed must not collide with a master seed")
 
 YamlValue: TypeAlias = (
     "None | bool | int | float | TextValue | Sequence[YamlValue] | Mapping[TextValue, YamlValue]"

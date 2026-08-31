@@ -8,7 +8,7 @@ from fedsira.domain.enums import (
     ScientificCellPhase,
     SeedNamespace,
 )
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     ClassLabel,
     DerivedSeed,

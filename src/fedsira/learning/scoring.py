@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as torch_functional
 
-from fedsira.domain.records import KeepGradients
+from fedsira.domain.types import KeepGradients
 
 
 def logits_for_samples(

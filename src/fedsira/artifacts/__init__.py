@@ -6,20 +6,20 @@ from fedsira.artifacts.fingerprints import (
     resolve_producer_import_closure,
 )
 from fedsira.artifacts.graph import ArtifactGraph
-from fedsira.artifacts.paths import (
-    OUTPUTS_ROOT,
-    RESULTS_ROOT,
-    path_scope_for_family,
-    workspace_root_for_family,
-)
 from fedsira.artifacts.provenance import (
     ProvenanceRecord,
     classify_provenance_change,
     outcome_invalidates_artifact,
 )
 from fedsira.artifacts.records import ArtifactManifest
-from fedsira.artifacts.storage import compute_checksum, publish, replace, retire, verify_checksum
 from fedsira.artifacts.validation import validate_artifact_for_scientific_read
+from fedsira.io.paths import (
+    OUTPUTS_ROOT,
+    RESULTS_ROOT,
+    path_scope_for_family,
+    workspace_root_for_family,
+)
+from fedsira.io.storage import compute_checksum, publish, replace, retire, verify_checksum
 
 __all__ = [
     "OUTPUTS_ROOT",

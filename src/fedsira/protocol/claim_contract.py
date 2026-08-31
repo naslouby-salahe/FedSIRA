@@ -1,9 +1,10 @@
 import hashlib
 from typing import Final
 
-from fedsira.config.schema import CapabilityClaimConfig, EvidenceMinimaConfig
+from fedsira.config.models import CapabilityClaimConfig, EvidenceMinimaConfig
 from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import (
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     ArtifactDigest,
     BenignFalseAlarmRateIncrease,
     CapabilityContractSatisfied,
@@ -22,7 +23,6 @@ from fedsira.domain.records import (
     TargetF1,
     TargetF1Gain,
 )
-from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import framed_bytes
 
 CLAIM_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_claim_contract_identity"

@@ -12,7 +12,7 @@ from fedsira.domain.enums import (
     Role,
     RootCauseMixture,
 )
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AdmissionCount,
     AdmissionRateChange,
     AttackStrength,

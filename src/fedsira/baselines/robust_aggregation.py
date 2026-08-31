@@ -1,9 +1,9 @@
 import torch
 
-from fedsira.config.schema import ThreeRowCoordinateMedianConfig
+from fedsira.config.models import ThreeRowCoordinateMedianConfig
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     CommitteeSize,
     DerivedSeed,
     FederatedRoundCount,

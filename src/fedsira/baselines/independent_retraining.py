@@ -1,6 +1,6 @@
 from fedsira.baselines.references import post_reference_retrain_maximum_local_epochs
 from fedsira.domain.enums import ClaimOpeningMode
-from fedsira.domain.records import LocalEpochCount
+from fedsira.domain.types import LocalEpochCount
 
 
 def one_independent_retrain_local_epochs() -> LocalEpochCount:

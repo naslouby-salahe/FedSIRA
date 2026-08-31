@@ -1,7 +1,7 @@
 import re
 from enum import StrEnum
 
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AttackBasename,
     AttackFamilyName,
     DomainId,

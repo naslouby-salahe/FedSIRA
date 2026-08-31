@@ -1,5 +1,5 @@
 from fedsira.domain.enums import ProvenanceValidationOutcome
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInvalidated,
     CreationContext,

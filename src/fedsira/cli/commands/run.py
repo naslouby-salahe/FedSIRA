@@ -1,9 +1,8 @@
 from pathlib import Path
 
-from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
-from fedsira.domain.records import ExperimentName, OverwriteExisting, RunRenderText
+from fedsira.domain.types import ExperimentName, OverwriteExisting, RunRenderText
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -11,7 +10,13 @@ from fedsira.experiments.collapse import (
     publish_resolved_core,
     read_resolved_core,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.definitions import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    ClaimFamily,
+    experiment_by_name,
+)
+from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.runner import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -20,8 +25,7 @@ from fedsira.experiments.execution import (
     comparison_results_for_experiment,
     execute_experiment,
 )
-from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily, experiment_by_name
+from fedsira.io.paths import workspace_root_for_family
 from fedsira.runtime.environment import configure_deterministic_backend
 from fedsira.runtime.state import (
     ApplicationContext,

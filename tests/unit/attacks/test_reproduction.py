@@ -7,8 +7,8 @@ from fedsira.attacks.reproduction import (
     verifier_aware_training_step,
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.learning.training import build_loss_function, build_optimizer
-from fedsira.models.mlp import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.runtime.determinism import seed_job_local_rng_streams
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

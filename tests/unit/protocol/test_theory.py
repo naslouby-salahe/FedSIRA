@@ -6,7 +6,7 @@ import torch
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import TernaryOutcome
-from fedsira.protocol.theory import (
+from fedsira.protocol.specification import (
     deduplicate_reports_by_proxy,
     diagnostic_at_least_two_byzantine_probability,
     first_cycle_with_minimum_eligible_evidence_holders,

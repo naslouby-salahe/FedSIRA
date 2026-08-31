@@ -1,4 +1,4 @@
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -6,7 +6,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.records import DomainCount
+from fedsira.domain.types import DomainCount
 
 
 def domains_with_target_stream(

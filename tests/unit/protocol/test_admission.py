@@ -4,8 +4,8 @@ import torch
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
-from fedsira.domain.records import SeedBundle
-from fedsira.evaluation.records import MetricResult
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import SeedBundle
 from fedsira.protocol.admission import (
     AdmissionArtifactContent,
     apply_production_update,

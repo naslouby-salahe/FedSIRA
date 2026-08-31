@@ -1,9 +1,12 @@
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.config.schema import RoleInterval, ScalingConfig
-from fedsira.config.validation import validate_scientific_config
+from fedsira.config.loading import (
+    PRODUCTION_CONFIG_PATH,
+    load_scientific_config,
+    validate_scientific_config,
+)
+from fedsira.config.models import RoleInterval, ScalingConfig
 
 
 def test_production_config_passes_cross_field_validation() -> None:

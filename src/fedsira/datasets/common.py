@@ -5,7 +5,7 @@ from typing import Self
 from pydantic import model_validator
 
 from fedsira.domain.enums import Role
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     FrozenDomainModel,
     RelativePathText,

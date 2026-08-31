@@ -3,25 +3,11 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 
-from fedsira.analysis.comparisons import (
-    ComparisonFamilyResult,
-    ComparisonMetric,
-    ComparisonResult,
-    ComparisonState,
-)
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
-from fedsira.artifacts.storage import (
-    compute_checksum,
-    is_artifact_complete_and_valid,
-    publish_artifact_to_disk,
-    published_artifact_paths,
-    read_published_manifest,
-    stage_payload,
-)
 from fedsira.artifacts.validation import validate_artifact_lifecycle_readable
-from fedsira.config.schema import MaterialityConfig
+from fedsira.config.models import MaterialityConfig
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOpeningMode
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     ClaimReason,
@@ -36,7 +22,21 @@ from fedsira.domain.records import (
     ResolvedCoreIdentity,
     SourceExcludedFromKrum,
 )
-from fedsira.experiments.registry import ClaimFamily
+from fedsira.evaluation.comparisons import (
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonResult,
+    ComparisonState,
+)
+from fedsira.experiments.definitions import ClaimFamily
+from fedsira.io.storage import (
+    compute_checksum,
+    is_artifact_complete_and_valid,
+    publish_artifact_to_disk,
+    published_artifact_paths,
+    read_published_manifest,
+    stage_payload,
+)
 
 
 class CollapseDecisionKind(StrEnum):

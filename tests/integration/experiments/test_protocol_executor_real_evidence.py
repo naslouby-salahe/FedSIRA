@@ -5,7 +5,7 @@ import pytest
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     materialize_nbaiot_prepared_views,
@@ -18,14 +18,7 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
 from fedsira.experiments.collapse import resolve_core_mapping
-from fedsira.experiments.execution import (
-    ProtocolCellExecutor,
-    evaluate_domain,
-    non_source_domains,
-    train_anchor,
-)
-from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -46,13 +39,20 @@ from fedsira.experiments.registry import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.protocol.opening import select_source_domain, source_selection_order
+from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.runner import (
+    ProtocolCellExecutor,
+    evaluate_domain,
+    non_source_domains,
+    train_anchor,
+)
+from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime.determinism import namespace_seed
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training end-to-end through"
     " ProtocolCellExecutor; skipped by default to avoid competing for CPU with other work."
-    " Re-enable deliberately when verifying fedsira.experiments.execution."
+    " Re-enable deliberately when verifying fedsira.experiments.runner."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

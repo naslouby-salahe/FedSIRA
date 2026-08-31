@@ -1,15 +1,24 @@
 from pathlib import Path
 
 from fedsira.artifacts.graph import load_published_artifact_graph, stale_artifact_identities
-from fedsira.artifacts.paths import OUTPUTS_ROOT, RESULTS_ROOT, preprocessing_root
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.domain.records import ExperimentName, OverwriteExisting
+from fedsira.domain.types import ExperimentName, OverwriteExisting
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
     materialize_resolved_core,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.definitions import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    ClaimFamily,
+    experiment_by_name,
+)
+from fedsira.experiments.planning import (
+    ScientificCell,
+    build_plan,
+    validate_planned_cell_count_invariant,
+)
+from fedsira.experiments.runner import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -18,12 +27,7 @@ from fedsira.experiments.execution import (
     comparison_results_for_experiment,
     derive_experiment_lifecycle,
 )
-from fedsira.experiments.planning import (
-    ScientificCell,
-    build_plan,
-    validate_planned_cell_count_invariant,
-)
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, ClaimFamily, experiment_by_name
+from fedsira.io.paths import OUTPUTS_ROOT, RESULTS_ROOT, preprocessing_root
 from fedsira.reporting.export import (
     claim_definition_count,
     derive_claim_states_for_export,

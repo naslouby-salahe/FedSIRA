@@ -1,7 +1,7 @@
 import torch
 
-from fedsira.domain.records import ExampleCount, ParameterName, TensorDomainModel
-from fedsira.models.mlp import FedSIRAClassifier
+from fedsira.domain.types import ExampleCount, ParameterName, TensorDomainModel
+from fedsira.learning.model import FedSIRAClassifier
 
 
 class ModelParameter(TensorDomainModel):

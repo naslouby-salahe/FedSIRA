@@ -1,8 +1,8 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass
 from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import ArtifactDigest, ClassCount
-from fedsira.evaluation.records import MetricResult
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import ArtifactDigest, ClassCount
 from fedsira.protocol.claim_contract import (
     CapabilityClaimContract,
     build_capability_claim_contract,

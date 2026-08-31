@@ -8,8 +8,8 @@ from typing import Protocol, cast
 
 import torch
 
-from fedsira.config.schema import ReferenceEnvironmentConfig
-from fedsira.domain.records import (
+from fedsira.config.models import ReferenceEnvironmentConfig
+from fedsira.domain.types import (
     ByteCount,
     DeterministicExecutionReady,
     EnvironmentText,

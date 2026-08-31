@@ -4,7 +4,8 @@ import pytest
 
 from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.records import ArtifactManifest
-from fedsira.artifacts.storage import (
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
+from fedsira.io.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
     publish,
@@ -15,7 +16,6 @@ from fedsira.artifacts.storage import (
     stage_payload,
     verify_checksum,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 
 def staged_manifest(

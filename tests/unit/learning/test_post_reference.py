@@ -3,6 +3,7 @@ import math
 import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.learning.post_reference import (
     compute_delta_l2,
     compute_stability_kl,
@@ -10,7 +11,6 @@ from fedsira.learning.post_reference import (
     run_post_reference_training,
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
-from fedsira.models.mlp import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.runtime.determinism import seed_job_local_rng_streams
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

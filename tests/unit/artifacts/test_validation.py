@@ -1,7 +1,6 @@
 import pytest
 
 from fedsira.artifacts.records import ArtifactManifest
-from fedsira.artifacts.storage import compute_checksum
 from fedsira.artifacts.validation import (
     validate_artifact_for_scientific_read,
     validate_artifact_lifecycle_readable,
@@ -9,6 +8,7 @@ from fedsira.artifacts.validation import (
     validate_artifact_provenance_outcome,
 )
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ProvenanceValidationOutcome
+from fedsira.io.storage import compute_checksum
 
 
 def manifest(lifecycle_state: ArtifactLifecycleState, payload: bytes) -> ArtifactManifest:

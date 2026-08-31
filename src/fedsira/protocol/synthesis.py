@@ -2,9 +2,9 @@ from collections.abc import Sequence
 
 import torch
 
-from fedsira.config.schema import FinalGateConfig
+from fedsira.config.models import FinalGateConfig
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     CommitteeSize,
     DomainId,
@@ -16,7 +16,7 @@ from fedsira.domain.records import (
     SourceExcludedFromKrum,
     TensorDomainModel,
 )
-from fedsira.protocol.theory import krum_committee_is_admissible
+from fedsira.protocol.specification import krum_committee_is_admissible
 
 
 def synthesis_pending_transition(

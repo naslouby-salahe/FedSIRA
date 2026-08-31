@@ -14,8 +14,8 @@ from typing import Annotated, Protocol, TypeAlias, cast
 
 from pydantic import Field
 
-from fedsira.config.schema import SamplingCapsPerDomain
-from fedsira.datasets.ciciot2023.acquisition import (
+from fedsira.config.models import SamplingCapsPerDomain
+from fedsira.datasets.ciciot2023.loading import (
     SecondaryCsvFile,
     compute_dataset_manifest_hash,
     read_csv_header,
@@ -58,7 +58,7 @@ from fedsira.datasets.scaling import (
     fit_feature_moments,
     standardize_row,
 )
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     ClassLabel,

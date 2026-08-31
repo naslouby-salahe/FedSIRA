@@ -1,5 +1,5 @@
+from fedsira.experiments.definitions import experiment_by_name, experiment_registry
 from fedsira.experiments.planning import PLAN_CELL_COUNT_CONTRACT, build_plan
-from fedsira.experiments.registry import experiment_by_name, experiment_registry
 
 
 def test_registry_names_are_unique() -> None:

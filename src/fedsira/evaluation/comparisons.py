@@ -3,15 +3,10 @@ from __future__ import annotations
 import math
 from enum import StrEnum
 
-from fedsira.analysis.statistics import (
-    exact_sign_flip_non_inferiority_p_value,
-    exact_sign_flip_two_sided_p_value,
-    holm_adjusted_p_values,
-)
 from fedsira.baselines.registry import BaselineIdentity
-from fedsira.config.schema import BootstrapConfig, MultiplicityConfig
+from fedsira.config.models import BootstrapConfig, MultiplicityConfig
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
     CompleteSeedCount,
@@ -28,8 +23,13 @@ from fedsira.domain.records import (
     PValue,
     ScenarioName,
 )
-from fedsira.evaluation.aggregation import bootstrap_percentile_confidence_interval
-from fedsira.experiments.registry import (
+from fedsira.evaluation.statistics import (
+    exact_sign_flip_non_inferiority_p_value,
+    exact_sign_flip_two_sided_p_value,
+    holm_adjusted_p_values,
+)
+from fedsira.evaluation.summaries import bootstrap_percentile_confidence_interval
+from fedsira.experiments.definitions import (
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,

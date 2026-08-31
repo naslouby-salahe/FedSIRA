@@ -1,5 +1,5 @@
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.protocol.opening import select_source_domain, source_selection_order
+from fedsira.protocol.proposal import select_source_domain, source_selection_order
 
 DOMAIN_A, DOMAIN_B, DOMAIN_C = NBAIOT_DOMAIN_ORDER[:3]
 

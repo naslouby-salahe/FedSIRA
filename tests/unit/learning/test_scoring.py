@@ -1,8 +1,8 @@
 import torch
 
+from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import build_loss_function
-from fedsira.models.mlp import FedSIRAClassifier
 
 
 def _model() -> FedSIRAClassifier:

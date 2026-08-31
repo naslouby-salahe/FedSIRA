@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.models.mlp import (
+from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,

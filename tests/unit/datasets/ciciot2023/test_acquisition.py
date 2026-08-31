@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.ciciot2023.acquisition import (
+from fedsira.datasets.ciciot2023.loading import (
     compute_dataset_manifest_hash,
     compute_file_checksum,
     discover_secondary_csv_files,

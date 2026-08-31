@@ -5,26 +5,19 @@ from fedsira.artifacts.fingerprints import (
     producer_fingerprint_specification,
     raw_schema_exclusion_manifest_entry_modules,
 )
-from fedsira.artifacts.paths import (
-    prepared_evidence_root,
-    prepared_feature_root,
-    preprocessing_metadata_root,
-    workspace_root_for_family,
-)
 from fedsira.artifacts.records import (
     CICIoT2023DatasetManifestPayload,
     DatasetManifestPayload,
     NBaiotDatasetManifestPayload,
 )
-from fedsira.artifacts.storage import publish_or_reuse_artifact_payload
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.datasets.ciciot2023.acquisition import discover_secondary_csv_files
+from fedsira.datasets.ciciot2023.loading import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
 )
-from fedsira.datasets.nbaiot.acquisition import (
+from fedsira.datasets.nbaiot.loading import (
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
 )
@@ -40,7 +33,7 @@ from fedsira.datasets.nbaiot.validation import (
     validate_target_holder_feasibility,
 )
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ProducerFingerprintFamily
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactReuseDecision,
     DatasetClassToken,
@@ -50,6 +43,13 @@ from fedsira.domain.records import (
     Probability,
     SchemaVersion,
 )
+from fedsira.io.paths import (
+    prepared_evidence_root,
+    prepared_feature_root,
+    preprocessing_metadata_root,
+    workspace_root_for_family,
+)
+from fedsira.io.storage import publish_or_reuse_artifact_payload
 from fedsira.runtime.state import (
     ApplicationContext,
     bound_application_context,

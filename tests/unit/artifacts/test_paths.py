@@ -1,12 +1,12 @@
 import pytest
 
-from fedsira.artifacts.paths import (
+from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
+from fedsira.io.paths import (
     OUTPUTS_ROOT,
     RESULTS_ROOT,
     path_scope_for_family,
     workspace_root_for_family,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
 
 
 def test_preprocessing_family_maps_to_outputs_preprocessing() -> None:

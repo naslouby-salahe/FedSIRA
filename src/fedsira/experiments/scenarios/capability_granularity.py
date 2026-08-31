@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.domain.enums import CapabilityContractScope, RootCause, SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     FeatureIndex,
     NamespaceSeed,
     SampleId,

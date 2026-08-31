@@ -1,8 +1,8 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState
-from fedsira.evaluation.records import MetricResult
-from fedsira.protocol.opening import (
+from fedsira.domain.models import MetricResult
+from fedsira.protocol.proposal import (
     ScreenDomainResult,
     candidate_free_screen_domain_predicate,
     candidate_screen_transition,

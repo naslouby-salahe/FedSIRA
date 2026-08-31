@@ -1,4 +1,5 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.domain.models import FalseSameCapabilityReason, MetricResult, ProposalOracleLabel
 from fedsira.evaluation.metrics import (
     accuracy,
     attack_success_rate_within_domain,
@@ -32,7 +33,6 @@ from fedsira.evaluation.metrics import (
     verifier_abstention_rate,
     weighted_f1,
 )
-from fedsira.evaluation.records import FalseSameCapabilityReason, MetricResult, ProposalOracleLabel
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 

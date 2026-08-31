@@ -1,14 +1,14 @@
 from pathlib import Path
 
-from fedsira.analysis.comparisons import (
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.domain.enums import ClaimOpeningMode
+from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonResult,
     ComparisonState,
     build_comparison_registry,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.domain.enums import ClaimOpeningMode
 from fedsira.experiments.collapse import (
     CollapseDecision,
     CollapseDecisionKind,
@@ -23,7 +23,7 @@ from fedsira.experiments.collapse import (
     resolve_all_eight_cases,
     resolve_core_mapping,
 )
-from fedsira.experiments.registry import ClaimFamily
+from fedsira.experiments.definitions import ClaimFamily
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 MATERIALITY = CONFIG.metrics_and_statistics.materiality

@@ -2,9 +2,10 @@ import hashlib
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 
-from fedsira.config.schema import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
+from fedsira.config.models import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     AttackCarrierRequired,
     DerivedSeed,
     DomainId,
@@ -22,8 +23,7 @@ from fedsira.domain.records import (
     ScreenLoss,
     SourceCommitted,
 )
-from fedsira.evaluation.aggregation import match_nearest_within_decile
-from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.summaries import match_nearest_within_decile
 from fedsira.runtime.determinism import deterministic_order, framed_bytes
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value

@@ -1,4 +1,4 @@
-from fedsira.protocol.theory import krum_committee_is_admissible
+from fedsira.protocol.specification import krum_committee_is_admissible
 from fedsira.runtime.state import current_application_context
 
 

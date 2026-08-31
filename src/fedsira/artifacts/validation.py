@@ -1,6 +1,6 @@
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
-from fedsira.artifacts.storage import verify_checksum
 from fedsira.domain.enums import ArtifactLifecycleState, ProvenanceValidationOutcome
+from fedsira.io.storage import verify_checksum
 
 
 def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:

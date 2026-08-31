@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Self
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.config.schema import ScientificConfig
+from fedsira.config.models import ScientificConfig
 from fedsira.domain.enums import (
     CellPhaseState,
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
 )
-from fedsira.domain.records import AutomaticallyRetriable, FailureMessage, FrozenDomainModel
+from fedsira.domain.types import AutomaticallyRetriable, FailureMessage, FrozenDomainModel
 
 CELL_PHASE_TRANSITIONS: tuple[tuple[CellPhaseState, frozenset[CellPhaseState]], ...] = (
     (CellPhaseState.PLANNED, frozenset({CellPhaseState.RUNNING})),

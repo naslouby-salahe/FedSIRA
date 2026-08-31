@@ -2,9 +2,14 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from fedsira.analysis.comparisons import ComparisonMetric
-from fedsira.config.schema import CapabilityClaimConfig, CleanOracleMaterialityConfig
-from fedsira.domain.records import (
+from fedsira.config.models import CapabilityClaimConfig, CleanOracleMaterialityConfig
+from fedsira.domain.models import (
+    ConfusionCounts,
+    FalseSameCapabilityReason,
+    MetricResult,
+    ProposalOracleLabel,
+)
+from fedsira.domain.types import (
     AdmissionCount,
     AdmissionIndicatorSeries,
     BinaryLabelMaskSeries,
@@ -13,6 +18,7 @@ from fedsira.domain.records import (
     DatasetClassToken,
     DomainCount,
     ExampleCount,
+    FailureMessage,
     FalseCertificationCount,
     FalseSameEquivalenceCheck,
     MetricName,
@@ -27,14 +33,8 @@ from fedsira.domain.records import (
     TriggeredSampleMaskSeries,
     VerifierReportCount,
 )
-from fedsira.evaluation.aggregation import minimum_defined_domain_count
-from fedsira.evaluation.records import (
-    ConfusionCounts,
-    FalseSameCapabilityReason,
-    MetricResult,
-    ProposalOracleLabel,
-)
-from fedsira.evaluation.validation import validate_metric_class_membership
+from fedsira.evaluation.comparisons import ComparisonMetric
+from fedsira.evaluation.summaries import minimum_defined_domain_count
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,34 @@ class BoundaryMetricSet:
     false_same_capability_rate: MetricResult
     false_same_capability_reason: FalseSameCapabilityReason | None
     false_same_equivalence_check: FalseSameEquivalenceCheck
+
+
+class EvaluationValidationError(ValueError):
+    def __init__(self, message: FailureMessage) -> None:
+        super().__init__(message)
+        self.message = message
+
+
+def validate_metric_class_membership(
+    class_tokens: Sequence[DatasetClassToken],
+    target_class_token: DatasetClassToken,
+    benign_class_token: DatasetClassToken,
+    supported_class_tokens: Sequence[DatasetClassToken],
+) -> None:
+    vocabulary = frozenset(class_tokens)
+    if target_class_token not in vocabulary:
+        raise EvaluationValidationError(
+            f"target class {target_class_token!r} is outside the metric class vocabulary"
+        )
+    if benign_class_token not in vocabulary:
+        raise EvaluationValidationError(
+            f"benign class {benign_class_token!r} is outside the metric class vocabulary"
+        )
+    for supported in supported_class_tokens:
+        if supported not in vocabulary:
+            raise EvaluationValidationError(
+                f"supported class {supported!r} is outside the metric class vocabulary"
+            )
 
 
 def compute_confusion_counts(

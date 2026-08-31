@@ -1,5 +1,5 @@
-from fedsira.config.schema import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
-from fedsira.domain.records import (
+from fedsira.config.models import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
+from fedsira.domain.types import (
     LearningRate,
     ModelInputWidth,
     ModelOutputWidth,
@@ -7,7 +7,7 @@ from fedsira.domain.records import (
 )
 from fedsira.learning.aggregation import ModelState, load_model_state
 from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
-from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
+from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 
 
 def _model_state_parameter_count(state: ModelState) -> PositiveInt:

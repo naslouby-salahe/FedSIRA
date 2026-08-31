@@ -1,12 +1,13 @@
 import torch
 
-from fedsira.config.schema import (
+from fedsira.config.models import (
     DensityClusterTrimmedMeanConfig,
     MaterialityConfig,
     ParameterSimilarityConfig,
 )
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.domain.records import (
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     CalibrationErrorCount,
     ClusterSize,
     DeterministicInteger,
@@ -34,8 +35,7 @@ from fedsira.domain.records import (
     VectorNorm,
     VerifierCount,
 )
-from fedsira.evaluation.aggregation import quantile_type7
-from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.summaries import quantile_type7
 from fedsira.learning.aggregation import ModelState, WeightedModelState, federated_averaging
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 

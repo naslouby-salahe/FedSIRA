@@ -1,4 +1,5 @@
-from fedsira.analysis.comparisons import (
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonOrientation,
@@ -9,8 +10,7 @@ from fedsira.analysis.comparisons import (
     build_comparison_registry,
     evaluate_comparison,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     AblationVariant,

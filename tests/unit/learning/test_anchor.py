@@ -5,7 +5,7 @@ from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_confi
 from fedsira.learning.aggregation import model_state_from_classifier
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.federated import LocalTrainingClient
-from fedsira.models.mlp import FedSIRAClassifier
+from fedsira.learning.model import FedSIRAClassifier
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from fedsira.domain.records import SeedBundle
+from fedsira.domain.types import SeedBundle
 
 
 def test_seed_bundle_confirmatory_seed_count_matches_master_seed_length() -> None:

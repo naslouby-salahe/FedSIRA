@@ -6,7 +6,7 @@ import torch
 
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     AttackCount,
     ExampleCount,

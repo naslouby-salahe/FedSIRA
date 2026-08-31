@@ -1,17 +1,17 @@
-from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily
-from fedsira.domain.records import PlanRenderText, ResolvedCoreComplete
+from fedsira.domain.types import PlanRenderText, ResolvedCoreComplete
 from fedsira.experiments.collapse import read_resolved_core
+from fedsira.experiments.definitions import (
+    COLLAPSE_EXPERIMENT_NAMES,
+    POST_CORE_EXPERIMENT_NAMES,
+)
 from fedsira.experiments.planning import (
     ExperimentPlan,
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.experiments.registry import (
-    COLLAPSE_EXPERIMENT_NAMES,
-    POST_CORE_EXPERIMENT_NAMES,
-)
+from fedsira.io.paths import workspace_root_for_family
 from fedsira.runtime.state import ApplicationContext, bound_application_context
 
 

@@ -8,7 +8,7 @@ from fedsira.datasets.nbaiot.schema import (
     nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     FeatureCount,
     FeatureName,
     FeatureShiftSign,

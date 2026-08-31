@@ -3,6 +3,7 @@ import math
 import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.training import (
     build_epoch_batches,
     build_loss_function,
@@ -13,7 +14,6 @@ from fedsira.learning.training import (
     train_epochs_with_deterministic_batch_order,
     train_one_epoch,
 )
-from fedsira.models.mlp import FedSIRAClassifier
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

@@ -1,7 +1,7 @@
 from typing import TypeAlias
 
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
     DatasetManifestDigest,

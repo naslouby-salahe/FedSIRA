@@ -11,27 +11,13 @@ from typing import Protocol
 import pandas
 import torch
 
-from fedsira.analysis.comparisons import (
-    ComparisonDefinition,
-    ComparisonEffectScale,
-    ComparisonFamilyResult,
-    ComparisonMetric,
-    ComparisonOrientation,
-    ComparisonReferenceKind,
-    ComparisonResult,
-    ComparisonState,
-    apply_holm_adjustment,
-    build_comparison_registry,
-    evaluate_comparison,
-)
-from fedsira.artifacts.paths import prepared_evidence_root
 from fedsira.attacks.reproduction import (
     scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
     verifier_aware_training_step,
 )
-from fedsira.attacks.source_backdoor import (
+from fedsira.attacks.source import (
     apply_trigger_transform,
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
@@ -96,7 +82,7 @@ from fedsira.baselines.robust_aggregation import (
     krum_reference_round_participants,
     validate_three_row_coordinate_median_committee_size,
 )
-from fedsira.baselines.source_authority import (
+from fedsira.baselines.source_model import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
     INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
@@ -111,38 +97,7 @@ from fedsira.baselines.source_authority import (
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
 )
-from fedsira.boundaries.capability_granularity import (
-    apply_root_cause_feature_shift,
-    balanced_capability_selection,
-    root_cause_for_sample,
-    target_row_ids_for_contract,
-    validate_excluded_root_cause_not_supported,
-)
-from fedsira.boundaries.epistemic_failure import (
-    apply_attacker_induced_common_context,
-    apply_shared_spurious_feature,
-    diagnostic_marker_metric_or_insufficient,
-    match_diagnostic_benign_report_test_rows,
-    relabel_shared_label_error_rows,
-    select_shared_label_error_rows,
-    select_spurious_feature_rows,
-)
-from fedsira.boundaries.evidence_arrival import (
-    EvidenceArrivalSchedule,
-    compute_t_evidence,
-    first_holder_cycle_for_domain,
-    holder_count_at_cycle,
-    reproducer_order,
-)
-from fedsira.boundaries.heterogeneity import (
-    apply_quantity_skew_to_cap,
-    exclude_source_from_quantity_skew,
-    feature_shift_sign,
-    quantity_skew_multiplier_by_domain,
-    quantity_skew_multiplier_for_domain,
-    select_heterogeneity_shift_features,
-)
-from fedsira.config.schema import VerificationConfig
+from fedsira.config.models import VerificationConfig
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
 from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
@@ -171,7 +126,22 @@ from fedsira.domain.enums import (
     TernaryOutcome,
     VerificationOmissionMarker,
 )
-from fedsira.domain.records import (
+from fedsira.domain.models import (
+    SERVER_ID,
+    AdmissionDelayDecomposition,
+    CommunicationMessageMetadata,
+    CommunicationMessageType,
+    MetricResult,
+    ProposalOracleLabel,
+    TensorEnvelopePayload,
+    TensorParameterKind,
+    TensorPayloadMetadata,
+    communication_bytes,
+    encode_message_envelope,
+    model_transmission_count,
+    parameter_tensor_name,
+)
+from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     AlgorithmName,
     AllowSourceAsVerifier,
@@ -227,15 +197,18 @@ from fedsira.domain.records import (
     SeedBundle,
     TriggerFeatureValue,
 )
-from fedsira.evaluation.aggregation import (
-    coefficient_of_variation,
-    decile_bin,
-    decile_boundaries,
-    domain_disparity,
-    equal_weight_domain_mean,
-    interquartile_range,
-    percentile_10_domain_target_f1,
-    worst_domain_target_f1,
+from fedsira.evaluation.comparisons import (
+    ComparisonDefinition,
+    ComparisonEffectScale,
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonOrientation,
+    ComparisonReferenceKind,
+    ComparisonResult,
+    ComparisonState,
+    apply_holm_adjustment,
+    build_comparison_registry,
+    evaluate_comparison,
 )
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
@@ -254,29 +227,18 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
-from fedsira.evaluation.records import (
-    SERVER_ID,
-    AdmissionDelayDecomposition,
-    CommunicationMessageMetadata,
-    CommunicationMessageType,
-    MetricResult,
-    ProposalOracleLabel,
-    TensorEnvelopePayload,
-    TensorParameterKind,
-    TensorPayloadMetadata,
-    communication_bytes,
-    encode_message_envelope,
-    model_transmission_count,
-    parameter_tensor_name,
+from fedsira.evaluation.summaries import (
+    coefficient_of_variation,
+    decile_bin,
+    decile_boundaries,
+    domain_disparity,
+    equal_weight_domain_mean,
+    interquartile_range,
+    percentile_10_domain_target_f1,
+    worst_domain_target_f1,
 )
 from fedsira.experiments.collapse import CollapseEvaluationInput, ResolvedCore
-from fedsira.experiments.planning import (
-    ExperimentPlan,
-    PlannedExperiment,
-    ScientificCell,
-    build_plan,
-)
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
@@ -312,6 +274,43 @@ from fedsira.experiments.registry import (
     VerifierProfile,
     experiment_by_name,
 )
+from fedsira.experiments.planning import (
+    ExperimentPlan,
+    PlannedExperiment,
+    ScientificCell,
+    build_plan,
+)
+from fedsira.experiments.scenarios.capability_granularity import (
+    apply_root_cause_feature_shift,
+    balanced_capability_selection,
+    root_cause_for_sample,
+    target_row_ids_for_contract,
+    validate_excluded_root_cause_not_supported,
+)
+from fedsira.experiments.scenarios.evidence_arrival import (
+    EvidenceArrivalSchedule,
+    compute_t_evidence,
+    first_holder_cycle_for_domain,
+    holder_count_at_cycle,
+    reproducer_order,
+)
+from fedsira.experiments.scenarios.evidence_scarcity import (
+    apply_attacker_induced_common_context,
+    apply_shared_spurious_feature,
+    diagnostic_marker_metric_or_insufficient,
+    match_diagnostic_benign_report_test_rows,
+    relabel_shared_label_error_rows,
+    select_shared_label_error_rows,
+    select_spurious_feature_rows,
+)
+from fedsira.experiments.scenarios.heterogeneity import (
+    apply_quantity_skew_to_cap,
+    exclude_source_from_quantity_skew,
+    feature_shift_sign,
+    quantity_skew_multiplier_by_domain,
+    quantity_skew_multiplier_for_domain,
+    select_heterogeneity_shift_features,
+)
 from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
     run_data_and_domain_evidence_validation,
@@ -321,6 +320,7 @@ from fedsira.experiments.validation import (
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
 )
+from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
     ModelState,
     WeightedModelState,
@@ -333,13 +333,13 @@ from fedsira.learning.federated import (
     run_fedavg_round,
     train_one_client_locally,
 )
-from fedsira.learning.post_reference import run_post_reference_training
-from fedsira.learning.scoring import logits_for_samples
-from fedsira.models.mlp import (
+from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
+from fedsira.learning.post_reference import run_post_reference_training
+from fedsira.learning.scoring import logits_for_samples
 from fedsira.protocol.admission import (
     AdmissionArtifactContent,
     apply_production_update,
@@ -359,7 +359,7 @@ from fedsira.protocol.claim_contract import (
     validate_source_excluded_production_weight,
     verification_evidence_is_adequate,
 )
-from fedsira.protocol.opening import (
+from fedsira.protocol.proposal import (
     ScreenDomainResult,
     ScreenLossObservation,
     candidate_free_screen_domain_predicate,
@@ -387,6 +387,17 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
 )
+from fedsira.protocol.specification import (
+    deduplicate_reports_by_proxy,
+    diagnostic_at_least_two_byzantine_probability,
+    first_cycle_with_minimum_eligible_evidence_holders,
+    krum_committee_is_admissible,
+    minimum_honest_positive_count,
+    report_for_domain,
+    reproduction_update_vector,
+    validate_exactly_one_source_domain,
+    validate_no_safety_claim_before_tau_k,
+)
 from fedsira.protocol.state_machine import (
     apply_logical_cycle_expiry,
     resolve_ternary_outcome,
@@ -397,17 +408,6 @@ from fedsira.protocol.synthesis import (
     krum_input_excludes_source,
     select_krum_update,
     synthesis_pending_transition,
-)
-from fedsira.protocol.theory import (
-    deduplicate_reports_by_proxy,
-    diagnostic_at_least_two_byzantine_probability,
-    first_cycle_with_minimum_eligible_evidence_holders,
-    krum_committee_is_admissible,
-    minimum_honest_positive_count,
-    report_for_domain,
-    reproduction_update_vector,
-    validate_exactly_one_source_domain,
-    validate_no_safety_claim_before_tau_k,
 )
 from fedsira.protocol.verification import (
     byzantine_selection_order,

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role, compute_sample_id
-from fedsira.datasets.nbaiot.acquisition import (
+from fedsira.datasets.nbaiot.loading import (
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
 )

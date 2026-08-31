@@ -1,4 +1,4 @@
-from fedsira.baselines.source_authority import (
+from fedsira.baselines.source_model import (
     independent_local_reference_reviewer_is_positive,
     secure_continual_assessment_post_reference_rounds,
 )

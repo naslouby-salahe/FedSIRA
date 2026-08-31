@@ -1,9 +1,9 @@
 import pytest
 
 from fedsira.datasets.nbaiot.schema import NBaiotClass
-from fedsira.evaluation.metrics import report_metric_set
-from fedsira.evaluation.validation import (
+from fedsira.evaluation.metrics import (
     EvaluationValidationError,
+    report_metric_set,
     validate_metric_class_membership,
 )
 

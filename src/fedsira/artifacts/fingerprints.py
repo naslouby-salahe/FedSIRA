@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 
 from fedsira.domain.enums import DatasetId, ProducerFingerprintFamily
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     AstDumpText,
     BooleanValue,
@@ -59,7 +59,7 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.ANCHOR_FEDAVG_CHECKPOINTS,
         entry_modules=(
-            "fedsira.models.mlp",
+            "fedsira.learning.model",
             "fedsira.learning.training",
             "fedsira.learning.federated",
             "fedsira.learning.anchor",
@@ -70,7 +70,7 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.SOURCE_REPRODUCTION_CHECKPOINTS,
         entry_modules=(
-            "fedsira.models.mlp",
+            "fedsira.learning.model",
             "fedsira.learning.training",
             "fedsira.learning.post_reference",
             "fedsira.runtime.determinism",
@@ -84,7 +84,7 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.MODEL_SCORES,
-        entry_modules=("fedsira.models.mlp", "fedsira.learning.scoring"),
+        entry_modules=("fedsira.learning.model", "fedsira.learning.scoring"),
         relevant_external_import_names=("torch", "numpy"),
     ),
     ProducerFingerprintSpecification(
@@ -101,19 +101,19 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
         family=ProducerFingerprintFamily.METRIC_ARTIFACT,
         entry_modules=(
             "fedsira.evaluation.metrics",
-            "fedsira.evaluation.aggregation",
-            "fedsira.evaluation.validation",
+            "fedsira.evaluation.summaries",
+            "fedsira.evaluation.metrics",
         ),
         relevant_external_import_names=("numpy", "sklearn"),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT,
-        entry_modules=("fedsira.analysis.statistics", "fedsira.analysis.comparisons"),
+        entry_modules=("fedsira.evaluation.statistics", "fedsira.evaluation.comparisons"),
         relevant_external_import_names=("numpy", "scipy", "statsmodels"),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT,
-        entry_modules=("fedsira.analysis.claims", "fedsira.analysis.comparisons"),
+        entry_modules=("fedsira.analysis.claims", "fedsira.evaluation.comparisons"),
         relevant_external_import_names=("numpy",),
     ),
     ProducerFingerprintSpecification(

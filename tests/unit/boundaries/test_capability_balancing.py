@@ -1,4 +1,4 @@
-from fedsira.boundaries.capability_granularity import balanced_capability_selection
+from fedsira.experiments.scenarios.capability_granularity import balanced_capability_selection
 
 
 def test_balanced_selection_uses_the_smaller_group_size() -> None:

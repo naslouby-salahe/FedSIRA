@@ -2,7 +2,7 @@ import json
 import logging
 from typing import ClassVar
 
-from fedsira.domain.records import LogRecordText, RuntimeComponentName
+from fedsira.domain.types import LogRecordText, RuntimeComponentName
 
 LOGGER_NAME_PREFIX = "fedsira"
 

@@ -7,7 +7,7 @@ from fedsira.learning.federated import (
     run_fedavg_round,
     train_one_client_locally,
 )
-from fedsira.models.mlp import FedSIRAClassifier
+from fedsira.learning.model import FedSIRAClassifier
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

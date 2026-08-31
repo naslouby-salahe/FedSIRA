@@ -26,7 +26,7 @@ from fedsira.baselines.calibration import (
 )
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.evaluation.records import MetricResult
+from fedsira.domain.models import MetricResult
 from fedsira.learning.aggregation import ModelParameter, ModelState, WeightedModelState
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 

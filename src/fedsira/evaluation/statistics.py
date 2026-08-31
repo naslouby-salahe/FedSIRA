@@ -1,7 +1,7 @@
 import itertools
 from typing import Literal, TypeAlias
 
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
     PairedDifference,

@@ -6,15 +6,16 @@ import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     materialize_nbaiot_prepared_views,
 )
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
-from fedsira.domain.records import FeatureName
-from fedsira.experiments.execution import (
+from fedsira.domain.types import FeatureName
+from fedsira.experiments.definitions import EpistemicFailureType
+from fedsira.experiments.runner import (
     BackdoorScope,
     EpistemicFailureScope,
     HeterogeneityScope,
@@ -47,13 +48,12 @@ from fedsira.experiments.execution import (
     train_update_reconstruction_filter_delta,
     triggered_to_benign_rate,
 )
-from fedsira.experiments.registry import EpistemicFailureType
-from fedsira.models.mlp import FedSIRAClassifier, trainable_parameter_count
+from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training; skipped by default"
     " to avoid competing for CPU with other work. Re-enable deliberately when verifying"
-    " fedsira.experiments.execution."
+    " fedsira.experiments.runner."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

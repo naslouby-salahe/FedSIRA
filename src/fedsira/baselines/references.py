@@ -4,7 +4,7 @@ import torch
 
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     DomainLocalEvaluation,
     FederatedRoundCount,
     LocalEpochCount,

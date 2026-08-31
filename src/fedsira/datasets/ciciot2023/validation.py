@@ -1,7 +1,7 @@
 import re
 
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL, normalize_label
-from fedsira.domain.records import BooleanValue, ClassLabel
+from fedsira.domain.types import BooleanValue, ClassLabel
 
 _WHITESPACE_HYPHEN_UNDERSCORE = re.compile(r"[\s\-_]+")
 

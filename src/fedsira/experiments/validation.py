@@ -6,9 +6,7 @@ from collections import OrderedDict
 import numpy
 import torch
 
-from fedsira.analysis.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
 from fedsira.artifacts.graph import ArtifactGraph
-from fedsira.artifacts.paths import smoke_record_path
 from fedsira.artifacts.records import ArtifactManifest
 from fedsira.baselines.registry import validate_role_not_used_for_tuning
 from fedsira.config.loading import (
@@ -26,7 +24,8 @@ from fedsira.domain.enums import (
     ScientificCellPhase,
     TernaryOutcome,
 )
-from fedsira.domain.records import (
+from fedsira.domain.models import AdmissionDelayDecomposition
+from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     ExperimentName,
     FrozenDomainModel,
@@ -39,15 +38,14 @@ from fedsira.domain.records import (
     ScientificCellSemanticKey,
     TextValue,
 )
-from fedsira.evaluation.aggregation import (
+from fedsira.evaluation.metrics import accuracy, compute_confusion_counts
+from fedsira.evaluation.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
+from fedsira.evaluation.summaries import (
     bootstrap_percentile_confidence_interval,
     quantile_type7,
 )
-from fedsira.evaluation.metrics import accuracy, compute_confusion_counts
-from fedsira.evaluation.records import AdmissionDelayDecomposition
 from fedsira.experiments.collapse import resolve_all_eight_cases
-from fedsira.experiments.planning import ExperimentPlan, ScientificCell
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     AblationVariant,
     BoundCondition,
     CapabilityContractGranularity,
@@ -55,11 +53,18 @@ from fedsira.experiments.registry import (
     RootCauseMixture,
     experiment_by_name,
 )
+from fedsira.experiments.planning import ExperimentPlan, ScientificCell
+from fedsira.io.paths import smoke_record_path
 from fedsira.learning.aggregation import (
     ModelParameter,
     ModelState,
     WeightedModelState,
     federated_averaging,
+)
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    trainable_parameter_count,
 )
 from fedsira.learning.post_reference import (
     compute_stability_kl,
@@ -67,23 +72,18 @@ from fedsira.learning.post_reference import (
     run_post_reference_training,
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
-from fedsira.models.mlp import (
-    FedSIRAClassifier,
-    flatten_trainable_parameters,
-    trainable_parameter_count,
-)
 from fedsira.protocol.admission import validate_admission_requires_final_gate
 from fedsira.protocol.claim_contract import (
     SOURCE_DIRECT_PRODUCTION_WEIGHT,
     validate_source_excluded_production_weight,
 )
 from fedsira.protocol.reproduction import validate_commitment_exists_before_verifier_assignment
-from fedsira.protocol.synthesis import select_krum_update
-from fedsira.protocol.theory import (
+from fedsira.protocol.specification import (
     diagnostic_at_least_two_byzantine_probability,
     krum_committee_is_admissible,
     minimum_honest_positive_count,
 )
+from fedsira.protocol.synthesis import select_krum_update
 from fedsira.protocol.verification import reproduction_row_is_certified, verifier_is_eligible
 from fedsira.runtime.state import current_application_context
 

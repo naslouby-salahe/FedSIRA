@@ -8,9 +8,8 @@ from fedsira.analysis.claims import (
     ClaimStateResult,
     derive_claim_states,
 )
-from fedsira.analysis.comparisons import ComparisonFamilyResult
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ExperimentName,
     FigureName,
     FrozenDomainModel,
@@ -21,9 +20,10 @@ from fedsira.domain.records import (
     TableName,
     VerificationPassed,
 )
+from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
-from fedsira.experiments.execution import ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.experiments.runner import ExperimentExecutionResult
 from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (
     EfficiencyMetricObservation,

@@ -1,6 +1,8 @@
 import torch
 
-from fedsira.boundaries.epistemic_failure import (
+from fedsira.datasets.nbaiot.schema import NBaiotClass
+from fedsira.domain.enums import EvaluationInsufficiencyReason
+from fedsira.experiments.scenarios.evidence_scarcity import (
     apply_attacker_induced_common_context,
     apply_shared_spurious_feature,
     diagnostic_marker_metric_or_insufficient,
@@ -9,8 +11,6 @@ from fedsira.boundaries.epistemic_failure import (
     select_shared_label_error_rows,
     select_spurious_feature_rows,
 )
-from fedsira.datasets.nbaiot.schema import NBaiotClass
-from fedsira.domain.enums import EvaluationInsufficiencyReason
 
 
 def test_select_shared_label_error_rows_uses_configured_fraction() -> None:

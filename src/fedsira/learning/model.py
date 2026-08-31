@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from fedsira.domain.records import ModelInputWidth, ModelOutputWidth, TrainableParameterCount
+from fedsira.domain.types import ModelInputWidth, ModelOutputWidth, TrainableParameterCount
 
 
 class FedSIRAClassifier(nn.Module):

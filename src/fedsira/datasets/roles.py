@@ -1,4 +1,4 @@
-from fedsira.config.schema import RoleIntervals
+from fedsira.config.models import RoleIntervals
 from fedsira.datasets.common import SUPPORTED_ROLE_ORDER, TARGET_ROLE_ORDER, RoleWindow
 
 

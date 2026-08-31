@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.attacks.source_backdoor import (
+from fedsira.attacks.source import (
     apply_trigger_transform,
     attack_row_order,
     fraction_to_attack_count,

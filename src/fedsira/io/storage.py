@@ -6,7 +6,7 @@ from pathlib import Path
 from fedsira.artifacts.graph import ArtifactGraph
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.domain.records import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
+from fedsira.domain.types import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"

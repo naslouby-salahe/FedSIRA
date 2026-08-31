@@ -1,6 +1,6 @@
 from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.experiments.definitions import COLLAPSE_EXPERIMENT_NAMES, POST_CORE_EXPERIMENT_NAMES
 from fedsira.experiments.planning import build_plan, validate_planned_cell_count_invariant
-from fedsira.experiments.registry import COLLAPSE_EXPERIMENT_NAMES, POST_CORE_EXPERIMENT_NAMES
 
 
 def test_plan_matches_section_31_counts_exactly() -> None:

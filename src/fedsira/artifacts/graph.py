@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fedsira.artifacts.records import ArtifactManifest
 from fedsira.domain.enums import ArtifactLifecycleState
-from fedsira.domain.records import ArtifactActive, ArtifactDigest
+from fedsira.domain.types import ArtifactActive, ArtifactDigest
 
 PUBLISHED_MANIFEST_SUFFIX = ".manifest.json"
 

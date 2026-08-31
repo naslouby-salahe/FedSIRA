@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     CheckpointIdentity,
     ClaimDefinitionCount,
     ExperimentName,
@@ -11,8 +11,8 @@ from fedsira.domain.records import (
     ScientificCellCount,
     VerificationPassed,
 )
-from fedsira.experiments.execution import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
+from fedsira.experiments.runner import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 
 
 class ExperimentTerminalCount(FrozenDomainModel):

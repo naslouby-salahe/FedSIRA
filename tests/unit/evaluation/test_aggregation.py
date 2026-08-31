@@ -1,7 +1,8 @@
 import numpy
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.evaluation.aggregation import (
+from fedsira.domain.models import MetricResult
+from fedsira.evaluation.summaries import (
     bootstrap_percentile_confidence_interval,
     coefficient_of_variation,
     decile_bin,
@@ -15,7 +16,6 @@ from fedsira.evaluation.aggregation import (
     quantile_type7,
     worst_domain_target_f1,
 )
-from fedsira.evaluation.records import MetricResult
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 

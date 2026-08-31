@@ -4,8 +4,8 @@ import torch
 from torch import nn, optim
 from torch.nn import functional as torch_functional
 
-from fedsira.config.schema import PostReferenceConfig, TrainingConfig
-from fedsira.domain.records import (
+from fedsira.config.models import PostReferenceConfig, TrainingConfig
+from fedsira.domain.types import (
     DerivedSeed,
     LocalEpochCount,
     SampleId,
@@ -13,13 +13,13 @@ from fedsira.domain.records import (
     TrainableParameterCount,
     TrainingLoss,
 )
-from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
-from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
-from fedsira.models.mlp import (
+from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     trainable_parameter_count,
 )
+from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
+from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
 
 
 def compute_stability_kl(

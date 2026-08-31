@@ -1,6 +1,6 @@
 import json
 
-from fedsira.evaluation.records import (
+from fedsira.domain.models import (
     COMMUNICATION_SCHEMA,
     CommunicationMessageMetadata,
     CommunicationMessageType,

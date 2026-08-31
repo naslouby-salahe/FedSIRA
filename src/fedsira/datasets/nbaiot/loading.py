@@ -11,7 +11,7 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AttackFamilyDirectoryToken,
     AttackFamilyName,
     DatasetFileDigest,

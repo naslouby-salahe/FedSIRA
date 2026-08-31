@@ -8,9 +8,8 @@ from fedsira.baselines.registry import (
     BaselineIdentity,
     BaselineValidationFixture,
 )
-from fedsira.boundaries.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ConditionName,
     ExperimentName,
     FrozenDomainModel,
@@ -18,6 +17,7 @@ from fedsira.domain.records import (
     ScientificCellCount,
     SeedCount,
 )
+from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.runtime.state import current_application_context
 
 

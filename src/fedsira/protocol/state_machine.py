@@ -1,6 +1,6 @@
-from fedsira.config.schema import ResourceHorizonConfig
+from fedsira.config.models import ResourceHorizonConfig
 from fedsira.domain.enums import ClaimState, DormantOrigin, TernaryOutcome
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ClaimStateIsTerminal,
     EvidenceAdequate,
     EvidenceCycleIndex,

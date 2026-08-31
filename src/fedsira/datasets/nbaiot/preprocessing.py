@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas
 
-from fedsira.config.schema import RoleIntervals, SamplingCapsPerDomain
+from fedsira.config.models import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
@@ -16,7 +16,7 @@ from fedsira.datasets.common import (
     role_for_normalized_position,
     role_hash_token,
 )
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
@@ -34,7 +34,7 @@ from fedsira.datasets.scaling import (
     fit_feature_moments,
     standardize_row,
 )
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
     DatasetColumnName,

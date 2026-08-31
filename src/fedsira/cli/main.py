@@ -8,7 +8,7 @@ from fedsira.cli.commands import report as report_command
 from fedsira.cli.commands import run as run_command
 from fedsira.cli.commands import smoke as smoke_command
 from fedsira.domain.enums import DatasetId
-from fedsira.domain.records import ExperimentName, OverwriteExisting
+from fedsira.domain.types import ExperimentName, OverwriteExisting
 
 app = typer.Typer(name="fedsira", no_args_is_help=True)
 console = Console()

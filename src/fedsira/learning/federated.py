@@ -1,7 +1,7 @@
 import torch
 
-from fedsira.config.schema import OptimizerConfig, TrainingConfig
-from fedsira.domain.records import (
+from fedsira.config.models import OptimizerConfig, TrainingConfig
+from fedsira.domain.types import (
     DerivedSeed,
     LearningRate,
     LocalEpochCount,
@@ -18,12 +18,12 @@ from fedsira.learning.aggregation import (
     load_model_state,
     model_state_from_classifier,
 )
+from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.training import (
     build_loss_function,
     build_optimizer,
     train_epochs_with_deterministic_batch_order,
 )
-from fedsira.models.mlp import FedSIRAClassifier
 
 
 class LocalTrainingClient(TensorDomainModel):

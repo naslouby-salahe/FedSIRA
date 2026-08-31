@@ -7,7 +7,7 @@ import pytest
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import DatasetExclusionReason, Role, role_hash_token
-from fedsira.datasets.nbaiot.acquisition import DiscoveredCsvFile
+from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     PreparedView,

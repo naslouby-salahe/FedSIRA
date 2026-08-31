@@ -5,7 +5,7 @@ import time
 
 import torch
 
-from fedsira.domain.records import PeakMemoryBytes, WallClockSeconds
+from fedsira.domain.types import PeakMemoryBytes, WallClockSeconds
 
 BYTES_PER_KIBIBYTE = 1024
 

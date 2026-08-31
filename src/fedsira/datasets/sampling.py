@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import Field
 
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     UINT32_MODULUS,
     ClassLabel,
     DatasetFileDigest,

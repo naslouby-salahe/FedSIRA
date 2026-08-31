@@ -6,7 +6,7 @@ from typing import Protocol, cast
 import torch
 
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ArtifactDigest,
     CheckpointIdentity,
     CompromisedReproducerCount,

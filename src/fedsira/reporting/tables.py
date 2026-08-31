@@ -4,23 +4,12 @@ import csv
 from io import StringIO
 
 from fedsira.analysis.claims import CLAIM_DEFINITIONS, ClaimDefinition, ClaimStateResult
-from fedsira.analysis.comparisons import (
-    ComparisonDefinition,
-    ComparisonFamilyResult,
-    ComparisonMetric,
-    ComparisonReferenceKind,
-    ComparisonResult,
-    ComparisonState,
-    ComparisonTestKind,
-    MaterialityDirection,
-    build_comparison_registry,
-)
 from fedsira.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
     BaselineIdentity,
     BaselineValidationFixture,
 )
-from fedsira.config.schema import PublicationRoundingConfig
+from fedsira.config.models import PublicationRoundingConfig
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
@@ -28,7 +17,7 @@ from fedsira.datasets.ciciot2023.schema import (
 )
 from fedsira.datasets.nbaiot.preprocessing import NBAIOT_PRIMARY_PREDICTOR_COUNT
 from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBAIOT_DOMAIN_ORDER
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ExperimentName,
     FormattedStatisticText,
     FrozenDomainModel,
@@ -40,6 +29,17 @@ from fedsira.domain.records import (
     TableName,
     TextValue,
 )
+from fedsira.evaluation.comparisons import (
+    ComparisonDefinition,
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonReferenceKind,
+    ComparisonResult,
+    ComparisonState,
+    ComparisonTestKind,
+    MaterialityDirection,
+    build_comparison_registry,
+)
 from fedsira.experiments.collapse import (
     CollapseDecision,
     CollapseDecisionKind,
@@ -48,8 +48,7 @@ from fedsira.experiments.collapse import (
     ResolvedCore,
     RowVerificationMode,
 )
-from fedsira.experiments.planning import ExperimentPlan
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -67,6 +66,7 @@ from fedsira.experiments.registry import (
     ExperimentClass,
     PrimaryScenario,
 )
+from fedsira.experiments.planning import ExperimentPlan
 from fedsira.runtime.state import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (

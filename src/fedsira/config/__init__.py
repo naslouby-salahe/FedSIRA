@@ -6,7 +6,7 @@ from fedsira.config.loading import (
     load_smoke_config,
     load_test_fixture_config,
 )
-from fedsira.config.schema import ScientificConfig, SmokeConfig, TestFixtureConfig
+from fedsira.config.models import ScientificConfig, SmokeConfig, TestFixtureConfig
 
 __all__ = [
     "PRODUCTION_CONFIG_PATH",

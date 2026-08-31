@@ -4,7 +4,7 @@ import unicodedata
 from enum import IntEnum
 
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ClassLabel,
     DatasetManifestDigest,
     DomainCount,

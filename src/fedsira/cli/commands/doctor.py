@@ -2,15 +2,10 @@ from pathlib import Path
 
 from rich.console import Console
 
-from fedsira.artifacts.paths import (
-    prepared_evidence_root,
-    smoke_record_path,
-    workspace_root_for_family,
-)
 from fedsira.artifacts.provenance import classify_provenance_change, outcome_invalidates_artifact
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     BooleanValue,
     ConfigurationLoadable,
     DeterministicExecutionReady,
@@ -24,9 +19,7 @@ from fedsira.domain.records import (
     ResolvedCoreComplete,
 )
 from fedsira.experiments.collapse import read_resolved_core
-from fedsira.experiments.execution import ExecutionRecordStore, derive_experiment_lifecycle
-from fedsira.experiments.planning import ExperimentPlan, build_plan
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
@@ -41,6 +34,13 @@ from fedsira.experiments.registry import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+)
+from fedsira.experiments.planning import ExperimentPlan, build_plan
+from fedsira.experiments.runner import ExecutionRecordStore, derive_experiment_lifecycle
+from fedsira.io.paths import (
+    prepared_evidence_root,
+    smoke_record_path,
+    workspace_root_for_family,
 )
 from fedsira.runtime.environment import EnvironmentMismatch, collect_environment_mismatches
 from fedsira.runtime.logging import get_structured_logger

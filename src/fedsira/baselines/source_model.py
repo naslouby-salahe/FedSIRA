@@ -3,10 +3,10 @@ from typing import Final
 import torch
 
 from fedsira.baselines.references import post_reference_retrain_maximum_local_epochs
-from fedsira.config.schema import MaterialityConfig
+from fedsira.config.models import MaterialityConfig
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     CapabilityContractSatisfied,
     DiscardSourceWeights,
     FederatedRoundCount,

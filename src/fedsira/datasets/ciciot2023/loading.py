@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 
 from fedsira.datasets.ciciot2023.schema import normalize_label_token
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     DatasetColumnName,
     DatasetFileDigest,
     DatasetManifestDigest,

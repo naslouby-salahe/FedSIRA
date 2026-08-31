@@ -1,4 +1,4 @@
-from fedsira.evaluation.records import AdmissionDelayDecomposition
+from fedsira.domain.models import AdmissionDelayDecomposition
 
 
 def test_admission_delay_decomposition_sums_post_evidence_components() -> None:

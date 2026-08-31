@@ -3,10 +3,11 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.attacks.source_backdoor import apply_trigger_transform, select_fractional_attack_rows
+from fedsira.attacks.source import apply_trigger_transform, select_fractional_attack_rows
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import EvaluationInsufficiencyReason
-from fedsira.domain.records import (
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     ArtifactDigest,
     FeatureIndex,
     MetricValue,
@@ -15,8 +16,7 @@ from fedsira.domain.records import (
     ScreenLoss,
     TriggerFeatureValue,
 )
-from fedsira.evaluation.aggregation import match_nearest_within_decile
-from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.summaries import match_nearest_within_decile
 
 
 def select_shared_label_error_rows(

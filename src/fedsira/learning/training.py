@@ -3,8 +3,8 @@ from typing import Protocol, cast
 import torch
 from torch import nn, optim
 
-from fedsira.config.schema import OptimizerConfig, TrainingConfig
-from fedsira.domain.records import (
+from fedsira.config.models import OptimizerConfig, TrainingConfig
+from fedsira.domain.types import (
     BatchSize,
     DerivedSeed,
     EpochIndex,
@@ -13,7 +13,7 @@ from fedsira.domain.records import (
     SampleId,
     TrainingLoss,
 )
-from fedsira.models.mlp import FedSIRAClassifier
+from fedsira.learning.model import FedSIRAClassifier
 from fedsira.runtime.determinism import minibatch_order
 
 

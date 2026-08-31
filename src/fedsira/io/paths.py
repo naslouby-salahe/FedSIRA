@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
-from fedsira.domain.records import ExperimentName
+from fedsira.domain.types import ExperimentName
 
 OUTPUTS_ROOT = Path("outputs")
 RESULTS_ROOT = Path("results")

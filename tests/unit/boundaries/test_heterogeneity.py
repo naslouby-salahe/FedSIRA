@@ -1,4 +1,6 @@
-from fedsira.boundaries.heterogeneity import (
+from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+from fedsira.experiments.scenarios.heterogeneity import (
     apply_quantity_skew_to_cap,
     exclude_source_from_quantity_skew,
     feature_shift_sign,
@@ -6,8 +8,6 @@ from fedsira.boundaries.heterogeneity import (
     quantity_skew_multiplier_for_domain,
     select_heterogeneity_shift_features,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 HETEROGENEITY_CONFIG = CONFIG.attacks_and_boundaries.heterogeneity

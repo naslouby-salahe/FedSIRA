@@ -7,7 +7,7 @@ import torch
 from pydantic import Field
 
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     UINT32_MODULUS,
     AlgorithmName,
     CheckpointIdentity,

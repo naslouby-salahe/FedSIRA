@@ -1,4 +1,4 @@
-from fedsira.protocol.opening import (
+from fedsira.protocol.proposal import (
     ScreenLossObservation,
     match_held_out_fold,
     proposal_screen_differential,

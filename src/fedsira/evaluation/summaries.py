@@ -2,8 +2,9 @@ import math
 
 import numpy
 
-from fedsira.config.schema import BootstrapConfig
-from fedsira.domain.records import (
+from fedsira.config.models import BootstrapConfig
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     ConfidenceIntervalBound,
     DecileBinIndex,
     DomainCount,
@@ -15,7 +16,6 @@ from fedsira.domain.records import (
     SampleId,
     SeedDerivationLabel,
 )
-from fedsira.evaluation.records import MetricResult
 from fedsira.runtime.determinism import derive_uint32
 
 SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR: SeedDerivationLabel = "SINGLE_METHOD_MEAN_BOOTSTRAP"

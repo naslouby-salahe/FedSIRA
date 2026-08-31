@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-from fedsira.config.schema import VerificationConfig
+from fedsira.config.models import VerificationConfig
 from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AllowSourceAsVerifier,
     ArtifactDigest,
     ByzantineDomainCount,

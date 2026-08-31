@@ -3,15 +3,15 @@ from pathlib import Path
 import pytest
 
 from fedsira.domain.enums import ExperimentLifecycleState
-from fedsira.experiments.execution import (
-    PreparedEvidenceCounts,
-    ProtocolCellExecutor,
-)
-from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.registry import (
+from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
+)
+from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.runner import (
+    PreparedEvidenceCounts,
+    ProtocolCellExecutor,
 )
 from fedsira.experiments.validation import run_data_and_domain_evidence_validation
 
@@ -81,7 +81,7 @@ def test_baseline_implementation_validation_dispatches_to_baseline_cell(
         return evidence
 
     monkeypatch.setattr(
-        "fedsira.experiments.execution.load_prepared_evidence_counts",
+        "fedsira.experiments.runner.load_prepared_evidence_counts",
         _prepared_counts,
     )
     executor = ProtocolCellExecutor()

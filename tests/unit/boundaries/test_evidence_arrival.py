@@ -1,4 +1,5 @@
-from fedsira.boundaries.evidence_arrival import (
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
+from fedsira.experiments.scenarios.evidence_arrival import (
     EvidenceArrivalSchedule,
     compute_t_evidence,
     cycle_when_requirement_met,
@@ -7,7 +8,6 @@ from fedsira.boundaries.evidence_arrival import (
     holders_at_cycle,
     reproducer_order,
 )
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 
 CYCLES = tuple(range(0, 13))
 EIGHT_DOMAINS = NBAIOT_DOMAIN_ORDER[:8]

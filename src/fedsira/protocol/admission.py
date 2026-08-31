@@ -2,9 +2,10 @@ from collections.abc import Sequence
 
 import torch
 
-from fedsira.config.schema import FinalGateConfig
+from fedsira.config.models import FinalGateConfig
 from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
-from fedsira.domain.records import (
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import (
     ArtifactDigest,
     CellPhaseIdentity,
     DomainId,
@@ -17,8 +18,7 @@ from fedsira.domain.records import (
     ScientificCellSemanticKey,
     SeedBundle,
 )
-from fedsira.evaluation.aggregation import quantile_type7
-from fedsira.evaluation.records import MetricResult
+from fedsira.evaluation.summaries import quantile_type7
 
 
 def validate_admission_requires_final_gate(

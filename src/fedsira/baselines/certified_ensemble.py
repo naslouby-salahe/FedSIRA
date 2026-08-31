@@ -7,7 +7,7 @@ from fedsira.datasets.nbaiot.schema import (
     deterministic_domain_order,
 )
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     ClassIndex,
     FederatedRoundCount,
     GroupCount,

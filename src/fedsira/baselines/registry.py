@@ -4,7 +4,7 @@ from typing import Final
 
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import ClaimState, TernaryOutcome
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     BaselineFullParticipationAllowed,
     DomainId,
     FrozenDomainModel,

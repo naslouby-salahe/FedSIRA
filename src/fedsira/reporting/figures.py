@@ -4,9 +4,8 @@ from pathlib import Path
 
 from matplotlib.figure import Figure
 
-from fedsira.analysis.comparisons import ComparisonFamilyResult, ComparisonMetric
 from fedsira.domain.enums import ClaimState
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     EvidenceCycleIndex,
     FigureName,
     FrozenDomainModel,
@@ -16,6 +15,7 @@ from fedsira.domain.records import (
     Probability,
     TextValue,
 )
+from fedsira.evaluation.comparisons import ComparisonFamilyResult, ComparisonMetric
 
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "FedSIRA Protocol Schematic",

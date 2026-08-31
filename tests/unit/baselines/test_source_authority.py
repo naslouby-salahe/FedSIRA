@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.baselines.source_authority import (
+from fedsira.baselines.source_model import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
     SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,

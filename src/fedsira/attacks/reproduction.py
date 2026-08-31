@@ -3,9 +3,9 @@ from collections.abc import Sequence
 import torch
 from torch import nn, optim
 
-from fedsira.attacks.source_backdoor import select_fractional_attack_rows
-from fedsira.config.schema import PostReferenceConfig, TrainingConfig
-from fedsira.domain.records import (
+from fedsira.attacks.source import select_fractional_attack_rows
+from fedsira.config.models import PostReferenceConfig, TrainingConfig
+from fedsira.domain.types import (
     ArtifactDigest,
     DeltaScale,
     LossWeight,
@@ -14,9 +14,9 @@ from fedsira.domain.records import (
     TrainableParameterCount,
     TrainingLoss,
 )
+from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
 from fedsira.learning.training import clip_gradients, step_optimizer
-from fedsira.models.mlp import FedSIRAClassifier
 
 
 def source_copy_update(

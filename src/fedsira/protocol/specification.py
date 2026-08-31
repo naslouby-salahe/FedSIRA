@@ -4,7 +4,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.domain.enums import TernaryOutcome
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AtLeastTwoByzantineProbability,
     ByzantineDomainCount,
     ClaimedCompletionCycleIndex,

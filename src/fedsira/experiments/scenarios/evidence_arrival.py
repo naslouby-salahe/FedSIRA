@@ -2,7 +2,7 @@ from enum import StrEnum
 
 from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
-from fedsira.domain.records import (
+from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     DomainCount,
     EligibleEvidenceHolderCount,
@@ -13,7 +13,7 @@ from fedsira.domain.records import (
     NonNegativeInt,
     RequiredReproductionRowCount,
 )
-from fedsira.protocol.theory import first_cycle_with_minimum_eligible_evidence_holders
+from fedsira.protocol.specification import first_cycle_with_minimum_eligible_evidence_holders
 
 REPRODUCER_ORDER_SEPARATOR = SeedNamespace.REPRODUCER_ORDER.value
 
