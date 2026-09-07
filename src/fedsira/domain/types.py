@@ -19,7 +19,8 @@ TextValue = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True
 Uint32Bound = Annotated[int, Field(ge=0, lt=UINT32_MODULUS, strict=True)]
 DeterministicInteger = Annotated[int, Field(strict=True)]
 FramingField: TypeAlias = TextValue | DeterministicInteger
-FeatureShiftSign: TypeAlias = Literal[-1, 1]
+Sign: TypeAlias = Literal[-1, 1]
+FeatureShiftSign: TypeAlias = Sign
 
 ExperimentSlug = Annotated[
     str,
@@ -116,6 +117,7 @@ RetryCount = NonNegativeInt
 
 RowCount = NonNegativeInt
 SourceRowIndex = NonNegativeInt
+ColumnIndex = NonNegativeInt
 SamplingCap = NonNegativeInt
 FeatureIndex = NonNegativeInt
 ClassIndex = NonNegativeInt
@@ -161,6 +163,7 @@ ConfigFormatVersion = PositiveInt
 CompleteSeedCount = NonNegativeInt
 ByteCount = NonNegativeInt
 ModelTransmissionCount = NonNegativeInt
+CommunicationMessageCount = NonNegativeInt
 AdequateFinalGateDomainCount = NonNegativeInt
 PreparedScreenTargetCount = NonNegativeInt
 PreparedReproductionTargetCount = NonNegativeInt
@@ -301,10 +304,13 @@ TensorAxisSize = PositiveInt
 CalibrationErrorCount = PositiveInt
 MinimumDefinedDomainCount = PositiveInt
 MemberIndex = NonNegativeInt
+GroupIndex = NonNegativeInt
 AttackCount = NonNegativeInt
 TensorPayloadCount = NonNegativeInt
 DecileBinIndex = NonNegativeInt
 ConfusionCount = NonNegativeInt
+VoteCount = NonNegativeInt
+RepetitionIndex = PositiveInt
 PeakMemoryBytes = ByteCount
 VectorNorm = NonNegativeFloat
 TrainingLoss = NonNegativeFloat
@@ -312,6 +318,12 @@ WallClockSeconds = NonNegativeFloat
 FeatureMoment = FiniteFloat
 FeatureAccumulator = FiniteFloat
 SquaredFeatureAccumulator = NonNegativeFloat
+FeatureValue = FiniteFloat
+FeatureVector: TypeAlias = tuple[FeatureValue, ...]
+FeatureMatrix: TypeAlias = tuple[FeatureVector, ...]
+FeaturePayloadBytes = Annotated[bytes, Field(min_length=8)]
+SqliteScalar: TypeAlias = TextValue | NonNegativeInt | FeaturePayloadBytes
+ParquetScalar: TypeAlias = TextValue | NonNegativeInt | FiniteFloat
 PreparedEvidencePresent = BooleanValue
 ArtifactComplete = BooleanValue
 ArtifactActive = BooleanValue
@@ -345,6 +357,7 @@ ReconstructionError = NonNegativeFloat
 ReconstructionThreshold = NonNegativeFloat
 PairwiseDistance = NonNegativeFloat
 ParameterSimilarity = FiniteFloat
+ModelParameterValue = FiniteFloat
 MonotonicTimestamp = PositiveFloat
 ReconstructionErrorSeries: TypeAlias = tuple[ReconstructionError, ...]
 PairwiseDistanceMatrix: TypeAlias = tuple[tuple[PairwiseDistance, ...], ...]

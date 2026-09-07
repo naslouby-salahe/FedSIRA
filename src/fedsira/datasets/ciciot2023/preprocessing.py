@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from enum import StrEnum
 from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Protocol, TypeAlias, cast
+from typing import Annotated, Protocol, cast
 
 from pydantic import Field
 
@@ -53,7 +53,6 @@ from fedsira.datasets.sampling import (
 )
 from fedsira.datasets.scaling import (
     FeatureMoments,
-    FeatureVector,
     accumulate_feature_statistics,
     fit_feature_moments,
     standardize_row,
@@ -62,16 +61,18 @@ from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     ClassLabel,
+    ColumnIndex,
     DatasetClassToken,
     DatasetColumnName,
     DatasetManifestDigest,
     DeterministicInteger,
-    FiniteFloat,
+    FeatureMoment,
+    FeaturePayloadBytes,
+    FeatureVector,
     FrozenDomainModel,
-    NonNegativeInt,
     OverwriteExisting,
+    ParquetScalar,
     PartitionSalt,
-    PositiveInt,
     PredictorCount,
     PredictorCountMatchesOfficial,
     PreparedViewKey,
@@ -83,23 +84,21 @@ from fedsira.domain.types import (
     SamplingCap,
     SchemaVersion,
     SourceRowIndex,
+    SqliteScalar,
     TextValue,
 )
 from fedsira.runtime.determinism import framed_bytes
 from fedsira.runtime.state import current_application_context
 
 RawCsvValue = Annotated[str, Field(strict=True)]
-FeaturePayloadBytes = Annotated[bytes, Field(min_length=8)]
-SqliteScalar: TypeAlias = TextValue | NonNegativeInt | FeaturePayloadBytes
-ParquetScalar: TypeAlias = TextValue | NonNegativeInt | FiniteFloat
 
 STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"
 PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
 ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"
 EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
-READ_BATCH_ROWS: PositiveInt = 25_000
-WRITE_BATCH_ROWS: PositiveInt = 25_000
+READ_BATCH_ROWS: RowCount = 25_000
+WRITE_BATCH_ROWS: RowCount = 25_000
 
 
 class _ParquetScalarKind(StrEnum):
@@ -240,8 +239,8 @@ class _PreparedViewMetadata(FrozenDomainModel):
 class _ScalerMetadata(FrozenDomainModel):
     schema_version: SchemaVersion
     feature_names: tuple[DatasetColumnName, ...]
-    means: tuple[FiniteFloat, ...]
-    standard_deviations: tuple[FiniteFloat, ...]
+    means: tuple[FeatureMoment, ...]
+    standard_deviations: tuple[FeatureMoment, ...]
     training_row_count: RowCount
 
 
@@ -263,7 +262,7 @@ def compute_stable_row_id(
 def _column_index(
     header: tuple[DatasetColumnName, ...],
     column: DatasetColumnName,
-) -> NonNegativeInt:
+) -> ColumnIndex:
     try:
         return header.index(column)
     except ValueError as error:
@@ -419,7 +418,7 @@ def secondary_sampling_selection_key(
     return digest, stable_row_id
 
 
-def _sqlite_int(value: SqliteScalar) -> NonNegativeInt:
+def _sqlite_int(value: SqliteScalar) -> RowCount:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise TypeError(f"expected non-negative SQLite integer, received {type(value).__name__}")
     return value
@@ -1148,7 +1147,7 @@ def _persist_complete_case_batch(
 
 def _is_physical_row_identifier(
     path: Path,
-    column_index: NonNegativeInt,
+    column_index: ColumnIndex,
 ) -> BooleanValue:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
@@ -1156,7 +1155,7 @@ def _is_physical_row_identifier(
             next(reader)
         except StopIteration:
             return False
-        base: NonNegativeInt | None = None
+        base: SourceRowIndex | None = None
         row_count: RowCount = 0
         for physical_row_index, values in enumerate(reader):
             if column_index >= len(values):

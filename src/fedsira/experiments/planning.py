@@ -8,7 +8,7 @@ from fedsira.domain.types import (
     FrozenDomainModel,
     MasterSeed,
     MethodName,
-    NonNegativeInt,
+    RepetitionIndex,
     ResolvedCoreComplete,
     ResolvedCoreDependent,
     ScientificCellCount,
@@ -113,7 +113,7 @@ PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
         *COLLAPSE_EXPERIMENT_NAMES,
     }
 )
-EFFICIENCY_REPETITION_INDICES: tuple[NonNegativeInt, ...] = (1, 2, 3, 4, 5)
+EFFICIENCY_REPETITION_INDICES: tuple[RepetitionIndex, ...] = (1, 2, 3, 4, 5)
 PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
     data_and_domain_evidence_validation=1,
     protocol_invariant_validation=1,

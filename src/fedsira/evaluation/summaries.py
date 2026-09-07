@@ -11,14 +11,9 @@ from fedsira.domain.types import (
     MasterSeed,
     MetricValue,
     MinimumDefinedDomainCount,
-    NonNegativeInt,
     Probability,
     SampleId,
-    SeedDerivationLabel,
 )
-from fedsira.runtime.determinism import derive_uint32
-
-SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR: SeedDerivationLabel = "SINGLE_METHOD_MEAN_BOOTSTRAP"
 
 
 def minimum_defined_domain_count(
@@ -59,7 +54,7 @@ def decile_bin(
     value: MetricValue,
     boundaries: tuple[MetricValue, ...],
 ) -> DecileBinIndex:
-    bin_index: NonNegativeInt = 0
+    bin_index: DecileBinIndex = 0
     for boundary in boundaries:
         if value <= boundary:
             break
@@ -174,8 +169,7 @@ def bootstrap_percentile_confidence_interval(
 ) -> tuple[ConfidenceIntervalBound, ConfidenceIntervalBound] | None:
     if not seed_level_values:
         return None
-    bootstrap_seed = derive_uint32(SINGLE_METHOD_MEAN_BOOTSTRAP_SEPARATOR, analysis_seed)
-    generator = numpy.random.default_rng(bootstrap_seed)
+    generator = numpy.random.default_rng(analysis_seed)
     values = numpy.asarray(seed_level_values, dtype=numpy.float64)
     sample_size = len(values)
     resampled_means = numpy.empty(bootstrap_config.resamples, dtype=numpy.float64)

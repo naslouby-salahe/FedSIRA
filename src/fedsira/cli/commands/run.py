@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
-from fedsira.domain.types import ExperimentName, OverwriteExisting, RunRenderText
+from fedsira.domain.types import BooleanValue, ExperimentName, OverwriteExisting, RunRenderText
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -15,7 +15,7 @@ from fedsira.experiments.definitions import (
     ClaimFamily,
     experiment_by_name,
 )
-from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.experiments.runner import (
     CellExecutionOutcome,
     ExecutionRecordStore,
@@ -23,6 +23,7 @@ from fedsira.experiments.runner import (
     ProtocolCellExecutor,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
+    derive_experiment_lifecycle,
     execute_experiment,
 )
 from fedsira.io.paths import workspace_root_for_family
@@ -79,18 +80,36 @@ def _collapse_family_for_experiment(experiment: ExperimentName) -> ClaimFamily |
     return definition.claim_family
 
 
+def _collapse_experiment_completed(
+    experiment: ExperimentName, store: ExecutionRecordStore
+) -> BooleanValue:
+    config = current_application_context().scientific_config
+    definition = experiment_by_name(experiment)
+    planned = build_plan(
+        resolved_core_complete=False,
+        master_seeds=config.seeds_and_determinism.master_seeds,
+        smoke_seed=config.seeds_and_determinism.smoke_seed,
+    ).experiment(experiment)
+    lifecycle = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
+    return (
+        lifecycle is ExperimentLifecycleState.COMPLETED
+        and len(store.read_all_outcomes(experiment)) == definition.nominal_cell_count
+    )
+
+
 def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
     config = current_application_context().scientific_config
     store = ExecutionRecordStore(
-        REPOSITORY_ROOT / Path(config.runtime.repository_layout.execution_workspace)
+        REPOSITORY_ROOT / Path(config.execution.repository_layout.execution_workspace)
     )
+    for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
+        if not _collapse_experiment_completed(collapse_experiment, store):
+            return
     decisions: list[CollapseDecision] = []
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         records = store.read_all_outcomes(collapse_experiment)
-        if not records:
-            return
         outcomes = tuple(
             CellExecutionOutcome(
                 cell=ScientificCell(

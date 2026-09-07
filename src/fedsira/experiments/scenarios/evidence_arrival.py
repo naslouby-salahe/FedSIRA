@@ -10,14 +10,16 @@ from fedsira.domain.types import (
     EvidenceCycleIndex,
     MinimumEligibleEvidenceHolderCount,
     NamespaceSeed,
-    NonNegativeInt,
     RequiredReproductionRowCount,
 )
 from fedsira.protocol.specification import first_cycle_with_minimum_eligible_evidence_holders
 
 REPRODUCER_ORDER_SEPARATOR = SeedNamespace.REPRODUCER_ORDER.value
 
-_GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[tuple[NonNegativeInt, NonNegativeInt], ...] = (
+_GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[
+    tuple[EvidenceCycleIndex, EligibleEvidenceHolderCount],
+    ...,
+] = (
     (0, 0),
     (2, 1),
     (4, 3),
@@ -55,7 +57,7 @@ def holder_count_at_cycle(
         return 0 if cycle < 2 else min(1, eligible_domain_count)
     if schedule is EvidenceArrivalSchedule.IMMEDIATE_QUORUM:
         return eligible_domain_count
-    count: NonNegativeInt = 0
+    count: EligibleEvidenceHolderCount = 0
     for breakpoint_cycle, breakpoint_count in _GRADUAL_TO_QUORUM_BREAKPOINTS:
         if cycle >= breakpoint_cycle:
             count = breakpoint_count
@@ -87,7 +89,7 @@ def _holder_counts_by_cycle(
     schedule: EvidenceArrivalSchedule,
     target_capable_reproducer_order: tuple[NBaiotDomain, ...],
     candidate_cycles: EvidenceArrivalCycleSequence,
-) -> tuple[NonNegativeInt, ...]:
+) -> tuple[EligibleEvidenceHolderCount, ...]:
     return tuple(
         holder_count_at_cycle(schedule, cycle, len(target_capable_reproducer_order))
         for cycle in candidate_cycles

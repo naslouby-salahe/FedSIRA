@@ -11,14 +11,12 @@ from fedsira.domain.types import (
     FeatureAccumulator,
     FeatureMoment,
     FeatureName,
-    FiniteFloat,
+    FeatureValue,
+    FeatureVector,
     FrozenDomainModel,
     RowCount,
     SquaredFeatureAccumulator,
 )
-
-FeatureVector = tuple[FiniteFloat, ...]
-FeatureMatrix = tuple[FeatureVector, ...]
 
 
 class FeatureStatistic(FrozenDomainModel):
@@ -88,8 +86,8 @@ def fit_feature_moments(
 ) -> FeatureMoments:
     if len(feature_names) != len(statistics):
         raise ValueError("feature name count must match statistics count")
-    means: list[FiniteFloat] = []
-    standard_deviations: list[FiniteFloat] = []
+    means: list[FeatureMoment] = []
+    standard_deviations: list[FeatureMoment] = []
     row_count: RowCount = 0
     for feature_index, feature_name in enumerate(feature_names):
         statistic = statistics[feature_index]
@@ -118,7 +116,7 @@ def standardize_row(
 ) -> FeatureVector:
     if len(row) != len(moments.feature_names):
         raise ValueError("feature row width does not match fitted moments")
-    standardized: list[FiniteFloat] = []
+    standardized: list[FeatureValue] = []
     for column_index, numeric_value in enumerate(row):
         mean = moments.means[column_index]
         standard_deviation = moments.standard_deviations[column_index]

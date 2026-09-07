@@ -68,11 +68,11 @@ typeCheckingMode = "strict"
 pythonVersion = "3.11"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/reporting/figures.py"
+root = "src/fedsira/cli/main.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/models/mlp.py"
+root = "src/fedsira/reporting/figures.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]

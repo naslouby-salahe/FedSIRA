@@ -10,14 +10,13 @@ from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     CalibrationErrorCount,
     ClusterSize,
+    DbscanEpsilon,
     DeterministicInteger,
     DomainCount,
     FederatedRoundCount,
     FrozenDomainModel,
     MemberIndex,
     MetricValue,
-    NonNegativeFloat,
-    NonNegativeInt,
     NumericalEpsilon,
     OptionalParameterSimilarity,
     PairwiseDistance,
@@ -136,10 +135,10 @@ def _validate_distance_matrix(
 
 
 def _dbscan_neighbors(
-    point_index: NonNegativeInt,
+    point_index: MemberIndex,
     distance_matrix: PairwiseDistanceMatrix,
-    epsilon: NonNegativeFloat,
-) -> tuple[NonNegativeInt, ...]:
+    epsilon: DbscanEpsilon,
+) -> tuple[MemberIndex, ...]:
     return tuple(
         candidate_index
         for candidate_index, distance in enumerate(distance_matrix[point_index])
@@ -153,7 +152,7 @@ def density_cluster_labels(
 ) -> tuple[DeterministicInteger, ...]:
     _validate_distance_matrix(distance_matrix)
     labels: list[DeterministicInteger] = [_DBSCAN_UNASSIGNED] * len(distance_matrix)
-    next_cluster: NonNegativeInt = 0
+    next_cluster: DeterministicInteger = 0
     for point_index in range(len(distance_matrix)):
         if labels[point_index] != _DBSCAN_UNASSIGNED:
             continue
@@ -185,9 +184,9 @@ def density_cluster_labels(
 
 
 def _mean_within_cluster_distance(
-    indices: tuple[NonNegativeInt, ...],
+    indices: tuple[MemberIndex, ...],
     distance_matrix: PairwiseDistanceMatrix,
-) -> NonNegativeFloat:
+) -> PairwiseDistance:
     if len(indices) < 2:
         return 0.0
     pairwise_distances = tuple(
@@ -201,13 +200,13 @@ def _mean_within_cluster_distance(
 def _cluster_members(
     label: DeterministicInteger,
     labels: tuple[DeterministicInteger, ...],
-) -> tuple[NonNegativeInt, ...]:
+) -> tuple[MemberIndex, ...]:
     return tuple(index for index, observed in enumerate(labels) if observed == label)
 
 
 def _ordered_cluster_domains(
     domains: tuple[NBaiotDomain, ...],
-    indices: tuple[NonNegativeInt, ...],
+    indices: tuple[MemberIndex, ...],
 ) -> tuple[NBaiotDomain, ...]:
     return tuple(
         sorted(

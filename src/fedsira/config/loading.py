@@ -22,6 +22,7 @@ def validate_scientific_config(config: ScientificConfig) -> None:
     if seeds.analysis_seed in seeds.master_seeds:
         raise ValueError("seeds_and_determinism.analysis_seed must not collide with a master seed")
 
+
 YamlValue: TypeAlias = (
     "None | bool | int | float | TextValue | Sequence[YamlValue] | Mapping[TextValue, YamlValue]"
 )

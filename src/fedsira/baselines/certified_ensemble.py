@@ -12,10 +12,10 @@ from fedsira.domain.types import (
     FederatedRoundCount,
     GroupCount,
     NamespaceSeed,
-    NonNegativeInt,
     Probability,
     RowCount,
     TargetBearingMemberPresent,
+    VoteCount,
 )
 from fedsira.runtime.state import current_application_context
 
@@ -24,7 +24,7 @@ DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 
 def certified_ensemble_post_reference_rounds() -> FederatedRoundCount:
     baselines = current_application_context().scientific_config.baselines
-    return baselines.multiple_model_certified_ensemble_post_reference_rounds
+    return baselines.fedavg_post_reference_rounds
 
 
 def certified_ensemble_domain_groups(
@@ -52,7 +52,7 @@ def validate_group_without_target_member_uses_supported_only(
 def ensemble_predicted_label(
     predicted_labels: Sequence[ClassIndex], softmax_probabilities: Sequence[Sequence[Probability]]
 ) -> ClassIndex:
-    counts: OrderedDict[ClassIndex, NonNegativeInt] = OrderedDict()
+    counts: OrderedDict[ClassIndex, VoteCount] = OrderedDict()
     for label in predicted_labels:
         counts[label] = counts.get(label, 0) + 1
     max_count = max(counts.values())

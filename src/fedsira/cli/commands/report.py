@@ -2,11 +2,13 @@ from pathlib import Path
 
 from fedsira.artifacts.graph import load_published_artifact_graph, stale_artifact_identities
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.domain.types import ExperimentName, OverwriteExisting
+from fedsira.domain.enums import ArtifactFamily
+from fedsira.domain.types import BooleanValue, ExperimentName, OverwriteExisting
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
     materialize_resolved_core,
+    read_resolved_core,
 )
 from fedsira.experiments.definitions import (
     COLLAPSE_EXPERIMENT_NAMES,
@@ -27,7 +29,12 @@ from fedsira.experiments.runner import (
     comparison_results_for_experiment,
     derive_experiment_lifecycle,
 )
-from fedsira.io.paths import OUTPUTS_ROOT, RESULTS_ROOT, preprocessing_root
+from fedsira.io.paths import (
+    OUTPUTS_ROOT,
+    RESULTS_ROOT,
+    preprocessing_root,
+    workspace_root_for_family,
+)
 from fedsira.reporting.export import (
     claim_definition_count,
     derive_claim_states_for_export,
@@ -69,13 +76,13 @@ def execute(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
 def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     store = ExecutionRecordStore(
-        REPOSITORY_ROOT / Path(config.runtime.repository_layout.execution_workspace)
+        REPOSITORY_ROOT / Path(config.execution.repository_layout.execution_workspace)
     )
     if name is not None:
         result = _load_experiment_result(name, store)
         experiment_root = (
             REPOSITORY_ROOT
-            / Path(config.runtime.repository_layout.manuscript_results)
+            / Path(config.execution.repository_layout.manuscript_results)
             / "experiments"
             / name
         )
@@ -89,7 +96,8 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         if not export.verification.passed:
             raise SystemExit(1)
         return
-    plan = build_plan(resolved_core_complete=True)
+    resolved_core_complete = _resolved_core_complete()
+    plan = build_plan(resolved_core_complete=resolved_core_complete)
     validate_planned_cell_count_invariant(plan)
     terminal_counts: list[ExperimentTerminalCount] = []
     lifecycle_states: list[ExperimentLifecycleRecord] = []
@@ -155,11 +163,18 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         raise SystemExit(1)
 
 
+def _resolved_core_complete() -> BooleanValue:
+    directory = REPOSITORY_ROOT / workspace_root_for_family(
+        ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
+    )
+    return read_resolved_core(directory) is not None
+
+
 def _load_experiment_result(
     name: ExperimentName, store: ExecutionRecordStore
 ) -> ExperimentExecutionResult:
     definition = experiment_by_name(name)
-    plan = build_plan(resolved_core_complete=True)
+    plan = build_plan(resolved_core_complete=_resolved_core_complete())
     records = store.read_all_outcomes(name)
     outcomes = tuple(
         CellExecutionOutcome(

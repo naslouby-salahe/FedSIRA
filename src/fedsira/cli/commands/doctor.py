@@ -37,6 +37,7 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.planning import ExperimentPlan, build_plan
 from fedsira.experiments.runner import ExecutionRecordStore, derive_experiment_lifecycle
+from fedsira.experiments.validation import PersistedSmokeRecord
 from fedsira.io.paths import (
     prepared_evidence_root,
     smoke_record_path,
@@ -111,9 +112,9 @@ def _diagnose_bound(
     context: ApplicationContext,
     environment_mismatches: tuple[EnvironmentMismatch, ...],
 ) -> DoctorReport:
-    raw_root = REPOSITORY_ROOT / context.scientific_config.runtime.repository_layout.raw_data
+    raw_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
     workspace = (
-        REPOSITORY_ROOT / context.scientific_config.runtime.repository_layout.execution_workspace
+        REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.execution_workspace
     )
     store = ExecutionRecordStore(workspace)
     resolved_core = read_resolved_core(REPOSITORY_ROOT / _RESOLVED_CORE_DIRECTORY)
@@ -227,7 +228,10 @@ def _experiment_summary(
 
 def _smoke_complete() -> BooleanValue:
     record_path = REPOSITORY_ROOT / smoke_record_path()
-    return record_path.is_file()
+    if not record_path.is_file():
+        return False
+    record = PersistedSmokeRecord.model_validate_json(record_path.read_text(encoding="utf-8"))
+    return record.passed
 
 
 def _all_complete(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from collections import OrderedDict
 
 import numpy
@@ -51,6 +52,7 @@ from fedsira.experiments.definitions import (
     CapabilityContractGranularity,
     EpistemicFailureType,
     RootCauseMixture,
+    epistemic_strength_tokens,
     experiment_by_name,
 )
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
@@ -139,19 +141,6 @@ class ExperimentPrerequisiteState(FrozenDomainModel):
     lifecycle_state: ExperimentLifecycleState
 
 
-def _epistemic_strengths(
-    failure_type: EpistemicFailureType,
-) -> tuple[ScenarioName, ...]:
-    if failure_type is EpistemicFailureType.SHARED_LABEL_ERROR:
-        return ("0.05", "0.10", "0.20")
-    if failure_type in (
-        EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
-        EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
-    ):
-        return ("0.25", "0.50", "1.00")
-    raise ValueError(f"unsupported epistemic failure type: {failure_type.value}")
-
-
 def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] | None:
     if experiment == "Byzantine-Bound Violation":
         return frozenset(condition.value for condition in BoundCondition)
@@ -159,7 +148,7 @@ def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] |
         return frozenset(
             f"{failure_type.value}|{strength}"
             for failure_type in EpistemicFailureType
-            for strength in _epistemic_strengths(failure_type)
+            for strength in epistemic_strength_tokens(failure_type)
         )
     if experiment == "Capability Under-Specification Boundary":
         return frozenset(mixture.value for mixture in RootCauseMixture)
@@ -427,7 +416,7 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
         original_logits = model(features)
         restored_logits = restored(features)
         delta = (restored_logits - original_logits).abs().max()
-    restore_matches = float(delta) <= config.runtime.same_environment_absolute_metric_tolerance
+    restore_matches = float(delta) <= config.execution.same_environment_absolute_metric_tolerance
     report_test_rejected = False
     try:
         validate_role_not_used_for_tuning(Role.REPORT_TEST)
@@ -685,7 +674,20 @@ def run_protocol_invariant_validation() -> None:
         raise ValueError(f"protocol invariant validation failed: {', '.join(failed)}")
 
 
+def _load_persisted_smoke_record() -> PersistedSmokeRecord | None:
+    record_path = smoke_record_path()
+    if not record_path.exists():
+        return None
+    try:
+        return PersistedSmokeRecord.model_validate_json(record_path.read_text(encoding="utf-8"))
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+
 def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:
+    existing = None if overwrite else _load_persisted_smoke_record()
+    if existing is not None and existing.passed:
+        return SmokeSuiteResult(checks=existing.checks)
     checks = (
         *_data_invariants(),
         *_model_invariants(),
@@ -696,13 +698,13 @@ def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:
         *_artifact_invariants(),
     )
     result = SmokeSuiteResult(checks=checks)
-    _persist_smoke_record(result, overwrite)
+    _persist_smoke_record(result, overwrite or existing is None or not existing.passed)
     return result
 
 
 def _persist_smoke_record(result: SmokeSuiteResult, overwrite: OverwriteExisting) -> None:
     record_path = smoke_record_path()
-    if record_path.exists() and not overwrite:
+    if record_path.exists() and not overwrite and result.passed:
         return
     record_path.parent.mkdir(parents=True, exist_ok=True)
     record = PersistedSmokeRecord(

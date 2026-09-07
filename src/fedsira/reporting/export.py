@@ -169,7 +169,7 @@ def export_project_summary(
 
     project_root = _results_root() / "project_summary"
     tables_root = project_root / "tables" / "main"
-    claims_root = project_root / "claims"
+    claims_root = project_root / "claim_registry"
     reproducibility_root = project_root / "reproducibility" / "execution"
     figures_root = project_root / "figures" / "main"
     for directory in (tables_root, claims_root, reproducibility_root, figures_root):

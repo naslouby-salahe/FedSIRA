@@ -756,7 +756,7 @@ def _reproducer_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _non_inferiority(
                     ComparisonMetric.TARGET_F1,
                     ComparisonOrientation.HIGHER_IS_BETTER,
-                    materiality.target_f1_noninferiority_margin,
+                    materiality.target_f1_gain_minimum,
                 ),
             )
         else:

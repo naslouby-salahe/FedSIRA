@@ -71,30 +71,12 @@ _NON_ALPHANUMERIC = re.compile(r"[^0-9a-zA-Z]+")
 
 
 def nbaiot_domain_hash_token(domain: NBaiotDomain) -> DomainId:
-    if domain is NBaiotDomain.DANMINI_DOORBELL:
-        return "DANMINI_DOORBELL"
-    if domain is NBaiotDomain.ENNIO_DOORBELL:
-        return "ENNIO_DOORBELL"
-    if domain is NBaiotDomain.ECOBEE_THERMOSTAT:
-        return "ECOBEE_THERMOSTAT"
-    if domain is NBaiotDomain.PHILIPS_BABY_MONITOR:
-        return "PHILIPS_BABY_MONITOR"
-    if domain is NBaiotDomain.PROVISION_PT737E_CAMERA:
-        return "PROVISION_PT737E_CAMERA"
-    if domain is NBaiotDomain.PROVISION_PT838_CAMERA:
-        return "PROVISION_PT838_CAMERA"
-    if domain is NBaiotDomain.SIMPLEHOME_1002_CAMERA:
-        return "SIMPLEHOME_1002_CAMERA"
-    if domain is NBaiotDomain.SIMPLEHOME_1003_CAMERA:
-        return "SIMPLEHOME_1003_CAMERA"
-    if domain is NBaiotDomain.SAMSUNG_WEBCAM:
-        return "SAMSUNG_WEBCAM"
-    raise ValueError(f"unsupported N-BaIoT domain: {domain.value}")
+    return domain.name
 
 
 def nbaiot_domain_from_hash_token(token: DomainId) -> NBaiotDomain:
     for domain in NBAIOT_DOMAIN_ORDER:
-        if nbaiot_domain_hash_token(domain) == token:
+        if domain.name == token:
             return domain
     raise ValueError(f"unknown N-BaIoT domain hash token: {token}")
 

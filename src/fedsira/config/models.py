@@ -38,7 +38,6 @@ from fedsira.domain.types import (
     Doi,
     DomainCount,
     DurationToleranceSeconds,
-    EnvironmentText,
     EvidenceCycleIndex,
     ExampleCount,
     FamilyWiseAlpha,
@@ -47,8 +46,6 @@ from fedsira.domain.types import (
     FederatedRoundCount,
     FixtureCaseName,
     FoldCount,
-    GigabyteCount,
-    GpuCount,
     GradientL2Clip,
     GroupCount,
     HashModulus,
@@ -566,7 +563,6 @@ class BaselinesConfig(FrozenConfigModel):
     centralized_reference_epochs: LocalEpochCount
     fedavg_post_reference_rounds: FederatedRoundCount
     multiple_model_certified_ensemble_group_count: GroupCount
-    multiple_model_certified_ensemble_post_reference_rounds: FederatedRoundCount
     reconstruction_filter: ReconstructionFilterConfig
     density_cluster_trimmed_mean: DensityClusterTrimmedMeanConfig
     secure_continual_assessment_post_reference_rounds: FederatedRoundCount
@@ -574,7 +570,6 @@ class BaselinesConfig(FrozenConfigModel):
     source_update_sanitization: SourceUpdateSanitizationConfig
     parameter_similarity: ParameterSimilarityConfig
     three_row_coordinate_median: ThreeRowCoordinateMedianConfig
-    krum_robust_aggregation_post_reference_rounds: FederatedRoundCount
 
 
 class MetricAggregationConfig(FrozenConfigModel):
@@ -592,7 +587,6 @@ class BootstrapConfig(FrozenConfigModel):
 
 class MaterialityConfig(FrozenConfigModel):
     target_f1_gain_minimum: TargetF1Gain
-    target_f1_noninferiority_margin: TargetF1
     supported_macro_f1_noninferiority_margin: SupportedMacroF1Drop
     benign_false_alarm_rate_noninferiority_margin: BenignFalseAlarmRateIncrease
     source_exclusion_asr_reduction_minimum: RateReduction
@@ -661,28 +655,13 @@ class TimingConfig(FrozenConfigModel):
     warmup_forward_passes: WarmupPassCount
 
 
-class ReferenceEnvironmentConfig(FrozenConfigModel):
-    os_name: EnvironmentText
-    os_version_id: EnvironmentText
-    python_version: EnvironmentText
-    cuda_runtime_version: EnvironmentText
-    gpu_name: EnvironmentText
-    gpu_vram_gigabytes: GigabyteCount
-    minimum_cpu_ram_gigabytes: GigabyteCount
-    minimum_free_storage_gigabytes: GigabyteCount
-    required_gpu_count: GpuCount
-    unrar_version: EnvironmentText
-    cublas_workspace_config: EnvironmentText
-
-
-class RuntimeConfig(FrozenConfigModel):
+class ExecutionConfig(FrozenConfigModel):
     repository_layout: RepositoryLayoutConfig
     data_loader: DataLoaderConfig
     timeouts_seconds: TimeoutsSecondsConfig
     automatic_infrastructure_retries_per_cell_phase: RetryCount
     timing: TimingConfig
     same_environment_absolute_metric_tolerance: MetricTolerance
-    reference_environment: ReferenceEnvironmentConfig
 
 
 class ByzantineOperatingRegionConfig(FrozenConfigModel):
@@ -729,7 +708,7 @@ class ScientificConfig(FrozenConfigModel):
     attacks_and_boundaries: AttacksAndBoundariesConfig
     baselines: BaselinesConfig
     metrics_and_statistics: MetricsAndStatisticsConfig
-    runtime: RuntimeConfig
+    execution: ExecutionConfig
     claim_support_thresholds: ClaimSupportThresholdsConfig
     validation_tolerances: ValidationTolerancesConfig
 

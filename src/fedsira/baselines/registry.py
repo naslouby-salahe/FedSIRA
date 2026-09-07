@@ -116,7 +116,9 @@ if frozenset(identity for identity, _fixture in BASELINE_VALIDATION_FIXTURE_MAP)
     raise AssertionError("every registered baseline must have exactly one predeclared fixture")
 
 
-TUNING_FORBIDDEN_ROLES: Final[frozenset[Role]] = frozenset({Role.REPORT_TEST, Role.FINAL_GATE})
+TUNING_FORBIDDEN_ROLES: Final[frozenset[Role]] = frozenset(
+    {Role.REPORT_TEST, Role.FINAL_GATE, Role.ROW_VERIFICATION}
+)
 
 
 class PostReferenceDataAccess(FrozenDomainModel):

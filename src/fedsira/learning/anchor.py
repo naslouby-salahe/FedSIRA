@@ -3,14 +3,14 @@ from fedsira.domain.types import (
     LearningRate,
     ModelInputWidth,
     ModelOutputWidth,
-    PositiveInt,
+    TrainableParameterCount,
 )
 from fedsira.learning.aggregation import ModelState, load_model_state
 from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 
 
-def _model_state_parameter_count(state: ModelState) -> PositiveInt:
+def _model_state_parameter_count(state: ModelState) -> TrainableParameterCount:
     parameter_count = sum(parameter.value.numel() for parameter in state.parameters)
     if parameter_count <= 0:
         raise ValueError("anchor model state must contain trainable parameters")

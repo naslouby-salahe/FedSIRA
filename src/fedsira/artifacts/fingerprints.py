@@ -50,9 +50,12 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.ROLE_SPLIT_SAMPLE_PREPARED_SCALER,
         entry_modules=(
+            "fedsira.datasets.common",
             "fedsira.datasets.roles",
             "fedsira.datasets.sampling",
             "fedsira.datasets.scaling",
+            "fedsira.datasets.nbaiot.preprocessing",
+            "fedsira.datasets.ciciot2023.preprocessing",
         ),
         relevant_external_import_names=("pandas", "numpy", "pyarrow"),
     ),
@@ -73,13 +76,30 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
             "fedsira.learning.model",
             "fedsira.learning.training",
             "fedsira.learning.post_reference",
+            "fedsira.attacks.source",
+            "fedsira.attacks.reproduction",
+            "fedsira.attacks.verification",
             "fedsira.runtime.determinism",
         ),
         relevant_external_import_names=("torch", "numpy"),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.BASELINE_CHECKPOINT_CALIBRATION,
-        entry_modules=("fedsira.baselines.registry", "fedsira.runtime.determinism"),
+        entry_modules=(
+            "fedsira.baselines.registry",
+            "fedsira.baselines.references",
+            "fedsira.baselines.source_model",
+            "fedsira.baselines.independent_retraining",
+            "fedsira.baselines.robust_aggregation",
+            "fedsira.baselines.certified_ensemble",
+            "fedsira.baselines.calibration",
+            "fedsira.learning.model",
+            "fedsira.learning.training",
+            "fedsira.learning.federated",
+            "fedsira.learning.anchor",
+            "fedsira.learning.post_reference",
+            "fedsira.runtime.determinism",
+        ),
         relevant_external_import_names=("torch", "numpy", "scipy", "sklearn"),
     ),
     ProducerFingerprintSpecification(
@@ -89,12 +109,32 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE,
-        entry_modules=("fedsira.evaluation.metrics", "fedsira.learning.aggregation"),
+        entry_modules=(
+            "fedsira.protocol.specification",
+            "fedsira.protocol.claim_contract",
+            "fedsira.protocol.proposal",
+            "fedsira.protocol.reproduction",
+            "fedsira.protocol.verification",
+            "fedsira.protocol.synthesis",
+            "fedsira.protocol.admission",
+            "fedsira.protocol.state_machine",
+            "fedsira.evaluation.metrics",
+            "fedsira.learning.aggregation",
+        ),
         relevant_external_import_names=("numpy", "scipy", "sklearn"),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.BOUNDARY_TRANSFORMATION,
-        entry_modules=("fedsira.datasets.sampling",),
+        entry_modules=(
+            "fedsira.datasets.sampling",
+            "fedsira.attacks.source",
+            "fedsira.attacks.reproduction",
+            "fedsira.attacks.verification",
+            "fedsira.experiments.scenarios.capability_granularity",
+            "fedsira.experiments.scenarios.evidence_arrival",
+            "fedsira.experiments.scenarios.evidence_scarcity",
+            "fedsira.experiments.scenarios.heterogeneity",
+        ),
         relevant_external_import_names=("numpy", "pandas", "pyarrow"),
     ),
     ProducerFingerprintSpecification(
@@ -102,7 +142,6 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
         entry_modules=(
             "fedsira.evaluation.metrics",
             "fedsira.evaluation.summaries",
-            "fedsira.evaluation.metrics",
         ),
         relevant_external_import_names=("numpy", "sklearn"),
     ),
@@ -113,12 +152,21 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT,
-        entry_modules=("fedsira.analysis.claims", "fedsira.evaluation.comparisons"),
+        entry_modules=(
+            "fedsira.analysis.claims",
+            "fedsira.evaluation.summaries",
+            "fedsira.evaluation.comparisons",
+        ),
         relevant_external_import_names=("numpy",),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.REPORT_SOURCE_EXPORT,
-        entry_modules=("fedsira.reporting",),
+        entry_modules=(
+            "fedsira.reporting.tables",
+            "fedsira.reporting.figures",
+            "fedsira.reporting.export",
+            "fedsira.reporting.verification",
+        ),
         relevant_external_import_names=("pandas", "pyarrow", "matplotlib"),
     ),
 )
@@ -143,9 +191,9 @@ def raw_schema_exclusion_manifest_entry_modules(
     else:
         raise ValueError(f"unsupported dataset identity: {dataset}")
     return (
-        f"fedsira.datasets.{package}.acquisition",
+        f"fedsira.datasets.{package}.loading",
         f"fedsira.datasets.{package}.schema",
-        f"fedsira.datasets.{package}.validation",
+        f"fedsira.datasets.{package}.preprocessing",
     )
 
 

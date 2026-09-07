@@ -226,3 +226,6 @@ results/*
 # Session/tool artifacts
 .commandcode/
 prompt.md
+
+# Temporary Graphify audit workspace
+docs/.graphify-audit/

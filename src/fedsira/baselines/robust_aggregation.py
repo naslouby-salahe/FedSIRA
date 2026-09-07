@@ -58,7 +58,7 @@ def coordinate_wise_median_synthesis(
 
 def krum_reference_post_reference_rounds() -> FederatedRoundCount:
     baselines = current_application_context().scientific_config.baselines
-    return baselines.krum_robust_aggregation_post_reference_rounds
+    return baselines.fedavg_post_reference_rounds
 
 
 def client_sampling_round_seed(master_seed: MasterSeed, round_index: RoundIndex) -> DerivedSeed:

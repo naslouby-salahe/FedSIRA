@@ -32,6 +32,7 @@ class DiscoveredCsvFile(FrozenDomainModel):
     relative_path: RelativePathText
     file_sha256: DatasetFileDigest
     absolute_path: Path
+    source_archive_digest: DatasetFileDigest | None = None
 
 
 def attack_family_for_directory_token(
@@ -74,11 +75,13 @@ def _discover_attack_csv_files(
 ) -> tuple[DiscoveredCsvFile, ...]:
     family = attack_family_for_directory_token(directory_token)
     extracted_directory = device_directory / f"{family}_attacks"
+    archive_digest: DatasetFileDigest | None = None
     if not extracted_directory.is_dir():
         archive_path = device_directory / f"{family}_attacks.rar"
         if not archive_path.exists():
             return ()
         extracted_directory = extraction_cache_root / domain.value / f"{family}_attacks"
+        archive_digest = compute_file_checksum(archive_path)
         extract_rar_archive(archive_path, extracted_directory)
     discovered: list[DiscoveredCsvFile] = []
     for csv_path in extracted_directory.glob("*.csv"):
@@ -87,13 +90,18 @@ def _discover_attack_csv_files(
             raise ValueError(
                 f"unrecognized {family} attack basename {csv_path.stem!r} in {csv_path}"
             )
+        try:
+            layout_relative_path = csv_path.relative_to(device_directory).as_posix()
+        except ValueError:
+            layout_relative_path = f"{csv_path.parent.name}/{csv_path.name}"
         discovered.append(
             DiscoveredCsvFile(
                 domain=domain,
                 class_id=class_id,
-                relative_path=csv_path.relative_to(device_directory).as_posix(),
+                relative_path=layout_relative_path,
                 file_sha256=compute_file_checksum(csv_path),
                 absolute_path=csv_path,
+                source_archive_digest=archive_digest,
             )
         )
     return tuple(discovered)
@@ -149,6 +157,7 @@ def compute_dataset_manifest_hash(
                 nbaiot_domain_hash_token(item.domain),
                 item.relative_path,
                 item.file_sha256,
+                item.source_archive_digest or "",
             )
         )
     return hasher.hexdigest()

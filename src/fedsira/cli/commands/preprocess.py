@@ -92,7 +92,7 @@ def _publish_dataset_manifest(
         published_directory=REPOSITORY_ROOT
         / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST),
         staging_root=REPOSITORY_ROOT
-        / config.runtime.repository_layout.execution_workspace
+        / config.execution.repository_layout.execution_workspace
         / "cache"
         / "staging",
     )
@@ -101,10 +101,12 @@ def _publish_dataset_manifest(
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
-    raw_root = REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / DatasetId.N_BAIOT.value
+    raw_root = (
+        REPOSITORY_ROOT / config.execution.repository_layout.raw_data / DatasetId.N_BAIOT.value
+    )
     extraction_cache_root = (
         REPOSITORY_ROOT
-        / config.runtime.repository_layout.execution_workspace
+        / config.execution.repository_layout.execution_workspace
         / "cache"
         / "preprocessing"
     )
@@ -150,12 +152,15 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     csv_root = (
-        REPOSITORY_ROOT / config.runtime.repository_layout.raw_data / "CIC_IOT_Dataset2023" / "CSV"
+        REPOSITORY_ROOT
+        / config.execution.repository_layout.raw_data
+        / "CIC_IOT_Dataset2023"
+        / "CSV"
     )
     discovered = discover_secondary_csv_files(csv_root)
     cache_root = (
         REPOSITORY_ROOT
-        / config.runtime.repository_layout.execution_workspace
+        / config.execution.repository_layout.execution_workspace
         / "cache"
         / "preprocessing"
     )

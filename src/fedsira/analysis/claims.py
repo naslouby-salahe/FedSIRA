@@ -367,9 +367,11 @@ def _derive_claim_state(
     }:
         return FinalClaimState.SUPPORTED
     if claim_id == "Authority Transition":
-        if sum(evidence.legitimate_admissions) >= minimum_complete_pairs_for_claim_support:
-            return FinalClaimState.SUPPORTED
-        return FinalClaimState.NOT_SUPPORTED
+        if len(evidence.legitimate_admissions) >= minimum_complete_pairs_for_claim_support:
+            if any(admission >= 1 for admission in evidence.legitimate_admissions):
+                return FinalClaimState.SUPPORTED
+            return FinalClaimState.NOT_SUPPORTED
+        return FinalClaimState.NOT_TESTED
     if claim_id == "Malicious Source Salvage":
         if evidence.source_exclusion_gate_passed is None:
             return FinalClaimState.NOT_TESTED
@@ -398,14 +400,15 @@ def _derive_claim_state(
             ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
         )
         survival = tuple(_family_survival(evidence, family) for family in families)
-        if any(state is None for state in survival):
-            return FinalClaimState.NOT_TESTED
         supported_count = sum(state is True for state in survival)
+        failed_count = sum(state is False for state in survival)
         if supported_count == len(families):
             return FinalClaimState.SUPPORTED
-        if supported_count > 0:
+        if failed_count >= 1 and supported_count >= 1:
             return FinalClaimState.PARTIALLY_SUPPORTED
-        return FinalClaimState.NULL_RESULT
+        if failed_count == len(families):
+            return FinalClaimState.NULL_RESULT
+        return FinalClaimState.NOT_TESTED
     if claim_id == "Byzantine Operating Region":
         byzantine_thresholds = claim_support_thresholds.byzantine_operating_region
         maximum = byzantine_thresholds.maximum_malicious_admissions_within_bound
@@ -424,12 +427,19 @@ def _derive_claim_state(
     if claim_id == "Capability-Granularity Boundary":
         if not evidence.false_same_capability_rates:
             return FinalClaimState.NULL_RESULT
+        p_values = tuple(
+            item.p_value for item in evidence.comparison_p_values if item.p_value is not None
+        )
+        if not p_values:
+            return FinalClaimState.NOT_TESTED
         mean_rate = sum(evidence.false_same_capability_rates) / len(
             evidence.false_same_capability_rates
         )
         granularity_thresholds = claim_support_thresholds.capability_granularity_boundary
         minimum = granularity_thresholds.false_same_capability_certification_rate_minimum
-        return FinalClaimState.SUPPORTED if mean_rate >= minimum else FinalClaimState.NULL_RESULT
+        if mean_rate >= minimum and any(p_value < family_wise_alpha for p_value in p_values):
+            return FinalClaimState.SUPPORTED
+        return FinalClaimState.NULL_RESULT
     if claim_id == "Heterogeneity Boundary":
         if evidence.heterogeneity_boundary_passes is None:
             return FinalClaimState.NOT_TESTED
@@ -452,5 +462,7 @@ def _derive_claim_state(
     if claim_id == "IoT IDS Application":
         if evidence.secondary_generalization_passes is None:
             return FinalClaimState.PARTIALLY_SUPPORTED
-        return FinalClaimState.SUPPORTED
+        if evidence.secondary_generalization_passes:
+            return FinalClaimState.SUPPORTED
+        return FinalClaimState.PARTIALLY_SUPPORTED
     return FinalClaimState.NOT_TESTED

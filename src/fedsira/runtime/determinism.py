@@ -53,7 +53,7 @@ def framed_bytes(*fields: FramingField) -> FramedBytes:
 
 
 def namespace_seed(master_seed: MasterSeed, namespace: SeedNamespace) -> NamespaceSeed:
-    message = f"{NAMESPACE_SEED_PREFIX}{master_seed}|{namespace.value}"
+    message = f"{NAMESPACE_SEED_PREFIX}{master_seed}|{namespace}"
     digest = hashlib.sha256(message.encode("utf-8")).digest()
     return int.from_bytes(digest[0:8], byteorder="big", signed=False) % UINT32_MODULUS
 
@@ -118,7 +118,7 @@ def minibatch_order(
 
 
 def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
-    random.seed(int(seed))
-    numpy.random.seed(int(seed))
+    random.seed(seed)
+    numpy.random.seed(seed)
     _TORCH_MANUAL_SEED(seed)
     _TORCH_CUDA_MANUAL_SEED_ALL(seed)

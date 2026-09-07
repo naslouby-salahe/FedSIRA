@@ -251,9 +251,16 @@ def _unique(values: Iterable[ConditionName]) -> tuple[ConditionName, ...]:
 
 
 def epistemic_strength_tokens(failure_type: EpistemicFailureType) -> tuple[ConditionName, ...]:
+    attacks = current_application_context().scientific_config.attacks_and_boundaries
     if failure_type is EpistemicFailureType.SHARED_LABEL_ERROR:
-        return ("0.05", "0.10", "0.20")
-    return ("0.25", "0.50", "1.00")
+        strengths = attacks.shared_label_error.strengths
+    elif failure_type is EpistemicFailureType.SHARED_SPURIOUS_FEATURE:
+        strengths = attacks.shared_spurious_feature.strengths
+    elif failure_type is EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT:
+        strengths = attacks.attacker_induced_common_context.strengths
+    else:
+        raise ValueError(f"unsupported epistemic failure type: {failure_type.value}")
+    return tuple(f"{strength:.2f}" for strength in strengths)
 
 
 def ablation_scenario_for_variant(variant: AblationVariant) -> AblationScenario:

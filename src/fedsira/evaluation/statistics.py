@@ -1,15 +1,16 @@
 import itertools
-from typing import Literal, TypeAlias
+from typing import TypeAlias
 
 from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
     PairedDifference,
     PValue,
+    Sign,
     SignFlipSampleCount,
 )
 
-SignFlipSign: TypeAlias = Literal[-1, 1]
+SignFlipSign: TypeAlias = Sign
 SignFlipAssignment: TypeAlias = tuple[SignFlipSign, ...]
 NamedPValue: TypeAlias = tuple[ComparisonName, PValue]
 

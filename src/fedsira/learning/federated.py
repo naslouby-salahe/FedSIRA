@@ -3,11 +3,11 @@ import torch
 from fedsira.config.models import OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
     DerivedSeed,
+    ExampleCount,
     LearningRate,
     LocalEpochCount,
     ModelInputWidth,
     ModelOutputWidth,
-    PositiveInt,
     SampleId,
     TensorDomainModel,
 )
@@ -33,7 +33,7 @@ class LocalTrainingClient(TensorDomainModel):
     training_seed: DerivedSeed
 
 
-def _validate_client_rows(client: LocalTrainingClient) -> PositiveInt:
+def _validate_client_rows(client: LocalTrainingClient) -> ExampleCount:
     feature_rows = client.features.shape[0]
     if feature_rows <= 0:
         raise ValueError("local training requires at least one example")

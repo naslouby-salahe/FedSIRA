@@ -5,6 +5,8 @@ import pytest
 
 from fedsira.experiments.validation import (
     SMOKE_RECORD_SCHEMA_VERSION,
+    PersistedSmokeRecord,
+    SmokeCheckResult,
     SmokeSuiteResult,
     render_smoke,
     run_smoke_suite,
@@ -58,7 +60,25 @@ def test_run_smoke_suite_writes_payload(tmp_path: Path, monkeypatch: pytest.Monk
     assert len(payload["checks"]) == len(result.checks)
 
 
-def test_run_smoke_suite_respects_no_overwrite(
+def test_run_smoke_suite_reuses_an_exact_valid_record_without_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record_path = tmp_path / "smoke_record.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    persisted = PersistedSmokeRecord(
+        schema_version=SMOKE_RECORD_SCHEMA_VERSION,
+        passed=True,
+        checks=(SmokeCheckResult(name="fixture check", passed=True),),
+    )
+    original = persisted.model_dump_json(indent=2)
+    record_path.write_text(original)
+    monkeypatch.setattr("fedsira.experiments.validation.smoke_record_path", lambda: record_path)
+    result = run_smoke_suite(overwrite=False)
+    assert result.passed
+    assert record_path.read_text() == original
+
+
+def test_run_smoke_suite_recomputes_and_rewrites_an_invalid_or_failed_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     record_path = tmp_path / "smoke_record.json"
@@ -66,4 +86,6 @@ def test_run_smoke_suite_respects_no_overwrite(
     record_path.write_text("sentinel")
     monkeypatch.setattr("fedsira.experiments.validation.smoke_record_path", lambda: record_path)
     run_smoke_suite(overwrite=False)
-    assert record_path.read_text() == "sentinel"
+    payload = json.loads(record_path.read_text())
+    assert payload["schema_version"] == SMOKE_RECORD_SCHEMA_VERSION
+    assert payload["passed"] is True

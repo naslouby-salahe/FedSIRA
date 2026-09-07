@@ -26,10 +26,8 @@ from fedsira.datasets.nbaiot.schema import (
 from fedsira.datasets.roles import supported_role_windows, target_role_windows
 from fedsira.datasets.sampling import apply_sampling_cap
 from fedsira.datasets.scaling import (
-    FeatureMatrix,
     FeatureMoments,
     FeatureStatistic,
-    FeatureVector,
     accumulate_feature_statistics,
     fit_feature_moments,
     standardize_row,
@@ -39,7 +37,9 @@ from fedsira.domain.types import (
     DatasetClassToken,
     DatasetColumnName,
     DomainId,
+    FeatureMatrix,
     FeatureMoment,
+    FeatureVector,
     FrozenDomainModel,
     OverwriteExisting,
     PredictorCount,

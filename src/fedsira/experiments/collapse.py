@@ -262,7 +262,7 @@ def _constraints_pass(
         return (
             _defined_within(
                 evaluation.source_exclusion_target_f1_drop,
-                materiality.target_f1_noninferiority_margin,
+                materiality.target_f1_gain_minimum,
             )
             and _defined_within(
                 evaluation.source_exclusion_supported_harm,
