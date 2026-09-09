@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 
 import torch
 
+from fedsira.attacks import (
+    apply_trigger_transform,
+    relabel_triggered_rows_as_benign,
+    select_source_backdoor_poison_rows,
+)
+from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -84,3 +91,33 @@ class EpistemicFailureScope:
     spurious_feature_value: TriggerFeatureValue
     common_context_feature_names: tuple[FeatureName, ...]
     common_context_trigger_value: TriggerFeatureValue
+
+
+def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
+    poisoned_ids = select_source_backdoor_poison_rows(
+        rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
+    )
+    if not poisoned_ids:
+        return rows
+    poisoned_id_set = frozenset(poisoned_ids)
+    labels_by_row_id = OrderedDict(
+        zip(rows.sample_ids, (NBaiotClass(label) for label in rows.labels), strict=True)
+    )
+    relabeled = relabel_triggered_rows_as_benign(labels_by_row_id, poisoned_ids)
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[ClassLabel] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in poisoned_id_set:
+            kept_features.append(features)
+            kept_labels.append(relabeled[sample_id].value)
+            continue
+        triggered = apply_trigger_transform(
+            torch.tensor(features, dtype=torch.float32),
+            scope.trigger_feature_indices,
+            scope.trigger_value,
+        )
+        kept_features.append(tuple(float(value) for value in triggered))
+        kept_labels.append(relabeled[sample_id].value)
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
+    )

@@ -14,12 +14,9 @@ from fedsira.artifacts import (
     collect_reconstruction_provenance,
 )
 from fedsira.attacks import (
-    apply_trigger_transform,
-    relabel_triggered_rows_as_benign,
     resolve_byzantine_verifier_vote,
     scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
-    select_source_backdoor_poison_rows,
     source_copy_update,
     verifier_aware_training_step,
 )
@@ -333,6 +330,7 @@ from fedsira.experiments.workflow import (
     PreparedRows,
     RealAnchor,
     RootCauseScope,
+    poison_backdoor_rows,
 )
 from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
@@ -1073,36 +1071,6 @@ RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURC
 CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_ANCHOR"
 CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_POST_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
-
-
-def _poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
-    poisoned_ids = select_source_backdoor_poison_rows(
-        rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
-    )
-    if not poisoned_ids:
-        return rows
-    poisoned_id_set = frozenset(poisoned_ids)
-    labels_by_row_id = OrderedDict(
-        zip(rows.sample_ids, (NBaiotClass(label) for label in rows.labels), strict=True)
-    )
-    relabeled = relabel_triggered_rows_as_benign(labels_by_row_id, poisoned_ids)
-    kept_features: list[tuple[float, ...]] = []
-    kept_labels: list[ClassLabel] = []
-    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
-        if sample_id not in poisoned_id_set:
-            kept_features.append(features)
-            kept_labels.append(relabeled[sample_id].value)
-            continue
-        triggered = apply_trigger_transform(
-            torch.tensor(features, dtype=torch.float32),
-            scope.trigger_feature_indices,
-            scope.trigger_value,
-        )
-        kept_features.append(tuple(float(value) for value in triggered))
-        kept_labels.append(relabeled[sample_id].value)
-    return PreparedRows(
-        sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
-    )
 
 
 def _apply_heterogeneity_shift(
@@ -1853,7 +1821,7 @@ def _combined_post_reference_rows(
         ):
             rows, relabeled_mask = _relabel_shared_label_error_rows(rows, epistemic_failure_scope)
         if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and (backdoor_scope is not None):
-            rows = _poison_backdoor_rows(rows, backdoor_scope)
+            rows = poison_backdoor_rows(rows, backdoor_scope)
         if rows is not None and heterogeneity_scope is not None:
             rows = _apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
         replay_tensor = _tensor_view(rows)
