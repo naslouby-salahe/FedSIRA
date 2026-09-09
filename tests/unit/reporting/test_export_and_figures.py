@@ -30,8 +30,8 @@ from fedsira.experiments.definitions import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     PrimaryScenario,
 )
+from fedsira.experiments.executor import CellExecutionOutcome, ExecutionRecordStore
 from fedsira.experiments.planning import ScientificCell, build_plan
-from fedsira.experiments.runner import CellExecutionOutcome, ExecutionRecordStore
 from fedsira.reporting.export import (
     ReportExportResult,
     export_project_summary,

@@ -15,8 +15,7 @@ from fedsira.experiments.definitions import (
     ComparisonFamily,
     experiment_by_name,
 )
-from fedsira.experiments.planning import ScientificCell, build_plan
-from fedsira.experiments.runner import (
+from fedsira.experiments.executor import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -26,6 +25,7 @@ from fedsira.experiments.runner import (
     derive_experiment_lifecycle,
     execute_experiment,
 )
+from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.io.paths import workspace_root_for_family
 from fedsira.runtime import (
     ApplicationContext,

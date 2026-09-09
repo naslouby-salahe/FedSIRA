@@ -98,6 +98,7 @@ PreparedViewKey = TextValue
 DoctorArtifactSummary = TextValue
 DoctorExperimentSummary = TextValue
 ProjectProgressDescription = TextValue
+ApplicationExitCode = NonNegativeInt
 NextValidAction = TextValue
 
 MasterSeed = Uint32Bound

@@ -19,7 +19,7 @@ SCALAR_FOUNDATIONS = {
     "TextValue",
     "Uint32Bound",
 }
-CONFIG_SCHEMA_FILE = SRC_ROOT / "config" / "models.py"
+CONFIG_SCHEMA_FILE = SRC_ROOT / "config.py"
 MODEL_BASES = {"BaseModel", "FrozenConfigModel", "FrozenDomainModel", "TensorDomainModel"}
 
 ViolationDetector = Callable[[ast.Module], list[str]]

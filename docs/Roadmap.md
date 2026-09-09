@@ -2249,6 +2249,7 @@ FedSIRA/
 ├── src/
 │   └── fedsira/
 │       ├── __init__.py
+│       ├── application.py
 │       │
 │       ├── cli/
 │       │   ├── __init__.py
@@ -2327,7 +2328,7 @@ FedSIRA/
 │       │   ├── __init__.py
 │       │   ├── definitions.py
 │       │   ├── planning.py
-│       │   ├── runner.py
+│       │   ├── executor.py
 │       │   └── scenarios/
 │       │       ├── __init__.py
 │       │       ├── capability_granularity.py

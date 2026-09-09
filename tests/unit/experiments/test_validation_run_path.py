@@ -8,11 +8,11 @@ from fedsira.experiments.definitions import (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
-from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.runner import (
+from fedsira.experiments.executor import (
     PreparedEvidenceCounts,
     ProtocolCellExecutor,
 )
+from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.validation import run_data_and_domain_evidence_validation
 
 
@@ -81,7 +81,7 @@ def test_baseline_implementation_validation_dispatches_to_baseline_cell(
         return evidence
 
     monkeypatch.setattr(
-        "fedsira.experiments.runner.load_prepared_evidence_counts",
+        "fedsira.experiments.executor.load_prepared_evidence_counts",
         _prepared_counts,
     )
     executor = ProtocolCellExecutor()

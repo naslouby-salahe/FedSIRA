@@ -15,7 +15,7 @@ from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass,
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.types import FeatureName
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.runner import (
+from fedsira.experiments.executor import (
     BackdoorScope,
     EpistemicFailureScope,
     HeterogeneityScope,
@@ -53,7 +53,7 @@ from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training; skipped by default"
     " to avoid competing for CPU with other work. Re-enable deliberately when verifying"
-    " fedsira.experiments.runner."
+    " fedsira.experiments.executor."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

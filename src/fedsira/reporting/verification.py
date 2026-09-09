@@ -9,8 +9,8 @@ from fedsira.domain.types import (
     ScientificCellCount,
     VerificationPassed,
 )
+from fedsira.experiments.executor import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
-from fedsira.experiments.runner import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 
 
 class ExperimentTerminalCount(FrozenDomainModel):

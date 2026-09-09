@@ -6,6 +6,7 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
 BOOTSTRAP_RELATIVE = frozenset(
     {
+        "config.py",
         "config/loading.py",
         "config/models.py",
         "runtime/state.py",

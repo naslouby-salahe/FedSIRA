@@ -72,8 +72,8 @@ from fedsira.experiments.definitions import (
     PrimaryScenario,
     SourceExclusionMethod,
 )
+from fedsira.experiments.executor import CellExecutionOutcome
 from fedsira.experiments.planning import ExperimentPlan
-from fedsira.experiments.runner import CellExecutionOutcome
 from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (

@@ -24,13 +24,7 @@ from fedsira.experiments.definitions import (
     ComparisonFamily,
     experiment_by_name,
 )
-from fedsira.experiments.planning import (
-    ExperimentPlan,
-    ScientificCell,
-    build_plan,
-    validate_planned_cell_count_invariant,
-)
-from fedsira.experiments.runner import (
+from fedsira.experiments.executor import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -39,6 +33,12 @@ from fedsira.experiments.runner import (
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
     derive_experiment_lifecycle,
+)
+from fedsira.experiments.planning import (
+    ExperimentPlan,
+    ScientificCell,
+    build_plan,
+    validate_planned_cell_count_invariant,
 )
 from fedsira.io.paths import (
     OUTPUTS_ROOT,

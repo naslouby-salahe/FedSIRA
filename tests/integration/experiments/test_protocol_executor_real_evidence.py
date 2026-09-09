@@ -39,20 +39,20 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.runner import (
+from fedsira.experiments.executor import (
     ProtocolCellExecutor,
     evaluate_domain,
     non_source_domains,
     train_anchor,
 )
+from fedsira.experiments.planning import ScientificCell
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime_execution import namespace_seed
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training end-to-end through"
     " ProtocolCellExecutor; skipped by default to avoid competing for CPU with other work."
-    " Re-enable deliberately when verifying fedsira.experiments.runner."
+    " Re-enable deliberately when verifying fedsira.experiments.executor."
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

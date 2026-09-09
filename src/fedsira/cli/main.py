@@ -1,25 +1,18 @@
 import typer
 from rich.console import Console
 
-from fedsira.cli.commands import doctor as doctor_command
-from fedsira.cli.commands import plan as plan_command
-from fedsira.cli.commands import preprocess as preprocess_command
-from fedsira.cli.commands import report as report_command
-from fedsira.cli.commands import run as run_command
-from fedsira.cli.commands import smoke as smoke_command
+from fedsira.application import FedSIRAApplication
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import ExperimentName, OverwriteExisting
 
 app = typer.Typer(name="fedsira", no_args_is_help=True)
 console = Console()
+application = FedSIRAApplication()
 
 
 @app.command()
 def doctor() -> None:
-    report = doctor_command.diagnose()
-    doctor_command.render(report, console)
-    if not report.is_deterministic_execution_ready:
-        raise typer.Exit(code=1)
+    raise typer.Exit(code=application.doctor(console))
 
 
 @app.command()
@@ -27,17 +20,17 @@ def preprocess(
     dataset: DatasetId | None = typer.Argument(None),
     overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
-    preprocess_command.execute(dataset, overwrite)
+    raise typer.Exit(code=application.preprocess(dataset, overwrite))
 
 
 @app.command()
 def plan() -> None:
-    plan_command.execute()
+    raise typer.Exit(code=application.plan())
 
 
 @app.command()
 def smoke(overwrite: OverwriteExisting = typer.Option(False, "--overwrite")) -> None:
-    smoke_command.execute(overwrite)
+    raise typer.Exit(code=application.smoke(overwrite))
 
 
 @app.command(name="run")
@@ -45,7 +38,7 @@ def run_experiment(
     name: ExperimentName = typer.Argument(...),
     overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
-    run_command.execute(name, overwrite)
+    raise typer.Exit(code=application.run(name, overwrite))
 
 
 @app.command()
@@ -53,7 +46,7 @@ def report(
     name: ExperimentName | None = typer.Argument(None),
     overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),
 ) -> None:
-    report_command.execute(name, overwrite)
+    raise typer.Exit(code=application.report(name, overwrite))
 
 
 if __name__ == "__main__":
