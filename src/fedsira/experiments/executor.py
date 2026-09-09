@@ -283,8 +283,6 @@ from fedsira.experiments.planning import (
     build_plan,
 )
 from fedsira.experiments.scenarios.capability_granularity import (
-    apply_root_cause_feature_shift,
-    balanced_capability_selection,
     root_cause_for_sample,
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
@@ -332,6 +330,7 @@ from fedsira.experiments.workflow import (
     RootCauseScope,
     apply_heterogeneity_shift,
     poison_backdoor_rows,
+    scope_and_shift_rows,
 )
 from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
@@ -1074,52 +1073,6 @@ CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 
 
-def _scope_and_shift_rows(
-    rows: PreparedRows, root_cause_scope: RootCauseScope
-) -> PreparedRows | None:
-    root_cause_a_ids = frozenset(
-        sample_id
-        for sample_id in rows.sample_ids
-        if root_cause_for_sample(sample_id) is RootCause.A
-    )
-    root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
-    if root_cause_scope.balanced_selection_seed is not None:
-        selected_a_ids, selected_b_ids = balanced_capability_selection(
-            sorted(root_cause_a_ids),
-            sorted(root_cause_b_ids),
-            root_cause_scope.balanced_selection_seed,
-        )
-        root_cause_a_ids = frozenset(selected_a_ids)
-        root_cause_b_ids = frozenset(selected_b_ids)
-    allowed_ids = target_row_ids_for_contract(
-        root_cause_scope.contract_scope, root_cause_a_ids, root_cause_b_ids
-    )
-    a_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_a_feature_name)
-    b_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_b_feature_name)
-    kept_sample_ids: list[ArtifactDigest] = []
-    kept_features: list[tuple[float, ...]] = []
-    kept_labels: list[ClassLabel] = []
-    for sample_id, features, label in zip(rows.sample_ids, rows.features, rows.labels, strict=True):
-        if sample_id not in allowed_ids:
-            continue
-        row_root_cause = root_cause_for_sample(sample_id)
-        shifted = apply_root_cause_feature_shift(
-            torch.tensor(features, dtype=torch.float32),
-            row_root_cause,
-            a_index,
-            b_index,
-            root_cause_scope.shift_value,
-        )
-        kept_sample_ids.append(sample_id)
-        kept_features.append(tuple(float(value) for value in shifted))
-        kept_labels.append(label)
-    if not kept_sample_ids:
-        return None
-    return PreparedRows(
-        sample_ids=tuple(kept_sample_ids), features=tuple(kept_features), labels=tuple(kept_labels)
-    )
-
-
 def _relabel_shared_label_error_rows(
     rows: PreparedRows, scope: EpistemicFailureScope
 ) -> tuple[PreparedRows, tuple[BooleanValue, ...]]:
@@ -1765,7 +1718,7 @@ def _combined_post_reference_rows(
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
     target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
     if target_rows is not None and root_cause_scope is not None:
-        target_rows = _scope_and_shift_rows(target_rows, root_cause_scope)
+        target_rows = scope_and_shift_rows(target_rows, root_cause_scope)
     if (
         target_rows is not None
         and epistemic_failure_scope is not None
@@ -2678,7 +2631,7 @@ def evaluate_domain(
                 and root_cause_scope is not None
                 and (rows is not None)
             ):
-                rows = _scope_and_shift_rows(rows, root_cause_scope)
+                rows = scope_and_shift_rows(rows, root_cause_scope)
             if rows is not None and heterogeneity_scope is not None:
                 rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
             tensor_view = _tensor_view(rows)

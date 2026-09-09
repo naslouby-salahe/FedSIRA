@@ -11,7 +11,7 @@ from fedsira.attacks import (
     select_source_backdoor_poison_rows,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.domain.enums import CapabilityContractScope
+from fedsira.domain.enums import CapabilityContractScope, RootCause
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -26,6 +26,12 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
+from fedsira.experiments.scenarios.capability_granularity import (
+    apply_root_cause_feature_shift,
+    balanced_capability_selection,
+    root_cause_for_sample,
+    target_row_ids_for_contract,
+)
 from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
 
 
@@ -142,4 +148,49 @@ def apply_heterogeneity_shift(
         shifted_features.append(tuple(float(value) for value in tensor))
     return PreparedRows(
         sample_ids=rows.sample_ids, features=tuple(shifted_features), labels=rows.labels
+    )
+
+
+def scope_and_shift_rows(
+    rows: PreparedRows, root_cause_scope: RootCauseScope
+) -> PreparedRows | None:
+    root_cause_a_ids = frozenset(
+        sample_id
+        for sample_id in rows.sample_ids
+        if root_cause_for_sample(sample_id) is RootCause.A
+    )
+    root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
+    if root_cause_scope.balanced_selection_seed is not None:
+        selected_a_ids, selected_b_ids = balanced_capability_selection(
+            sorted(root_cause_a_ids),
+            sorted(root_cause_b_ids),
+            root_cause_scope.balanced_selection_seed,
+        )
+        root_cause_a_ids = frozenset(selected_a_ids)
+        root_cause_b_ids = frozenset(selected_b_ids)
+    allowed_ids = target_row_ids_for_contract(
+        root_cause_scope.contract_scope, root_cause_a_ids, root_cause_b_ids
+    )
+    a_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_a_feature_name)
+    b_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_b_feature_name)
+    kept_sample_ids: list[ArtifactDigest] = []
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[ClassLabel] = []
+    for sample_id, features, label in zip(rows.sample_ids, rows.features, rows.labels, strict=True):
+        if sample_id not in allowed_ids:
+            continue
+        shifted = apply_root_cause_feature_shift(
+            torch.tensor(features, dtype=torch.float32),
+            root_cause_for_sample(sample_id),
+            a_index,
+            b_index,
+            root_cause_scope.shift_value,
+        )
+        kept_sample_ids.append(sample_id)
+        kept_features.append(tuple(float(value) for value in shifted))
+        kept_labels.append(label)
+    if not kept_sample_ids:
+        return None
+    return PreparedRows(
+        sample_ids=tuple(kept_sample_ids), features=tuple(kept_features), labels=tuple(kept_labels)
     )
