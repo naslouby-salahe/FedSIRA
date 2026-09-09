@@ -34,8 +34,11 @@ from fedsira.experiments.scenarios.capability_granularity import (
     target_row_ids_for_contract,
 )
 from fedsira.experiments.scenarios.evidence_scarcity import (
+    apply_attacker_induced_common_context,
+    apply_shared_spurious_feature,
     relabel_shared_label_error_rows,
     select_shared_label_error_rows,
+    select_spurious_feature_rows,
 )
 from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
 
@@ -224,3 +227,46 @@ def relabel_shared_label_error_rows_for_scope(
         ),
         tuple(sample_id not in selected_ids for sample_id in rows.sample_ids),
     )
+
+
+def mark_epistemic_rows(
+    rows: PreparedRows,
+    scope: EpistemicFailureScope,
+    selected_ids: frozenset[ArtifactDigest],
+) -> PreparedRows:
+    if not selected_ids:
+        return rows
+    is_common_context = scope.failure_type is EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT
+    if is_common_context:
+        feature_indices = tuple(
+            scope.feature_names.index(name) for name in scope.common_context_feature_names
+        )
+        trigger_value = scope.common_context_trigger_value
+    else:
+        feature_indices = (scope.feature_names.index(scope.spurious_feature_name),)
+        trigger_value = scope.spurious_feature_value
+    marked_features: list[tuple[float, ...]] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in selected_ids:
+            marked_features.append(features)
+            continue
+        tensor = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+        shifted = (
+            apply_attacker_induced_common_context(tensor, feature_indices, trigger_value)
+            if is_common_context
+            else apply_shared_spurious_feature(tensor, feature_indices[0], trigger_value)
+        )
+        marked_features.append(tuple(float(value) for value in shifted.squeeze(0)))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(marked_features), labels=rows.labels
+    )
+
+
+def apply_epistemic_target_marker(
+    rows: PreparedRows, scope: EpistemicFailureScope
+) -> PreparedRows:
+    selected = (
+        select_spurious_feature_rows(rows.sample_ids, scope.strength, scope.attack_generation_seed)
+        or ()
+    )
+    return mark_epistemic_rows(rows, scope, frozenset(selected))
