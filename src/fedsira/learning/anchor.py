@@ -1,4 +1,4 @@
-from fedsira.config.models import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
+from fedsira.config import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
     LearningRate,
     ModelInputWidth,

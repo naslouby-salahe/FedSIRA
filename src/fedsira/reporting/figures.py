@@ -35,7 +35,7 @@ from fedsira.experiments.definitions import (
     VerifierCondition,
 )
 from fedsira.experiments.runner import CellExecutionOutcome
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "FedSIRA Protocol Schematic",
@@ -52,6 +52,7 @@ MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "Efficiency Profile",
     "Secondary Generalization",
 )
+FIGURE_ANNOTATION_INSET: Probability = 1 / 100
 
 
 class EvidenceStateFraction(FrozenDomainModel):
@@ -305,7 +306,13 @@ def _render_experiment_effects(
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
     if annotation is not None:
-        axis.text(0.01, 0.01, annotation, transform=axis.transAxes, va="bottom")
+        axis.text(
+            FIGURE_ANNOTATION_INSET,
+            FIGURE_ANNOTATION_INSET,
+            annotation,
+            transform=axis.transAxes,
+            va="bottom",
+        )
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination

@@ -1,11 +1,4 @@
-from fedsira.artifacts.fingerprints import (
-    compute_artifact_dependency_fingerprint,
-    compute_external_dependency_fingerprint,
-    compute_producer_component_fingerprint,
-    producer_fingerprint_specification,
-    raw_schema_exclusion_manifest_entry_modules,
-)
-from fedsira.artifacts.records import (
+from fedsira.artifacts import (
     CICIoT2023DatasetManifestPayload,
     DatasetManifestPayload,
     NBaiotDatasetManifestPayload,
@@ -32,16 +25,13 @@ from fedsira.datasets.nbaiot.validation import (
     classes_structurally_unavailable,
     validate_target_holder_feasibility,
 )
-from fedsira.domain.enums import ArtifactFamily, DatasetId, ProducerFingerprintFamily
+from fedsira.domain.enums import ArtifactFamily, DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactReuseDecision,
     DatasetClassToken,
-    DatasetManifestDigest,
-    FingerprintPayload,
     OverwriteExisting,
     Probability,
-    SchemaVersion,
 )
 from fedsira.io.paths import (
     prepared_evidence_root,
@@ -49,46 +39,24 @@ from fedsira.io.paths import (
     preprocessing_metadata_root,
     workspace_root_for_family,
 )
-from fedsira.io.storage import publish_or_reuse_artifact_payload
-from fedsira.runtime.state import (
+from fedsira.io.storage import compute_checksum, publish_or_reuse_artifact_payload
+from fedsira.runtime import (
     ApplicationContext,
     bound_application_context,
     current_application_context,
 )
 
-DATASET_MANIFEST_SCHEMA_VERSION: SchemaVersion = "1"
-
 
 def _publish_dataset_manifest(
-    dataset: DatasetId,
-    dataset_split_view_identities: DatasetManifestDigest,
     payload: DatasetManifestPayload,
 ) -> ArtifactReuseDecision:
     config = current_application_context().scientific_config
-    entry_modules = raw_schema_exclusion_manifest_entry_modules(dataset)
-    specification = producer_fingerprint_specification(
-        ProducerFingerprintFamily.RAW_SCHEMA_EXCLUSION_MANIFEST
-    )
-    producer_fingerprint = compute_producer_component_fingerprint(
-        entry_modules, schema_version=DATASET_MANIFEST_SCHEMA_VERSION
-    )
-    external_fingerprint = compute_external_dependency_fingerprint(
-        entry_modules, specification.relevant_external_import_names
-    )
-    fingerprint_payload: FingerprintPayload = dataset.value
-    identity: ArtifactDigest = compute_artifact_dependency_fingerprint(
-        schema_version=DATASET_MANIFEST_SCHEMA_VERSION,
-        scientific_configuration_subset=fingerprint_payload,
-        dataset_split_view_identities=dataset_split_view_identities,
-        semantic_coordinates_and_seed_namespaces=fingerprint_payload,
-        upstream_artifact_identities=(),
-        producer_component_fingerprint=producer_fingerprint,
-        external_dependency_fingerprint=external_fingerprint,
-    )
+    serialized_payload = payload.model_dump_json().encode("utf-8")
+    identity: ArtifactDigest = compute_checksum(serialized_payload)
     _, reused = publish_or_reuse_artifact_payload(
         family=ArtifactFamily.DATASET_MANIFEST,
         identity=identity,
-        payload=payload.model_dump_json().encode("utf-8"),
+        payload=serialized_payload,
         published_directory=REPOSITORY_ROOT
         / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST),
         staging_root=REPOSITORY_ROOT
@@ -126,8 +94,6 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         validate_consistent_predictor_schema(reference_header, observed_header)
         validate_all_predictors_finite(item.absolute_path, reference_header)
     reused = _publish_dataset_manifest(
-        DatasetId.N_BAIOT,
-        manifest_hash,
         NBaiotDatasetManifestPayload(
             dataset_file_manifest_hash=manifest_hash,
             structurally_unavailable_classes=unavailable_classes,
@@ -175,8 +141,6 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         overwrite,
     )
     reused = _publish_dataset_manifest(
-        DatasetId.CICIOT2023,
-        summary.dataset_manifest_hash,
         CICIoT2023DatasetManifestPayload(
             dataset_file_manifest_hash=summary.dataset_manifest_hash,
             file_count=len(discovered),

@@ -19,7 +19,7 @@ from fedsira.domain.types import (
     FrozenDomainModel,
     RelativePathText,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime_execution import framed_bytes
 
 GAFGYT_DIRECTORY_TOKEN: AttackFamilyDirectoryToken = "GAFGYT_ATTACKS"
 MIRAI_DIRECTORY_TOKEN: AttackFamilyDirectoryToken = "MIRAI_ATTACKS"

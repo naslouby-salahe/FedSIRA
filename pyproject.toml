@@ -76,8 +76,9 @@ root = "src/fedsira/reporting/figures.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/runtime/determinism.py"
+root = "src/fedsira/runtime_execution.py"
 reportUnknownMemberType = "none"
+reportAttributeAccessIssue = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/fedsira/learning/model.py"

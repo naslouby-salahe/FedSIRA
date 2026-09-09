@@ -2,8 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.artifacts.graph import ArtifactGraph
-from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts import ArtifactGraph, ArtifactManifest
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 from fedsira.io.storage import (
     compute_checksum,

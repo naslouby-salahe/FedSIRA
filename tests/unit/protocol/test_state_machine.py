@@ -1,4 +1,4 @@
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import AdmissionState, DormantOrigin, TernaryOutcome
 from fedsira.protocol.state_machine import (
     TERMINAL_ADMISSION_STATES,

@@ -4,7 +4,7 @@ import pandas
 import pytest
 import torch
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (

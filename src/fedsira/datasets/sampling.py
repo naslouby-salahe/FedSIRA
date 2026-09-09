@@ -13,7 +13,7 @@ from fedsira.domain.types import (
     SamplingCap,
     SourceRowIndex,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime_execution import framed_bytes
 
 SamplingSelectionDigest = Annotated[bytes, Field(min_length=32, max_length=32)]
 

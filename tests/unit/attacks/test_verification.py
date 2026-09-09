@@ -1,4 +1,4 @@
-from fedsira.attacks.verification import resolve_byzantine_verifier_vote
+from fedsira.attacks import resolve_byzantine_verifier_vote
 from fedsira.domain.enums import ByzantineVerifierBehavior, TernaryOutcome
 
 

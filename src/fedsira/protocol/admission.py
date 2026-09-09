@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import torch
 
-from fedsira.config.models import FinalGateConfig
+from fedsira.config import FinalGateConfig
 from fedsira.domain.enums import AdmissionState
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (

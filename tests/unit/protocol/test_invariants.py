@@ -4,7 +4,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass
 from fedsira.domain.enums import DatasetId, TernaryOutcome
 from fedsira.domain.models import (

@@ -2,7 +2,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from fedsira.config.models import CapabilityContractConfig, CleanOracleMaterialityConfig
+from fedsira.config import CapabilityContractConfig, CleanOracleMaterialityConfig
 from fedsira.domain.models import (
     ConfusionCounts,
     FalseSameCapabilityReason,

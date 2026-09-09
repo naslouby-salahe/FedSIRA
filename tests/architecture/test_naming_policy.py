@@ -7,7 +7,7 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
 BANNED_GENERIC_STEMS = {"utils", "helper", "helpers", "manager", "processor", "base", "misc"}
 ARTIFICIAL_VERSION_PATTERN = re.compile(r"(_v\d+$|_final\d*$|_new$|_old$|_copy$)", re.IGNORECASE)
-FORBIDDEN_NAMING_PATTERN = re.compile("c" "anonical", re.IGNORECASE)
+FORBIDDEN_NAMING_PATTERN = re.compile("canonical", re.IGNORECASE)
 
 
 def naming_violations(tree: ast.Module, module_stem: str) -> list[str]:
@@ -62,6 +62,6 @@ def test_violation_detected_for_versioned_symbol_name() -> None:
 def test_violation_detected_for_forbidden_identifier() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         offending = Path(tmp) / "module.py"
-        forbidden_name = "c" "anonical_value"
+        forbidden_name = "canonical_value"
         offending.write_text(f"{forbidden_name} = 1\n")
         assert naming_violations(parse(offending), offending.stem)

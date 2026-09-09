@@ -1,6 +1,6 @@
-from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, module_name
+from modulefinder import ModuleFinder
 
-from fedsira.artifacts.fingerprints import resolve_producer_import_closure
+from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, module_name
 
 APPLICATION_ENTRY_MODULES = (
     "fedsira.cli.main",
@@ -14,8 +14,10 @@ APPLICATION_ENTRY_MODULES = (
 
 
 def _application_modules() -> frozenset[str]:
+    finder = ModuleFinder(path=[str(SRC_ROOT.parent)])
+    finder.run_script(str(SRC_ROOT / "cli" / "main.py"))
     return frozenset(
-        source.module for source in resolve_producer_import_closure(APPLICATION_ENTRY_MODULES)
+        name for name in finder.modules if name == "fedsira" or name.startswith("fedsira.")
     )
 
 

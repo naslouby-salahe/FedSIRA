@@ -1,4 +1,4 @@
-from fedsira.config.loading import load_test_fixture_config
+from fedsira.config import load_test_fixture_config
 from fedsira.evaluation.statistics import exact_sign_flip_two_sided_p_value
 
 

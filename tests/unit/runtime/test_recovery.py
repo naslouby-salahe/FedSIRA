@@ -1,5 +1,5 @@
 from fedsira.domain.enums import FailureClass
-from fedsira.runtime.recovery import automatic_recovery_permitted
+from fedsira.runtime import automatic_recovery_permitted
 
 
 def test_infrastructure_interruption_is_permitted_once() -> None:

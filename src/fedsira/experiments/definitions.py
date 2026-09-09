@@ -18,7 +18,7 @@ from fedsira.domain.types import (
     SeedCount,
 )
 from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedule
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 
 class ComparisonFamily(StrEnum):

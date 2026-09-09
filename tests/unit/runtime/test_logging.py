@@ -1,7 +1,7 @@
 import json
 import logging
 
-from fedsira.runtime.logging import get_structured_logger
+from fedsira.runtime_execution import get_structured_logger
 
 
 def test_get_structured_logger_emits_json_lines() -> None:

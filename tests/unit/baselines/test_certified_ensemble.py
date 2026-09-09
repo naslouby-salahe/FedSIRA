@@ -6,7 +6,7 @@ from fedsira.baselines.certified_ensemble import (
     ensemble_predicted_label,
     validate_group_without_target_member_uses_supported_only,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

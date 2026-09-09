@@ -14,7 +14,7 @@ from fedsira.domain.types import (
     RelativePathText,
     SeedDerivationLabel,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime_execution import framed_bytes
 
 _ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
 DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"

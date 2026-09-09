@@ -2,7 +2,7 @@ import math
 
 import torch
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.training import (
     build_epoch_batches,

@@ -253,7 +253,7 @@ def test_redundant_same_base_cast_mutation_is_detected() -> None:
 def test_cross_base_conversion_is_not_flagged_as_redundant() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "compliant.py"
-        path.write_text("def handler(seed: int) -> str:\n" "    return str(seed)\n")
+        path.write_text("def handler(seed: int) -> str:\n    return str(seed)\n")
         assert redundant_same_base_cast_violations(parse(path)) == []
 
 

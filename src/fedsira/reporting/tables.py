@@ -9,7 +9,7 @@ from fedsira.baselines.registry import (
     BaselineIdentity,
     BaselineValidationFixture,
 )
-from fedsira.config.models import PublicationRoundingConfig
+from fedsira.config import PublicationRoundingConfig
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
@@ -74,7 +74,7 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.experiments.runner import CellExecutionOutcome
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Dataset and Domain Protocol",
@@ -203,9 +203,7 @@ def _statistical_summary_row(
     confidence_interval = (
         "NA"
         if comparison.confidence_interval is None
-        else (
-            f"[{comparison.confidence_interval[0]:.3f}," f"{comparison.confidence_interval[1]:.3f}]"
-        )
+        else (f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]")
     )
     margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
     materiality = (
@@ -447,9 +445,7 @@ def _outcome_timing_median_iqr(
     first_quartile = quantile_type7(ordered_values, 0.25)
     third_quartile = quantile_type7(ordered_values, 0.75)
     decimals = _publication_rounding().seconds_decimals
-    return (
-        f"{median:.{decimals}f} " f"[{first_quartile:.{decimals}f},{third_quartile:.{decimals}f}]"
-    )
+    return f"{median:.{decimals}f} [{first_quartile:.{decimals}f},{third_quartile:.{decimals}f}]"
 
 
 def _completed_outcome_count(

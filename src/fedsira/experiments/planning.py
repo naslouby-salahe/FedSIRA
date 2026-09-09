@@ -274,7 +274,7 @@ def build_plan(
     smoke_seed: MasterSeed | None = None,
 ) -> ExperimentPlan:
     if master_seeds is None or smoke_seed is None:
-        from fedsira.runtime.state import current_application_context
+        from fedsira.runtime import current_application_context
 
         seeds = current_application_context().scientific_config.seeds_and_determinism
         master_seeds = master_seeds or seeds.master_seeds

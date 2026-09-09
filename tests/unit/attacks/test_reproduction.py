@@ -1,15 +1,15 @@
 import torch
 
-from fedsira.attacks.reproduction import (
+from fedsira.attacks import (
     scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
     verifier_aware_training_step,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.learning.training import build_loss_function, build_optimizer
-from fedsira.runtime.determinism import seed_job_local_rng_streams
+from fedsira.runtime_execution import seed_job_local_rng_streams
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

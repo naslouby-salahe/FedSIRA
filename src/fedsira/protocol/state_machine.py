@@ -1,4 +1,4 @@
-from fedsira.config.models import ResourceHorizonConfig
+from fedsira.config import ResourceHorizonConfig
 from fedsira.domain.enums import AdmissionState, DormantOrigin, TernaryOutcome
 from fedsira.domain.types import (
     AdmissionStateIsTerminal,

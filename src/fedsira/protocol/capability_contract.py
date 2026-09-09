@@ -1,7 +1,7 @@
 import hashlib
 from typing import Final
 
-from fedsira.config.models import CapabilityContractConfig, EvidenceMinimaConfig
+from fedsira.config import CapabilityContractConfig, EvidenceMinimaConfig
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -23,7 +23,7 @@ from fedsira.domain.types import (
     TargetF1,
     TargetF1Gain,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime_execution import framed_bytes
 
 CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0

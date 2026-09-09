@@ -4,100 +4,64 @@ from pathlib import Path
 
 from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, parse
 
-GENERIC_WRAPPERS = {
-    "BooleanValue",
+FORBIDDEN_GENERIC_ALIASES = {
     "FiniteFloat",
     "NonNegativeFloat",
     "NonNegativeInt",
+    "OpenUnitInterval",
     "PositiveFloat",
     "PositiveInt",
-    "TextValue",
+    "SignedInt",
+    "UnitInterval",
 }
-
-
-def _annotation_names(annotation: ast.expr | None) -> set[str]:
-    if annotation is None:
-        return set()
-    return {node.id for node in ast.walk(annotation) if isinstance(node, ast.Name)}
-
-
-def _iter_public_callables(
-    tree: ast.Module,
-) -> list[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
-    found: list[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]] = []
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and not node.name.startswith(
-            "_"
-        ):
-            found.append((node.name, node))
-        if not isinstance(node, ast.ClassDef) or node.name.startswith("_"):
-            continue
-        for member in node.body:
-            if not isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef):
-                continue
-            if member.name.startswith("_") and member.name != "__init__":
-                continue
-            found.append((f"{node.name}.{member.name}", member))
-    return found
+CANONICAL_TYPES_PATH = SRC_ROOT / "domain" / "types.py"
 
 
 def generic_wrapper_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
-    for owner, function in _iter_public_callables(tree):
-        for argument in function.args.args + function.args.kwonlyargs:
-            if argument.arg in {"self", "cls"}:
-                continue
-            wrappers = sorted(_annotation_names(argument.annotation) & GENERIC_WRAPPERS)
-            for wrapper in wrappers:
-                found.append(f"{owner}.{argument.arg}:{wrapper}")
-        wrappers = sorted(_annotation_names(function.returns) & GENERIC_WRAPPERS)
-        for wrapper in wrappers:
-            found.append(f"{owner}->:{wrapper}")
-    for node in tree.body:
-        if not isinstance(node, ast.ClassDef) or node.name.startswith("_"):
-            continue
-        for member in node.body:
-            if not isinstance(member, ast.AnnAssign) or not isinstance(member.target, ast.Name):
-                continue
-            if member.target.id.startswith("_"):
-                continue
-            wrappers = sorted(_annotation_names(member.annotation) & GENERIC_WRAPPERS)
-            for wrapper in wrappers:
-                found.append(f"{node.name}.{member.target.id}:{wrapper}")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in FORBIDDEN_GENERIC_ALIASES:
+            found.append(f"name:{node.id}:{node.lineno}")
+        elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_GENERIC_ALIASES:
+            found.append(f"attribute:{node.attr}:{node.lineno}")
+        elif isinstance(node, ast.ImportFrom):
+            for imported in node.names:
+                if imported.name in FORBIDDEN_GENERIC_ALIASES:
+                    found.append(f"import:{imported.name}:{node.lineno}")
     return found
 
 
-def test_public_production_apis_do_not_use_generic_numeric_wrappers() -> None:
+def test_production_code_uses_no_generic_numeric_wrappers() -> None:
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
-        if path.name == "records.py" and path.parent.name == "domain":
+        if path == CANONICAL_TYPES_PATH:
             continue
         for violation in generic_wrapper_violations(parse(path)):
             offenders.append(f"{path.relative_to(REPO_ROOT)}:{violation}")
-    assert not offenders, f"Generic primitive wrappers on public APIs: {offenders}"
+    assert not offenders, f"Generic primitive wrappers in production code: {offenders}"
 
 
-def test_violation_detected_for_generic_wrapper_parameter() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "offending.py"
-        path.write_text("def count_items(value: PositiveInt) -> BooleanValue:\n    return True\n")
-        assert generic_wrapper_violations(parse(path)) == [
-            "count_items.value:PositiveInt",
-            "count_items->:BooleanValue",
-        ]
-
-
-def test_violation_detected_for_generic_wrapper_field_and_init() -> None:
+def test_violation_detected_in_private_nested_generic_and_alias() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "offending.py"
         path.write_text(
-            "class Result:\n"
-            "    survives: BooleanValue\n"
-            "    def __init__(self, count: PositiveInt) -> FiniteFloat:\n"
-            "        self.count = count\n"
+            "from fedsira.domain.types import PositiveInt\n"
+            "import fedsira.domain.types as domain_types\n"
+            "Alias = tuple[PositiveInt, ...]\n"
+            "def _private(values: list[domain_types.FiniteFloat]) -> None:\n"
+            "    def nested(value: PositiveInt) -> None:\n"
+            "        return None\n"
+            "    return None\n"
         )
-        assert generic_wrapper_violations(parse(path)) == [
-            "Result.__init__.count:PositiveInt",
-            "Result.__init__->:FiniteFloat",
-            "Result.survives:BooleanValue",
-        ]
+        violations = generic_wrapper_violations(parse(path))
+        assert "import:PositiveInt:1" in violations
+        assert "name:PositiveInt:3" in violations
+        assert "attribute:FiniteFloat:4" in violations
+        assert "name:PositiveInt:5" in violations
+
+
+def test_qualified_forbidden_alias_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text("import fedsira.domain.types as t\nVALUE: t.NonNegativeInt = 0\n")
+        assert generic_wrapper_violations(parse(path)) == ["attribute:NonNegativeInt:2"]

@@ -1,4 +1,4 @@
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.experiments.scenarios.heterogeneity import (
     apply_quantity_skew_to_cap,

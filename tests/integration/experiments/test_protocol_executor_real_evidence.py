@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas
 import pytest
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (
@@ -47,7 +47,7 @@ from fedsira.experiments.runner import (
     train_anchor,
 )
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
-from fedsira.runtime.determinism import namespace_seed
+from fedsira.runtime_execution import namespace_seed
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training end-to-end through"

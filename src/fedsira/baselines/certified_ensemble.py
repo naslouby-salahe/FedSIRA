@@ -17,7 +17,7 @@ from fedsira.domain.types import (
     TargetBearingMemberPresent,
     VoteCount,
 )
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 

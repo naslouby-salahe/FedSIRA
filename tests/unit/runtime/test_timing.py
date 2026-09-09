@@ -1,6 +1,6 @@
 import time
 
-from fedsira.runtime.timing import ElapsedTimer, peak_host_resident_set_bytes
+from fedsira.runtime_execution import ElapsedTimer, peak_host_resident_set_bytes
 
 
 def test_elapsed_timer_is_non_negative() -> None:

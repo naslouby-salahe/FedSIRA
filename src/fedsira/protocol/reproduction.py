@@ -20,7 +20,7 @@ from fedsira.domain.types import (
     ResolvedRowRequirementReached,
     SeedDerivationLabel,
 )
-from fedsira.runtime.determinism import framed_bytes
+from fedsira.runtime_execution import framed_bytes
 
 REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
 

@@ -4,7 +4,7 @@ import torch
 from torch import nn, optim
 from torch.nn import functional as torch_functional
 
-from fedsira.config.models import PostReferenceConfig, TrainingConfig
+from fedsira.config import PostReferenceConfig, TrainingConfig
 from fedsira.domain.types import (
     DerivedSeed,
     LocalEpochCount,

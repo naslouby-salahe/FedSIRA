@@ -2,7 +2,7 @@ import hashlib
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 
-from fedsira.config.models import (
+from fedsira.config import (
     AdmissionOpeningConfig,
     CapabilityContractConfig,
     ProposalScreenConfig,
@@ -28,7 +28,7 @@ from fedsira.domain.types import (
     SourceCommitted,
 )
 from fedsira.evaluation.summaries import match_nearest_within_decile
-from fedsira.runtime.determinism import deterministic_order, framed_bytes
+from fedsira.runtime_execution import deterministic_order, framed_bytes
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value

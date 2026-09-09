@@ -3,7 +3,7 @@ from typing import Protocol, cast
 import torch
 from torch import nn, optim
 
-from fedsira.config.models import OptimizerConfig, TrainingConfig
+from fedsira.config import OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
     BatchSize,
     DerivedSeed,
@@ -14,7 +14,7 @@ from fedsira.domain.types import (
     TrainingLoss,
 )
 from fedsira.learning.model import FedSIRAClassifier
-from fedsira.runtime.determinism import minibatch_order
+from fedsira.runtime_execution import minibatch_order
 
 
 class _SteppableOptimizer(Protocol):

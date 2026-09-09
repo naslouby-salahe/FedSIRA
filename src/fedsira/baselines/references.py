@@ -10,7 +10,7 @@ from fedsira.domain.types import (
     LocalEpochCount,
     SourceAvailable,
 )
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 
 def local_only_reference_local_epochs() -> LocalEpochCount:

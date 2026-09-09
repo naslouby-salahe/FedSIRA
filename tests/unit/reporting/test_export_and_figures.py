@@ -7,7 +7,7 @@ from fedsira.cli.commands.report import (
     project_efficiency_telemetry,
     project_evidence_trajectory,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
     CoreMethodIdentity,

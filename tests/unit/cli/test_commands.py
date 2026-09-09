@@ -3,7 +3,7 @@ from typer.testing import CliRunner
 
 from fedsira.cli.commands import doctor, preprocess
 from fedsira.cli.main import app
-from fedsira.runtime.environment import EnvironmentMismatch
+from fedsira.runtime_execution import EnvironmentMismatch
 
 runner = CliRunner()
 

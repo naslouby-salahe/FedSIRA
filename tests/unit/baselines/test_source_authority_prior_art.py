@@ -2,7 +2,7 @@ from fedsira.baselines.source_model import (
     independent_local_reference_reviewer_is_positive,
     secure_continual_assessment_post_reference_rounds,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 MATERIALITY_CONFIG = CONFIG.metrics_and_statistics.materiality

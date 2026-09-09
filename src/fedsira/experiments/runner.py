@@ -11,22 +11,20 @@ from typing import Protocol
 import pandas
 import torch
 
-from fedsira.artifacts.provenance import (
+from fedsira.artifacts import (
     ReconstructionProvenance,
     collect_reconstruction_provenance,
 )
-from fedsira.attacks.reproduction import (
+from fedsira.attacks import (
+    apply_trigger_transform,
+    relabel_triggered_rows_as_benign,
+    resolve_byzantine_verifier_vote,
     scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
+    select_source_backdoor_poison_rows,
     source_copy_update,
     verifier_aware_training_step,
 )
-from fedsira.attacks.source import (
-    apply_trigger_transform,
-    relabel_triggered_rows_as_benign,
-    select_source_backdoor_poison_rows,
-)
-from fedsira.attacks.verification import resolve_byzantine_verifier_vote
 from fedsira.baselines.calibration import (
     DomainFeatureMean,
     clip_source_update,
@@ -101,7 +99,7 @@ from fedsira.baselines.source_model import (
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
 )
-from fedsira.config.models import VerificationConfig
+from fedsira.config import VerificationConfig
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
 from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
@@ -427,20 +425,21 @@ from fedsira.protocol.verification import (
     verifier_assignment_timestamp_is_valid,
     verifier_is_eligible,
 )
-from fedsira.runtime.determinism import (
+from fedsira.runtime import (
+    FailureDetail,
+    automatic_recovery_permitted,
+    current_application_context,
+)
+from fedsira.runtime_execution import (
+    ElapsedTimer,
     derive_uint32,
     framed_bytes,
     local_training_seed,
     namespace_seed,
-    seed_job_local_rng_streams,
-)
-from fedsira.runtime.recovery import automatic_recovery_permitted
-from fedsira.runtime.state import FailureDetail, current_application_context
-from fedsira.runtime.timing import (
-    ElapsedTimer,
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,
+    seed_job_local_rng_streams,
 )
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
@@ -481,6 +480,22 @@ class ProtocolPhaseDurations(FrozenDomainModel):
     reproduce_seconds: MetricValue = 0.0
     verify_seconds: MetricValue = 0.0
     synthesize_seconds: MetricValue = 0.0
+
+    def with_verify_seconds(self, elapsed_seconds: MetricValue) -> ProtocolPhaseDurations:
+        return ProtocolPhaseDurations(
+            assignment_seconds=self.assignment_seconds,
+            reproduce_seconds=self.reproduce_seconds,
+            verify_seconds=elapsed_seconds,
+            synthesize_seconds=self.synthesize_seconds,
+        )
+
+    def with_synthesize_seconds(self, elapsed_seconds: MetricValue) -> ProtocolPhaseDurations:
+        return ProtocolPhaseDurations(
+            assignment_seconds=self.assignment_seconds,
+            reproduce_seconds=self.reproduce_seconds,
+            verify_seconds=self.verify_seconds,
+            synthesize_seconds=elapsed_seconds,
+        )
 
 
 TERMINAL_EXPERIMENT_STATES: frozenset[ExperimentLifecycleState] = frozenset(
@@ -5569,8 +5584,8 @@ class ProtocolCellExecutor(CellExecutor):
                     config.protocol.verification,
                 )
                 self._last_protocol_phase_durations = (
-                    self._last_protocol_phase_durations.model_copy(
-                        update={"verify_seconds": verification_timer.elapsed_seconds()}
+                    self._last_protocol_phase_durations.with_verify_seconds(
+                        verification_timer.elapsed_seconds()
                     )
                 )
         if progression_state is AdmissionState.SYNTHESIS_PENDING:
@@ -5602,8 +5617,10 @@ class ProtocolCellExecutor(CellExecutor):
                 force_first_row_to_source_delta=byzantine_reproducer_copies_source_active,
                 heterogeneity_scope=self._heterogeneity_scope_for_cell(cell),
             )
-            self._last_protocol_phase_durations = self._last_protocol_phase_durations.model_copy(
-                update={"synthesize_seconds": synthesis_timer.elapsed_seconds()}
+            self._last_protocol_phase_durations = (
+                self._last_protocol_phase_durations.with_synthesize_seconds(
+                    synthesis_timer.elapsed_seconds()
+                )
             )
         else:
             state = progression_state

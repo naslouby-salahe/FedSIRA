@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas
 
-from fedsira.config.models import RoleIntervals, SamplingCapsPerDomain
+from fedsira.config import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
@@ -52,7 +52,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     SourceRowIndex,
 )
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 NBAIOT_PRIMARY_PREDICTOR_COUNT: PredictorCount = 115
 NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"

@@ -3,7 +3,7 @@ from typing import Final
 import torch
 
 from fedsira.baselines.references import post_reference_retrain_maximum_local_epochs
-from fedsira.config.models import MaterialityConfig
+from fedsira.config import MaterialityConfig
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import AdmissionState
 from fedsira.domain.types import (
@@ -16,7 +16,7 @@ from fedsira.domain.types import (
     ReviewerPositiveDecision,
     SourceIsProductionUpdate,
 )
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.CANDIDATE_SCREEN,

@@ -1,5 +1,5 @@
 from fedsira.protocol.specification import krum_committee_is_admissible
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 
 def test_primary_krum_committee_is_admissible_for_one_byzantine_row() -> None:

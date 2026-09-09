@@ -24,7 +24,7 @@ NON_SOURCE = NBAIOT_DOMAIN_ORDER[1]
 
 
 def test_standard_fl_baseline_budget_reads_yaml() -> None:
-    from fedsira.runtime.state import current_application_context
+    from fedsira.runtime import current_application_context
 
     model = current_application_context().scientific_config.model
     assert standard_fl_anchor_rounds() == model.anchor_fedavg.rounds

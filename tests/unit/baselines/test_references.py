@@ -10,7 +10,7 @@ from fedsira.baselines.references import (
     local_only_reference_local_epochs,
     local_only_reference_training_role,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 

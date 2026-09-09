@@ -1,4 +1,4 @@
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
@@ -50,15 +50,17 @@ def test_comparison_name_follows_section_18_9_pattern() -> None:
     )
 
 
-def test_source_exclusion_family_has_only_asr_superiority() -> None:
+def test_source_exclusion_family_covers_security_superiority_and_utility_noninferiority() -> None:
     definitions = tuple(
         definition
         for definition in build_comparison_registry()
         if definition.family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT
     )
-    assert len(definitions) == 1
-    assert definitions[0].metric is ComparisonMetric.ATTACK_SUCCESS_RATE
-    assert definitions[0].test_kind is ComparisonTestKind.SUPERIORITY
+    assert len(definitions) == 2
+    assert {(definition.metric, definition.test_kind) for definition in definitions} == {
+        (ComparisonMetric.ATTACK_SUCCESS_RATE, ComparisonTestKind.SUPERIORITY),
+        (ComparisonMetric.TARGET_F1, ComparisonTestKind.NON_INFERIORITY),
+    }
 
 
 def test_primary_family_contains_only_structurally_applicable_metrics() -> None:

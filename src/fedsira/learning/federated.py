@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.config.models import OptimizerConfig, TrainingConfig
+from fedsira.config import OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
     DerivedSeed,
     ExampleCount,

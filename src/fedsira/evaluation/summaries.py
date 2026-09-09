@@ -2,7 +2,7 @@ import math
 
 import numpy
 
-from fedsira.config.models import BootstrapConfig
+from fedsira.config import BootstrapConfig
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     ConfidenceIntervalBound,

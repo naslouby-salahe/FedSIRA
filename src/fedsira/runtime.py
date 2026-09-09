@@ -4,13 +4,18 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Self
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.config.models import ScientificConfig
+from fedsira.config import PRODUCTION_CONFIG_PATH, ScientificConfig, load_scientific_config
 from fedsira.domain.enums import (
     FailureClass,
     ScientificCellPhase,
 )
-from fedsira.domain.types import AutomaticallyRetriable, FailureMessage, FrozenDomainModel
+from fedsira.domain.types import (
+    AutomaticallyRetriable,
+    AutomaticRecoveryPermitted,
+    FailureMessage,
+    FrozenDomainModel,
+    RetryCount,
+)
 
 AUTOMATICALLY_RETRIABLE_FAILURE_CLASSES = frozenset({FailureClass.INFRASTRUCTURE_INTERRUPTION})
 
@@ -60,3 +65,13 @@ def current_application_context() -> ApplicationContext:
 
 def is_automatically_retriable(failure_class: FailureClass) -> AutomaticallyRetriable:
     return failure_class in AUTOMATICALLY_RETRIABLE_FAILURE_CLASSES
+
+
+def automatic_recovery_permitted(
+    failure_class: FailureClass,
+    attempts_used: RetryCount,
+    automatic_infrastructure_retries_per_cell_phase: RetryCount,
+) -> AutomaticRecoveryPermitted:
+    if not is_automatically_retriable(failure_class):
+        return False
+    return attempts_used < automatic_infrastructure_retries_per_cell_phase

@@ -42,9 +42,12 @@ from fedsira.io.paths import (
     smoke_record_path,
     workspace_root_for_family,
 )
-from fedsira.runtime.environment import EnvironmentMismatch, collect_environment_mismatches
-from fedsira.runtime.logging import get_structured_logger
-from fedsira.runtime.state import ApplicationContext, bound_application_context
+from fedsira.runtime import ApplicationContext, bound_application_context
+from fedsira.runtime_execution import (
+    EnvironmentMismatch,
+    collect_environment_mismatches,
+    get_structured_logger,
+)
 
 _LOGGER = get_structured_logger("doctor")
 _CICIOT2023_RAW_RELATIVE = Path("CIC_IOT_Dataset2023") / "CSV"

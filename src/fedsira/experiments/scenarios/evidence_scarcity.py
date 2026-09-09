@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.attacks.source import apply_trigger_transform, select_fractional_attack_rows
+from fedsira.attacks import apply_trigger_transform, select_fractional_attack_rows
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import EvaluationInsufficiencyReason
 from fedsira.domain.models import MetricResult

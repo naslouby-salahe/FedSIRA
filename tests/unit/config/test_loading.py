@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from fedsira.config.loading import (
+from fedsira.config import (
     PRODUCTION_CONFIG_PATH,
     TEST_FIXTURE_CONFIG_PATH,
     load_scientific_config,

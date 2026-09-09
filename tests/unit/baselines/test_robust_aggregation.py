@@ -6,7 +6,7 @@ from fedsira.baselines.robust_aggregation import (
     direct_krum_committee_rows,
     validate_three_row_coordinate_median_committee_size,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 

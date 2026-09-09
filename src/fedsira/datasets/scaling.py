@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import model_validator
 
-from fedsira.config.models import ScalingConfig
+from fedsira.config import ScalingConfig
 from fedsira.domain.types import (
     FeatureAccumulator,
     FeatureMoment,

@@ -1,6 +1,6 @@
 import numpy
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.models import MetricResult
 from fedsira.evaluation.summaries import (
     bootstrap_percentile_confidence_interval,

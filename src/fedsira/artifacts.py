@@ -1,9 +1,72 @@
+import hashlib
+import os
+import platform
+import subprocess
+import sys
 from collections import OrderedDict
 from pathlib import Path
+from typing import TypeAlias
 
-from fedsira.artifacts.records import ArtifactManifest
-from fedsira.domain.enums import ArtifactLifecycleState
-from fedsira.domain.types import ArtifactActive, ArtifactDigest
+import torch
+
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
+from fedsira.domain.types import (
+    ArtifactActive,
+    ArtifactDigest,
+    DatasetClassToken,
+    DatasetManifestDigest,
+    DomainCount,
+    FileCount,
+    FrozenDomainModel,
+    GitCommit,
+    PredictorCount,
+    PredictorCountMatchesOfficial,
+    RowCount,
+)
+
+ArtifactPayloadBytes: TypeAlias = bytes
+
+
+class ArtifactManifest(FrozenDomainModel):
+    family: ArtifactFamily
+    identity: ArtifactDigest
+    checksum: ArtifactDigest
+    lifecycle_state: ArtifactLifecycleState
+    upstream_identities: tuple[ArtifactDigest, ...]
+
+    def with_lifecycle_state(
+        self,
+        lifecycle_state: ArtifactLifecycleState,
+    ) -> "ArtifactManifest":
+        return ArtifactManifest(
+            family=self.family,
+            identity=self.identity,
+            checksum=self.checksum,
+            lifecycle_state=lifecycle_state,
+            upstream_identities=self.upstream_identities,
+        )
+
+
+class NBaiotDatasetManifestPayload(FrozenDomainModel):
+    dataset_file_manifest_hash: DatasetManifestDigest
+    structurally_unavailable_classes: tuple[DatasetClassToken, ...]
+
+
+class CICIoT2023DatasetManifestPayload(FrozenDomainModel):
+    dataset_file_manifest_hash: DatasetManifestDigest
+    file_count: FileCount
+    raw_row_count: RowCount
+    retained_row_count: RowCount
+    excluded_row_count: RowCount
+    predictor_count: PredictorCount
+    official_expected_predictor_count: PredictorCount
+    predictor_count_matches_official: PredictorCountMatchesOfficial
+    class_registry: tuple[DatasetClassToken, ...]
+    pseudo_domain_count: DomainCount
+
+
+DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
+
 
 PUBLISHED_MANIFEST_SUFFIX = ".manifest.json"
 
@@ -114,3 +177,55 @@ def stale_artifact_identities(graph: ArtifactGraph) -> tuple[ArtifactDigest, ...
         for node in graph.nodes
         if node.lifecycle_state is ArtifactLifecycleState.STALE
     )
+
+
+class ReconstructionProvenance(FrozenDomainModel):
+    repository_commit: GitCommit
+    dependency_lock_digest: ArtifactDigest
+    environment_fingerprint: ArtifactDigest
+
+
+def collect_reconstruction_provenance(repository_root: Path) -> ReconstructionProvenance:
+    lock_path = repository_root / "uv.lock"
+    if not lock_path.is_file():
+        raise ValueError(f"required dependency lock is missing: {lock_path}")
+    result = subprocess.run(
+        ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    commit = result.stdout.strip()
+    if result.returncode != 0 or len(commit) != 40:
+        raise ValueError("unable to resolve the current repository commit for provenance")
+    return ReconstructionProvenance(
+        repository_commit=commit,
+        dependency_lock_digest=hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+        environment_fingerprint=_environment_fingerprint(),
+    )
+
+
+def _environment_fingerprint() -> ArtifactDigest:
+    cuda_device = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "unavailable"
+    payload = "\n".join(
+        (
+            os.name,
+            platform.system(),
+            platform.release(),
+            platform.machine(),
+            sys.version,
+            torch.__version__,
+            str(torch.version.cuda),
+            str(torch.backends.cudnn.version()),
+            cuda_device,
+        )
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:
+    if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
+        raise ValueError(
+            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state.value}); "
+            "it is never a valid input to downstream science"
+        )

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.runtime.state import ApplicationContext, bound_application_context
+from fedsira.runtime import ApplicationContext, bound_application_context
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 

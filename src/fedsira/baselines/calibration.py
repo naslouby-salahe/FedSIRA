@@ -1,6 +1,6 @@
 import torch
 
-from fedsira.config.models import (
+from fedsira.config import (
     DensityClusterTrimmedMeanConfig,
     MaterialityConfig,
     ParameterSimilarityConfig,

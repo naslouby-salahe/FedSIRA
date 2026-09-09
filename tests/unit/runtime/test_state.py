@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.domain.enums import FailureClass
-from fedsira.runtime.state import (
+from fedsira.runtime import (
     ApplicationContext,
     bound_application_context,
     current_application_context,

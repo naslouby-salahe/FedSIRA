@@ -12,7 +12,7 @@ from fedsira.experiments.planning import (
     validate_planned_cell_count_invariant,
 )
 from fedsira.io.paths import workspace_root_for_family
-from fedsira.runtime.state import ApplicationContext, bound_application_context
+from fedsira.runtime import ApplicationContext, bound_application_context
 
 
 def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> ExperimentPlan:

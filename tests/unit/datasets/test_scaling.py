@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.scaling import (
     FeatureMoments,
     FeatureStatistic,

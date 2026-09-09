@@ -5,7 +5,7 @@ from typing import cast
 import pandas
 import pytest
 
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import DatasetExclusionReason, Role, role_hash_token
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
 from fedsira.datasets.nbaiot.preprocessing import (
@@ -28,7 +28,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_domain_hash_token,
 )
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 ROLE_INTERVALS = CONFIG.datasets.primary.role_intervals

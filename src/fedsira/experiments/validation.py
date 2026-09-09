@@ -7,10 +7,9 @@ from collections import OrderedDict
 import numpy
 import torch
 
-from fedsira.artifacts.graph import ArtifactGraph
-from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts import ArtifactGraph, ArtifactManifest
 from fedsira.baselines.registry import validate_role_not_used_for_tuning
-from fedsira.config.loading import (
+from fedsira.config import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
 )
@@ -87,7 +86,7 @@ from fedsira.protocol.specification import (
 )
 from fedsira.protocol.synthesis import select_krum_update
 from fedsira.protocol.verification import reproduction_row_is_certified, verifier_is_eligible
-from fedsira.runtime.state import current_application_context
+from fedsira.runtime import current_application_context
 
 SmokeCheckName = TextValue
 SmokeCheckDetail = TextValue

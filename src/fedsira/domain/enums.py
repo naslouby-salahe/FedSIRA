@@ -134,22 +134,6 @@ class ArtifactPathScope(StrEnum):
     MANUSCRIPT_RESULT = "manuscript_result"
 
 
-class ProducerFingerprintFamily(StrEnum):
-    RAW_SCHEMA_EXCLUSION_MANIFEST = "raw_schema_exclusion_manifest"
-    ROLE_SPLIT_SAMPLE_PREPARED_SCALER = "role_split_sample_prepared_scaler"
-    ANCHOR_FEDAVG_CHECKPOINTS = "anchor_fedavg_checkpoints"
-    SOURCE_REPRODUCTION_CHECKPOINTS = "source_reproduction_checkpoints"
-    BASELINE_CHECKPOINT_CALIBRATION = "baseline_checkpoint_calibration"
-    MODEL_SCORES = "model_scores"
-    OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE = (
-        "opening_verifier_certificate_synthesis_final_gate"
-    )
-    BOUNDARY_TRANSFORMATION = "boundary_transformation"
-    METRIC_ARTIFACT = "metric_artifact"
-    STATISTICAL_COMPARISON_ARTIFACT = "statistical_comparison_artifact"
-    REPORT_SOURCE_EXPORT = "report_source_export"
-
-
 class AdmissionOpeningMode(StrEnum):
     PROPOSAL_ASSISTED = "PROPOSAL_ASSISTED"
     CANDIDATE_FREE = "CANDIDATE_FREE"

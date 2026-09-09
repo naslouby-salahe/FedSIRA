@@ -24,7 +24,7 @@ from fedsira.baselines.calibration import (
     trimmed_mean_aggregate,
     vector_l2_norm,
 )
-from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.models import MetricResult
 from fedsira.learning.aggregation import ModelParameter, ModelState, WeightedModelState

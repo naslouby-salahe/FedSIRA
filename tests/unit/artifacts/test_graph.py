@@ -2,8 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.artifacts.graph import ArtifactGraph
-from fedsira.artifacts.records import ArtifactManifest
+from fedsira.artifacts import ArtifactGraph, ArtifactManifest
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 
@@ -54,7 +53,7 @@ def test_mark_stale_descendants_only_affects_downstream() -> None:
 def test_load_published_artifact_graph_walks_manifests_and_reports_stale(
     tmp_path: Path,
 ) -> None:
-    from fedsira.artifacts.graph import (
+    from fedsira.artifacts import (
         load_published_artifact_graph,
         stale_artifact_identities,
     )
