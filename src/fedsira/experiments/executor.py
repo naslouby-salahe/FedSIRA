@@ -323,6 +323,7 @@ from fedsira.experiments.workflow import (
     apply_epistemic_target_marker,
     apply_heterogeneity_shift,
     dataset_manifest_hash,
+    domain_anchor_train_feature_mean,
     load_prepared_rows,
     mark_epistemic_rows,
     poison_backdoor_rows,
@@ -1098,25 +1099,6 @@ def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
     values = flat_parameters.detach().cpu()
     joined = "|".join(repr(values[index].item()) for index in range(values.numel()))
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
-
-
-def domain_anchor_train_feature_mean(
-    prepared_root: Path, domain: NBaiotDomain
-) -> torch.Tensor | None:
-    combined_features: list[torch.Tensor] = []
-    for class_id in NBAIOT_CLASS_ORDER:
-        if class_id is NBaiotClass.GAFGYT_COMBO:
-            continue
-        tensor_view = _tensor_view(
-            load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
-        )
-        if tensor_view is None:
-            continue
-        features, _labels, _sample_ids = tensor_view
-        combined_features.append(features)
-    if not combined_features:
-        return None
-    return torch.cat(combined_features, dim=0).mean(dim=0)
 
 
 def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | None:

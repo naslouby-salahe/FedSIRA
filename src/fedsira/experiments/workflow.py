@@ -122,9 +122,7 @@ class EpistemicFailureScope:
     common_context_trigger_value: TriggerFeatureValue
 
 
-def prepared_view_key(
-    domain: NBaiotDomain, class_id: NBaiotClass, role: Role
-) -> PreparedViewKey:
+def prepared_view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> PreparedViewKey:
     return f"{nbaiot_domain_hash_token(domain)}_{class_id.value}_{role_hash_token(role)}"
 
 
@@ -184,6 +182,20 @@ def tensor_view(
     )
     labels = torch.tensor([label_to_index[label] for label in rows.labels], dtype=torch.long)
     return (features, labels, rows.sample_ids)
+
+
+def domain_anchor_train_feature_mean(
+    prepared_root: Path, domain: NBaiotDomain
+) -> torch.Tensor | None:
+    combined_features: list[torch.Tensor] = []
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        view = tensor_view(load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN))
+        if view is not None:
+            features, _labels, _sample_ids = view
+            combined_features.append(features)
+    return None if not combined_features else torch.cat(combined_features, dim=0).mean(dim=0)
 
 
 def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
@@ -340,9 +352,7 @@ def mark_epistemic_rows(
     )
 
 
-def apply_epistemic_target_marker(
-    rows: PreparedRows, scope: EpistemicFailureScope
-) -> PreparedRows:
+def apply_epistemic_target_marker(rows: PreparedRows, scope: EpistemicFailureScope) -> PreparedRows:
     selected = (
         select_spurious_feature_rows(rows.sample_ids, scope.strength, scope.attack_generation_seed)
         or ()

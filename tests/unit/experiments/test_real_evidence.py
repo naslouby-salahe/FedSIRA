@@ -21,7 +21,6 @@ from fedsira.experiments.executor import (
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
     compute_source_backdoor_asr,
-    domain_anchor_train_feature_mean,
     evaluate_domain,
     non_source_domains,
     prepared_feature_names,
@@ -49,6 +48,7 @@ from fedsira.experiments.workflow import (
     HeterogeneityScope,
     RealAnchor,
     RootCauseScope,
+    domain_anchor_train_feature_mean,
 )
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 
