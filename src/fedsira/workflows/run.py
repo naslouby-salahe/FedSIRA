@@ -18,12 +18,12 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    derive_experiment_lifecycle,
 )
 from fedsira.experiments.executor import (
     ProtocolCellExecutor,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
-    derive_experiment_lifecycle,
     execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan

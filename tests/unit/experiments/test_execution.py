@@ -10,11 +10,9 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedExecutionRecord,
-)
-from fedsira.experiments.executor import (
     derive_experiment_lifecycle,
-    execute_experiment,
 )
+from fedsira.experiments.executor import execute_experiment
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,

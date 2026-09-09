@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections import OrderedDict
 from collections.abc import Sequence
@@ -183,7 +182,6 @@ from fedsira.domain.types import (
     RowCount,
     ScenarioName,
     SchemaVersion,
-    ScientificCellSemanticKey,
     TriggerFeatureValue,
 )
 from fedsira.evaluation.comparisons import (
@@ -270,10 +268,12 @@ from fedsira.experiments.execution import (
     ExperimentExecutionResult,
     PersistedExecutionRecord,
     ProtocolPhaseDurations,
+    derive_experiment_lifecycle,
+    execute_cell_with_retry,
+    execution_digest,
 )
 from fedsira.experiments.planning import (
     ExperimentPlan,
-    PlannedExperiment,
     ScientificCell,
     build_plan,
 )
@@ -307,7 +307,6 @@ from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
     run_data_and_domain_evidence_validation,
     run_protocol_invariant_validation,
-    validate_cell_terminal_record,
     validate_condition_vocabulary,
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
@@ -438,7 +437,6 @@ from fedsira.protocol.verification import (
 )
 from fedsira.runtime import (
     FailureDetail,
-    automatic_recovery_permitted,
     current_application_context,
 )
 from fedsira.runtime_execution import (
@@ -464,12 +462,6 @@ class MetricCellKey(FrozenDomainModel):
 class MetricCellRecord(FrozenDomainModel):
     key: MetricCellKey
     metrics: tuple[MetricObservation, ...]
-
-
-class ExperimentExecutionDigestInput(FrozenDomainModel):
-    experiment: ExperimentName
-    lifecycle_state: ExperimentLifecycleState
-    semantic_keys: tuple[ScientificCellSemanticKey, ...]
 
 
 def _merge_metric_record(
@@ -904,80 +896,6 @@ def collapse_evaluation_from_records(
     return None
 
 
-def _digest_execution_result(
-    experiment: ExperimentName,
-    lifecycle_state: ExperimentLifecycleState,
-    outcomes: tuple[CellExecutionOutcome, ...],
-) -> ArtifactDigest:
-    payload = ExperimentExecutionDigestInput(
-        experiment=experiment,
-        lifecycle_state=lifecycle_state,
-        semantic_keys=tuple(outcome.cell.semantic_key for outcome in outcomes),
-    )
-    return hashlib.sha256(payload.model_dump_json().encode("utf-8")).hexdigest()
-
-
-def _execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> CellExecutionOutcome:
-    config = current_application_context().scientific_config
-    attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
-    last_outcome: CellExecutionOutcome | None = None
-    for attempt in range(attempts):
-        outcome = executor.execute_cell(cell)
-        validate_cell_terminal_record(cell, outcome.terminal_state)
-        if outcome.terminal_state is not ExperimentLifecycleState.FAILED:
-            return outcome
-        if outcome.failure is None or not automatic_recovery_permitted(
-            outcome.failure.failure_class,
-            attempt,
-            config.execution.automatic_infrastructure_retries_per_cell_phase,
-        ):
-            return outcome
-        last_outcome = outcome
-    if last_outcome is None:
-        raise RuntimeError("cell retry loop produced no outcome")
-    return last_outcome
-
-
-def _planned_semantic_keys(planned: PlannedExperiment) -> frozenset[ScientificCellSemanticKey]:
-    return frozenset(cell.semantic_key for cell in planned.cells)
-
-
-def planned_execution_records(
-    planned: PlannedExperiment, records: tuple[PersistedExecutionRecord, ...]
-) -> tuple[PersistedExecutionRecord, ...]:
-    planned_keys = _planned_semantic_keys(planned)
-    return tuple(record for record in records if record.semantic_key in planned_keys)
-
-
-def _record_for_cell(
-    records: tuple[PersistedExecutionRecord, ...], cell: ScientificCell
-) -> PersistedExecutionRecord | None:
-    for record in records:
-        if record.semantic_key == cell.semantic_key:
-            return record
-    return None
-
-
-def derive_experiment_lifecycle(
-    planned: PlannedExperiment, records: tuple[PersistedExecutionRecord, ...]
-) -> ExperimentLifecycleState:
-    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
-        return ExperimentLifecycleState.BLOCKED
-    relevant = planned_execution_records(planned, records)
-    if not relevant:
-        return ExperimentLifecycleState.READY
-    if any(record.terminal_state is ExperimentLifecycleState.INVALID for record in relevant):
-        return ExperimentLifecycleState.INVALID
-    if any(record.terminal_state is ExperimentLifecycleState.FAILED for record in relevant):
-        return ExperimentLifecycleState.FAILED
-    complete = all(
-        (record := _record_for_cell(relevant, cell)) is not None
-        and record.terminal_state is ExperimentLifecycleState.COMPLETED
-        for cell in planned.cells
-    )
-    return ExperimentLifecycleState.COMPLETED if complete else ExperimentLifecycleState.RUNNING
-
-
 def _prerequisite_states_from_store(
     plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
 ) -> tuple[ExperimentPrerequisiteState, ...]:
@@ -1041,7 +959,7 @@ def execute_experiment(
                 )
             )
             continue
-        outcome = _execute_cell_with_retry(cell, executor)
+        outcome = execute_cell_with_retry(cell, executor)
         store.write_outcome(outcome)
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
@@ -1055,7 +973,7 @@ def execute_experiment(
         lifecycle_state=lifecycle_state,
         outcomes=outcome_tuple,
         comparison_results=comparison_results,
-        execution_digest=_digest_execution_result(experiment, lifecycle_state, outcome_tuple),
+        execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
     )
 
 

@@ -33,8 +33,7 @@ from fedsira.experiments.definitions import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
 )
-from fedsira.experiments.execution import ExecutionRecordStore
-from fedsira.experiments.executor import derive_experiment_lifecycle
+from fedsira.experiments.execution import ExecutionRecordStore, derive_experiment_lifecycle
 from fedsira.experiments.planning import ExperimentPlan, build_plan
 from fedsira.experiments.validation import PersistedSmokeRecord
 from fedsira.io.paths import (

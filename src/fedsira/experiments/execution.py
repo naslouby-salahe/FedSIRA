@@ -23,7 +23,8 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.planning import PlannedExperiment, ScientificCell
-from fedsira.runtime import FailureDetail
+from fedsira.experiments.validation import validate_cell_terminal_record
+from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
 from fedsira.runtime_execution import framed_bytes
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
@@ -105,6 +106,76 @@ class ExperimentExecutionResult(FrozenDomainModel):
 
 class CellExecutor(Protocol):
     def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome: ...
+
+
+class ExperimentExecutionDigestInput(FrozenDomainModel):
+    experiment: ExperimentName
+    lifecycle_state: ExperimentLifecycleState
+    semantic_keys: tuple[ScientificCellSemanticKey, ...]
+
+
+def execution_digest(
+    experiment: ExperimentName,
+    lifecycle_state: ExperimentLifecycleState,
+    outcomes: tuple[CellExecutionOutcome, ...],
+) -> ArtifactDigest:
+    payload = ExperimentExecutionDigestInput(
+        experiment=experiment,
+        lifecycle_state=lifecycle_state,
+        semantic_keys=tuple(outcome.cell.semantic_key for outcome in outcomes),
+    )
+    return hashlib.sha256(payload.model_dump_json().encode("utf-8")).hexdigest()
+
+
+def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> CellExecutionOutcome:
+    config = current_application_context().scientific_config
+    attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
+    last_outcome: CellExecutionOutcome | None = None
+    for attempt in range(attempts):
+        outcome = executor.execute_cell(cell)
+        validate_cell_terminal_record(cell, outcome.terminal_state)
+        if outcome.terminal_state is not ExperimentLifecycleState.FAILED:
+            return outcome
+        if outcome.failure is None or not automatic_recovery_permitted(
+            outcome.failure.failure_class,
+            attempt,
+            config.execution.automatic_infrastructure_retries_per_cell_phase,
+        ):
+            return outcome
+        last_outcome = outcome
+    if last_outcome is None:
+        raise RuntimeError("cell retry loop produced no outcome")
+    return last_outcome
+
+
+def planned_execution_records(
+    planned: PlannedExperiment, records: tuple[PersistedExecutionRecord, ...]
+) -> tuple[PersistedExecutionRecord, ...]:
+    planned_keys = frozenset(cell.semantic_key for cell in planned.cells)
+    return tuple(record for record in records if record.semantic_key in planned_keys)
+
+
+def derive_experiment_lifecycle(
+    planned: PlannedExperiment, records: tuple[PersistedExecutionRecord, ...]
+) -> ExperimentLifecycleState:
+    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
+        return ExperimentLifecycleState.BLOCKED
+    relevant = planned_execution_records(planned, records)
+    if not relevant:
+        return ExperimentLifecycleState.READY
+    if any(record.terminal_state is ExperimentLifecycleState.INVALID for record in relevant):
+        return ExperimentLifecycleState.INVALID
+    if any(record.terminal_state is ExperimentLifecycleState.FAILED for record in relevant):
+        return ExperimentLifecycleState.FAILED
+    complete = all(
+        any(
+            record.semantic_key == cell.semantic_key
+            and record.terminal_state is ExperimentLifecycleState.COMPLETED
+            for record in relevant
+        )
+        for cell in planned.cells
+    )
+    return ExperimentLifecycleState.COMPLETED if complete else ExperimentLifecycleState.RUNNING
 
 
 class ExecutionRecordStore:

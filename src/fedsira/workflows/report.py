@@ -29,11 +29,11 @@ from fedsira.experiments.execution import (
     ExperimentExecutionResult,
     PersistedExecutionRecord,
     PersistedFailureDetail,
+    derive_experiment_lifecycle,
 )
 from fedsira.experiments.executor import (
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
-    derive_experiment_lifecycle,
 )
 from fedsira.experiments.planning import (
     ExperimentPlan,
