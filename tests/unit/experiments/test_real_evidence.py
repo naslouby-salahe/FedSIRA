@@ -16,11 +16,6 @@ from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.types import FeatureName
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.experiments.executor import (
-    BackdoorScope,
-    EpistemicFailureScope,
-    HeterogeneityScope,
-    RealAnchor,
-    RootCauseScope,
     anchor_round_calibration_updates,
     anchor_round_reconstruction_calibration_errors,
     compute_capability_under_specification_summary,
@@ -47,6 +42,13 @@ from fedsira.experiments.executor import (
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
     triggered_to_benign_rate,
+)
+from fedsira.experiments.workflow import (
+    BackdoorScope,
+    EpistemicFailureScope,
+    HeterogeneityScope,
+    RealAnchor,
+    RootCauseScope,
 )
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 

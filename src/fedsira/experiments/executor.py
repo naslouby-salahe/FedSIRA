@@ -164,7 +164,6 @@ from fedsira.domain.types import (
     FeatureCount,
     FeatureIndex,
     FeatureName,
-    FeatureVector,
     FederatedRoundCount,
     FoldIndex,
     FrozenDomainModel,
@@ -185,7 +184,6 @@ from fedsira.domain.types import (
     PreparedScreenTargetCount,
     PreparedSupportedReplayCount,
     PreparedViewKey,
-    Probability,
     ReconstructionError,
     RequiredReproductionRowCount,
     ResolvedCoreComplete,
@@ -326,6 +324,15 @@ from fedsira.experiments.validation import (
     validate_condition_vocabulary,
     validate_experiment_prerequisites_met,
     validate_no_duplicate_semantic_cells,
+)
+from fedsira.experiments.workflow import (
+    BackdoorScope,
+    DomainTargetMetrics,
+    EpistemicFailureScope,
+    HeterogeneityScope,
+    PreparedRows,
+    RealAnchor,
+    RootCauseScope,
 )
 from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
@@ -1068,51 +1075,6 @@ CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 
 
-@dataclass(frozen=True)
-class PreparedRows:
-    sample_ids: tuple[ArtifactDigest, ...]
-    features: tuple[FeatureVector, ...]
-    labels: tuple[ClassLabel, ...]
-
-    @property
-    def row_count(self) -> ExampleCount:
-        return len(self.sample_ids)
-
-
-@dataclass(frozen=True)
-class RealAnchor:
-    input_width: FeatureCount
-    output_width: FeatureCount
-    flat_parameters: torch.Tensor
-    dataset_manifest_hash: ArtifactDigest
-    round_start_flat_parameters: tuple[torch.Tensor, ...]
-
-
-@dataclass(frozen=True)
-class DomainTargetMetrics:
-    target_f1: MetricResult
-    supported_macro_f1: MetricResult
-    benign_far: MetricResult
-
-
-@dataclass(frozen=True)
-class RootCauseScope:
-    contract_scope: CapabilityContractScope
-    feature_names: tuple[FeatureName, ...]
-    root_cause_a_feature_name: FeatureName
-    root_cause_b_feature_name: FeatureName
-    shift_value: TriggerFeatureValue
-    balanced_selection_seed: DerivedSeed | None = None
-
-
-@dataclass(frozen=True)
-class BackdoorScope:
-    attack_generation_seed: DerivedSeed
-    poison_fraction: Probability
-    trigger_feature_indices: tuple[FeatureIndex, ...]
-    trigger_value: TriggerFeatureValue
-
-
 def _poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
     poisoned_ids = select_source_backdoor_poison_rows(
         rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
@@ -1141,14 +1103,6 @@ def _poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedR
     return PreparedRows(
         sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
     )
-
-
-@dataclass(frozen=True)
-class HeterogeneityScope:
-    heterogeneity_namespace_seed: DerivedSeed
-    selected_feature_names: tuple[FeatureName, ...]
-    feature_names: tuple[FeatureName, ...]
-    shift_magnitude: TriggerFeatureValue
 
 
 def _apply_heterogeneity_shift(
@@ -1216,18 +1170,6 @@ def _scope_and_shift_rows(
     return PreparedRows(
         sample_ids=tuple(kept_sample_ids), features=tuple(kept_features), labels=tuple(kept_labels)
     )
-
-
-@dataclass(frozen=True)
-class EpistemicFailureScope:
-    failure_type: EpistemicFailureType
-    strength: TriggerFeatureValue
-    attack_generation_seed: DerivedSeed
-    feature_names: tuple[FeatureName, ...]
-    spurious_feature_name: FeatureName
-    spurious_feature_value: TriggerFeatureValue
-    common_context_feature_names: tuple[FeatureName, ...]
-    common_context_trigger_value: TriggerFeatureValue
 
 
 def _relabel_shared_label_error_rows(

@@ -55,6 +55,7 @@ ROADMAP_MODULES = frozenset(
         "experiments/definitions.py",
         "experiments/execution.py",
         "experiments/planning.py",
+        "experiments/workflow.py",
         "experiments/executor.py",
         "experiments/scenarios/__init__.py",
         "experiments/scenarios/capability_granularity.py",
