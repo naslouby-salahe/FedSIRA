@@ -104,7 +104,7 @@ def test_record_store_read_malformed_record_is_rejected(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
     cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
     store.write_outcome(_completed_outcome(cell))
-    record_dir = tmp_path / "experiments" / cell.experiment / "evaluations" / "records"
+    record_dir = tmp_path / "experiments" / cell.experiment / "records"
     next(record_dir.glob("*.json")).write_text("{not valid json")
     with pytest.raises(pydantic.ValidationError):
         store.read_all_outcomes(cell.experiment)

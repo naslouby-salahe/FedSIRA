@@ -117,7 +117,7 @@ class ExecutionRecordStore:
         self._reconstruction_provenance = reconstruction_provenance
 
     def _record_directory(self, experiment: ExperimentName) -> Path:
-        return self._workspace_root / "experiments" / experiment / "evaluations" / "records"
+        return self._workspace_root / "experiments" / experiment / "records"
 
     def write_outcome(self, outcome: CellExecutionOutcome) -> None:
         directory = self._record_directory(outcome.cell.experiment)
