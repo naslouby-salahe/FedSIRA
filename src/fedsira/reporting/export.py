@@ -2,12 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fedsira.analysis.claims import (
-    CLAIM_DEFINITIONS,
-    ClaimEvidenceRecord,
-    ClaimStateResult,
-    derive_claim_states,
-)
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.types import (
     ExperimentName,
@@ -22,8 +16,23 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
+from fedsira.experiments.definitions import (
+    ADMISSION_DELAY_DECOMPOSITION_NAME,
+    BYZANTINE_BOUND_VIOLATION_NAME,
+    CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+    COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+    COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+    EFFICIENCY_MEASUREMENT_NAME,
+    EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+    HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+    MECHANISM_ABLATION_NAME,
+    PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+    SECONDARY_DATASET_GENERALIZATION_NAME,
+    SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+)
 from fedsira.experiments.planning import ExperimentPlan
-from fedsira.experiments.runner import ExperimentExecutionResult
+from fedsira.experiments.runner import CellExecutionOutcome, ExperimentExecutionResult
 from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
@@ -36,9 +45,39 @@ from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
 )
-from fedsira.runtime.state import current_application_context
 
 EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
+
+_RESULT_TABLE_EVIDENCE: tuple[tuple[TableName, tuple[ExperimentName, ...]], ...] = (
+    ("Primary Results", (PRIMARY_CONFIRMATORY_EVALUATION_NAME,)),
+    ("Source-Exclusion Results", (SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,)),
+    ("Ablation Results", (MECHANISM_ABLATION_NAME,)),
+    (
+        "Byzantine Robustness",
+        (
+            COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+            COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+            BYZANTINE_BOUND_VIOLATION_NAME,
+        ),
+    ),
+    (
+        "Failure Boundaries",
+        (
+            EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+            SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+            CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+            HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+        ),
+    ),
+    (
+        "Delay and Efficiency",
+        (
+            ADMISSION_DELAY_DECOMPOSITION_NAME,
+            EFFICIENCY_MEASUREMENT_NAME,
+        ),
+    ),
+    ("Generalization Results", (SECONDARY_DATASET_GENERALIZATION_NAME,)),
+)
 
 
 class ExperimentReportSummary(FrozenDomainModel):
@@ -66,10 +105,6 @@ class ReportExportResult(FrozenDomainModel):
     verification: CompletenessVerificationResult
 
 
-def claim_definition_count() -> ScientificCellCount:
-    return len(CLAIM_DEFINITIONS)
-
-
 def _results_root() -> Path:
     return Path("results")
 
@@ -78,18 +113,6 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
     return destination
-
-
-def derive_claim_states_for_export(
-    claim_evidence: tuple[ClaimEvidenceRecord, ...] = (),
-) -> tuple[ClaimStateResult, ...]:
-    config = current_application_context().scientific_config
-    return derive_claim_states(
-        claim_evidence,
-        config.claim_support_thresholds,
-        config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_claim_support,
-        config.metrics_and_statistics.multiplicity.family_wise_alpha,
-    )
 
 
 def export_experiment_report(
@@ -149,14 +172,36 @@ def _report_material_failures(
     return tuple(failures)
 
 
+def _missing_result_evidence(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+) -> tuple[ReportVerificationFailure, ...]:
+    evidenced_experiments = frozenset(
+        comparison.definition.experiment
+        for family in comparison_results
+        for comparison in family.comparisons
+    )
+    failures: list[ReportVerificationFailure] = []
+    for table_name, expected_experiments in _RESULT_TABLE_EVIDENCE:
+        missing = tuple(
+            experiment
+            for experiment in expected_experiments
+            if experiment not in evidenced_experiments
+        )
+        if missing:
+            failures.append(f"{table_name}: missing comparison evidence for {', '.join(missing)}")
+    if not comparison_results:
+        failures.append("Statistical Summary: no comparison evidence")
+    return tuple(failures)
+
+
 def export_project_summary(
     plan: ExperimentPlan,
-    claim_states: tuple[ClaimStateResult, ...],
     lifecycle_states: tuple[ExperimentLifecycleRecord, ...],
     verification: CompletenessVerificationResult,
     collapse_decisions: tuple[CollapseDecision, ...] | None = None,
     resolved_core: ResolvedCore | None = None,
     comparison_results: tuple[ComparisonFamilyResult, ...] = (),
+    outcomes: tuple[CellExecutionOutcome, ...] = (),
     evidence_trajectory: tuple[EvidenceStateFraction, ...] | None = None,
     telemetry: tuple[EfficiencyMetricObservation, ...] | None = None,
 ) -> ReportExportResult:
@@ -167,12 +212,22 @@ def export_project_summary(
             verification=verification,
         )
 
+    evidence_failures = _missing_result_evidence(comparison_results)
+    if evidence_failures:
+        return ReportExportResult(
+            experiment=None,
+            exported_paths=(),
+            verification=CompletenessVerificationResult(
+                passed=False,
+                failures=evidence_failures,
+            ),
+        )
+
     project_root = _results_root() / "project_summary"
     tables_root = project_root / "tables" / "main"
-    claims_root = project_root / "claim_registry"
     reproducibility_root = project_root / "reproducibility" / "execution"
     figures_root = project_root / "figures" / "main"
-    for directory in (tables_root, claims_root, reproducibility_root, figures_root):
+    for directory in (tables_root, reproducibility_root, figures_root):
         directory.mkdir(parents=True, exist_ok=True)
 
     exported: list[Path] = []
@@ -180,15 +235,12 @@ def export_project_summary(
 
     for table in render_mandatory_tables(
         plan,
-        claim_states,
         collapse_decisions=collapse_decisions,
         resolved_core=resolved_core,
         comparison_results=comparison_results,
+        outcomes=outcomes,
     ):
-        if table.name == "Claim Support":
-            exported.append(_write_table(claims_root, table))
-        else:
-            exported.append(_write_table(tables_root, table))
+        exported.append(_write_table(tables_root, table))
         materialized_tables.append(table.name)
 
     exported.extend(
@@ -197,6 +249,7 @@ def export_project_summary(
             figures_root,
             evidence_trajectory=evidence_trajectory,
             telemetry=telemetry,
+            outcomes=outcomes,
         )
     )
 

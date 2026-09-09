@@ -79,8 +79,13 @@ reportUnknownMemberType = "none"
 root = "src/fedsira/runtime/determinism.py"
 reportUnknownMemberType = "none"
 
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/learning/model.py"
+reportUnknownMemberType = "none"
+
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
+known_first_party = ["fedsira"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["pyarrow", "matplotlib", "statsmodels", "scikit-learn", "torch", "numpy", "pandas", "scipy", "click"]

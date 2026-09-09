@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.domain.enums import ClaimOpeningMode
+from fedsira.domain.enums import AdmissionOpeningMode
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
@@ -23,13 +23,13 @@ from fedsira.experiments.collapse import (
     resolve_all_eight_cases,
     resolve_core_mapping,
 )
-from fedsira.experiments.definitions import ClaimFamily
+from fedsira.experiments.definitions import ComparisonFamily
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 MATERIALITY = CONFIG.metrics_and_statistics.materiality
 
 
-def _definition(family: ClaimFamily, metric: ComparisonMetric):
+def _definition(family: ComparisonFamily, metric: ComparisonMetric):
     return next(
         definition
         for definition in build_comparison_registry()
@@ -38,7 +38,7 @@ def _definition(family: ClaimFamily, metric: ComparisonMetric):
 
 
 def _passed_family(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     metric: ComparisonMetric,
 ) -> tuple[ComparisonFamilyResult, ...]:
     definition = _definition(family, metric)
@@ -59,7 +59,7 @@ def _passed_family(
 
 
 def _failed_family(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     metric: ComparisonMetric,
 ) -> tuple[ComparisonFamilyResult, ...]:
     definition = _definition(family, metric)
@@ -125,14 +125,14 @@ def test_all_eight_cases_have_exact_section_18_7_mapping() -> None:
     assert len(cases) == 8
     assert len(coordinates) == 8
     full = _case(True, True, True)
-    assert full.opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED
+    assert full.opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED
     assert (
         full.reproduction_row_requirement
         is ReproductionRowRequirement.FIVE_CERTIFIED_NON_SOURCE_ROWS
     )
     assert full.row_verification_mode is RowVerificationMode.THREE_VERIFIER_TWO_OF_THREE
     assert full.production_update_rule is ProductionUpdateRule.KRUM_CERTIFIED_ROWS
-    assert _case(False, True, True).opening_mode is ClaimOpeningMode.CANDIDATE_FREE
+    assert _case(False, True, True).opening_mode is AdmissionOpeningMode.CANDIDATE_FREE
     assert _case(True, True, False).row_verification_mode is RowVerificationMode.NONE
     assert (
         _case(True, True, False).production_update_rule is ProductionUpdateRule.KRUM_COMMITTED_ROWS
@@ -159,7 +159,7 @@ def test_resolved_core_decision_identity_is_descriptive() -> None:
 
 
 def test_proposal_survival_requires_passed_effect_and_constraints() -> None:
-    family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
+    family = ComparisonFamily.PROPOSAL_SCREEN_NECESSITY
     decision = collapse_decision_from_comparison_families(
         family,
         _passed_family(family, ComparisonMetric.FALSE_LAUNCH),
@@ -171,7 +171,7 @@ def test_proposal_survival_requires_passed_effect_and_constraints() -> None:
 
 
 def test_proposal_survival_fails_when_positive_comparison_failed() -> None:
-    family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
+    family = ComparisonFamily.PROPOSAL_SCREEN_NECESSITY
     decision = collapse_decision_from_comparison_families(
         family,
         _failed_family(family, ComparisonMetric.FALSE_LAUNCH),
@@ -182,7 +182,7 @@ def test_proposal_survival_fails_when_positive_comparison_failed() -> None:
 
 
 def test_plurality_survival_requires_mar_or_worst_domain_gain_and_constraints() -> None:
-    family = ClaimFamily.PLURALITY_NECESSITY
+    family = ComparisonFamily.PLURALITY_NECESSITY
     decision = collapse_decision_from_comparison_families(
         family,
         _passed_family(family, ComparisonMetric.MALICIOUS_ADMISSION),
@@ -193,7 +193,7 @@ def test_plurality_survival_requires_mar_or_worst_domain_gain_and_constraints() 
 
 
 def test_source_exclusion_survival_requires_asr_and_all_constraints() -> None:
-    family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
+    family = ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT
     decision = collapse_decision_from_comparison_families(
         family,
         _passed_family(family, ComparisonMetric.ATTACK_SUCCESS_RATE),
@@ -204,7 +204,7 @@ def test_source_exclusion_survival_requires_asr_and_all_constraints() -> None:
 
 
 def test_source_exclusion_survival_fails_when_a_constraint_is_missing() -> None:
-    family = ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
+    family = ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT
     decision = collapse_decision_from_comparison_families(
         family,
         _passed_family(family, ComparisonMetric.ATTACK_SUCCESS_RATE),
@@ -215,7 +215,7 @@ def test_source_exclusion_survival_fails_when_a_constraint_is_missing() -> None:
 
 
 def test_external_verification_survival_requires_effect_and_liveness_constraint() -> None:
-    family = ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY
+    family = ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY
     decision = collapse_decision_from_comparison_families(
         family,
         _passed_family(family, ComparisonMetric.MALICIOUS_ADMISSION),

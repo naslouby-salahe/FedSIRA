@@ -133,17 +133,19 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
             structurally_unavailable_classes=unavailable_classes,
         ),
     )
-    views, moments = materialize_nbaiot_prepared_views(
+    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
+    _views, moments = materialize_nbaiot_prepared_views(
         discovered,
-        REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT),
+        prepared_root,
         REPOSITORY_ROOT / prepared_feature_root(),
         overwrite,
+        retain_materialized_views=False,
     )
     print(
         "N-BaIoT preprocessing complete: "
         f"dataset_file_manifest_hash={manifest_hash}, "
         f"structurally_unavailable_classes={list(unavailable_classes)}, "
-        f"prepared_views={len(views)}, "
+        f"prepared_views={len(tuple(prepared_root.glob('*.json')))}, "
         f"scaler_training_rows={moments.training_row_count}, "
         f"dataset_manifest_reused={reused}"
     )

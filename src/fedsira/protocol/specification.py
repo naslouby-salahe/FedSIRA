@@ -7,8 +7,8 @@ from fedsira.domain.enums import TernaryOutcome
 from fedsira.domain.types import (
     AtLeastTwoByzantineProbability,
     ByzantineDomainCount,
-    ClaimedCompletionCycleIndex,
     CommitteeSize,
+    CompletionCycleIndex,
     DomainId,
     EligibleEvidenceHolderCount,
     EligiblePoolSize,
@@ -52,12 +52,12 @@ def first_cycle_with_minimum_eligible_evidence_holders(
     return None
 
 
-def validate_no_safety_claim_before_tau_k(
-    claimed_completion_cycle: ClaimedCompletionCycleIndex,
+def validate_no_safety_completion_before_tau_k(
+    completion_cycle: CompletionCycleIndex,
     tau_k: EvidenceArrivalCycleIndex | None,
 ) -> None:
-    if tau_k is None or claimed_completion_cycle < tau_k:
-        raise ValueError("safety completion claimed before the required evidence-arrival cycle")
+    if tau_k is None or completion_cycle < tau_k:
+        raise ValueError("safety completion precedes the required evidence-arrival cycle")
 
 
 def deduplicate_reports_by_proxy(
@@ -86,7 +86,7 @@ def report_for_domain(
 def validate_exactly_one_source_domain(source_domains: Sequence[DomainId]) -> None:
     if len(source_domains) != 1:
         raise ValueError(
-            f"a claim instance must have exactly one source domain, got {len(source_domains)}"
+            f"an admission instance must have exactly one source domain, got {len(source_domains)}"
         )
 
 

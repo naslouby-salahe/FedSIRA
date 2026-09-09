@@ -17,7 +17,7 @@ from fedsira.baselines.registry import (
 )
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import ClaimState, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, TernaryOutcome
 
 SOURCE = NBAIOT_DOMAIN_ORDER[0]
 NON_SOURCE = NBAIOT_DOMAIN_ORDER[1]
@@ -79,28 +79,30 @@ def test_single_fresh_verifier_domain_excludes_source_and_reproducer() -> None:
 
 
 def test_single_fresh_verifier_outcome_dormant_when_no_verifier() -> None:
-    assert single_fresh_verifier_outcome(None, None) is ClaimState.DORMANT
+    assert single_fresh_verifier_outcome(None, None) is AdmissionState.DORMANT
 
 
 def test_single_fresh_verifier_outcome_admitted_only_on_positive_vote() -> None:
-    assert single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.POSITIVE) is ClaimState.ADMITTED
     assert (
-        single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.NEGATIVE)
-        is ClaimState.REJECTED_CLAIM
+        single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.POSITIVE)
+        is AdmissionState.ADMITTED
     )
     assert (
-        single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.ABSTAIN)
-        is ClaimState.REJECTED_CLAIM
+        single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.NEGATIVE)
+        is AdmissionState.REJECTED
+    )
+    assert (
+        single_fresh_verifier_outcome(NON_SOURCE, TernaryOutcome.ABSTAIN) is AdmissionState.REJECTED
     )
 
 
 def test_review_style_baseline_outcome_dormant_below_panel_size() -> None:
-    assert review_style_baseline_outcome(2, 2, 3, 2) is ClaimState.DORMANT
+    assert review_style_baseline_outcome(2, 2, 3, 2) is AdmissionState.DORMANT
 
 
 def test_review_style_baseline_outcome_admitted_at_required_positives() -> None:
-    assert review_style_baseline_outcome(3, 2, 3, 2) is ClaimState.ADMITTED
+    assert review_style_baseline_outcome(3, 2, 3, 2) is AdmissionState.ADMITTED
 
 
 def test_review_style_baseline_outcome_rejected_below_required_positives() -> None:
-    assert review_style_baseline_outcome(3, 1, 3, 2) is ClaimState.REJECTED_CLAIM
+    assert review_style_baseline_outcome(3, 1, 3, 2) is AdmissionState.REJECTED

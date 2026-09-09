@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import csv
+import math
 from io import StringIO
 
-from fedsira.analysis.claims import CLAIM_DEFINITIONS, ClaimDefinition, ClaimStateResult
 from fedsira.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
     BaselineIdentity,
@@ -22,6 +22,7 @@ from fedsira.domain.types import (
     FormattedStatisticText,
     FrozenDomainModel,
     MethodName,
+    MetricName,
     MetricValue,
     PValue,
     ScenarioName,
@@ -39,6 +40,10 @@ from fedsira.evaluation.comparisons import (
     ComparisonTestKind,
     MaterialityDirection,
     build_comparison_registry,
+)
+from fedsira.evaluation.summaries import (
+    bootstrap_percentile_confidence_interval,
+    quantile_type7,
 )
 from fedsira.experiments.collapse import (
     CollapseDecision,
@@ -65,8 +70,10 @@ from fedsira.experiments.definitions import (
     AblationVariant,
     ExperimentClass,
     PrimaryScenario,
+    SourceExclusionMethod,
 )
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.experiments.runner import CellExecutionOutcome
 from fedsira.runtime.state import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
@@ -86,7 +93,6 @@ MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Delay and Efficiency",
     "Generalization Results",
     "Statistical Summary",
-    "Claim Support",
 )
 
 
@@ -141,8 +147,8 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
             str(planned.definition.seed_count),
             str(len(planned.cells)),
             (
-                planned.definition.claim_family.value
-                if planned.definition.claim_family is not None
+                planned.definition.comparison_family.value
+                if planned.definition.comparison_family is not None
                 else "NA"
             ),
         )
@@ -158,7 +164,7 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
                 "conditions",
                 "seeds",
                 "nominal_run_count",
-                "claim_family",
+                "comparison_family",
             ),
             rows,
         ),
@@ -246,7 +252,7 @@ def render_statistical_summary_table(
         name="Statistical Summary",
         csv_text=_csv_text(
             (
-                "claim",
+                "comparison_family",
                 "comparison",
                 "metric",
                 "direction",
@@ -270,65 +276,6 @@ def render_statistical_summary_table(
     )
 
 
-def _claim_definition(claim_id: TextValue) -> ClaimDefinition | None:
-    for definition in CLAIM_DEFINITIONS:
-        if definition.claim_id == claim_id:
-            return definition
-    return None
-
-
-def render_claim_support_table(
-    claim_states: tuple[ClaimStateResult, ...],
-) -> RenderedTable:
-    rows_list: list[tuple[TextValue, ...]] = []
-    for state in claim_states:
-        definition = _claim_definition(state.claim_id)
-        evidence = "|".join(definition.evidence_experiments) if definition is not None else "NA"
-        metric = (
-            definition.primary_metric
-            if definition is not None and definition.primary_metric is not None
-            else "NA"
-        )
-        required = (
-            definition.required_family.value
-            if definition is not None and definition.required_family is not None
-            else "NA"
-        )
-        rows_list.append(
-            (
-                state.claim_id,
-                state.scope,
-                evidence,
-                metric,
-                required,
-                state.state.value,
-                "Claim Support",
-                "FedSIRA Protocol Schematic",
-                state.scope,
-                state.reason,
-            )
-        )
-    rows = tuple(rows_list)
-    return RenderedTable(
-        name="Claim Support",
-        csv_text=_csv_text(
-            (
-                "claim",
-                "exact_scoped_claim",
-                "evidence_experiments",
-                "primary_metric",
-                "required_comparison",
-                "claim_state",
-                "supporting_table",
-                "supporting_figure",
-                "valid_scope",
-                "forbidden_extrapolation",
-            ),
-            rows,
-        ),
-    )
-
-
 def _decision_kind_label(kind: CollapseDecisionKind) -> TextValue:
     return kind.value
 
@@ -346,7 +293,6 @@ def render_collapse_decisions_table(
             "mechanical",
             "survives" if decision.survives else "removed",
             "survives" if decision.survives else "removed",
-            "NA",
             "NA",
         )
         for decision in decisions
@@ -394,7 +340,7 @@ def _comparison_value(
     experiment: ExperimentName,
     method: MethodName,
     scenario: ScenarioName,
-    metric: ComparisonMetric,
+    metric: MetricName,
 ) -> FormattedStatisticText:
     for family in comparison_results:
         for comparison in family.comparisons:
@@ -409,11 +355,149 @@ def _comparison_value(
     return "NA"
 
 
+def _comparison_result(
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: ComparisonMetric,
+) -> ComparisonResult | None:
+    for family in comparison_results:
+        for comparison in family.comparisons:
+            definition = comparison.definition
+            if (
+                definition.experiment == experiment
+                and definition.method == method
+                and definition.scientific_scenario == scenario
+                and definition.metric is metric
+            ):
+                return comparison
+    return None
+
+
+def _comparison_confidence_interval(comparison: ComparisonResult | None) -> FormattedStatisticText:
+    if comparison is None or comparison.confidence_interval is None:
+        return "NA"
+    return f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]"
+
+
+def _outcome_metric_values(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: MetricName,
+) -> tuple[MetricValue, ...]:
+    return tuple(
+        value
+        for outcome in sorted(outcomes, key=lambda item: item.cell.master_seed)
+        if (
+            outcome.completed
+            and outcome.cell.experiment == experiment
+            and outcome.cell.method == method
+            and outcome.cell.condition == scenario
+        )
+        for metric_name, value in outcome.metrics
+        if metric_name == metric and value is not None
+    )
+
+
+def _outcome_metric_mean(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: MetricName,
+) -> MetricValue | None:
+    values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
+    return None if not values else sum(values) / len(values)
+
+
+def _outcome_metric_confidence_interval(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: ComparisonMetric,
+) -> FormattedStatisticText:
+    values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
+    config = current_application_context().scientific_config
+    interval = bootstrap_percentile_confidence_interval(
+        values,
+        config.metrics_and_statistics.bootstrap,
+        config.seeds_and_determinism.analysis_seed,
+    )
+    if interval is None:
+        return "NA"
+    return f"[{interval[0]:.3f},{interval[1]:.3f}]"
+
+
+def _outcome_timing_median_iqr(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: MetricName,
+) -> FormattedStatisticText:
+    values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
+    if not values:
+        return "NA"
+    ordered_values = tuple(sorted(values))
+    median = quantile_type7(ordered_values, 0.5)
+    first_quartile = quantile_type7(ordered_values, 0.25)
+    third_quartile = quantile_type7(ordered_values, 0.75)
+    decimals = _publication_rounding().seconds_decimals
+    return (
+        f"{median:.{decimals}f} " f"[{first_quartile:.{decimals}f},{third_quartile:.{decimals}f}]"
+    )
+
+
+def _completed_outcome_count(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+) -> TextValue:
+    return str(
+        sum(
+            1
+            for outcome in outcomes
+            if (
+                outcome.completed
+                and outcome.cell.experiment == experiment
+                and outcome.cell.method == method
+                and outcome.cell.condition == scenario
+            )
+        )
+    )
+
+
+def _outcome_summary_or_comparison(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: ComparisonMetric,
+) -> FormattedStatisticText:
+    values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
+    if values:
+        mean = sum(values) / len(values)
+        sample_standard_deviation = (
+            0.0
+            if len(values) == 1
+            else math.sqrt(sum((value - mean) ** 2 for value in values) / (len(values) - 1))
+        )
+        decimals = _publication_rounding().f1_accuracy_rates_decimals
+        return f"{mean:.{decimals}f} ± {sample_standard_deviation:.{decimals}f}"
+    return _comparison_value(comparison_results, experiment, method, scenario, metric)
+
+
 def render_dataset_and_domain_protocol_table() -> RenderedTable:
     config = current_application_context().scientific_config
     primary = config.datasets.primary
     secondary = config.datasets.secondary
-    minima = config.capability_claim.evidence_minima
+    minima = config.capability_contract.evidence_minima
     rows = (
         (
             primary.name.value,
@@ -584,7 +668,7 @@ def render_model_and_training_protocol_table() -> RenderedTable:
 def render_security_and_capability_contract_protocol_table() -> RenderedTable:
     config = current_application_context().scientific_config
     protocol = config.protocol
-    claim = config.capability_claim
+    contract = config.capability_contract
     diagnostic = protocol.diagnostic_random_verifier_profile
     rows = (
         (
@@ -600,10 +684,10 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
                 - protocol.synthesis.maximum_byzantine_reproduction_rows
                 - 2
             ),
-            str(claim.target_f1_minimum),
-            str(claim.supported_macro_f1_drop_maximum),
-            str(claim.benign_false_alarm_rate_increase_maximum),
-            str(claim.evidence_minima.verification_target_examples),
+            str(contract.target_f1_minimum),
+            str(contract.supported_macro_f1_drop_maximum),
+            str(contract.benign_false_alarm_rate_increase_maximum),
+            str(contract.evidence_minima.verification_target_examples),
             "ordinary 2-of-3",
         ),
         (
@@ -615,10 +699,10 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
             "NA",
             "NA",
             "NA",
-            str(claim.target_f1_minimum),
-            str(claim.supported_macro_f1_drop_maximum),
-            str(claim.benign_false_alarm_rate_increase_maximum),
-            str(claim.evidence_minima.verification_target_examples),
+            str(contract.target_f1_minimum),
+            str(contract.supported_macro_f1_drop_maximum),
+            str(contract.benign_false_alarm_rate_increase_maximum),
+            str(contract.evidence_minima.verification_target_examples),
             f"contamination<{diagnostic.tolerated_contamination_risk}",
         ),
         (
@@ -785,6 +869,7 @@ def render_metric_and_statistics_protocol_table() -> RenderedTable:
 
 def render_primary_results_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
+    outcomes: tuple[CellExecutionOutcome, ...] = (),
 ) -> RenderedTable:
     methods_scenarios: list[tuple[MethodName, ScenarioName]] = []
     seen: set[tuple[MethodName, ScenarioName]] = set()
@@ -798,61 +883,87 @@ def render_primary_results_table(
                 continue
             seen.add(key)
             methods_scenarios.append(key)
+    for outcome in outcomes:
+        if outcome.cell.experiment != PRIMARY_CONFIRMATORY_EVALUATION_NAME:
+            continue
+        key = (outcome.cell.method, outcome.cell.condition)
+        if key in seen:
+            continue
+        seen.add(key)
+        methods_scenarios.append(key)
     rows = tuple(
         (
             method,
             scenario,
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.TARGET_F1,
             ),
-            "NA",
-            _comparison_value(
+            _outcome_metric_confidence_interval(
+                outcomes,
+                PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                method,
+                scenario,
+                ComparisonMetric.TARGET_F1,
+            ),
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.ATTACK_SUCCESS_RATE,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.MALICIOUS_ADMISSION,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.LEGITIMATE_ADMISSION,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 PRIMARY_CONFIRMATORY_EVALUATION_NAME,
                 method,
                 scenario,
                 ComparisonMetric.WORST_DOMAIN_TARGET_F1,
             ),
-            "NA",
+            _completed_outcome_count(
+                outcomes,
+                PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                method,
+                scenario,
+            ),
         )
         for method, scenario in methods_scenarios
     )
@@ -879,7 +990,22 @@ def render_primary_results_table(
 
 def render_source_exclusion_results_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
+    outcomes: tuple[CellExecutionOutcome, ...] = (),
+    collapse_decisions: tuple[CollapseDecision, ...] | None = None,
 ) -> RenderedTable:
+    source_exclusion_decision = next(
+        (
+            decision
+            for decision in collapse_decisions or ()
+            if decision.kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
+        ),
+        None,
+    )
+    source_exclusion_gate_outcome: FormattedStatisticText = (
+        "NA"
+        if source_exclusion_decision is None
+        else ("Survives" if source_exclusion_decision.survives else "Not Supported")
+    )
     methods: list[MethodName] = []
     seen: set[MethodName] = set()
     for family in comparison_results:
@@ -891,44 +1017,103 @@ def render_source_exclusion_results_table(
                 continue
             seen.add(definition.method)
             methods.append(definition.method)
+    source_scenario = PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value
+    for outcome in outcomes:
+        if outcome.cell.experiment != SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+            continue
+        if outcome.cell.condition != source_scenario or outcome.cell.method in seen:
+            continue
+        seen.add(outcome.cell.method)
+        methods.append(outcome.cell.method)
+    methods.sort(
+        key=lambda method: (
+            0 if method == SourceExclusionMethod.FULL_FEDSIRA else 1,
+            asr
+            if (
+                asr := _outcome_metric_mean(
+                    outcomes,
+                    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+                    method,
+                    source_scenario,
+                    ComparisonMetric.ATTACK_SUCCESS_RATE,
+                )
+            )
+            is not None
+            else math.inf,
+            method,
+        )
+    )
+    target_noninferiority_status: FormattedStatisticText = "NA"
+    target_noninferiority_comparison = _comparison_result(
+        comparison_results,
+        SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        source_scenario,
+        ComparisonMetric.TARGET_F1,
+    )
+    if target_noninferiority_comparison is not None:
+        target_noninferiority_status = target_noninferiority_comparison.comparison_state.value
     rows = tuple(
         (
             method,
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
                 method,
-                PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+                source_scenario,
                 ComparisonMetric.ATTACK_SUCCESS_RATE,
             ),
-            "NA",
-            "NA",
-            "NA",
-            _comparison_value(
+            format_metric_value(
+                None
+                if source_asr_comparison is None
+                else source_asr_comparison.mean_paired_difference
+            ),
+            format_p_value(
+                None if source_asr_comparison is None else source_asr_comparison.adjusted_p_value
+            ),
+            _comparison_confidence_interval(source_asr_comparison),
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
                 method,
-                PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+                source_scenario,
                 ComparisonMetric.TARGET_F1,
             ),
-            "NA",
-            _comparison_value(
+            (
+                target_noninferiority_status
+                if method == SourceExclusionMethod.FULL_FEDSIRA
+                else "NA"
+            ),
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
                 method,
-                PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+                source_scenario,
                 ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
             ),
-            _comparison_value(
+            _outcome_summary_or_comparison(
+                outcomes,
                 comparison_results,
                 SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
                 method,
-                PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+                source_scenario,
                 ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
             ),
-            "NA",
+            source_exclusion_gate_outcome,
         )
         for method in methods
+        for source_asr_comparison in (
+            _comparison_result(
+                comparison_results,
+                SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+                method,
+                source_scenario,
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+            ),
+        )
     )
     return RenderedTable(
         name="Source-Exclusion Results",
@@ -1104,7 +1289,7 @@ def render_failure_boundaries_table(
                 "target_f1",
                 "worst_domain_f1",
                 "clean_oracle_error",
-                "claim_implication",
+                "scope_boundary",
             ),
             rows,
         ),
@@ -1113,31 +1298,71 @@ def render_failure_boundaries_table(
 
 def render_delay_and_efficiency_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
+    outcomes: tuple[CellExecutionOutcome, ...] = (),
 ) -> RenderedTable:
+    rows_to_render: list[tuple[ExperimentName, MethodName, ScenarioName]] = []
+    seen: set[tuple[ExperimentName, MethodName, ScenarioName]] = set()
+    relevant_experiments = frozenset(
+        (ADMISSION_DELAY_DECOMPOSITION_NAME, EFFICIENCY_MEASUREMENT_NAME)
+    )
+    for family in comparison_results:
+        for comparison in family.comparisons:
+            definition = comparison.definition
+            key = (definition.experiment, definition.method, definition.scientific_scenario)
+            if definition.experiment not in relevant_experiments or key in seen:
+                continue
+            seen.add(key)
+            rows_to_render.append(key)
+    for outcome in outcomes:
+        cell = outcome.cell
+        key = (cell.experiment, cell.method, cell.condition)
+        if cell.experiment not in relevant_experiments or key in seen:
+            continue
+        seen.add(key)
+        rows_to_render.append(key)
     rows = tuple(
         (
-            comparison.definition.method,
-            comparison.definition.scientific_scenario,
+            method,
+            scenario,
+            format_metric_value(
+                _outcome_metric_mean(outcomes, experiment, method, scenario, "t-evidence")
+            ),
             "NA",
             "NA",
             "NA",
             "NA",
+            _outcome_timing_median_iqr(
+                outcomes,
+                experiment,
+                method,
+                scenario,
+                "post-evidence-wall-clock-seconds",
+            ),
+            _outcome_timing_median_iqr(
+                outcomes,
+                experiment,
+                method,
+                scenario,
+                "post-evidence-wall-clock-seconds",
+            ),
             "NA",
-            format_metric_value(comparison.mean_paired_difference)
-            if comparison.definition.metric is ComparisonMetric.POST_EVIDENCE_OVERHEAD
-            else "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
+            format_metric_value(
+                _outcome_metric_mean(
+                    outcomes, experiment, method, scenario, "peak-gpu-memory-bytes"
+                )
+            ),
+            format_metric_value(
+                _outcome_metric_mean(outcomes, experiment, method, scenario, "peak-host-rss-bytes")
+            ),
+            format_metric_value(
+                _outcome_metric_mean(outcomes, experiment, method, scenario, "communication-bytes")
+            ),
+            format_metric_value(
+                _outcome_metric_mean(outcomes, experiment, method, scenario, "model-transmissions")
+            ),
             "NA",
         )
-        for family in comparison_results
-        for comparison in family.comparisons
-        if comparison.definition.experiment
-        in (ADMISSION_DELAY_DECOMPOSITION_NAME, EFFICIENCY_MEASUREMENT_NAME)
+        for experiment, method, scenario in rows_to_render
     )
     return RenderedTable(
         name="Delay and Efficiency",
@@ -1209,7 +1434,7 @@ def render_generalization_results_table(
                 "paired_effect_vs_fedsira",
                 "adjusted_p",
                 "materiality_pass",
-                "claim_label",
+                "scope_label",
             ),
             rows,
         ),
@@ -1218,10 +1443,10 @@ def render_generalization_results_table(
 
 def render_mandatory_tables(
     plan: ExperimentPlan,
-    claim_states: tuple[ClaimStateResult, ...],
     collapse_decisions: tuple[CollapseDecision, ...] | None = None,
     resolved_core: ResolvedCore | None = None,
     comparison_results: tuple[ComparisonFamilyResult, ...] = (),
+    outcomes: tuple[CellExecutionOutcome, ...] = (),
 ) -> tuple[RenderedTable, ...]:
     tables = [
         render_dataset_and_domain_protocol_table(),
@@ -1231,8 +1456,12 @@ def render_mandatory_tables(
         render_baseline_protocol_table(),
         render_experiment_plan_table(plan),
         render_metric_and_statistics_protocol_table(),
-        render_primary_results_table(comparison_results),
-        render_source_exclusion_results_table(comparison_results),
+        render_primary_results_table(comparison_results, outcomes),
+        render_source_exclusion_results_table(
+            comparison_results,
+            outcomes,
+            collapse_decisions,
+        ),
     ]
     if collapse_decisions is not None and resolved_core is not None:
         tables.append(render_collapse_decisions_table(collapse_decisions, resolved_core))
@@ -1261,10 +1490,9 @@ def render_mandatory_tables(
             render_ablation_results_table(comparison_results),
             render_byzantine_robustness_table(comparison_results),
             render_failure_boundaries_table(comparison_results),
-            render_delay_and_efficiency_table(comparison_results),
+            render_delay_and_efficiency_table(comparison_results, outcomes),
             render_generalization_results_table(comparison_results),
             render_statistical_summary_table(comparison_results),
-            render_claim_support_table(claim_states),
         )
     )
     return tuple(tables)

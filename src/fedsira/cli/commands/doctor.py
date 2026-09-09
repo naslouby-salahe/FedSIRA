@@ -2,7 +2,6 @@ from pathlib import Path
 
 from rich.console import Console
 
-from fedsira.artifacts.provenance import classify_provenance_change, outcome_invalidates_artifact
 from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
 from fedsira.domain.types import (
@@ -102,9 +101,7 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
     with bound_application_context(context):
-        environment_mismatches = collect_environment_mismatches(
-            REPOSITORY_ROOT, rar_archives_present
-        )
+        environment_mismatches = collect_environment_mismatches(rar_archives_present)
         return _diagnose_bound(context, environment_mismatches)
 
 
@@ -123,8 +120,6 @@ def _diagnose_bound(
         master_seeds=context.scientific_config.seeds_and_determinism.master_seeds,
         smoke_seed=context.scientific_config.seeds_and_determinism.smoke_seed,
     )
-    if outcome_invalidates_artifact(classify_provenance_change(False, False, False, False)):
-        raise RuntimeError("empty provenance change must remain non-material")
     dataset_readiness = _dataset_readiness(raw_root)
     artifact_summary = _artifact_summary(dataset_readiness, resolved_core is not None)
     experiment_summary = _experiment_summary(plan, store)
@@ -285,8 +280,8 @@ def _project_stage(
     ):
         return ProjectStage.SECONDARY_GENERALIZATION
     results_root = REPOSITORY_ROOT / "results" / "project_summary"
-    if not (results_root / "claim_registry").exists():
-        return ProjectStage.STATISTICAL_CLAIM_COMPLETION
+    if not (results_root / "tables" / "main").exists():
+        return ProjectStage.STATISTICAL_EVIDENCE_COMPLETION
     return ProjectStage.REPORT_EXPORT
 
 
@@ -366,9 +361,9 @@ STAGE_GUIDANCE: tuple[StageGuidance, ...] = (
         action="run fedsira run 'Secondary-Dataset Generalization'",
     ),
     StageGuidance(
-        stage=ProjectStage.STATISTICAL_CLAIM_COMPLETION,
+        stage=ProjectStage.STATISTICAL_EVIDENCE_COMPLETION,
         progress=(
-            "scientific experiments have terminal records; manuscript claim export is incomplete"
+            "scientific experiments have terminal records; manuscript evidence export is incomplete"
         ),
         action="run fedsira report",
     ),

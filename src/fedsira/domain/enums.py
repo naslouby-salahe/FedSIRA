@@ -78,7 +78,7 @@ class ProjectStage(StrEnum):
     EVIDENCE_AND_FAILURE_BOUNDARIES = "evidence and scientific failure boundaries"
     DELAY_AND_EFFICIENCY = "delay and efficiency"
     SECONDARY_GENERALIZATION = "secondary generalization"
-    STATISTICAL_CLAIM_COMPLETION = "project statistical/claim completion"
+    STATISTICAL_EVIDENCE_COMPLETION = "project statistical/evidence completion"
     REPORT_EXPORT = "report project verification and export"
 
 
@@ -116,14 +116,13 @@ class ArtifactFamily(StrEnum):
     MODEL_SCORE_ARTIFACT = "Model score artifact"
     SCREEN_MATCHING_ARTIFACT = "Screen matching/differential artifact"
     BASELINE_CALIBRATION_ARTIFACT = "Baseline calibration artifact"
-    FIXED_PROTOCOL_CONFIGURATION = "Fixed Capability Claim Contract/Krum/protocol configuration"
+    FIXED_PROTOCOL_CONFIGURATION = "Fixed Capability Contract/Krum/protocol configuration"
     VERIFIER_ASSIGNMENT_REPORT = "Verifier assignment/report"
     REPRODUCTION_CERTIFICATE = "Reproduction certificate"
     KRUM_SYNTHESIZED_UPDATE = "Krum synthesized update/model"
     FINAL_GATE_DECISION = "Final-gate evaluation/decision"
     DOMAIN_SEED_METRIC_ARTIFACT = "Domain/seed metric artifact"
     STATISTICAL_COMPARISON_ARTIFACT = "Statistical comparison/gate artifact"
-    CLAIM_STATE_ARTIFACT = "Claim-state artifact"
     TABLE_FIGURE_SOURCE_DATA = "Table/figure source data"
     TABLE_FIGURE_REPORT_EXPORT = "Table/figure/report export"
 
@@ -148,24 +147,23 @@ class ProducerFingerprintFamily(StrEnum):
     BOUNDARY_TRANSFORMATION = "boundary_transformation"
     METRIC_ARTIFACT = "metric_artifact"
     STATISTICAL_COMPARISON_ARTIFACT = "statistical_comparison_artifact"
-    CLAIM_STATE_ARTIFACT = "claim_state_artifact"
     REPORT_SOURCE_EXPORT = "report_source_export"
 
 
-class ClaimOpeningMode(StrEnum):
+class AdmissionOpeningMode(StrEnum):
     PROPOSAL_ASSISTED = "PROPOSAL_ASSISTED"
     CANDIDATE_FREE = "CANDIDATE_FREE"
 
 
-class ClaimState(StrEnum):
+class AdmissionState(StrEnum):
     CANDIDATE_SCREEN = "Candidate Screen"
-    CLAIM_OPEN = "Claim Open"
+    ADMISSION_OPEN = "Admission Open"
     REPRODUCTION_PENDING = "Reproduction Pending"
     VERIFICATION_PENDING = "Verification Pending"
     SYNTHESIS_PENDING = "Synthesis Pending"
     ADMITTED = "Admitted"
     DORMANT = "Dormant"
-    REJECTED_CLAIM = "Rejected Claim"
+    REJECTED = "Rejected Admission"
     EXPIRED = "Expired"
 
 
@@ -197,10 +195,6 @@ class EvaluationInsufficiencyReason(StrEnum):
     )
 
 
-class VerificationOmissionMarker(StrEnum):
-    EXTERNAL_VERIFICATION_NOT_USED = "External Verification Not Used"
-
-
 class ByzantineVerifierBehavior(StrEnum):
     FALSE_POSITIVE = "False Positive"
     FALSE_NEGATIVE = "False Negative"
@@ -210,14 +204,6 @@ class TernaryOutcome(StrEnum):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
     ABSTAIN = "ABSTAIN"
-
-
-class ProvenanceValidationOutcome(StrEnum):
-    PARTIAL_OR_STALE_PAYLOAD = "partial_or_stale_payload"
-    SCIENTIFIC_CONFIGURATION_MISMATCH = "scientific_configuration_mismatch"
-    DATASET_SPLIT_UPSTREAM_MISMATCH = "dataset_split_upstream_mismatch"
-    PRODUCER_CODE_RUNTIME_MISMATCH = "producer_code_runtime_mismatch"
-    NON_MATERIAL_CHANGE = "non_material_change"
 
 
 class CoreMethodIdentity(StrEnum):

@@ -1,7 +1,7 @@
 import hashlib
 from typing import Final
 
-from fedsira.config.models import CapabilityClaimConfig, EvidenceMinimaConfig
+from fedsira.config.models import CapabilityContractConfig, EvidenceMinimaConfig
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -25,33 +25,33 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime.determinism import framed_bytes
 
-CLAIM_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_claim_contract_identity"
+CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0
 
 
-class CapabilityClaimSelector(FrozenDomainModel):
+class CapabilitySelector(FrozenDomainModel):
     dataset_manifest_hash: DatasetManifestDigest
     supported_control_role: RoleToken
 
 
-class CapabilityClaimScope(FrozenDomainModel):
+class CapabilityScope(FrozenDomainModel):
     dataset_id: DatasetId
     domain_count: DomainCount
     feature_schema_hash: FeatureSchemaDigest
 
 
-class CapabilityClaimContract(FrozenDomainModel):
-    selector: CapabilityClaimSelector
+class CapabilityContract(FrozenDomainModel):
+    selector: CapabilitySelector
     target_class: ClassLabel
     supported_class_count: ClassCount
     target_f1_minimum: TargetF1
     target_f1_gain_over_anchor_minimum: TargetF1Gain
     supported_macro_f1_drop_maximum: SupportedMacroF1Drop
     benign_false_alarm_rate_increase_maximum: BenignFalseAlarmRateIncrease
-    scope: CapabilityClaimScope
+    scope: CapabilityScope
 
 
-def build_capability_claim_contract(
+def build_capability_contract(
     dataset_manifest_hash: DatasetManifestDigest,
     supported_control_role: RoleToken,
     dataset_id: DatasetId,
@@ -59,24 +59,24 @@ def build_capability_claim_contract(
     feature_schema_hash: FeatureSchemaDigest,
     target_class: ClassLabel,
     supported_class_count: ClassCount,
-    capability_claim_config: CapabilityClaimConfig,
-) -> CapabilityClaimContract:
-    return CapabilityClaimContract(
-        selector=CapabilityClaimSelector(
+    capability_contract_config: CapabilityContractConfig,
+) -> CapabilityContract:
+    return CapabilityContract(
+        selector=CapabilitySelector(
             dataset_manifest_hash=dataset_manifest_hash,
             supported_control_role=supported_control_role,
         ),
         target_class=target_class,
         supported_class_count=supported_class_count,
-        target_f1_minimum=capability_claim_config.target_f1_minimum,
+        target_f1_minimum=capability_contract_config.target_f1_minimum,
         target_f1_gain_over_anchor_minimum=(
-            capability_claim_config.target_f1_gain_over_anchor_minimum
+            capability_contract_config.target_f1_gain_over_anchor_minimum
         ),
-        supported_macro_f1_drop_maximum=capability_claim_config.supported_macro_f1_drop_maximum,
+        supported_macro_f1_drop_maximum=capability_contract_config.supported_macro_f1_drop_maximum,
         benign_false_alarm_rate_increase_maximum=(
-            capability_claim_config.benign_false_alarm_rate_increase_maximum
+            capability_contract_config.benign_false_alarm_rate_increase_maximum
         ),
-        scope=CapabilityClaimScope(
+        scope=CapabilityScope(
             dataset_id=dataset_id,
             domain_count=domain_count,
             feature_schema_hash=feature_schema_hash,
@@ -84,10 +84,10 @@ def build_capability_claim_contract(
     )
 
 
-def compute_claim_identity(contract: CapabilityClaimContract) -> ArtifactDigest:
+def compute_capability_identity(contract: CapabilityContract) -> ArtifactDigest:
     return hashlib.sha256(
         framed_bytes(
-            CLAIM_IDENTITY_SEPARATOR,
+            CAPABILITY_IDENTITY_SEPARATOR,
             contract.selector.dataset_manifest_hash,
             contract.selector.supported_control_role,
             contract.target_class,
@@ -134,8 +134,8 @@ def screen_evidence_is_adequate(
     return target_example_count >= evidence_minima.proposal_screen_target_examples
 
 
-def capability_claim_contract_passes(
-    contract: CapabilityClaimContract,
+def capability_contract_passes(
+    contract: CapabilityContract,
     target_f1: MetricResult,
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,

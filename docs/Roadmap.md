@@ -41,7 +41,7 @@ $$
 For every claim instance FedSIRA must enforce:
 
 1. a clean/current anchor checkpoint;
-2. an immutable Capability Claim Contract before reproduction outcomes are observed;
+2. an immutable Capability Contract before reproduction outcomes are observed;
 3. zero direct production weight for the source artifact;
 4. honest reproduction from the anchor and non-source local evidence only;
 5. reproduction commitment before verifier assignment;
@@ -50,7 +50,7 @@ For every claim instance FedSIRA must enforce:
 8. enough certified non-source reproduction rows to satisfy the selected synthesis rule's own admissibility condition;
 9. robust synthesis with no explicit source-artifact input;
 10. a final fresh gate after synthesis;
-11. explicit `Dormant`, `Rejected Claim`, and `Expired` outcomes rather than forced acceptance.
+11. explicit `Dormant`, `Rejected Admission`, and `Expired` outcomes rather than forced acceptance.
 
 ## 1.4 Safe manuscript claims
 
@@ -62,7 +62,7 @@ The manuscript may make only the claims below, and only when the Section 35 clai
 | `Pre-Evidence Information Limit` | If the observable pre-independent-evidence transcript has the same distribution in legitimate and Byzantine-mimic worlds, a source-only admission rule cannot distinguish the two beyond its allowed error. |
 | `Authority Transition` | FedSIRA changes the authority object from a source-model approval decision to independently constructed and externally re-demonstrated functionality. |
 | `Direct Source Exclusion` | The source artifact is never an explicit input to final production synthesis or to the single-reproduction production update when the resolved core uses the single-reproduction path. |
-| `Conditional Non-Interference` | Conditional on the same fixed Capability Claim Contract and honest authority-path execution, changing the source artifact does not change honest reproduction or source-excluded production-update computations. |
+| `Conditional Non-Interference` | Conditional on the same fixed Capability Contract and honest authority-path execution, changing the source artifact does not change honest reproduction or source-excluded production-update computations. |
 | `Malicious Source Salvage` | Useful functionality first exposed by a malicious source can be learned without directly deploying that source artifact when enough independent honest domains can construct the same capability. |
 | `Proposal Assistance Value` | Proposal assistance has value only when its preregistered comparison materially reduces false launches, reproduction attempts, or post-evidence overhead without violating the specified safety/liveness constraints. |
 | `Plurality Necessity` | More than one independent reproduction is necessary only when the preregistered plurality comparison defeats the single-reproduction alternative under the specified rule. |
@@ -71,7 +71,7 @@ The manuscript may make only the claims below, and only when the Section 35 clai
 | `Byzantine Operating Region` | Security/liveness claims are conditional on the tested `f_R=1`, `f_V=1` primary profile and are not extrapolated above the declared bound. |
 | `Safe Dormancy` | A permanent singleton may remain unresolved rather than being falsely authenticated. |
 | `Reproducibility Is Not Truth` | Independent reproducibility can still certify a semantically wrong function under shared label error, common spurious structure, or attacker-induced common context. |
-| `Capability-Granularity Boundary` | A broad Capability Claim Contract can create false functional equivalence that a root-cause-scoped contract avoids on the specified fixture. |
+| `Capability-Granularity Boundary` | A broad Capability Contract can create false functional equivalence that a root-cause-scoped contract avoids on the specified fixture. |
 | `Heterogeneity Boundary` | FedSIRA's liveness/synthesis claim is restricted to the highest tested heterogeneity regime satisfying the Section 35 boundary rule. |
 | `Information-Arrival Delay` | Part of admission delay is an information-arrival cost; FedSIRA's post-evidence overhead is separately measurable. |
 | `Post-Evidence Efficiency` | Efficiency claims are descriptive measurements under the specified machine/timing contract unless an explicitly specified material comparison is stated. |
@@ -86,7 +86,7 @@ The study must not claim any of the following:
 * that reproducibility proves semantic truth, causal correctness, or benevolent origin;
 * that administrative independence guarantees independent labels, preprocessing, threat-intelligence feeds, or environmental causes;
 * that a Byzantine reproducer cannot copy a source model out of band;
-* that the source has zero total causal influence; a proposal may select which predeclared claim is investigated;
+* that the source has zero total causal influence; a proposal may select which predeclared admission criterion is investigated;
 * universal liveness for a capability that remains a permanent singleton;
 * security above the declared Byzantine bound;
 * anonymous/Sybil security;
@@ -124,7 +124,7 @@ The study must not claim any of the following:
 | $s$                     | Source domain that exposes a proposal-assisted unsupported capability.                                                                                                        |
 | $w_a$                   | Fixed clean/current anchor checkpoint.                                                                                                                                       |
 | $a_s$                   | Source model artifact; committed but assigned zero direct production weight.                                                                                                  |
-| $\mathcal C$            | Fixed Capability Claim Contract.                                                                                                                                             |
+| $\mathcal C$            | Fixed Capability Contract.                                                                                                                                             |
 | $j$                     | Reproducer domain.                                                                                                                                                            |
 | $r_j$                   | Reproduction update from domain $j$.                                                                                                                                          |
 | $w_j=w_a+r_j$           | Reproduced model.                                                                                                                                                             |
@@ -167,7 +167,7 @@ Unless an experiment says otherwise, Byzantine participants know:
 
 * model architecture and training code;
 * preprocessing and feature schema;
-* the fixed Capability Claim Contract, all thresholds, and the final Krum rule;
+* the fixed Capability Contract, all thresholds, and the final Krum rule;
 * the verifier algorithm;
 * the distribution from which role assignments are selected;
 * their own local data and all server messages legitimately sent to them.
@@ -184,9 +184,9 @@ The source and Byzantine reproducers may collude. A Byzantine reproducer may cop
 
 An honest reproducer:
 
-* receives only the anchor, fixed Capability Claim Contract, its authorized local post-reference data, and fixed training configuration;
+* receives only the anchor, fixed Capability Contract, its authorized local post-reference data, and fixed training configuration;
 * never receives or reads the source artifact as a declared training input;
-* cannot change Capability Claim Contract thresholds after seeing outcomes;
+* cannot change Capability Contract thresholds after seeing outcomes;
 * commits its update before verifier assignment.
 
 An honest verifier:
@@ -194,7 +194,7 @@ An honest verifier:
 * uses only its designated fresh verifier window;
 * never certifies itself;
 * reports `Abstain` when evidence minimums are not met;
-* evaluates the exact fixed Capability Claim Contract and no post-hoc criterion.
+* evaluates the exact fixed Capability Contract and no post-hoc criterion.
 
 ## 4.4 Failure boundaries that must be tested
 
@@ -214,9 +214,9 @@ These are part of the scientific program, not optional debugging cases.
 
 ---
 
-# 5. Capability Claim Contract
+# 5. Capability Contract
 
-**Configuration authority:** the numerical Capability Claim Contract thresholds and evidence minima are `capability_claim.*`; numerical claim-opening, verification, synthesis, final-gate, and resource limits are the applicable `protocol.*` fields in `configs/fedsira.yaml`. The contract metric definitions, eligibility semantics, ordering rules, and failure behavior are fixed by Sections 5–7 rather than encoded as configuration strings.
+**Configuration authority:** the numerical Capability Contract thresholds and evidence minima are `capability_contract.*`; numerical admission-opening, verification, synthesis, final-gate, and resource limits are the applicable `protocol.*` fields in `configs/fedsira.yaml`. The contract metric definitions, eligibility semantics, ordering rules, and failure behavior are fixed by Sections 5–7 rather than encoded as configuration strings.
 
 Every claim instance is:
 
@@ -253,7 +253,7 @@ When an evidence minimum is not met, the outcome is `Abstain`. Insufficient evid
 
 ## 5.2 Contract immutability
 
-The Capability Claim Contract JSON is hashed before any reproduction begins. Any change to selector, target metric, supported metrics, thresholds, or scope creates a **new claim identity** and invalidates downstream artifacts from the earlier claim.
+The Capability Contract JSON is hashed before any reproduction begins. Any change to selector, target metric, supported metrics, thresholds, or scope creates a **new capability identity** and invalidates downstream artifacts from the earlier contract.
 
 ## 5.3 Secondary-dataset claim
 
@@ -267,17 +267,17 @@ The secondary dataset uses the same numerical $\Gamma$ and $B$ thresholds, the s
 
 ```text
 Candidate Screen       optional proposal-assisted front end or candidate-free adequacy check
-Claim Open             immutable Capability Claim Contract exists and opening rule passed
+Admission Open         immutable Capability Contract exists and opening rule passed
 Reproduction Pending   waiting for the next eligible non-source reproduction opportunity
 Verification Pending   one committed row exists and its external verification is incomplete
 Synthesis Pending      the resolved multi-reproduction path has the required committee, or the resolved single-reproduction path has its production update
 Admitted               final fresh gate passed
 Dormant                currently insufficient independent evidence to advance
-Rejected Claim         adequate evidence contradicts the fixed claim or an adequate final gate fails
+Rejected Admission     adequate evidence contradicts the fixed contract or an adequate final gate fails
 Expired                logical evidence-cycle horizon exhausted without terminal admission/rejection
 ```
 
-`Dormant` is resumable only when the experiment supplies a later logical evidence cycle with newly adequate evidence. `Admitted`, `Rejected Claim`, and `Expired` are terminal.
+`Dormant` is resumable only when the experiment supplies a later logical evidence cycle with newly adequate evidence. `Admitted`, `Rejected Admission`, and `Expired` are terminal.
 
 ## 6.2 Resource horizon
 
@@ -299,11 +299,11 @@ Protocol work is sequential in logical authority order; parallel execution may b
 | start | proposal-assisted mode selected | `Candidate Screen` | commit source artifact, record direct production weight `0.0`, resolve screen domains |
 | start | candidate-free mode selected | `Candidate Screen` | resolve the same screen-domain order without reading a source artifact |
 | `Candidate Screen` | fewer than 2 screen domains adequate | `Dormant` | record adequacy counts; resume only on later evidence cycle |
-| `Candidate Screen` | proposal mode, at least 2 adequate and at least 2 positive | `Claim Open` | publish immutable Capability Claim Contract identity |
-| `Candidate Screen` | proposal mode, at least 2 adequate and fewer than 2 positive | `Rejected Claim` | terminal rejection |
-| `Candidate Screen` | candidate-free mode, at least 2 adequate and at least 2 adequate domains have anchor target F1 `<0.50` | `Claim Open` | publish immutable Capability Claim Contract identity |
-| `Candidate Screen` | candidate-free mode, at least 2 adequate but fewer than 2 satisfy anchor target F1 `<0.50` | `Rejected Claim` | terminal rejection |
-| `Claim Open` | opening complete | `Reproduction Pending` | begin/resume scan of unconsumed non-source domains in `Reproducer Order` |
+| `Candidate Screen` | proposal mode, at least 2 adequate and at least 2 positive | `Admission Open` | publish immutable Capability Contract identity |
+| `Candidate Screen` | proposal mode, at least 2 adequate and fewer than 2 positive | `Rejected Admission` | terminal rejection |
+| `Candidate Screen` | candidate-free mode, at least 2 adequate and at least 2 adequate domains have anchor target F1 `<0.50` | `Admission Open` | publish immutable Capability Contract identity |
+| `Candidate Screen` | candidate-free mode, at least 2 adequate but fewer than 2 satisfy anchor target F1 `<0.50` | `Rejected Admission` | terminal rejection |
+| `Admission Open` | opening complete | `Reproduction Pending` | begin/resume scan of unconsumed non-source domains in `Reproducer Order` |
 | `Reproduction Pending` | next domain inadequate | `Reproduction Pending` | record reproduction `Abstain`; do not consume domain; continue scan |
 | `Reproduction Pending` | next domain adequate | `Verification Pending` when external verification is active; otherwise `Reproduction Pending`/`Synthesis Pending` according to resolved row count | train once from the authoritative start checkpoint, commit immutable update, consume domain |
 | `Verification Pending` | fewer than 3 adequate eligible verifiers | `Reproduction Pending` | row is uncertified; record verification insufficiency; continue to next unconsumed reproducer |
@@ -315,7 +315,7 @@ Protocol work is sequential in logical authority order; parallel execution may b
 | `Synthesis Pending` | production update/model constructed | `Synthesis Pending` | evaluate final fresh gate; Krum is used only when the resolved path requires plurality |
 | `Synthesis Pending` | fewer than 6 adequate final-gate domains | `Dormant` | retain production-update artifact; a later evidence cycle may re-evaluate the same model on newly adequate final-gate roles |
 | `Synthesis Pending` | at least 6 adequate final-gate domains and all final-gate predicates pass | `Admitted` | publish admission artifact |
-| `Synthesis Pending` | at least 6 adequate final-gate domains and any final-gate predicate fails | `Rejected Claim` | terminal rejection |
+| `Synthesis Pending` | at least 6 adequate final-gate domains and any final-gate predicate fails | `Rejected Admission` | terminal rejection |
 | any nonterminal state | logical cycle reaches 30 without another terminal state | `Expired` | terminal expiry |
 
 Reproduction candidates are never reordered by their measured quality. Once the resolved row requirement is reached, later reproducer candidates are not trained for that claim unless an experiment explicitly requires their committed rows as a comparator input.
@@ -340,20 +340,20 @@ Reproduction candidates are never reordered by their measured quality. Once the 
 
 # 7. Exact FedSIRA procedure
 
-## 7.1 Claim opening
+## 7.1 Admission opening
 
 ### Proposal-assisted mode
 
 1. Receive and immutably commit source artifact $a_s$.
 2. Record direct production weight `0.0`.
 3. Run the fixed proposal screen on three post-commitment non-source screen domains.
-4. Open the predeclared claim only if at least **2 of 3** adequate screen domains are positive.
+4. Open the predeclared admission criterion only if at least **2 of 3** adequate screen domains are positive.
 5. If fewer than 2 screen domains have adequate evidence, return `Dormant`.
-6. If at least 2 are adequate and fewer than 2 are positive, return `Rejected Claim` for the proposal-assisted claim instance.
+6. If at least 2 are adequate and fewer than 2 are positive, return `Rejected Admission` for the proposal-assisted admission instance.
 
 ### Candidate-free mode
 
-Use the same deterministic three-domain screen order but do not read a source model. If fewer than **2** screen domains are adequate, return `Dormant`. If at least **2** are adequate, open the same predeclared claim only when at least **2** adequate screen domains have anchor target F1 below **0.50**. Otherwise return `Rejected Claim`.
+Use the same deterministic three-domain screen order but do not read a source model. If fewer than **2** screen domains are adequate, return `Dormant`. If at least **2** are adequate, open the same predeclared admission criterion only when at least **2** adequate screen domains have anchor target F1 below **0.50**. Otherwise return `Rejected Admission`.
 
 ## 7.2 Proposal screen
 
@@ -471,7 +471,7 @@ Admission requires all of:
 * benign false-alarm rate, pooled by equal domain weight, increases by no more than **0.01**;
 * no provenance, path-required verification/certificate, or invariant failure exists. A path that mechanically omits external row verification does not fail merely because no reproduction certificate exists; its resolved-core artifact must instead record that omission explicitly.
 
-Failure with adequate evidence produces `Rejected Claim`. Failure solely because fewer than six domains are adequate produces `Dormant`.
+Failure with adequate evidence produces `Rejected Admission`. Failure solely because fewer than six domains are adequate produces `Dormant`.
 
 ---
 
@@ -491,7 +491,7 @@ Independent reproduction adds distinguishing information only when its observati
 
 ## 8.3 Claim-conditional direct source-artifact non-interference
 
-For two source artifacts opening the same fixed Capability Claim Contract, the honest authority-path computation graph must have no model-input edge from the source artifact to reproduction training or Krum synthesis. The implementation test is a dependency/provenance assertion, not a claim that Byzantine reproducers cannot copy the source.
+For two source artifacts opening the same fixed Capability Contract, the honest authority-path computation graph must have no model-input edge from the source artifact to reproduction training or Krum synthesis. The implementation test is a dependency/provenance assertion, not a claim that Byzantine reproducers cannot copy the source.
 
 ## 8.4 Honest-support counting
 
@@ -836,7 +836,7 @@ pseudo_domain = HASH_TO_INDEX(
 
 Within each canonical `label × pseudo_domain` group, order retained rows by `stable_row_id` byte value ascending, then assign the same supported/target normalized role intervals as Sections 10.1 and 10.2 using that group-local index and count. This ordering is the complete secondary chronology rule; physical CSV shard order does not otherwise influence role membership.
 
-The same sampling caps, evidence minima, Capability Claim Contract numerical thresholds, optimizer/training parameters, model family, seed/hash logic, verifier semantics, and applicable synthesis procedure are used without retuning. The secondary dataset fits its **own** scaler from its supported-class `Anchor Train` rows across the nine pseudo-domains using the exact Section 10.5 formula/clip rule; the primary N-BaIoT scaler is never applied to CICIoT2023. If the observed real data cannot satisfy a required target-holder/evidence minimum under these roles, the affected secondary cell is `Evidence Insufficient`/`Dormant` as specified by the protocol; target labels, thresholds, pseudo-domain count, or role intervals are never changed to rescue feasibility.
+The same sampling caps, evidence minima, Capability Contract numerical thresholds, optimizer/training parameters, model family, seed/hash logic, verifier semantics, and applicable synthesis procedure are used without retuning. The secondary dataset fits its **own** scaler from its supported-class `Anchor Train` rows across the nine pseudo-domains using the exact Section 10.5 formula/clip rule; the primary N-BaIoT scaler is never applied to CICIoT2023. If the observed real data cannot satisfy a required target-holder/evidence minimum under these roles, the affected secondary cell is `Evidence Insufficient`/`Dormant` as specified by the protocol; target labels, thresholds, pseudo-domain count, or role intervals are never changed to rescue feasibility.
 
 No primary threshold is retuned from secondary outcomes.
 
@@ -1110,7 +1110,7 @@ An admission artifact is valid only if it contains immutable identities for:
 
 * anchor checkpoint;
 * source commitment when proposal-assisted;
-* Capability Claim Contract;
+* Capability Contract;
 * reproducer assignment order;
 * every reproduction commitment required by the resolved production path;
 * every verifier assignment/report required by the resolved verification path, or an explicit `External Verification Not Used` marker when the resolved path omits it;
@@ -1224,7 +1224,7 @@ Compare three predeclared contracts:
 
 Supported classes remain the ten non-target labels for all three contracts. Evidence minima apply to the in-scope target stratum after mixture construction. The excluded opposite root cause remains available only to the experiment's separate diagnostic root-cause report-test metrics, never as a supported-control class.
 
-The purpose is not to invent a new mechanism; it tests whether Capability Claim Contract granularity is necessary for meaningful functional sameness.
+The purpose is not to invent a new mechanism; it tests whether Capability Contract granularity is necessary for meaningful functional sameness.
 
 ## 15.8 Evidence-arrival schedules
 
@@ -1290,7 +1290,7 @@ The two-root-cause under-specification fixture is applied consistently to target
 
 Thus 50/50 and 80/20 are exact derived cardinalities; no separate sample counts are configured.
 
-`false_same_capability_certification_rate` is defined only for the `Broad Target Only` contract because only that contract asserts equivalence across both root-cause strata. A broad-contract certified row is a false-same-capability certification when, on the same fresh verifier evidence, exactly one of the counterfactual A-scoped or B-scoped Capability Claim Contract predicates passes and the other fails. The denominator is the number of broad-contract certified rows; zero denominator is `NA`. Scoped contracts report their own certified yield and root-cause performance but do **not** receive an artificial false-equivalence rate. Section 35 tests the seed-level broad false-equivalence rate against zero with the specified material threshold rather than comparing it to an undefined scoped rate.
+`false_same_capability_certification_rate` is defined only for the `Broad Target Only` contract because only that contract asserts equivalence across both root-cause strata. A broad-contract certified row is a false-same-capability certification when, on the same fresh verifier evidence, exactly one of the counterfactual A-scoped or B-scoped Capability Contract predicates passes and the other fails. The denominator is the number of broad-contract certified rows; zero denominator is `NA`. Scoped contracts report their own certified yield and root-cause performance but do **not** receive an artificial false-equivalence rate. Section 35 tests the seed-level broad false-equivalence rate against zero with the specified material threshold rather than comparing it to an undefined scoped rate.
 
 The proposal-collapse controlled episodes are fully instantiated before execution:
 
@@ -1341,7 +1341,7 @@ Mechanism-faithful source-review baseline:
 
 1. source trains the candidate as specified;
 2. assign 3 non-source reviewers after source commitment;
-3. each reviewer evaluates the fixed Capability Claim Contract on the composite screen view defined in Section 7.2: target `Candidate Screen` rows plus supported `Post-Reference Replay` screen-control rows;
+3. each reviewer evaluates the fixed Capability Contract on the composite screen view defined in Section 7.2: target `Candidate Screen` rows plus supported `Post-Reference Replay` screen-control rows;
 4. source artifact is admitted directly when at least 2 of 3 reviewers are positive;
 5. production model is the source candidate itself.
 
@@ -1349,7 +1349,7 @@ This intentionally tests review of a source-controlled model rather than indepen
 
 ### `Client Review then One Independent Retrain`
 
-Run `Client Review with Direct Source Admission`; if review passes, discard the source weights for training and select the first eligible non-source reproducer in the precommitted order. Train one clean reproduction for 5 epochs and require one fresh verifier to pass the Capability Claim Contract. Production is that one reproduction. Purpose: predeclared review→retrain composition with minimal plurality.
+Run `Client Review with Direct Source Admission`; if review passes, discard the source weights for training and select the first eligible non-source reproducer in the precommitted order. Train one clean reproduction for 5 epochs and require one fresh verifier to pass the Capability Contract. Production is that one reproduction. Purpose: predeclared review→retrain composition with minimal plurality.
 
 ### `One Independent Retrain`
 
@@ -1385,8 +1385,8 @@ Purpose: compare to multiple separately trained models plus ensemble certificati
 SureFED-style mechanism representative:
 
 * each reviewer has a local reference model trained for 20 epochs on its own anchor data;
-* after source commitment, 3 reviewers compare source-candidate Capability Claim Contract behavior with their clean local reference behavior on the composite screen view from Section 7.2;
-* a reviewer votes positive only if the source candidate satisfies the fixed target/support Capability Claim Contract on that screen view and does not exceed the local reference supported harm;
+* after source commitment, 3 reviewers compare source-candidate Capability Contract behavior with their clean local reference behavior on the composite screen view from Section 7.2;
+* a reviewer votes positive only if the source candidate satisfies the fixed target/support Capability Contract on that screen view and does not exceed the local reference supported harm;
 * 2 of 3 votes admit the **source artifact**.
 
 Purpose: test independent clean local reference models as trust evidence while keeping the production object source-controlled.
@@ -1430,7 +1430,7 @@ Recovery-family representative:
 
 1. source artifact is admitted after `Client Review with Direct Source Admission`;
 2. evaluate the fresh `Row Verification` window;
-3. if the ordinary supported Capability Claim Contract fails or the fresh triggered-ASR diagnostic exceeds the preattack threshold calibrated in Section 16.5, roll back to the anchor;
+3. if the ordinary supported Capability Contract fails or the fresh triggered-ASR diagnostic exceeds the preattack threshold calibrated in Section 16.5, roll back to the anchor;
 4. retrain 5 epochs using non-source reproduction evidence pooled through standard FedAvg;
 5. apply the same final fresh gate.
 
@@ -1470,13 +1470,13 @@ The common-framework prior-art representatives are intentionally adaptations, no
 
 ### Review-style baselines
 
-Any 3-reviewer baseline uses the same post-commitment adequate-reviewer ordering as `Verifier Assignment`, excludes the source, and requires exactly 2 positive reports. Fewer than 3 adequate reviewers yields `Dormant`; three adequate reviewers with fewer than 2 positives yields `Rejected Claim`.
+Any 3-reviewer baseline uses the same post-commitment adequate-reviewer ordering as `Verifier Assignment`, excludes the source, and requires exactly 2 positive reports. Fewer than 3 adequate reviewers yields `Dormant`; three adequate reviewers with fewer than 2 positives yields `Rejected Admission`.
 
-For `Client Review then One Independent Retrain` and `One Independent Retrain`, the single fresh verifier is the first adequate eligible domain in the post-commitment `Verifier Assignment` order, excluding the source and reproducer. It uses the ordinary Capability Claim Contract: positive admits; negative rejects; if no adequate eligible verifier exists after scanning the fixed order, the result is `Dormant`.
+For `Client Review then One Independent Retrain` and `One Independent Retrain`, the single fresh verifier is the first adequate eligible domain in the post-commitment `Verifier Assignment` order, excluding the source and reproducer. It uses the ordinary Capability Contract: positive admits; negative rejects; if no adequate eligible verifier exists after scanning the fixed order, the result is `Dormant`.
 
-`Independent Local Reference with Source Admission` uses the local reference as an additional non-inferiority constraint: reviewer positivity requires the source candidate to pass the ordinary target Capability Claim Contract and to have supported macro-F1 no more than `0.02` below that reviewer's local reference and benign false-alarm rate no more than `0.01` above that reference.
+`Independent Local Reference with Source Admission` uses the local reference as an additional non-inferiority constraint: reviewer positivity requires the source candidate to pass the ordinary target Capability Contract and to have supported macro-F1 no more than `0.02` below that reviewer's local reference and benign false-alarm rate no more than `0.01` above that reference.
 
-`Secure Continual Assessment Reference` uses the same 3-reviewer Capability Claim Contract assessment of the committed source candidate to authorize continued learning; if authorized, it executes exactly 5 FedAvg rounds × 1 local epoch over all eligible domains including the source.
+`Secure Continual Assessment Reference` uses the same 3-reviewer Capability Contract assessment of the committed source candidate to authorize continued learning; if authorized, it executes exactly 5 FedAvg rounds × 1 local epoch over all eligible domains including the source.
 
 ### FLCert-style ensemble
 
@@ -1621,7 +1621,7 @@ One-vs-rest area under the precision-recall curve using trapezoidal integration 
 
 AUROC/AUPRC are descriptive secondary metrics, not primary claim-selection criteria.
 
-## 17.2 Capability Claim Contract metrics
+## 17.2 Capability Contract metrics
 
 ### Target capability gain
 
@@ -1637,7 +1637,7 @@ $$
 H_{macro}=MacroF1_{supported}(w_a)-MacroF1_{supported}(w).
 $$
 
-Lower is better; negative values mean improvement. Capability Claim Contract requires $H_{macro}\le0.02$.
+Lower is better; negative values mean improvement. Capability Contract requires $H_{macro}\le0.02$.
 
 ### Benign false-alarm-rate increase
 
@@ -1647,13 +1647,13 @@ $$
 BenignFAR(w)=\frac{\left\lvert\lbrace y=BENIGN\ \land\ \hat y\neq BENIGN\rbrace\right\rvert}{\left\lvert\lbrace y=BENIGN\rbrace\right\rvert}.
 $$
 
-The Capability Claim Contract change is:
+The Capability Contract change is:
 
 $$
 \Delta BenignFAR=BenignFAR(w)-BenignFAR(w_a).
 $$
 
-Lower is better; Capability Claim Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
+Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
 ## 17.3 Security and admission metrics
 
@@ -1688,7 +1688,7 @@ Cells without a malicious-authority fixture report MAR as `NA`, not zero.
 
 ### Legitimate admission rate
 
-`legitimate_admission` is defined when the scientific scenario contains the real target capability, including scenarios where that legitimate capability is first exposed by a malicious/backdoored source. It equals `1` iff the protocol terminal outcome is `Admitted`, otherwise `0` for `Dormant`, `Rejected Claim`, or `Expired`. Generic-hard-supported and irrelevant-source-improvement proposal episodes do not contain the target capability and therefore have `legitimate_admission=NA`.
+`legitimate_admission` is defined when the scientific scenario contains the real target capability, including scenarios where that legitimate capability is first exposed by a malicious/backdoored source. It equals `1` iff the protocol terminal outcome is `Admitted`, otherwise `0` for `Dormant`, `Rejected Admission`, or `Expired`. Generic-hard-supported and irrelevant-source-improvement proposal episodes do not contain the target capability and therefore have `legitimate_admission=NA`.
 
 $$
 LAR=\frac{\sum legitimate\_admission}{\left\lvert\lbrace eligible\ seed\ instances\ containing\ the\ legitimate\ target\ capability\rbrace\right\rvert}.
@@ -1742,7 +1742,7 @@ where $s$ is sample standard deviation with `ddof=1`. If $\bar x=0$, `NA`.
 
 A proposal instance has a post-execution **clean proposal oracle** only for evaluating screen selectivity; the oracle is never available to opening/training. Evaluate the committed source candidate on the clean `Report Test` roles of all non-source domains using the same target/support metric definitions and equal-domain aggregation as Section 17.8. The source proposal is `oracle-valid` iff the aggregate target F1 is at least `0.80`, target-F1 gain over the anchor is at least `0.20`, supported macro-F1 drop is at most `0.02`, and benign-FAR increase is at most `0.01`. At least 80% of the eight expected non-source domains must have the required defined oracle metrics; otherwise the oracle label is `NA`.
 
-* **false launch rate:** proposal-assisted claim instances for which opening launches at least one actual downstream reproduction-training attempt while the clean proposal oracle is `oracle-invalid`, divided by proposal instances with an adequate screen decision and defined clean proposal oracle;
+* **false launch rate:** proposal-assisted admission instances for which opening launches at least one actual downstream reproduction-training attempt while the clean proposal oracle is `oracle-invalid`, divided by proposal instances with an adequate screen decision and defined clean proposal oracle;
 * **reproduction attempts:** number of distinct domains for which scientific reproduction training actually starts before terminal state; an evidence-inadequate inspected domain is an abstention opportunity but not a training attempt;
 * **proposal-screen differential `A`:** Section 7.2.
 
@@ -1795,7 +1795,7 @@ Every cross-boundary scientific message is serialized by the following canonical
 3. each tensor payload is converted to contiguous little-endian scientific dtype (`float32` for model/update tensors), preceded by canonical JSON tensor metadata containing `name`, `dtype`, `shape`, and `nbytes`, itself prefixed by an unsigned 64-bit big-endian length;
 4. concatenate tensor fields in lexicographically ascending tensor name order; no compression is applied for the accounting representation.
 
-Count every semantic cross-boundary action used by the method with the message type above: source commitment upload; server model distribution; client update submission; Capability Claim Contract transmission; review/verifier/final-gate assignment (including the candidate/production model tensor when evaluation requires it); corresponding reports; and one terminal decision. A broadcast to `k` domains is `k` messages. Model tensors are named `model.<canonical_parameter_name>` and updates `update.<canonical_parameter_name>` in the Section 12 parameter registry. Local filesystem writes are excluded. `communication bytes` is the sum of envelope bytes in both directions. `model transmissions` counts only messages containing at least one model/checkpoint/update tensor payload; metadata-only messages contribute bytes but not a model transmission.
+Count every semantic cross-boundary action used by the method with the message type above: source commitment upload; server model distribution; client update submission; Capability Contract transmission; review/verifier/final-gate assignment (including the candidate/production model tensor when evaluation requires it); corresponding reports; and one terminal decision. A broadcast to `k` domains is `k` messages. Model tensors are named `model.<canonical_parameter_name>` and updates `update.<canonical_parameter_name>` in the Section 12 parameter registry. Local filesystem writes are excluded. `communication bytes` is the sum of envelope bytes in both directions. `model transmissions` counts only messages containing at least one model/checkpoint/update tensor payload; metadata-only messages contribute bytes but not a model transmission.
 
 For efficiency runs, peak GPU memory is `torch.cuda.max_memory_allocated()` after the prescribed counter reset. Peak host RSS is measured in the dedicated single-process timing worker as `resource.getrusage(resource.RUSAGE_SELF).ru_maxrss × 1024` bytes on Ubuntu/Linux; all measured method computation is sequential inside that worker, so child-process RSS aggregation is not an implementation choice.
 
@@ -1978,7 +1978,7 @@ Against the predeclared closest source-influence comparator `Source-Update Sanit
 * post-production ASR decreases by at least 0.20;
 * adjusted $p\lt 0.05$;
 * target F1 is non-inferior within 0.02;
-* supported macro-F1 and benign false-alarm rate satisfies the Capability Claim Contract.
+* supported macro-F1 and benign false-alarm rate satisfies the Capability Contract.
 
 Failure means the central contribution is `Not Supported`; no later favorable robustness cell may override this gate.
 
@@ -2114,7 +2114,7 @@ Decision rules always use full-precision values.
 
 **Configuration authority:** execution timeouts come from `execution.timeouts_seconds`, the automatic infrastructure retry count comes from `execution.automatic_infrastructure_retries_per_cell_phase`, and logical evidence-cycle limits come from `protocol.resource_horizon`. Failure meanings, retry eligibility, publication semantics, and recovery behavior are fixed by this section.
 
-Execution state and scientific protocol outcome are distinct. A valid experiment that falsifies its hypothesis is scientifically complete; `Admitted`, `Dormant`, `Rejected Claim`, `Expired`, and `Abstain` remain protocol outcomes rather than software failure states.
+Execution state and scientific protocol outcome are distinct. A valid experiment that falsifies its hypothesis is scientifically complete; `Admitted`, `Dormant`, `Rejected Admission`, `Expired`, and `Abstain` remain protocol outcomes rather than software failure states.
 
 A scientific cell uses the fixed execution-phase enum below; each phase instance has lifecycle state `Planned`, `Running`, `Completed`, `Failed`, or `Invalid`. An experiment state is exactly `Not Started`, `Blocked`, `Ready`, `Running`, `Completed`, `Failed`, or `Invalid`.
 
@@ -2191,7 +2191,6 @@ Reference confirmatory hardware and required system utility:
 ```text
 GPU: NVIDIA GeForce RTX 5060 Ti, 16 GB VRAM
 CPU RAM: at least 32 GB
-Free storage before full workflow: at least 100 GB
 GPU count: 1
 N-BaIoT RAR extractor when archives are present: Ubuntu `unrar` 1:7.0.7-1build1
 ```
@@ -2216,7 +2215,7 @@ There is no warning-only or nondeterministic fallback for claim-bearing cells. I
 
 # Configuration YAML
 
-`configs/fedsira.yaml` is the single authoritative configuration-data file for the study. It contains only values that must be supplied to execution: dataset/target identifiers, numerical thresholds and budgets, sampling/split intervals, experiment-strength grids, actual seeds, paths, execution limits, and a small number of genuine categorical grid/format selections. The implementation loads it through a typed, immutable schema. `configs/smoke.yaml` contains reduced deterministic smoke values and has no scientific authority.
+`configs/fedsira.yaml` is the single authoritative configuration-data file for the study. It contains only values that must be supplied to execution: dataset/target identifiers, numerical thresholds and budgets, sampling/split intervals, experiment-strength grids, actual seeds, paths, execution limits, and a small number of genuine categorical grid/format selections. The implementation loads it through a typed, immutable schema; the smoke workflow derives its settings from that schema and fixed runtime invariants.
 
 Presence in YAML does not authorize post-hoc tuning. Claim-bearing configuration values are governed by the authoritative roadmap contracts; experiment-grid categories may be traversed only where Section 30 declares them, and execution/path values may vary only where the execution contract permits variation without changing scientific identity.
 
@@ -2233,8 +2232,7 @@ FedSIRA/
 │       └── quality.yml
 │
 ├── configs/
-│   ├── fedsira.yaml
-│   └── smoke.yaml
+│   └── fedsira.yaml
 │
 ├── data/
 │   └── raw -> <shared-dataset-root>
@@ -2452,7 +2450,7 @@ datasets:
     name: CICIoT2023
     target_class: BACKDOOR_MALWARE
     pseudo_domain_partition_salt: 730201
-capability_claim:
+capability_contract:
   target_f1_minimum: 0.8
   target_f1_gain_over_anchor_minimum: 0.2
   supported_macro_f1_drop_maximum: 0.02
@@ -2465,7 +2463,7 @@ capability_claim:
     verification_supported_control_examples: 1000
     proposal_screen_target_examples: 500
 protocol:
-  claim_opening:
+  admission_opening:
     screen_domains: 3
     required_positive_screen_domains: 2
     candidate_free_required_adequate_domains: 2
@@ -2880,17 +2878,17 @@ Staging → Complete → Stale/Retired
 | Scaler                                             | preprocessing                            | supported `Anchor Train` rows, scaling formula, feature schema, scaling component fingerprint                                                                                                 | all model inputs for that dataset/protocol                                                                                                              |
 | Prepared role view                                 | preprocessing                            | role/split manifest, scaler, deterministic transformation-independent view definition                                                                                                         | training/scoring; role-specific views are independently reusable                                                                                        |
 | Anchor checkpoint and round checkpoints            | anchor training                          | prepared anchor views, model definition/init, anchor optimizer/training contract, master-seed namespaces, relevant PyTorch/CUDA deterministic runtime, training component fingerprint         | source training, reproductions, baselines, scoring; shared across experiments when identical                                                            |
-| Source candidate checkpoint/update                 | source training                          | anchor identity, source domain, source/scenario/attack training data view, Capability Claim Contract-relevant training config, attack transform when applicable, seeds, training component/runtime fingerprint      | proposal screen, source-authority baselines, malicious source scenarios                                                                                 |
+| Source candidate checkpoint/update                 | source training                          | anchor identity, source domain, source/scenario/attack training data view, Capability Contract-relevant training config, attack transform when applicable, seeds, training component/runtime fingerprint      | proposal screen, source-authority baselines, malicious source scenarios                                                                                 |
 | Honest or Byzantine reproduction checkpoint/update | reproduction training/attack producer    | anchor identity, reproducer, exact reproduction view, training objective/config, attack strategy/strength if any, seeds, relevant training/attack component/runtime fingerprint               | external reproduction verification, direct-Krum comparators, robustness, ablations; the same row is reused when these dependencies match                                               |
 | Standard FL/baseline checkpoint/update             | baseline trainer                         | exact baseline algorithm, prepared views, anchor/start model, budget, attack condition, seeds, baseline-training component/runtime fingerprint                                                | baseline scoring/evaluation; no reuse across scientifically different baseline algorithms                                                               |
 | Model score artifact                               | scoring producer                         | exact model/checkpoint identity, exact sample/view identity, scoring transform, output-class registry, scoring component fingerprint, relevant numerical runtime                              | screen calculations, verifier/final/report metrics; checkpoint remains valid when only metric code changes                                              |
-| Screen matching/differential artifact              | proposal-screen calibration producer     | anchor/source score artifacts, screen folds, matching/quantile rule, Capability Claim Contract screen constants, calibration component fingerprint                                                                  | proposal opening decision; reusable across experiments with identical source/screen semantics                                                           |
+| Screen matching/differential artifact              | proposal-screen calibration producer     | anchor/source score artifacts, screen folds, matching/quantile rule, Capability Contract screen constants, calibration component fingerprint                                                                  | proposal opening decision; reusable across experiments with identical source/screen semantics                                                           |
 | Baseline calibration artifact                      | named baseline calibration producer      | exact calibration score/update population, calibration rule and percentile, relevant baseline config and calibration component fingerprint                                                    | `Update Reconstruction Filter`, `Recovery after Source Admission`, `Source-Update Sanitization Reference`; each calibration type is independently keyed |
-| Fixed Capability Claim Contract/Krum/protocol configuration              | Configuration YAML           | Sections 5–7 and 13 constants                                                                                                                                                                 | all protocol decisions; fixed thresholds are configuration, not learned calibration outputs                                                             |
-| Verifier assignment/report                         | external reproduction verification evaluator                            | committed reproduction identity, Capability Claim Contract identity, eligible-domain state, verifier-order seed, exact row-verification score artifact, verifier behavior profile, evaluation component fingerprint | reproduction certificate                                                                                                                                |
+| Fixed Capability Contract/Krum/protocol configuration              | Configuration YAML           | Sections 5–7 and 13 constants                                                                                                                                                                 | all protocol decisions; fixed thresholds are configuration, not learned calibration outputs                                                             |
+| Verifier assignment/report                         | external reproduction verification evaluator                            | committed reproduction identity, Capability Contract identity, eligible-domain state, verifier-order seed, exact row-verification score artifact, verifier behavior profile, evaluation component fingerprint | reproduction certificate                                                                                                                                |
 | Reproduction certificate                           | certificate producer                     | certified-row reports/commitments and certificate rule                                                                                                                                        | Krum synthesis; reused only for the same five certified row identities/order semantics                                                                  |
 | Krum synthesized update/model                      | synthesis producer                       | five certified/noncertified input row identities as required by method, Krum config, synthesis component fingerprint                                                                          | final gate, report-test scoring                                                                                                                         |
-| Final-gate evaluation/decision                     | final-gate evaluator                     | synthesized/production model identity, exact final-gate score artifacts, domain adequacy, Capability Claim Contract/final-gate rules, evaluation component fingerprint                                              | admission outcome, metrics, claims                                                                                                                      |
+| Final-gate evaluation/decision                     | final-gate evaluator                     | synthesized/production model identity, exact final-gate score artifacts, domain adequacy, Capability Contract/final-gate rules, evaluation component fingerprint                                              | admission outcome, metrics, claims                                                                                                                      |
 | Domain/seed metric artifact                        | metric registry                          | score/evaluation artifacts, exact metric definitions, aggregation rules, adequacy/NA rules, metric component fingerprint                                                                      | statistics, tables, figures; a metric-code change need not invalidate models or scores                                                                  |
 | Statistical comparison/gate artifact               | evaluation producer                      | exact seed-level metrics, pairing set, comparison definition, test/sidedness, Holm family, bootstrap seed/resamples, materiality rule, evaluation component fingerprint                       | claim-support decisions, tables, figures                                                                                                                 |
 | Claim-state artifact                               | claim-decision producer                  | mandatory statistical/gate artifacts and Section 35 rule                                                                                                                                      | project summary/report                                                                                                                                  |
@@ -2910,7 +2908,7 @@ The following are the minimum invalidation rules. A change may invalidate a narr
 | Model architecture/init, training objective, optimizer/budget, training-role data, seed stream used by training, attack transform used during training, or training implementation/runtime capable of changing parameters | affected checkpoint/update                      | prepared data/splits/scaler and unrelated trained models                                        |
 | Scoring transform, model-to-output code, class-output interpretation, or scoring runtime capable of changing predictions/losses                                                                                           | affected score artifacts                        | checkpoints and upstream data                                                                   |
 | Screen matching/quantile logic or a learned baseline calibration rule/population                                                                                                                                          | affected calibration artifact                   | checkpoints and reusable scores if unchanged                                                    |
-| Capability Claim Contract/final-gate/verifier decision implementation or metric definition/aggregation/adequacy logic                                                                                                                           | affected protocol evaluation or metric artifact | checkpoints and scores unless scoring itself changed                                            |
+| Capability Contract/final-gate/verifier decision implementation or metric definition/aggregation/adequacy logic                                                                                                                           | affected protocol evaluation or metric artifact | checkpoints and scores unless scoring itself changed                                            |
 | Statistical test, sidedness, Holm family implementation, bootstrap implementation/seed/resample rule, materiality logic, or pairing logic                                                                                 | affected statistical/claim artifact             | all training, scores, evaluations, and seed metrics                                             |
 | Table/figure data-selection specification                                                                                                                                                                                 | affected source-data/report product             | scientific metrics/statistics                                                                   |
 | Plot style, layout, table renderer, caption/template, output format                                                                                                                                                       | affected report export only                     | all scientific artifacts and report source data                                                 |
@@ -2962,7 +2960,7 @@ Reuse is permitted across experiment names when the consumed artifact would be s
 
 Scientific independence requirements override cache reuse. Distinct master seeds, distinct semantic transformations, and distinct training algorithms are not collapsed merely because outputs happen to be numerically equal.
 
-The implementation must retain all scientifically meaningful objects needed by this study: dataset/preprocessing/split/domain identity and leakage validation; seed bundle and semantic cell identity; claim/Capability Claim Contract and evidence state; source/reproducer/verifier/final-gate assignments; domain- and seed-level metrics; paired statistics/effects/CIs/multiplicity/materiality decisions; technical versus scientific terminal outcomes; final claim state; and table/figure source data. Logs are never result storage.
+The implementation must retain all scientifically meaningful objects needed by this study: dataset/preprocessing/split/domain identity and leakage validation; seed bundle and semantic cell identity; claim/Capability Contract and evidence state; source/reproducer/verifier/final-gate assignments; domain- and seed-level metrics; paired statistics/effects/CIs/multiplicity/materiality decisions; technical versus scientific terminal outcomes; final claim state; and table/figure source data. Logs are never result storage.
 
 # 27. Logging, provenance, and dependency fingerprints
 
@@ -3048,7 +3046,7 @@ The active dependency graph is derived from immutable upstream artifact identiti
 * reproducer cannot self-certify;
 * verifier assignment before commitment throws an invariant error;
 * duplicate authority vote is rejected;
-* Capability Claim Contract mutation after reproduction begins is rejected;
+* Capability Contract mutation after reproduction begins is rejected;
 * `Abstain` cannot be cast to boolean vote;
 * fewer than five certified rows cannot call primary Krum synthesis;
 * source update hash cannot appear in final Krum input manifest;
@@ -3324,7 +3322,7 @@ Each variant is one semantic experiment cell per seed. Every non-`Full FedSIRA` 
 | `Multiple Reproductions without Cross-Verification` | first five adequate committed rows → Krum → final gate | `One Malicious Reproducer` | MAR |
 | `Same-Context Verification Only` | choose 3 adequate eligible verifiers with smallest anchor-train standardized feature-mean distance to reproducer | `Natural` | legitimate admission |
 | `No Origin Exclusion` | source may occupy first reproduction slot using its source update and may verify other rows; source still cannot self-verify | `Useful Backdoored Source — 5%` | ASR |
-| `Parameter-Similarity Certification` | Section 16.5 cosine-similarity certification; no functional verifier Capability Claim Contract | `Feature Shift ±1.0` | legitimate admission |
+| `Parameter-Similarity Certification` | Section 16.5 cosine-similarity certification; no functional verifier Capability Contract | `Feature Shift ±1.0` | legitimate admission |
 | `Candidate-Free Reproduction` | candidate-free opening; otherwise complete path | `Legitimate Target Capability` | post-evidence overhead |
 | `Direct Krum of Retrains` | same reproduction opportunities, no external row verification | `One Verifier-Aware Backdoor Reproducer` | MAR |
 | `Generic Three-Row Threshold` | Krum `n=3,f=1` branch must be `Invalid`; separately execute the three-row coordinate-median diagnostic | `One Malicious Reproducer` | coordinate-median diagnostic MAR |
@@ -3454,9 +3452,9 @@ Two Byzantine Verifiers — Above Bound
 ## 30.16 `Capability Under-Specification Boundary`
 
 **Class:** `Failure Boundary`
-**Runs:** `3 Capability Claim Contract granularities × 2 root-cause mixtures × 10 seeds = 60`.
+**Runs:** `3 Capability Contract granularities × 2 root-cause mixtures × 10 seeds = 60`.
 
-**Capability Claim Contract granularities:** broad target, A-scoped, B-scoped.
+**Capability Contract granularities:** broad target, A-scoped, B-scoped.
 **Mixtures:** `Balanced 50/50`, `A-Dominant 80/20`.
 **Metrics:** cross-domain verifier agreement, certified-row yield, final target F1 separately on root causes A/B, and `false_same_capability_certification_rate` for `Broad Target Only`; scoped-contract rows report that metric as `NA` by Section 15.10. Family 9 tests the broad seed-level rate against zero for each mixture.
 **Interpretation:** broad-claim failure limits what “same capability” means; no parameter-similarity mechanism may be added after observing it.
@@ -3616,7 +3614,7 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 
 ### `Metric and Statistics Protocol`
 
-**Rows:** every claim-bearing metric/comparison family.
+**Rows:** every predeclared metric/comparison family.
 **Columns:** metric, mathematical orientation, aggregation unit, undefined rule, primary/secondary role, effect threshold, test, sidedness, alpha, multiplicity family, CI method.
 
 ## 33.2 Result tables
@@ -3626,7 +3624,7 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 **Rows:** method × primary scenario.
 **Columns:** method, scenario, target F1 mean, target F1 95% CI, supported macro-F1 harm, benign false-alarm-rate increase, ASR where defined, malicious admission, legitimate admission, worst-domain target F1, complete seed count.
 **Aggregation:** equal seed weight after seed-level domain aggregation.
-**Uncertainty:** 95% bootstrap CI across paired seed units for claim-bearing differences; raw method summaries show mean ± sample SD.
+**Uncertainty:** 95% bootstrap CI across paired seed units for predeclared differences; raw method summaries show mean ± sample SD.
 **Ordering:** resolved FedSIRA first, then mechanism baselines in Section 30.9 order.
 
 ### `Source-Exclusion Results`
@@ -3656,7 +3654,7 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 ### `Failure Boundaries`
 
 **Rows:** scarcity schedule, epistemic failure type/strength, under-specification condition, heterogeneity regime.
-**Columns:** boundary family, condition, strength, admission/dormancy, target F1, worst-domain F1, claim implication; `clean_oracle_error` is populated only for the three `Shared Epistemic-Failure Boundary` failure types and is `NA` with reason `Not an Epistemic-Oracle Experiment` for the other boundary families.
+**Columns:** boundary family, condition, strength, admission/dormancy, target F1, worst-domain F1, scope boundary; `clean_oracle_error` is populated only for the three `Shared Epistemic-Failure Boundary` failure types and is `NA` with reason `Not an Epistemic-Oracle Experiment` for the other boundary families.
 **Purpose:** prevent favorable main results from hiding known boundaries.
 
 ### `Delay and Efficiency`
@@ -3669,17 +3667,14 @@ Every final table is generated by `fedsira report` from verified machine-readabl
 
 **Rows:** five methods × two secondary scenarios.
 **Columns:** target F1/gain, supported harm, benign false-alarm-rate increase, malicious/legitimate admission, paired effect vs FedSIRA, adjusted p, materiality pass.
-**Claim label:** `Data/Attack Generalization Only` printed in table footnote metadata.
+**Scope label:** `Data/Attack Generalization Only` printed in table footnote metadata.
 
 ### `Statistical Summary`
 
 **Rows:** one predeclared comparison.
-**Columns:** claim, comparison, metric, direction, margin, n pairs, mean difference, median difference, paired $d_z$, raw p, Holm p, 95% CI, materiality threshold, statistical pass, materiality pass, final comparison state.
+**Columns:** comparison family, comparison, metric, direction, margin, n pairs, mean difference, median difference, paired $d_z$, raw p, Holm p, 95% CI, materiality threshold, statistical pass, materiality pass, final comparison state.
 
-### `Claim Support`
-
-**Rows:** one manuscript claim.
-**Columns:** claim, exact scoped claim, evidence experiments, primary metric, required comparison, claim state, supporting table, supporting figure, valid scope, forbidden extrapolation.
+There is no separate claim-support table or registry. The predeclared comparison, result tables, and figures are the authoritative evidence products; their scope and non-extrapolation limits are expressed by the comparison definitions and table metadata.
 
 ## 33.3 Table rounding/significance display
 
@@ -3697,7 +3692,7 @@ Every required figure is generated from verified machine-readable result/statist
 
 **Question:** what changes authority from source model to independent evidence?
 **Type:** deterministic schematic, not data plot.
-**Content:** source commitment with zero direct weight → fixed Capability Claim Contract → non-source reproduction → post-commitment verifier panels → five-row external reproduction verification → Krum → final fresh gate → admission/dormancy/rejection.
+**Content:** source commitment with zero direct weight → fixed Capability Contract → non-source reproduction → post-commitment verifier panels → five-row external reproduction verification → Krum → final fresh gate → admission/dormancy/rejection.
 **Manuscript role:** method overview.
 
 ## 34.2 `Primary Security–Utility Tradeoff`
@@ -3717,7 +3712,7 @@ Every required figure is generated from verified machine-readable result/statist
 **X-axis:** post-production ASR.
 **Y-axis:** target F1.
 **Point:** method seed mean; error bars 95% CI of method summary.
-**Annotations:** Capability Claim Contract target-F1 threshold 0.80 and ASR direction.
+**Annotations:** Capability Contract target-F1 threshold 0.80 and ASR direction.
 
 ## 34.4 `Collapse Decision Effects`
 
@@ -3761,7 +3756,7 @@ Every required figure is generated from verified machine-readable result/statist
 ## 34.9 `Capability-Granularity Boundary`
 
 **Type:** grouped bars/points.
-**X-axis:** Capability Claim Contract granularity.
+**X-axis:** Capability Contract granularity.
 **Y-axis:** false same-capability certification rate and per-root-cause target F1 in separate figures.
 **Groups:** root-cause mixture.
 
@@ -3865,7 +3860,7 @@ Not Tested
 ### `Conditional Non-Interference`
 
 **Evidence:** Section 8.3 theorem plus the deterministic property fixture below.
-**Fixture:** construct one `Claim Open` instance with a fixed anchor, fixed Capability Claim Contract, fixed non-source prepared views, assignments, and seeds. Commit two distinct, architecture-compatible source artifacts: fixture A has a zero source delta; fixture B has the same delta except the first coordinate of the canonical Section 12 parameter vector is `+0.001`. Neither source artifact is exposed to the honest authority path.
+**Fixture:** construct one `Admission Open` instance with a fixed anchor, fixed Capability Contract, fixed non-source prepared views, assignments, and seeds. Commit two distinct, architecture-compatible source artifacts: fixture A has a zero source delta; fixture B has the same delta except the first coordinate of the canonical Section 12 parameter vector is `+0.001`. Neither source artifact is exposed to the honest authority path.
 **Minimum support:** the ordered identities and content hashes of every honest reproduction update and the resulting non-source production update are exactly identical between fixture A and fixture B. Source-commitment/provenance records are allowed to differ.
 **Failure:** any honest reproduction or production-update payload differs.
 **Forbidden extrapolation:** this does not imply that Byzantine reproducers cannot copy the source out of band.
@@ -3988,7 +3983,7 @@ If any condition fails, project-summary reporting is `Blocked`; `fedsira doctor`
 
 `fedsira report` exports only completed verified scientific evidence. All metrics, inferential statistics, confidence intervals, multiplicity decisions, materiality gates, scientific invariants, and provenance checks have already been completed by `run`.
 
-The named tables in Section 33, figures in Section 34, and claim states in Section 35 are mandatory. They must be generated from authoritative machine-readable `outputs/` metric/statistical/claim evidence, never from manually transcribed values or parsed logs. Experiment-owned exports are materialized under `results/experiments/<descriptive-experiment-name>/`; cross-experiment products are generated once under `results/project_summary/` rather than duplicated across experiment exports. Final claim-state exports belong under `results/project_summary/claim_registry/`, and compact reconstruction summaries belong under the applicable `results/project_summary/reproducibility/` subdirectories.
+The named tables in Section 33 and figures in Section 34 are mandatory. They must be generated from authoritative machine-readable `outputs/` metric, statistical, and admission-decision evidence, never from manually transcribed values or parsed logs. Experiment-owned exports are materialized under `results/experiments/<descriptive-experiment-name>/`; cross-experiment products are generated once under `results/project_summary/` rather than duplicated across experiment exports. Compact reconstruction summaries belong under the applicable `results/project_summary/reproducibility/` subdirectories.
 
 Table/figure source-data products remain computational outputs under `outputs/` according to their declared reuse scope. `results/` contains only the compact verified render/export products defined in Section 23 and is never read back by scientific execution.
 
@@ -4004,7 +3999,7 @@ Reproducibility requires traceability sufficient to detect dataset/split, config
 
 The study is ready for manuscript reporting only when:
 
-* all required Section 30 cells reach valid scientific terminal states, including legitimate `Abstain`, `Dormant`, `Rejected Claim`, `Expired`, null, and boundary outcomes where prescribed;
+* all required Section 30 cells reach valid scientific terminal states, including legitimate `Abstain`, `Dormant`, `Rejected Admission`, `Expired`, null, and boundary outcomes where prescribed;
 * the Section 31 count invariant and Section 37 scientific completeness verification are satisfied;
 * required metrics, statistics, effects, confidence intervals, multiplicity and materiality decisions exist;
 * every scientific invariant and data-leakage barrier passes;

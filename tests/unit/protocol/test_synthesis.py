@@ -2,7 +2,7 @@ import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,
     krum_input_excludes_source,
@@ -21,21 +21,21 @@ def test_synthesis_pending_dormant_when_too_few_adequate_final_gate_domains() ->
     state = synthesis_pending_transition(
         FINAL_GATE_CONFIG.minimum_adequate_non_source_domains - 1, True, FINAL_GATE_CONFIG
     )
-    assert state is ClaimState.DORMANT
+    assert state is AdmissionState.DORMANT
 
 
 def test_synthesis_pending_admitted_when_predicates_pass() -> None:
     state = synthesis_pending_transition(
         FINAL_GATE_CONFIG.minimum_adequate_non_source_domains, True, FINAL_GATE_CONFIG
     )
-    assert state is ClaimState.ADMITTED
+    assert state is AdmissionState.ADMITTED
 
 
 def test_synthesis_pending_rejected_when_predicates_fail() -> None:
     state = synthesis_pending_transition(
         FINAL_GATE_CONFIG.minimum_adequate_non_source_domains, False, FINAL_GATE_CONFIG
     )
-    assert state is ClaimState.REJECTED_CLAIM
+    assert state is AdmissionState.REJECTED
 
 
 def test_krum_input_excludes_source() -> None:

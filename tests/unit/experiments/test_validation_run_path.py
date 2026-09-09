@@ -65,9 +65,9 @@ def test_baseline_implementation_validation_dispatches_to_baseline_cell(
         evidence: PreparedEvidenceCounts,
     ) -> tuple[object, tuple[object, ...]]:
         called.append(cell.method)
-        from fedsira.domain.enums import ClaimState
+        from fedsira.domain.enums import AdmissionState
 
-        return ClaimState.ADMITTED, ()
+        return AdmissionState.ADMITTED, ()
 
     monkeypatch.setattr(ProtocolCellExecutor, "_execute_baseline_cell", fake_baseline)
     evidence = PreparedEvidenceCounts(

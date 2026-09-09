@@ -6,12 +6,12 @@ from pathlib import Path
 from fedsira.artifacts.records import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.artifacts.validation import validate_artifact_lifecycle_readable
 from fedsira.config.models import MaterialityConfig
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ClaimOpeningMode
+from fedsira.domain.enums import AdmissionOpeningMode, ArtifactFamily, ArtifactLifecycleState
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
-    ClaimReason,
     CollapseDecisionPassed,
+    CollapseReason,
     FinalGateRequired,
     FrozenDomainModel,
     MaterialityDecision,
@@ -28,7 +28,7 @@ from fedsira.evaluation.comparisons import (
     ComparisonResult,
     ComparisonState,
 )
-from fedsira.experiments.definitions import ClaimFamily
+from fedsira.experiments.definitions import ComparisonFamily
 from fedsira.io.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
@@ -76,7 +76,7 @@ class CollapseDecision(FrozenDomainModel):
     primary_material_effect: MetricName | None
     adjusted_p_value: PValue | None
     constraint_passes: MaterialityDecision
-    reason: ClaimReason
+    reason: CollapseReason
 
 
 class ResolvedCore(FrozenDomainModel):
@@ -84,7 +84,7 @@ class ResolvedCore(FrozenDomainModel):
     plurality_survives: CollapseDecisionPassed
     direct_source_exclusion_survives: CollapseDecisionPassed
     external_verification_survives: CollapseDecisionPassed
-    opening_mode: ClaimOpeningMode
+    opening_mode: AdmissionOpeningMode
     reproduction_row_requirement: ReproductionRowRequirement
     row_verification_mode: RowVerificationMode
     production_update_rule: ProductionUpdateRule
@@ -130,7 +130,9 @@ def resolve_core_mapping(
     external_verification_survives: CollapseDecisionPassed,
 ) -> ResolvedCore:
     opening_mode = (
-        ClaimOpeningMode.PROPOSAL_ASSISTED if proposal_survives else ClaimOpeningMode.CANDIDATE_FREE
+        AdmissionOpeningMode.PROPOSAL_ASSISTED
+        if proposal_survives
+        else AdmissionOpeningMode.CANDIDATE_FREE
     )
     if plurality_survives and external_verification_survives:
         return ResolvedCore(
@@ -194,7 +196,7 @@ def resolve_all_eight_cases() -> tuple[ResolvedCoreCase, ...]:
 
 
 def _family_comparisons(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     comparison_results: tuple[ComparisonFamilyResult, ...],
 ) -> tuple[ComparisonResult, ...]:
     return tuple(
@@ -206,7 +208,7 @@ def _family_comparisons(
 
 
 def _best_passed_metric(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     comparison_results: tuple[ComparisonFamilyResult, ...],
     allowed_metrics: frozenset[ComparisonMetric],
 ) -> tuple[MetricName | None, PValue | None]:
@@ -236,13 +238,13 @@ def _defined_within(
 
 
 def _constraints_pass(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     evaluation: CollapseEvaluationInput | None,
     materiality: MaterialityConfig | None,
 ) -> BooleanValue:
     if evaluation is None or materiality is None:
         return False
-    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+    if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
         return _defined_within(
             evaluation.proposal_legitimate_admission_degradation,
             materiality.legitimate_admission_noninferiority_margin,
@@ -250,7 +252,7 @@ def _constraints_pass(
             evaluation.proposal_malicious_admission_worsening,
             materiality.proposal_malicious_admission_worsening_maximum,
         )
-    if family is ClaimFamily.PLURALITY_NECESSITY:
+    if family is ComparisonFamily.PLURALITY_NECESSITY:
         return _defined_within(
             evaluation.plurality_legitimate_admission_degradation,
             materiality.legitimate_admission_noninferiority_margin,
@@ -258,7 +260,7 @@ def _constraints_pass(
             evaluation.plurality_supported_harm,
             materiality.supported_macro_f1_noninferiority_margin,
         )
-    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+    if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
         return (
             _defined_within(
                 evaluation.source_exclusion_target_f1_drop,
@@ -273,7 +275,7 @@ def _constraints_pass(
                 materiality.benign_false_alarm_rate_noninferiority_margin,
             )
         )
-    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+    if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
         return _defined_within(
             evaluation.external_verification_legitimate_admission_degradation,
             materiality.legitimate_admission_noninferiority_margin,
@@ -281,20 +283,20 @@ def _constraints_pass(
     raise ValueError(f"{family.value} is not a collapse family")
 
 
-def _decision_kind(family: ClaimFamily) -> CollapseDecisionKind:
-    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+def _decision_kind(family: ComparisonFamily) -> CollapseDecisionKind:
+    if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
         return CollapseDecisionKind.PROPOSAL_ASSISTANCE
-    if family is ClaimFamily.PLURALITY_NECESSITY:
+    if family is ComparisonFamily.PLURALITY_NECESSITY:
         return CollapseDecisionKind.PLURALITY
-    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+    if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
         return CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
-    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+    if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
         return CollapseDecisionKind.EXTERNAL_VERIFICATION
     raise ValueError(f"{family.value} is not a collapse family")
 
 
-def _positive_metrics(family: ClaimFamily) -> frozenset[ComparisonMetric]:
-    if family is ClaimFamily.PROPOSAL_SCREEN_NECESSITY:
+def _positive_metrics(family: ComparisonFamily) -> frozenset[ComparisonMetric]:
+    if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
         return frozenset(
             (
                 ComparisonMetric.FALSE_LAUNCH,
@@ -302,13 +304,13 @@ def _positive_metrics(family: ClaimFamily) -> frozenset[ComparisonMetric]:
                 ComparisonMetric.POST_EVIDENCE_OVERHEAD,
             )
         )
-    if family is ClaimFamily.PLURALITY_NECESSITY:
+    if family is ComparisonFamily.PLURALITY_NECESSITY:
         return frozenset(
             (ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1)
         )
-    if family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM:
+    if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
         return frozenset((ComparisonMetric.ATTACK_SUCCESS_RATE,))
-    if family is ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY:
+    if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
         return frozenset(
             (ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1)
         )
@@ -316,7 +318,7 @@ def _positive_metrics(family: ClaimFamily) -> frozenset[ComparisonMetric]:
 
 
 def collapse_decision_from_comparison_families(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     comparison_results: tuple[ComparisonFamilyResult, ...],
     evaluation: CollapseEvaluationInput | None,
     materiality_config: MaterialityConfig | None,

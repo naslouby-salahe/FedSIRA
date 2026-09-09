@@ -5,8 +5,6 @@ from _repo import SRC_ROOT
 ROADMAP_MODULES = frozenset(
     {
         "__init__.py",
-        "analysis/__init__.py",
-        "analysis/claims.py",
         "artifacts/__init__.py",
         "artifacts/fingerprints.py",
         "artifacts/graph.py",
@@ -85,7 +83,7 @@ ROADMAP_MODULES = frozenset(
         "learning/training.py",
         "protocol/__init__.py",
         "protocol/admission.py",
-        "protocol/claim_contract.py",
+        "protocol/capability_contract.py",
         "protocol/proposal.py",
         "protocol/reproduction.py",
         "protocol/specification.py",

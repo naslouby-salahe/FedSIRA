@@ -8,9 +8,7 @@ from fedsira.runtime.environment import EnvironmentMismatch
 runner = CliRunner()
 
 
-def _no_mismatches(
-    _workspace_path: object, _rar_archives_present: object
-) -> tuple[EnvironmentMismatch, ...]:
+def _no_mismatches(_rar_archives_present: object) -> tuple[EnvironmentMismatch, ...]:
     return ()
 
 

@@ -28,7 +28,7 @@ def make_metadata(payload_tensor_count: int = 0) -> CommunicationMessageMetadata
         round_index=0,
         sender="SERVER",
         receiver="DANMINI_DOORBELL",
-        claim_contract_hash=None,
+        capability_contract_hash=None,
         payload_tensor_count=payload_tensor_count,
     )
 
@@ -50,7 +50,7 @@ def test_encode_message_metadata_has_length_prefix_and_stable_json() -> None:
     assert length == len(payload)
     decoded = json.loads(payload)
     assert decoded["schema_version"] == COMMUNICATION_SCHEMA
-    assert decoded["claim_contract_hash"] is None
+    assert decoded["capability_contract_hash"] is None
     assert list(payload).count(ord(" ")) == 0
 
 

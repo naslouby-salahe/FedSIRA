@@ -12,7 +12,7 @@ from fedsira.evaluation.metrics import (
     clean_proposal_oracle_label,
     compute_confusion_counts,
     compute_confusion_counts_by_class,
-    dormant_claim_rate,
+    dormant_admission_rate,
     f1_for_class,
     false_launch_rate,
     false_negative_rate_for_class,
@@ -188,11 +188,11 @@ def test_malicious_admission_rate_and_legitimate_admission_rate() -> None:
     assert legitimate_admission_rate([True, True, False]).value == 2 / 3
 
 
-def test_verifier_and_reproduction_abstention_rates_and_dormant_claim_rate() -> None:
+def test_verifier_and_reproduction_abstention_rates_and_dormant_admission_rate() -> None:
     assert verifier_abstention_rate(0, 0).value is None
     assert verifier_abstention_rate(1, 4).value == 0.25
     assert reproduction_abstention_rate(2, 5).value == 0.4
-    assert dormant_claim_rate(3, 10).value == 0.3
+    assert dormant_admission_rate(3, 10).value == 0.3
 
 
 def test_auroc_one_vs_rest_perfect_separation() -> None:
@@ -237,7 +237,7 @@ def test_false_same_capability_certification_rate_numeric() -> None:
 
 
 def test_clean_proposal_oracle_label_na_below_defined_domain_threshold() -> None:
-    capability_claim_config = CONFIG.capability_claim
+    capability_contract_config = CONFIG.capability_contract
     label = clean_proposal_oracle_label(
         MetricResult(value=0.9, denominator=10),
         MetricResult(value=0.3, denominator=10),
@@ -246,13 +246,13 @@ def test_clean_proposal_oracle_label_na_below_defined_domain_threshold() -> None
         defined_domain_count=5,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
-        capability_claim_config=capability_claim_config,
+        capability_contract_config=capability_contract_config,
     )
     assert label == ProposalOracleLabel.NA
 
 
 def test_clean_proposal_oracle_label_valid_when_all_thresholds_pass() -> None:
-    capability_claim_config = CONFIG.capability_claim
+    capability_contract_config = CONFIG.capability_contract
     label = clean_proposal_oracle_label(
         MetricResult(value=0.85, denominator=10),
         MetricResult(value=0.25, denominator=10),
@@ -261,13 +261,13 @@ def test_clean_proposal_oracle_label_valid_when_all_thresholds_pass() -> None:
         defined_domain_count=7,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
-        capability_claim_config=capability_claim_config,
+        capability_contract_config=capability_contract_config,
     )
     assert label == ProposalOracleLabel.ORACLE_VALID
 
 
 def test_clean_proposal_oracle_label_invalid_when_a_threshold_fails() -> None:
-    capability_claim_config = CONFIG.capability_claim
+    capability_contract_config = CONFIG.capability_contract
     label = clean_proposal_oracle_label(
         MetricResult(value=0.5, denominator=10),
         MetricResult(value=0.25, denominator=10),
@@ -276,7 +276,7 @@ def test_clean_proposal_oracle_label_invalid_when_a_threshold_fails() -> None:
         defined_domain_count=7,
         expected_domain_count=8,
         generic_defined_domain_fraction_minimum=0.8,
-        capability_claim_config=capability_claim_config,
+        capability_contract_config=capability_contract_config,
     )
     assert label == ProposalOracleLabel.ORACLE_INVALID
 

@@ -1,6 +1,6 @@
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import ClaimState, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, TernaryOutcome
 from fedsira.protocol.verification import (
     byzantine_selection_order,
     construct_above_bound_panel,
@@ -48,22 +48,22 @@ def test_panel_votes_are_one_per_domain() -> None:
 
 def test_verification_pending_transition_insufficient_panel_is_uncertified() -> None:
     state = verification_pending_transition(2, 2, True, VERIFICATION_CONFIG)
-    assert state is ClaimState.REPRODUCTION_PENDING
+    assert state is AdmissionState.REPRODUCTION_PENDING
 
 
 def test_verification_pending_transition_panel_fails_threshold() -> None:
     state = verification_pending_transition(3, 1, True, VERIFICATION_CONFIG)
-    assert state is ClaimState.REPRODUCTION_PENDING
+    assert state is AdmissionState.REPRODUCTION_PENDING
 
 
 def test_verification_pending_transition_passes_but_row_requirement_not_reached() -> None:
     state = verification_pending_transition(3, 2, False, VERIFICATION_CONFIG)
-    assert state is ClaimState.REPRODUCTION_PENDING
+    assert state is AdmissionState.REPRODUCTION_PENDING
 
 
 def test_verification_pending_transition_passes_and_row_requirement_reached() -> None:
     state = verification_pending_transition(3, 2, True, VERIFICATION_CONFIG)
-    assert state is ClaimState.SYNTHESIS_PENDING
+    assert state is AdmissionState.SYNTHESIS_PENDING
 
 
 def test_verifier_assignment_seed_for_row_is_deterministic_and_row_specific() -> None:

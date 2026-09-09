@@ -2,8 +2,16 @@ from pathlib import Path
 
 from fedsira.artifacts.graph import load_published_artifact_graph, stale_artifact_identities
 from fedsira.cli.commands import REPOSITORY_ROOT
-from fedsira.domain.enums import ArtifactFamily
-from fedsira.domain.types import BooleanValue, ExperimentName, OverwriteExisting
+from fedsira.domain.enums import AdmissionState, ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.types import (
+    BooleanValue,
+    EvidenceCycleIndex,
+    ExperimentName,
+    MetricName,
+    MetricValue,
+    OverwriteExisting,
+)
+from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -11,11 +19,13 @@ from fedsira.experiments.collapse import (
     read_resolved_core,
 )
 from fedsira.experiments.definitions import (
+    ADMISSION_DELAY_DECOMPOSITION_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
-    ClaimFamily,
+    ComparisonFamily,
     experiment_by_name,
 )
 from fedsira.experiments.planning import (
+    ExperimentPlan,
     ScientificCell,
     build_plan,
     validate_planned_cell_count_invariant,
@@ -24,6 +34,7 @@ from fedsira.experiments.runner import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    PersistedExecutionRecord,
     PersistedFailureDetail,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
@@ -36,17 +47,15 @@ from fedsira.io.paths import (
     workspace_root_for_family,
 )
 from fedsira.reporting.export import (
-    claim_definition_count,
-    derive_claim_states_for_export,
     export_experiment_report,
     export_project_summary,
 )
+from fedsira.reporting.figures import EfficiencyMetricObservation, EvidenceStateFraction
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
     ExperimentTerminalCount,
     terminal_count_for_planned_experiment,
-    verify_claim_states_derivable,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
     verify_no_stale_ancestors,
@@ -59,11 +68,11 @@ from fedsira.runtime.state import (
     current_application_context,
 )
 
-_COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
-    ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
-    ClaimFamily.PLURALITY_NECESSITY,
-    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
-    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+_COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
+    ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
+    ComparisonFamily.PLURALITY_NECESSITY,
+    ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
+    ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
 )
 
 
@@ -123,8 +132,6 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     terminal_verification = verify_experiments_reached_terminal_state(
         lifecycle_records, experiment_names
     )
-    claim_states = derive_claim_states_for_export()
-    claim_verification = verify_claim_states_derivable(claim_states, claim_definition_count())
     artifact_roots = (
         REPOSITORY_ROOT / preprocessing_root(),
         REPOSITORY_ROOT / OUTPUTS_ROOT / "artifacts",
@@ -139,20 +146,24 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         *count_verification.failures,
         *completion_verification.failures,
         *terminal_verification.failures,
-        *claim_verification.failures,
         *stale_ancestor_verification.failures,
     )
     verification = CompletenessVerificationResult(passed=not failures, failures=failures)
     collapse_decisions = _load_collapse_decisions(store)
+    comparison_results = _project_comparison_results(plan, store)
+    outcomes = _project_outcomes(plan, store)
     export = export_project_summary(
         plan,
-        claim_states,
         lifecycle_records,
         verification,
         collapse_decisions=collapse_decisions,
         resolved_core=materialize_resolved_core(collapse_decisions)
         if collapse_decisions is not None
         else None,
+        comparison_results=comparison_results,
+        outcomes=outcomes,
+        evidence_trajectory=project_evidence_trajectory(store),
+        telemetry=project_efficiency_telemetry(outcomes),
     )
     for path in export.exported_paths:
         print(f"exported {path}")
@@ -161,6 +172,120 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         for failure in export.verification.failures:
             print(f"  {failure}")
         raise SystemExit(1)
+
+
+def _project_comparison_results(
+    plan: ExperimentPlan,
+    store: ExecutionRecordStore,
+) -> tuple[ComparisonFamilyResult, ...]:
+    return tuple(
+        comparison
+        for planned in plan.experiments
+        for comparison in _load_experiment_result(planned.definition.name, store).comparison_results
+    )
+
+
+def _project_outcomes(
+    plan: ExperimentPlan,
+    store: ExecutionRecordStore,
+) -> tuple[CellExecutionOutcome, ...]:
+    return tuple(
+        outcome
+        for planned in plan.experiments
+        for outcome in _load_experiment_result(planned.definition.name, store).outcomes
+    )
+
+
+def project_efficiency_telemetry(
+    outcomes: tuple[CellExecutionOutcome, ...],
+) -> tuple[EfficiencyMetricObservation, ...]:
+    metric_names: tuple[MetricName, ...] = (
+        "post-evidence-wall-clock-seconds",
+        "communication-bytes",
+        "peak-gpu-memory-bytes",
+    )
+    methods = tuple(sorted(frozenset(outcome.cell.method for outcome in outcomes)))
+    observations: list[EfficiencyMetricObservation] = []
+    for metric_name in metric_names:
+        for method in methods:
+            values = tuple(
+                value
+                for outcome in outcomes
+                if outcome.completed and outcome.cell.method == method
+                for recorded_metric, value in outcome.metrics
+                if recorded_metric == metric_name and value is not None
+            )
+            if values:
+                observations.append(
+                    EfficiencyMetricObservation(
+                        method=method,
+                        metric=metric_name,
+                        value=sum(values) / len(values),
+                    )
+                )
+    return tuple(observations)
+
+
+def _record_metric(record: PersistedExecutionRecord, name: MetricName) -> MetricValue | None:
+    for metric_name, value in record.metrics:
+        if metric_name == name:
+            return value
+    return None
+
+
+def _state_from_encoding(value: MetricValue) -> AdmissionState:
+    states = (
+        (1.0, AdmissionState.ADMITTED),
+        (-1.0, AdmissionState.REJECTED),
+        (-2.0, AdmissionState.EXPIRED),
+        (0.0, AdmissionState.DORMANT),
+    )
+    for encoding, state in states:
+        if value == encoding:
+            return state
+    raise ValueError(f"unknown terminal-state encoding: {value}")
+
+
+def project_evidence_trajectory(
+    store: ExecutionRecordStore,
+) -> tuple[EvidenceStateFraction, ...]:
+    config = current_application_context().scientific_config
+    records = tuple(
+        record
+        for record in store.read_all_outcomes(ADMISSION_DELAY_DECOMPOSITION_NAME)
+        if record.terminal_state is ExperimentLifecycleState.COMPLETED
+    )
+    if not records:
+        return ()
+    horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
+    result: list[EvidenceStateFraction] = []
+    displayed_states = (
+        AdmissionState.DORMANT,
+        AdmissionState.ADMITTED,
+        AdmissionState.REJECTED,
+        AdmissionState.EXPIRED,
+    )
+    for cycle in range(horizon + 1):
+        for state in displayed_states:
+            count = sum(1 for record in records if _state_at_evidence_cycle(record, cycle) is state)
+            if count:
+                result.append(
+                    EvidenceStateFraction(cycle=cycle, state=state, fraction=count / len(records))
+                )
+    return tuple(result)
+
+
+def _state_at_evidence_cycle(
+    record: PersistedExecutionRecord,
+    cycle: EvidenceCycleIndex,
+) -> AdmissionState:
+    terminal_encoding = _record_metric(record, "terminal-state")
+    if terminal_encoding is None:
+        raise ValueError("completed evidence-arrival record lacks terminal-state metric")
+    arrival_cycle = _record_metric(record, "evidence-arrival-cycle")
+    if arrival_cycle is None or cycle < arrival_cycle:
+        return AdmissionState.DORMANT
+    return _state_from_encoding(terminal_encoding)
 
 
 def _resolved_core_complete() -> BooleanValue:

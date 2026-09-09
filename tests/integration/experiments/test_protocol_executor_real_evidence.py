@@ -209,7 +209,7 @@ def test_proposal_assisted_opening_cell_executes_without_crashing(prepared_root:
     assert metrics["terminal-state"] in {1.0, -1.0, 0.0}
 
 
-def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
+def test_proposal_assisted_opening_reports_a_defined_capability_contract_decision(
     prepared_root: Path,
 ) -> None:
     executor = ProtocolCellExecutor(
@@ -219,7 +219,7 @@ def test_proposal_assisted_opening_reports_a_defined_claim_contract_decision(
         _opening_cell(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES, 6)
     )
     metrics = dict(outcome.metrics)
-    assert metrics["claim-contract-passes"] in {0.0, 1.0}
+    assert metrics["capability-contract-passes"] in {0.0, 1.0}
 
 
 def test_client_review_baseline_executes_without_crashing(prepared_root: Path) -> None:

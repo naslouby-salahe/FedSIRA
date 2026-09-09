@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from fedsira.config.models import VerificationConfig
-from fedsira.domain.enums import ClaimState, SeedNamespace, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, SeedNamespace, TernaryOutcome
 from fedsira.domain.types import (
     AllowSourceAsVerifier,
     ArtifactDigest,
@@ -117,11 +117,11 @@ def verification_pending_transition(
     panel_positive_report_count: ObservedPositiveReportCount,
     resolved_row_requirement_reached: ResolvedRowRequirementReached,
     verification_config: VerificationConfig,
-) -> ClaimState:
+) -> AdmissionState:
     if adequate_eligible_verifier_count < verification_config.panel_size:
-        return ClaimState.REPRODUCTION_PENDING
+        return AdmissionState.REPRODUCTION_PENDING
     if panel_positive_report_count < verification_config.required_positive_reports:
-        return ClaimState.REPRODUCTION_PENDING
+        return AdmissionState.REPRODUCTION_PENDING
     if resolved_row_requirement_reached:
-        return ClaimState.SYNTHESIS_PENDING
-    return ClaimState.REPRODUCTION_PENDING
+        return AdmissionState.SYNTHESIS_PENDING
+    return AdmissionState.REPRODUCTION_PENDING

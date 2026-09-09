@@ -241,7 +241,7 @@ class EvidenceMinimaConfig(FrozenConfigModel):
     proposal_screen_target_examples: MinimumExampleCount
 
 
-class CapabilityClaimConfig(FrozenConfigModel):
+class CapabilityContractConfig(FrozenConfigModel):
     target_f1_minimum: TargetF1
     target_f1_gain_over_anchor_minimum: TargetF1Gain
     supported_macro_f1_drop_maximum: SupportedMacroF1Drop
@@ -250,7 +250,7 @@ class CapabilityClaimConfig(FrozenConfigModel):
     evidence_minima: EvidenceMinimaConfig
 
 
-class ClaimOpeningConfig(FrozenConfigModel):
+class AdmissionOpeningConfig(FrozenConfigModel):
     screen_domains: ScreenDomainCount
     required_positive_screen_domains: ScreenDomainCount
     candidate_free_required_adequate_domains: DomainCount
@@ -343,7 +343,7 @@ class DiagnosticRandomVerifierProfileConfig(FrozenConfigModel):
 
 
 class ProtocolConfig(FrozenConfigModel):
-    claim_opening: ClaimOpeningConfig
+    admission_opening: AdmissionOpeningConfig
     proposal_screen: ProposalScreenConfig
     resource_horizon: ResourceHorizonConfig
     verification: VerificationConfig
@@ -600,7 +600,7 @@ class MaterialityConfig(FrozenConfigModel):
 
 
 class TechnicalCompletionConfig(FrozenConfigModel):
-    minimum_complete_pairs_for_claim_support: MinimumCompletePairCount
+    minimum_complete_pairs_for_inference: MinimumCompletePairCount
 
 
 class PublicationRoundingConfig(FrozenConfigModel):
@@ -686,7 +686,7 @@ class SecondaryGeneralizationConfig(FrozenConfigModel):
     malicious_admission_worsening_maximum: RateWorsening
 
 
-class ClaimSupportThresholdsConfig(FrozenConfigModel):
+class ScientificEvidenceThresholdsConfig(FrozenConfigModel):
     byzantine_operating_region: ByzantineOperatingRegionConfig
     safe_dormancy: SafeDormancyConfig
     capability_granularity_boundary: CapabilityGranularityBoundaryConfig
@@ -701,7 +701,7 @@ class ValidationTolerancesConfig(FrozenConfigModel):
 
 class ScientificConfig(FrozenConfigModel):
     datasets: DatasetsConfig
-    capability_claim: CapabilityClaimConfig
+    capability_contract: CapabilityContractConfig
     protocol: ProtocolConfig
     model: ModelConfig
     seeds_and_determinism: SeedsAndDeterminismConfig
@@ -709,7 +709,7 @@ class ScientificConfig(FrozenConfigModel):
     baselines: BaselinesConfig
     metrics_and_statistics: MetricsAndStatisticsConfig
     execution: ExecutionConfig
-    claim_support_thresholds: ClaimSupportThresholdsConfig
+    evidence_thresholds: ScientificEvidenceThresholdsConfig
     validation_tolerances: ValidationTolerancesConfig
 
 
@@ -742,7 +742,3 @@ class TestFixtureConfig(FrozenConfigModel):
     smoke_confusion_false_negative: ConfusionCount
     smoke_confusion_true_negative: ConfusionCount
     smoke_nonzero_production_weight: ProductionWeight
-
-
-class SmokeConfig(FrozenConfigModel):
-    smoke_format_version: ConfigFormatVersion

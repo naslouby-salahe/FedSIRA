@@ -111,7 +111,7 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
         family=ProducerFingerprintFamily.OPENING_VERIFIER_CERTIFICATE_SYNTHESIS_FINAL_GATE,
         entry_modules=(
             "fedsira.protocol.specification",
-            "fedsira.protocol.claim_contract",
+            "fedsira.protocol.capability_contract",
             "fedsira.protocol.proposal",
             "fedsira.protocol.reproduction",
             "fedsira.protocol.verification",
@@ -149,15 +149,6 @@ PRODUCER_FINGERPRINT_SPECIFICATIONS: tuple[ProducerFingerprintSpecification, ...
         family=ProducerFingerprintFamily.STATISTICAL_COMPARISON_ARTIFACT,
         entry_modules=("fedsira.evaluation.statistics", "fedsira.evaluation.comparisons"),
         relevant_external_import_names=("numpy", "scipy", "statsmodels"),
-    ),
-    ProducerFingerprintSpecification(
-        family=ProducerFingerprintFamily.CLAIM_STATE_ARTIFACT,
-        entry_modules=(
-            "fedsira.analysis.claims",
-            "fedsira.evaluation.summaries",
-            "fedsira.evaluation.comparisons",
-        ),
-        relevant_external_import_names=("numpy",),
     ),
     ProducerFingerprintSpecification(
         family=ProducerFingerprintFamily.REPORT_SOURCE_EXPORT,

@@ -2,7 +2,7 @@ from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from fedsira.config.models import CapabilityClaimConfig, CleanOracleMaterialityConfig
+from fedsira.config.models import CapabilityContractConfig, CleanOracleMaterialityConfig
 from fedsira.domain.models import (
     ConfusionCounts,
     FalseSameCapabilityReason,
@@ -288,7 +288,7 @@ def clean_proposal_oracle_label(
     defined_domain_count: DomainCount,
     expected_domain_count: DomainCount,
     generic_defined_domain_fraction_minimum: Probability,
-    capability_claim_config: CapabilityClaimConfig,
+    capability_contract_config: CapabilityContractConfig,
 ) -> ProposalOracleLabel:
     required_domain_count = minimum_defined_domain_count(
         expected_domain_count, generic_defined_domain_fraction_minimum
@@ -303,11 +303,12 @@ def clean_proposal_oracle_label(
     ):
         return ProposalOracleLabel.NA
     if (
-        aggregate_target_f1.value >= capability_claim_config.target_f1_minimum
-        and target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
-        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        aggregate_target_f1.value >= capability_contract_config.target_f1_minimum
+        and target_f1_gain.value >= capability_contract_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value
+        <= capability_contract_config.supported_macro_f1_drop_maximum
         and benign_far_increase.value
-        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+        <= capability_contract_config.benign_false_alarm_rate_increase_maximum
     ):
         return ProposalOracleLabel.ORACLE_VALID
     return ProposalOracleLabel.ORACLE_INVALID
@@ -377,13 +378,14 @@ def reproduction_abstention_rate(
     )
 
 
-def dormant_claim_rate(
-    dormant_claim_count: AdmissionCount, eligible_claim_count: AdmissionCount
+def dormant_admission_rate(
+    dormant_admission_count: AdmissionCount, eligible_admission_count: AdmissionCount
 ) -> MetricResult:
-    if eligible_claim_count == 0:
+    if eligible_admission_count == 0:
         return MetricResult(value=None, denominator=0)
     return MetricResult(
-        value=dormant_claim_count / eligible_claim_count, denominator=eligible_claim_count
+        value=dormant_admission_count / eligible_admission_count,
+        denominator=eligible_admission_count,
     )
 
 

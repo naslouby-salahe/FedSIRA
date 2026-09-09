@@ -3,28 +3,21 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.models import FinalGateConfig
-from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
+from fedsira.domain.enums import AdmissionState
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
-    ArtifactDigest,
-    CellPhaseIdentity,
-    DomainId,
     FinalGateArtifactValid,
     FinalGatePredicatesPass,
-    FrozenDomainModel,
-    GitCommit,
     InvariantChecksPassed,
     PluralityActive,
-    ScientificCellSemanticKey,
-    SeedBundle,
 )
 from fedsira.evaluation.summaries import quantile_type7
 
 
 def validate_admission_requires_final_gate(
-    state: ClaimState, final_gate_artifact_is_valid: FinalGateArtifactValid
+    state: AdmissionState, final_gate_artifact_is_valid: FinalGateArtifactValid
 ) -> None:
-    if state is ClaimState.ADMITTED and not final_gate_artifact_is_valid:
+    if state is AdmissionState.ADMITTED and not final_gate_artifact_is_valid:
         raise ValueError("Admitted state requires a valid final-gate artifact")
 
 
@@ -88,48 +81,3 @@ def final_gate_predicates_pass(
         and pooled_benign_far_increase.value
         <= final_gate_config.benign_false_alarm_rate_increase_maximum
     )
-
-
-class AdmissionArtifactContent(FrozenDomainModel):
-    anchor_checkpoint_identity: ArtifactDigest
-    source_commitment_identity: ArtifactDigest | None
-    claim_identity: ArtifactDigest
-    reproducer_assignment_order: tuple[DomainId, ...]
-    reproduction_commitment_hashes: tuple[ArtifactDigest, ...]
-    verifier_record: tuple[ArtifactDigest, ...] | VerificationOmissionMarker
-    krum_configuration_identity: ArtifactDigest | None
-    production_update_identity: ArtifactDigest
-    final_gate_sample_manifest_identity: ArtifactDigest
-    final_gate_metrics_identity: ArtifactDigest
-    seed_bundle: SeedBundle
-    semantic_cell_key: ScientificCellSemanticKey
-    cell_phase_identity: CellPhaseIdentity
-    upstream_dependency_fingerprints: tuple[ArtifactDigest, ...]
-    producer_component_fingerprint: ArtifactDigest
-    runtime_dependency_fingerprint: ArtifactDigest
-    repository_commit: GitCommit
-    dependency_lock_digest: ArtifactDigest
-    environment_fingerprint: ArtifactDigest
-
-
-def validate_admission_artifact_content(
-    content: AdmissionArtifactContent,
-    opening_mode: ClaimOpeningMode,
-    is_plurality_active: PluralityActive,
-) -> None:
-    if (
-        opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED
-        and content.source_commitment_identity is None
-    ):
-        raise ValueError(
-            "proposal-assisted admission artifact must record source commitment identity"
-        )
-    if is_plurality_active and content.krum_configuration_identity is None:
-        raise ValueError(
-            "plurality-path admission artifact must record Krum configuration identity"
-        )
-    if isinstance(content.verifier_record, tuple) and len(content.verifier_record) == 0:
-        raise ValueError(
-            "admission artifact must record verifier assignments/reports or an explicit "
-            "External Verification Not Used marker, never an empty record"
-        )

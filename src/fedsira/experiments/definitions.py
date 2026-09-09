@@ -21,10 +21,10 @@ from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedu
 from fedsira.runtime.state import current_application_context
 
 
-class ClaimFamily(StrEnum):
+class ComparisonFamily(StrEnum):
     PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"
     PLURALITY_NECESSITY = "plurality necessity"
-    SOURCE_EXCLUSION_CENTRAL_CLAIM = "source-exclusion central claim"
+    SOURCE_EXCLUSION_CENTRAL_EFFECT = "source-exclusion central effect"
     EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"
     PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"
     REPRODUCER_ROBUSTNESS = "reproducer robustness"
@@ -185,7 +185,7 @@ class ExperimentDefinition(FrozenDomainModel):
     conditions: tuple[ConditionName, ...]
     seed_count: SeedCount
     nominal_cell_count: ScientificCellCount
-    claim_family: ClaimFamily | None
+    comparison_family: ComparisonFamily | None
     prerequisites: tuple[ExperimentName, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
 
@@ -338,7 +338,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=("primary",),
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=1,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(),
         ),
         ExperimentDefinition(
@@ -348,7 +348,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=("aggregate",),
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=1,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(),
         ),
         ExperimentDefinition(
@@ -358,7 +358,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=_BASELINE_FIXTURES,
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=17,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
         ExperimentDefinition(
@@ -368,7 +368,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(episode.value for episode in ProposalEpisode),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
-            claim_family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+            comparison_family=ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
         ExperimentDefinition(
@@ -381,7 +381,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in PluralityCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
-            claim_family=ClaimFamily.PLURALITY_NECESSITY,
+            comparison_family=ComparisonFamily.PLURALITY_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
         ExperimentDefinition(
@@ -391,7 +391,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
-            claim_family=ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+            comparison_family=ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
         ExperimentDefinition(
@@ -404,7 +404,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in ExternalVerificationCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
-            claim_family=ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+            comparison_family=ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
         ),
         ExperimentDefinition(
@@ -429,7 +429,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(scenario.value for scenario in PrimaryScenario),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=420,
-            claim_family=ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
+            comparison_family=ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY,
             prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
         ),
         ExperimentDefinition(
@@ -439,7 +439,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=_ABLATION_SCENARIOS,
             seed_count=confirmatory_seed_count,
             nominal_cell_count=180,
-            claim_family=ClaimFamily.MECHANISM_ABLATION,
+            comparison_family=ComparisonFamily.MECHANISM_ABLATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -454,7 +454,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in ReproducerCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=280,
-            claim_family=ClaimFamily.REPRODUCER_ROBUSTNESS,
+            comparison_family=ComparisonFamily.REPRODUCER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -464,7 +464,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in VerifierCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=100,
-            claim_family=ClaimFamily.VERIFIER_ROBUSTNESS,
+            comparison_family=ComparisonFamily.VERIFIER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -477,7 +477,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in BoundCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -487,7 +487,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=40,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -501,7 +501,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             ),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=90,
-            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -511,7 +511,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(mixture.value for mixture in RootCauseMixture),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
-            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -526,7 +526,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(regime.value for regime in HeterogeneityRegime),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=160,
-            claim_family=ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -540,7 +540,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=120,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -555,7 +555,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=("timed",),
             seed_count=3,
             nominal_cell_count=60,
-            claim_family=None,
+            comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
         ),
         ExperimentDefinition(
@@ -571,7 +571,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(scenario.value for scenario in SecondaryScenario),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=100,
-            claim_family=ClaimFamily.SECONDARY_GENERALIZATION,
+            comparison_family=ComparisonFamily.SECONDARY_GENERALIZATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
             dataset=DatasetId.CICIOT2023,
         ),

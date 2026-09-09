@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Final
 
 from fedsira.datasets.common import Role
-from fedsira.domain.enums import ClaimState, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, TernaryOutcome
 from fedsira.domain.types import (
     BaselineFullParticipationAllowed,
     DomainId,
@@ -173,12 +173,12 @@ def single_fresh_verifier_domain(
 
 def single_fresh_verifier_outcome(
     verifier_domain: DomainId | None, verifier_vote: TernaryOutcome | None
-) -> ClaimState:
+) -> AdmissionState:
     if verifier_domain is None:
-        return ClaimState.DORMANT
+        return AdmissionState.DORMANT
     if verifier_vote is TernaryOutcome.POSITIVE:
-        return ClaimState.ADMITTED
-    return ClaimState.REJECTED_CLAIM
+        return AdmissionState.ADMITTED
+    return AdmissionState.REJECTED
 
 
 def review_style_baseline_outcome(
@@ -186,9 +186,9 @@ def review_style_baseline_outcome(
     positive_report_count: ObservedPositiveReportCount,
     panel_size: VerifierCount,
     required_positive_reports: VerifierCount,
-) -> ClaimState:
+) -> AdmissionState:
     if adequate_reviewer_count < panel_size:
-        return ClaimState.DORMANT
+        return AdmissionState.DORMANT
     if positive_report_count >= required_positive_reports:
-        return ClaimState.ADMITTED
-    return ClaimState.REJECTED_CLAIM
+        return AdmissionState.ADMITTED
+    return AdmissionState.REJECTED

@@ -10,7 +10,7 @@ from fedsira.baselines.source_model import (
     client_review_then_retrain_should_discard_source_weights,
 )
 from fedsira.datasets.common import Role
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 
 
 def test_client_review_composite_screen_roles_and_reviewer_count() -> None:
@@ -34,11 +34,11 @@ def test_client_review_direct_admission_production_is_source() -> None:
 
 
 def test_client_review_then_retrain_discards_source_weights_only_when_admitted() -> None:
-    assert client_review_then_retrain_should_discard_source_weights(ClaimState.ADMITTED) is True
+    assert client_review_then_retrain_should_discard_source_weights(AdmissionState.ADMITTED) is True
     assert (
-        client_review_then_retrain_should_discard_source_weights(ClaimState.REJECTED_CLAIM) is False
+        client_review_then_retrain_should_discard_source_weights(AdmissionState.REJECTED) is False
     )
-    assert client_review_then_retrain_should_discard_source_weights(ClaimState.DORMANT) is False
+    assert client_review_then_retrain_should_discard_source_weights(AdmissionState.DORMANT) is False
 
 
 def test_client_review_then_retrain_local_epochs_is_five() -> None:

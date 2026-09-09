@@ -5,10 +5,8 @@ from pydantic import ValidationError
 
 from fedsira.config.loading import (
     PRODUCTION_CONFIG_PATH,
-    SMOKE_CONFIG_PATH,
     TEST_FIXTURE_CONFIG_PATH,
     load_scientific_config,
-    load_smoke_config,
     load_test_fixture_config,
 )
 
@@ -22,11 +20,6 @@ def test_production_config_loads_and_validates() -> None:
 def test_test_fixture_config_loads() -> None:
     config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     assert config.fixture_format_version == 1
-
-
-def test_smoke_config_loads() -> None:
-    config = load_smoke_config(SMOKE_CONFIG_PATH)
-    assert config.smoke_format_version == 1
 
 
 def test_missing_file_raises_value_error(tmp_path: Path) -> None:

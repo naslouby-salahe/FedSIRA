@@ -5,7 +5,7 @@ from enum import StrEnum
 
 from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config.models import BootstrapConfig, MultiplicityConfig
-from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
+from fedsira.domain.enums import CoreMethodIdentity, RootCauseMixture
 from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
@@ -44,7 +44,7 @@ from fedsira.experiments.definitions import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     AblationVariant,
     CapabilityContractGranularity,
-    ClaimFamily,
+    ComparisonFamily,
     EpistemicFailureType,
     ExternalVerificationCondition,
     HeterogeneityRegime,
@@ -110,27 +110,9 @@ class ComparisonMetric(StrEnum):
     FALSE_SAME_CAPABILITY_CERTIFICATION_RATE = "false-same-capability-certification-rate"
 
 
-class PairingKey(FrozenDomainModel):
-    dataset: DatasetId
-    experiment: ExperimentName
-    scientific_scenario: ScenarioName
-    master_seed: MasterSeed
-
-    @property
-    def pairing_identity(self) -> ComparisonName:
-        return "|".join(
-            (
-                self.dataset.value,
-                self.experiment,
-                self.scientific_scenario,
-                str(self.master_seed),
-            )
-        )
-
-
 class ComparisonDefinition(FrozenDomainModel):
     comparison_name: ComparisonName
-    family: ClaimFamily
+    family: ComparisonFamily
     experiment: ExperimentName
     scientific_scenario: ScenarioName
     method: MethodName
@@ -162,7 +144,7 @@ class ComparisonResult(FrozenDomainModel):
 
 
 class ComparisonFamilyResult(FrozenDomainModel):
-    family: ClaimFamily
+    family: ComparisonFamily
     comparisons: tuple[ComparisonResult, ...]
 
 
@@ -338,7 +320,7 @@ def apply_holm_adjustment(
 
 
 def build_comparison_name(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     experiment: ExperimentName,
     scenario: ScenarioName,
     method: MethodName,
@@ -366,7 +348,7 @@ def _reference_label(
 
 
 def _definition(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     experiment: ExperimentName,
     scenario: ScenarioName,
     method: MethodName,
@@ -445,7 +427,7 @@ def _non_inferiority(
 
 
 def _matrix(
-    family: ClaimFamily,
+    family: ComparisonFamily,
     experiment: ExperimentName,
     scenarios: tuple[ScenarioName, ...],
     method: MethodName,
@@ -499,7 +481,7 @@ REPRODUCER_COMPARATORS: tuple[MethodName, ...] = tuple(
 def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
-    family = ClaimFamily.PROPOSAL_SCREEN_NECESSITY
+    family = ComparisonFamily.PROPOSAL_SCREEN_NECESSITY
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
     method = OpeningMode.PROPOSAL_ASSISTED.value
     reference = OpeningMode.CANDIDATE_FREE.value
@@ -588,7 +570,7 @@ def _plurality_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return _matrix(
-        ClaimFamily.PLURALITY_NECESSITY,
+        ComparisonFamily.PLURALITY_NECESSITY,
         SINGLE_REPRODUCTION_NECESSITY_NAME,
         (
             PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
@@ -616,7 +598,7 @@ def _source_exclusion_comparisons() -> tuple[ComparisonDefinition, ...]:
     materiality = config.metrics_and_statistics.materiality
     return (
         _definition(
-            ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
+            ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
             PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
             SourceExclusionMethod.FULL_FEDSIRA.value,
@@ -627,6 +609,18 @@ def _source_exclusion_comparisons() -> tuple[ComparisonDefinition, ...]:
                 materiality.source_exclusion_asr_reduction_minimum,
             ),
         ),
+        _definition(
+            ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
+            SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+            PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+            SourceExclusionMethod.FULL_FEDSIRA.value,
+            BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value,
+            _non_inferiority(
+                ComparisonMetric.TARGET_F1,
+                ComparisonOrientation.HIGHER_IS_BETTER,
+                materiality.target_f1_gain_minimum,
+            ),
+        ),
     )
 
 
@@ -634,7 +628,7 @@ def _external_verification_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
     materiality = config.metrics_and_statistics.materiality
     return _matrix(
-        ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+        ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
         EXTERNAL_VERIFICATION_NECESSITY_NAME,
         (
             ExternalVerificationCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
@@ -706,7 +700,7 @@ def _primary_templates(
 def _primary_baseline_comparisons() -> tuple[ComparisonDefinition, ...]:
     return tuple(
         _definition(
-            ClaimFamily.PRIMARY_BASELINE_SUPERIORITY,
+            ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY,
             PRIMARY_CONFIRMATORY_EVALUATION_NAME,
             scenario.value,
             CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
@@ -763,7 +757,7 @@ def _reproducer_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
             templates = _reproducer_attack_templates()
         definitions.extend(
             _matrix(
-                ClaimFamily.REPRODUCER_ROBUSTNESS,
+                ComparisonFamily.REPRODUCER_ROBUSTNESS,
                 COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
                 (condition.value,),
                 CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
@@ -785,7 +779,7 @@ def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
         ):
             definitions.append(
                 _definition(
-                    ClaimFamily.VERIFIER_ROBUSTNESS,
+                    ComparisonFamily.VERIFIER_ROBUSTNESS,
                     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
                     condition.value,
                     profile.value,
@@ -805,7 +799,7 @@ def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
         ):
             definitions.append(
                 _definition(
-                    ClaimFamily.VERIFIER_ROBUSTNESS,
+                    ComparisonFamily.VERIFIER_ROBUSTNESS,
                     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
                     condition.value,
                     profile.value,
@@ -862,7 +856,7 @@ def _ablation_metric(
             ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
             ComparisonOrientation.LOWER_IS_BETTER,
         )
-    raise ValueError(f"ablation variant {variant} has no claim-bearing metric")
+    raise ValueError(f"ablation variant {variant} has no predeclared metric")
 
 
 def _ablation_threshold(
@@ -886,7 +880,7 @@ def _ablation_threshold(
     if metric is ComparisonMetric.LEGITIMATE_ADMISSION:
         return materiality.legitimate_admission_noninferiority_margin
     if variant is AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
-        granularity_thresholds = config.claim_support_thresholds.capability_granularity_boundary
+        granularity_thresholds = config.evidence_thresholds.capability_granularity_boundary
         return granularity_thresholds.false_same_capability_certification_rate_minimum
     raise ValueError(f"no material threshold for ablation metric {metric}")
 
@@ -908,7 +902,7 @@ def _ablation_comparisons() -> tuple[ComparisonDefinition, ...]:
         )
         definitions.append(
             _definition(
-                ClaimFamily.MECHANISM_ABLATION,
+                ComparisonFamily.MECHANISM_ABLATION,
                 MECHANISM_ABLATION_NAME,
                 ablation_scenario_for_variant(variant),
                 variant.value,
@@ -950,7 +944,7 @@ def _shared_epistemic_comparisons() -> tuple[ComparisonDefinition, ...]:
     )
     return tuple(
         _definition(
-            ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
             f"{failure_type.value}|{strength}",
             CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
@@ -967,11 +961,11 @@ def _shared_epistemic_comparisons() -> tuple[ComparisonDefinition, ...]:
 
 def _capability_boundary_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
-    granularity_thresholds = config.claim_support_thresholds.capability_granularity_boundary
+    granularity_thresholds = config.evidence_thresholds.capability_granularity_boundary
     threshold = granularity_thresholds.false_same_capability_certification_rate_minimum
     return tuple(
         _definition(
-            ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+            ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
             mixture.value,
             CapabilityContractGranularity.BROAD_TARGET_ONLY.value,
@@ -989,7 +983,7 @@ def _capability_boundary_comparisons() -> tuple[ComparisonDefinition, ...]:
 
 def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
-    boundary = config.claim_support_thresholds.heterogeneity_boundary
+    boundary = config.evidence_thresholds.heterogeneity_boundary
     methods = (
         CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
         BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
@@ -1004,7 +998,7 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
             definitions.extend(
                 (
                     _definition(
-                        ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+                        ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
                         HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
                         regime.value,
                         method,
@@ -1017,7 +1011,7 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
                         reference_scenario=HeterogeneityRegime.NATURAL.value,
                     ),
                     _definition(
-                        ClaimFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
+                        ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
                         HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
                         regime.value,
                         method,
@@ -1036,14 +1030,14 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
 
 def _secondary_generalization_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
-    boundary = config.claim_support_thresholds.secondary_generalization
+    boundary = config.evidence_thresholds.secondary_generalization
     references = (
         BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value,
         BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
     )
     definitions = list(
         _matrix(
-            ClaimFamily.SECONDARY_GENERALIZATION,
+            ComparisonFamily.SECONDARY_GENERALIZATION,
             SECONDARY_DATASET_GENERALIZATION_NAME,
             tuple(scenario.value for scenario in SecondaryScenario),
             CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
@@ -1059,7 +1053,7 @@ def _secondary_generalization_comparisons() -> tuple[ComparisonDefinition, ...]:
     )
     definitions.extend(
         _matrix(
-            ClaimFamily.SECONDARY_GENERALIZATION,
+            ComparisonFamily.SECONDARY_GENERALIZATION,
             SECONDARY_DATASET_GENERALIZATION_NAME,
             (SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,),
             CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,

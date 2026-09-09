@@ -1,48 +1,54 @@
-from fedsira.domain.enums import ProvenanceValidationOutcome
-from fedsira.domain.types import (
-    ArtifactDigest,
-    ArtifactInvalidated,
-    CreationContext,
-    DatasetSplitUpstreamChanged,
-    EnvironmentRecord,
-    FrozenDomainModel,
-    GitCommit,
-    ProducerCodeOrRuntimeChanged,
-    ProvenancePayloadStale,
-    ScientificConfigurationChanged,
-    ScientificConfigurationSubset,
-)
+import hashlib
+import os
+import platform
+import subprocess
+import sys
+from pathlib import Path
+
+import torch
+
+from fedsira.domain.types import ArtifactDigest, FrozenDomainModel, GitCommit
 
 
-class ProvenanceRecord(FrozenDomainModel):
-    scientific_configuration_subset: ScientificConfigurationSubset
-    dataset_split_upstream_identities: tuple[ArtifactDigest, ...]
-    producer_component_fingerprint: ArtifactDigest
-    external_dependency_fingerprint: ArtifactDigest
+class ReconstructionProvenance(FrozenDomainModel):
     repository_commit: GitCommit
-    dependency_lock_identity: ArtifactDigest
-    environment_record: EnvironmentRecord
-    creation_context: CreationContext
+    dependency_lock_digest: ArtifactDigest
+    environment_fingerprint: ArtifactDigest
 
 
-def classify_provenance_change(
-    payload_partial_or_stale: ProvenancePayloadStale,
-    scientific_configuration_changed: ScientificConfigurationChanged,
-    dataset_split_upstream_changed: DatasetSplitUpstreamChanged,
-    producer_code_or_runtime_changed: ProducerCodeOrRuntimeChanged,
-) -> ProvenanceValidationOutcome:
-    if payload_partial_or_stale:
-        return ProvenanceValidationOutcome.PARTIAL_OR_STALE_PAYLOAD
-    if scientific_configuration_changed:
-        return ProvenanceValidationOutcome.SCIENTIFIC_CONFIGURATION_MISMATCH
-    if dataset_split_upstream_changed:
-        return ProvenanceValidationOutcome.DATASET_SPLIT_UPSTREAM_MISMATCH
-    if producer_code_or_runtime_changed:
-        return ProvenanceValidationOutcome.PRODUCER_CODE_RUNTIME_MISMATCH
-    return ProvenanceValidationOutcome.NON_MATERIAL_CHANGE
+def collect_reconstruction_provenance(repository_root: Path) -> ReconstructionProvenance:
+    lock_path = repository_root / "uv.lock"
+    if not lock_path.is_file():
+        raise ValueError(f"required dependency lock is missing: {lock_path}")
+    result = subprocess.run(
+        ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    commit = result.stdout.strip()
+    if result.returncode != 0 or len(commit) != 40:
+        raise ValueError("unable to resolve the current repository commit for provenance")
+    return ReconstructionProvenance(
+        repository_commit=commit,
+        dependency_lock_digest=hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+        environment_fingerprint=_environment_fingerprint(),
+    )
 
 
-def outcome_invalidates_artifact(
-    outcome: ProvenanceValidationOutcome,
-) -> ArtifactInvalidated:
-    return outcome is not ProvenanceValidationOutcome.NON_MATERIAL_CHANGE
+def _environment_fingerprint() -> ArtifactDigest:
+    cuda_device = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "unavailable"
+    payload = "\n".join(
+        (
+            os.name,
+            platform.system(),
+            platform.release(),
+            platform.machine(),
+            sys.version,
+            torch.__version__,
+            str(torch.version.cuda),
+            str(torch.backends.cudnn.version()),
+            cuda_device,
+        )
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()

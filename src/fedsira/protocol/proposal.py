@@ -2,8 +2,12 @@ import hashlib
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 
-from fedsira.config.models import CapabilityClaimConfig, ClaimOpeningConfig, ProposalScreenConfig
-from fedsira.domain.enums import ClaimOpeningMode, ClaimState, SeedNamespace
+from fedsira.config.models import (
+    AdmissionOpeningConfig,
+    CapabilityContractConfig,
+    ProposalScreenConfig,
+)
+from fedsira.domain.enums import AdmissionOpeningMode, AdmissionState, SeedNamespace
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     AttackCarrierRequired,
@@ -31,16 +35,16 @@ SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
 SOURCE_SELECTION_SEPARATOR = SeedNamespace.SOURCE_SELECTION.value
 
 
-class ClaimOpeningEntry(FrozenDomainModel):
-    state: ClaimState
+class AdmissionOpeningEntry(FrozenDomainModel):
+    state: AdmissionState
     source_committed: SourceCommitted
     direct_production_weight: ProductionWeight
 
 
-def start_claim(opening_mode: ClaimOpeningMode) -> ClaimOpeningEntry:
-    return ClaimOpeningEntry(
-        state=ClaimState.CANDIDATE_SCREEN,
-        source_committed=opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED,
+def start_admission(opening_mode: AdmissionOpeningMode) -> AdmissionOpeningEntry:
+    return AdmissionOpeningEntry(
+        state=AdmissionState.CANDIDATE_SCREEN,
+        source_committed=opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED,
         direct_production_weight=0.0,
     )
 
@@ -181,7 +185,7 @@ def screen_domain_decision_is_positive(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
-    capability_claim_config: CapabilityClaimConfig,
+    capability_contract_config: CapabilityContractConfig,
 ) -> ScreenDomainDecision:
     if differential_a is None:
         return False
@@ -193,10 +197,11 @@ def screen_domain_decision_is_positive(
         return False
     return (
         differential_a >= proposal_screen_config.differential_minimum_nats_per_example
-        and target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
-        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        and target_f1_gain.value >= capability_contract_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value
+        <= capability_contract_config.supported_macro_f1_drop_maximum
         and benign_far_increase.value
-        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+        <= capability_contract_config.benign_false_alarm_rate_increase_maximum
     )
 
 
@@ -204,7 +209,7 @@ def raw_target_f1_screen_domain_decision_is_positive(
     target_f1_gain: MetricResult,
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
-    capability_claim_config: CapabilityClaimConfig,
+    capability_contract_config: CapabilityContractConfig,
 ) -> ScreenDomainDecision:
     if (
         target_f1_gain.value is None
@@ -213,10 +218,11 @@ def raw_target_f1_screen_domain_decision_is_positive(
     ):
         return False
     return (
-        target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
-        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        target_f1_gain.value >= capability_contract_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value
+        <= capability_contract_config.supported_macro_f1_drop_maximum
         and benign_far_increase.value
-        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+        <= capability_contract_config.benign_false_alarm_rate_increase_maximum
     )
 
 
@@ -226,7 +232,7 @@ def unmatched_control_screen_domain_decision_is_positive(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     proposal_screen_config: ProposalScreenConfig,
-    capability_claim_config: CapabilityClaimConfig,
+    capability_contract_config: CapabilityContractConfig,
 ) -> ScreenDomainDecision:
     if unmatched_differential is None:
         return False
@@ -238,36 +244,39 @@ def unmatched_control_screen_domain_decision_is_positive(
         return False
     return (
         unmatched_differential >= proposal_screen_config.differential_minimum_nats_per_example
-        and target_f1_gain.value >= capability_claim_config.target_f1_gain_over_anchor_minimum
-        and supported_macro_f1_drop.value <= capability_claim_config.supported_macro_f1_drop_maximum
+        and target_f1_gain.value >= capability_contract_config.target_f1_gain_over_anchor_minimum
+        and supported_macro_f1_drop.value
+        <= capability_contract_config.supported_macro_f1_drop_maximum
         and benign_far_increase.value
-        <= capability_claim_config.benign_false_alarm_rate_increase_maximum
+        <= capability_contract_config.benign_false_alarm_rate_increase_maximum
     )
 
 
 def candidate_free_screen_domain_predicate(
-    anchor_target_f1: MetricResult, capability_claim_config: CapabilityClaimConfig
+    anchor_target_f1: MetricResult, capability_contract_config: CapabilityContractConfig
 ) -> ScreenDomainDecision:
     if anchor_target_f1.value is None:
         return False
-    return anchor_target_f1.value < capability_claim_config.candidate_free_anchor_target_f1_maximum
+    return (
+        anchor_target_f1.value < capability_contract_config.candidate_free_anchor_target_f1_maximum
+    )
 
 
 def candidate_screen_transition(
-    opening_mode: ClaimOpeningMode,
+    opening_mode: AdmissionOpeningMode,
     screen_results: Sequence[ScreenDomainResult],
-    claim_opening_config: ClaimOpeningConfig,
-) -> ClaimState:
+    admission_opening_config: AdmissionOpeningConfig,
+) -> AdmissionState:
     adequate_results = [result for result in screen_results if result.is_evidence_adequate]
-    if len(adequate_results) < claim_opening_config.required_positive_screen_domains:
-        return ClaimState.DORMANT
+    if len(adequate_results) < admission_opening_config.required_positive_screen_domains:
+        return AdmissionState.DORMANT
 
-    if opening_mode is ClaimOpeningMode.PROPOSAL_ASSISTED:
-        required_count = claim_opening_config.required_positive_screen_domains
+    if opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED:
+        required_count = admission_opening_config.required_positive_screen_domains
     else:
-        required_count = claim_opening_config.candidate_free_required_adequate_domains
+        required_count = admission_opening_config.candidate_free_required_adequate_domains
 
     predicate_count = sum(1 for result in adequate_results if result.meets_opening_predicate)
     if predicate_count >= required_count:
-        return ClaimState.CLAIM_OPEN
-    return ClaimState.REJECTED_CLAIM
+        return AdmissionState.ADMISSION_OPEN
+    return AdmissionState.REJECTED

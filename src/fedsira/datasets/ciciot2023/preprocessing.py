@@ -125,7 +125,7 @@ class _ArrowModule(Protocol):
     def array(
         self,
         values: tuple[ParquetScalar, ...],
-        data_type: _ArrowDataType,
+        _data_type: _ArrowDataType,
     ) -> _ArrowArray: ...
 
     def table(
@@ -148,7 +148,7 @@ class _ParquetWriter(Protocol):
 
 
 class _ParquetWriterFactory(Protocol):
-    def __call__(self, where: RepositoryPath, schema: _ArrowSchema) -> _ParquetWriter: ...
+    def __call__(self, _where: RepositoryPath, schema: _ArrowSchema) -> _ParquetWriter: ...
 
 
 class _ParquetModule(Protocol):

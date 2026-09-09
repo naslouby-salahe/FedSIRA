@@ -5,7 +5,7 @@ from typing import Protocol, cast
 
 import torch
 
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 from fedsira.domain.types import (
     ArtifactDigest,
     CheckpointIdentity,
@@ -50,27 +50,27 @@ def next_reproducer_domain(
     return None
 
 
-def handle_inadequate_domain() -> ClaimState:
-    return ClaimState.REPRODUCTION_PENDING
+def handle_inadequate_domain() -> AdmissionState:
+    return AdmissionState.REPRODUCTION_PENDING
 
 
 def handle_adequate_domain_trained(
     external_verification_active: ExternalVerificationActive,
     resolved_row_requirement_reached: ResolvedRowRequirementReached,
-) -> ClaimState:
+) -> AdmissionState:
     if external_verification_active:
-        return ClaimState.VERIFICATION_PENDING
+        return AdmissionState.VERIFICATION_PENDING
     if resolved_row_requirement_reached:
-        return ClaimState.SYNTHESIS_PENDING
-    return ClaimState.REPRODUCTION_PENDING
+        return AdmissionState.SYNTHESIS_PENDING
+    return AdmissionState.REPRODUCTION_PENDING
 
 
 def handle_no_adequate_unconsumed_domain(
     resolved_row_requirement_reached: ResolvedRowRequirementReached,
-) -> ClaimState:
+) -> AdmissionState:
     if resolved_row_requirement_reached:
-        return ClaimState.SYNTHESIS_PENDING
-    return ClaimState.DORMANT
+        return AdmissionState.SYNTHESIS_PENDING
+    return AdmissionState.DORMANT
 
 
 def validate_reproduction_start_checkpoint(
@@ -92,7 +92,7 @@ def validate_reproduction_starts_from_anchor(
 
 def compute_reproduction_commitment_hash(
     reproducer_domain: DomainId,
-    claim_identity: ArtifactDigest,
+    capability_identity: ArtifactDigest,
     training_seed: DerivedSeed,
     reproduced_flat_parameters: torch.Tensor,
 ) -> ArtifactDigest:
@@ -103,7 +103,7 @@ def compute_reproduction_commitment_hash(
     header = framed_bytes(
         REPRODUCTION_COMMITMENT_SEPARATOR,
         reproducer_domain,
-        claim_identity,
+        capability_identity,
         training_seed,
     )
     return hashlib.sha256(header + parameter_bytes).hexdigest()

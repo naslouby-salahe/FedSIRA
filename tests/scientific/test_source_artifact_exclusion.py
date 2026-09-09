@@ -1,4 +1,4 @@
-from fedsira.protocol.claim_contract import validate_source_excluded_production_weight
+from fedsira.protocol.capability_contract import validate_source_excluded_production_weight
 from fedsira.protocol.synthesis import krum_input_excludes_source
 
 

@@ -5,12 +5,11 @@ from typing import TypeAlias
 import yaml
 from pydantic import ValidationError
 
-from fedsira.config.models import ScientificConfig, SmokeConfig, TestFixtureConfig
+from fedsira.config.models import ScientificConfig, TestFixtureConfig
 from fedsira.domain.types import TextValue
 
 PRODUCTION_CONFIG_PATH = Path("configs/fedsira.yaml")
 TEST_FIXTURE_CONFIG_PATH = Path("configs/tests.yml")
-SMOKE_CONFIG_PATH = Path("configs/smoke.yaml")
 
 
 def validate_scientific_config(config: ScientificConfig) -> None:
@@ -55,11 +54,3 @@ def load_test_fixture_config(path: Path = TEST_FIXTURE_CONFIG_PATH) -> TestFixtu
         return TestFixtureConfig.model_validate(payload)
     except ValidationError as error:
         raise ValueError(f"invalid test fixture configuration in {path}: {error}") from error
-
-
-def load_smoke_config(path: Path = SMOKE_CONFIG_PATH) -> SmokeConfig:
-    payload = _read_yaml_mapping(path)
-    try:
-        return SmokeConfig.model_validate(payload)
-    except ValidationError as error:
-        raise ValueError(f"invalid smoke configuration in {path}: {error}") from error

@@ -14,11 +14,11 @@ from fedsira.domain.models import (
     encode_message_metadata,
 )
 from fedsira.learning.post_reference import run_post_reference_training
-from fedsira.protocol.claim_contract import build_capability_claim_contract
+from fedsira.protocol.capability_contract import build_capability_contract
 from fedsira.protocol.verification import reproduction_row_is_certified
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
-CAPABILITY_CLAIM_CONFIG = CONFIG.capability_claim
+CAPABILITY_CONTRACT_CONFIG = CONFIG.capability_contract
 
 
 def test_honest_reproduction_constructor_has_no_source_artifact_parameter() -> None:
@@ -26,8 +26,8 @@ def test_honest_reproduction_constructor_has_no_source_artifact_parameter() -> N
     assert not any("source" in name for name in parameter_names)
 
 
-def test_capability_claim_contract_mutation_after_construction_is_rejected() -> None:
-    contract = build_capability_claim_contract(
+def test_capability_contract_contract_mutation_after_construction_is_rejected() -> None:
+    contract = build_capability_contract(
         dataset_manifest_hash="a" * 64,
         supported_control_role="POST_REFERENCE_REPLAY",
         dataset_id=DatasetId.N_BAIOT,
@@ -35,7 +35,7 @@ def test_capability_claim_contract_mutation_after_construction_is_rejected() -> 
         feature_schema_hash="b" * 64,
         target_class=NBaiotClass.GAFGYT_COMBO.value,
         supported_class_count=len(NBAIOT_CLASS_ORDER) - 1,
-        capability_claim_config=CAPABILITY_CLAIM_CONFIG,
+        capability_contract_config=CAPABILITY_CONTRACT_CONFIG,
     )
     with pytest.raises(ValidationError):
         contract.target_f1_minimum = 0.99
@@ -64,7 +64,7 @@ def _metadata() -> CommunicationMessageMetadata:
         round_index=3,
         sender="SERVER",
         receiver="DANMINI_DOORBELL",
-        claim_contract_hash="c" * 64,
+        capability_contract_hash="c" * 64,
         payload_tensor_count=1,
     )
 

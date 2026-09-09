@@ -12,7 +12,7 @@ from fedsira.experiments.collapse import (
 )
 from fedsira.experiments.definitions import (
     COLLAPSE_EXPERIMENT_NAMES,
-    ClaimFamily,
+    ComparisonFamily,
     experiment_by_name,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
@@ -37,11 +37,11 @@ from fedsira.runtime.state import (
 RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 )
-_COLLAPSE_FAMILIES: tuple[ClaimFamily, ...] = (
-    ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
-    ClaimFamily.PLURALITY_NECESSITY,
-    ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM,
-    ClaimFamily.EXTERNAL_VERIFICATION_NECESSITY,
+_COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
+    ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
+    ComparisonFamily.PLURALITY_NECESSITY,
+    ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
+    ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
 )
 
 
@@ -73,11 +73,11 @@ def render_result(result: ExperimentExecutionResult) -> RunRenderText:
     return "\n".join(lines)
 
 
-def _collapse_family_for_experiment(experiment: ExperimentName) -> ClaimFamily | None:
+def _collapse_family_for_experiment(experiment: ExperimentName) -> ComparisonFamily | None:
     definition = experiment_by_name(experiment)
-    if definition.claim_family not in _COLLAPSE_FAMILIES:
+    if definition.comparison_family not in _COLLAPSE_FAMILIES:
         return None
-    return definition.claim_family
+    return definition.comparison_family
 
 
 def _collapse_experiment_completed(

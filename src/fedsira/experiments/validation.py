@@ -18,9 +18,9 @@ from fedsira.datasets.common import SUPPORTED_ROLE_ORDER, Role
 from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import (
+    AdmissionState,
     ArtifactFamily,
     ArtifactLifecycleState,
-    ClaimState,
     ExperimentLifecycleState,
     ScientificCellPhase,
     TernaryOutcome,
@@ -75,7 +75,7 @@ from fedsira.learning.post_reference import (
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
 from fedsira.protocol.admission import validate_admission_requires_final_gate
-from fedsira.protocol.claim_contract import (
+from fedsira.protocol.capability_contract import (
     SOURCE_DIRECT_PRODUCTION_WEIGHT,
     validate_source_excluded_production_weight,
 )
@@ -492,7 +492,7 @@ def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
         five_row_required = True
     admission_requires_gate = False
     try:
-        validate_admission_requires_final_gate(ClaimState.ADMITTED, False)
+        validate_admission_requires_final_gate(AdmissionState.ADMITTED, False)
     except ValueError:
         admission_requires_gate = True
     eight_cases = resolve_all_eight_cases()
@@ -648,7 +648,7 @@ def run_data_and_domain_evidence_validation(
     failed = tuple(check.name for check in _data_invariants() if not check.passed)
     if failed:
         raise ValueError(f"data and domain evidence validation failed: {', '.join(failed)}")
-    minima = config.capability_claim.evidence_minima
+    minima = config.capability_contract.evidence_minima
     if reproduction_target_count < minima.reproduction_target_examples:
         raise ValueError(
             "reproduction-target evidence is below the configured minimum "

@@ -1,10 +1,5 @@
-import pytest
-
 from fedsira.domain.enums import FailureClass
-from fedsira.runtime.recovery import (
-    automatic_recovery_permitted,
-    validate_recovered_checkpoint_lineage,
-)
+from fedsira.runtime.recovery import automatic_recovery_permitted
 
 
 def test_infrastructure_interruption_is_permitted_once() -> None:
@@ -21,13 +16,3 @@ def test_numerical_failure_is_never_automatically_retried() -> None:
 
 def test_data_invalid_is_never_automatically_retried() -> None:
     assert not automatic_recovery_permitted(FailureClass.DATA_INVALID, 0, 1)
-
-
-def test_matching_checkpoint_digest_is_accepted() -> None:
-    digest = "a" * 64
-    validate_recovered_checkpoint_lineage(digest, digest)
-
-
-def test_mismatched_checkpoint_digest_is_rejected() -> None:
-    with pytest.raises(ValueError):
-        validate_recovered_checkpoint_lineage("a" * 64, "b" * 64)

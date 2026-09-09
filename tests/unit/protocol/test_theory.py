@@ -15,7 +15,7 @@ from fedsira.protocol.specification import (
     minimum_honest_positive_count,
     reproduction_update_vector,
     validate_exactly_one_source_domain,
-    validate_no_safety_claim_before_tau_k,
+    validate_no_safety_completion_before_tau_k,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -79,12 +79,12 @@ def test_first_cycle_with_minimum_eligible_evidence_holders() -> None:
     assert first_cycle_with_minimum_eligible_evidence_holders(counts, 10) is None
 
 
-def test_validate_no_safety_claim_before_tau_k_rejects_early_claim() -> None:
-    with pytest.raises(ValueError, match="before"):
-        validate_no_safety_claim_before_tau_k(2, 3)
-    with pytest.raises(ValueError, match="before"):
-        validate_no_safety_claim_before_tau_k(0, None)
-    validate_no_safety_claim_before_tau_k(3, 3)
+def test_validate_no_safety_completion_before_tau_k_rejects_early_completion() -> None:
+    with pytest.raises(ValueError, match="precedes"):
+        validate_no_safety_completion_before_tau_k(2, 3)
+    with pytest.raises(ValueError, match="precedes"):
+        validate_no_safety_completion_before_tau_k(0, None)
+    validate_no_safety_completion_before_tau_k(3, 3)
 
 
 def test_deduplicate_reports_by_proxy_keeps_first_report_per_domain() -> None:

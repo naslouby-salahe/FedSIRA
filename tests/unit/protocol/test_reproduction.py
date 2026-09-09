@@ -3,7 +3,7 @@ import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 from fedsira.protocol.reproduction import (
     ReproductionAttempt,
     compute_reproduction_commitment_hash,
@@ -78,36 +78,36 @@ def test_next_reproducer_domain_returns_none_when_exhausted() -> None:
 
 
 def test_handle_inadequate_domain_does_not_consume() -> None:
-    assert handle_inadequate_domain() is ClaimState.REPRODUCTION_PENDING
+    assert handle_inadequate_domain() is AdmissionState.REPRODUCTION_PENDING
 
 
 def test_handle_adequate_domain_trained_goes_to_verification_when_active() -> None:
     state = handle_adequate_domain_trained(
         external_verification_active=True, resolved_row_requirement_reached=False
     )
-    assert state is ClaimState.VERIFICATION_PENDING
+    assert state is AdmissionState.VERIFICATION_PENDING
 
 
 def test_handle_adequate_domain_trained_goes_to_synthesis_without_verification() -> None:
     state = handle_adequate_domain_trained(
         external_verification_active=False, resolved_row_requirement_reached=True
     )
-    assert state is ClaimState.SYNTHESIS_PENDING
+    assert state is AdmissionState.SYNTHESIS_PENDING
 
 
 def test_handle_adequate_domain_trained_continues_scanning() -> None:
     state = handle_adequate_domain_trained(
         external_verification_active=False, resolved_row_requirement_reached=False
     )
-    assert state is ClaimState.REPRODUCTION_PENDING
+    assert state is AdmissionState.REPRODUCTION_PENDING
 
 
 def test_handle_no_adequate_unconsumed_domain_dormant_when_row_requirement_unmet() -> None:
-    assert handle_no_adequate_unconsumed_domain(False) is ClaimState.DORMANT
+    assert handle_no_adequate_unconsumed_domain(False) is AdmissionState.DORMANT
 
 
 def test_handle_no_adequate_unconsumed_domain_synthesizes_when_row_requirement_met() -> None:
-    assert handle_no_adequate_unconsumed_domain(True) is ClaimState.SYNTHESIS_PENDING
+    assert handle_no_adequate_unconsumed_domain(True) is AdmissionState.SYNTHESIS_PENDING
 
 
 def test_validate_reproduction_start_checkpoint_rejects_source_derived_checkpoint() -> None:

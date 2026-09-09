@@ -68,7 +68,7 @@ datasets:
     name: CICIoT2023
     target_class: BACKDOOR_MALWARE
     pseudo_domain_partition_salt: 730201
-capability_claim:
+capability_contract:
   target_f1_minimum: 0.8
   target_f1_gain_over_anchor_minimum: 0.2
   supported_macro_f1_drop_maximum: 0.02
@@ -81,7 +81,7 @@ capability_claim:
     verification_supported_control_examples: 1000
     proposal_screen_target_examples: 500
 protocol:
-  claim_opening:
+  admission_opening:
     screen_domains: 3
     required_positive_screen_domains: 2
     candidate_free_required_adequate_domains: 2
@@ -269,7 +269,7 @@ metrics_and_statistics:
     post_evidence_overhead_relative_reduction_minimum: 0.2
     proposal_malicious_admission_worsening_maximum: 0.02
   technical_completion:
-    minimum_complete_pairs_for_claim_support: 9
+    minimum_complete_pairs_for_inference: 9
   publication_rounding:
     f1_accuracy_rates_decimals: 3
     percentage_decimals: 1
@@ -300,7 +300,7 @@ execution:
   timing:
     warmup_forward_passes: 1
   same_environment_absolute_metric_tolerance: 1.0e-06
-claim_support_thresholds:
+evidence_thresholds:
   byzantine_operating_region:
     maximum_malicious_admissions_within_bound: 0
   safe_dormancy:

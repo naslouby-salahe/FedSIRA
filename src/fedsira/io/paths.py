@@ -35,7 +35,6 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
         ArtifactFamily.FINAL_GATE_DECISION,
         ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
         ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
-        ArtifactFamily.CLAIM_STATE_ARTIFACT,
         ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
     )
 )

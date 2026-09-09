@@ -2,17 +2,13 @@ import pytest
 import torch
 
 from fedsira.config.loading import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import ClaimOpeningMode, ClaimState, VerificationOmissionMarker
+from fedsira.domain.enums import AdmissionState
 from fedsira.domain.models import MetricResult
-from fedsira.domain.types import SeedBundle
 from fedsira.protocol.admission import (
-    AdmissionArtifactContent,
     apply_production_update,
     final_gate_predicates_pass,
     median_domain_target_f1,
     resolve_production_update,
-    validate_admission_artifact_content,
     validate_admission_requires_final_gate,
     validate_production_checkpoint_excludes_source,
 )
@@ -22,13 +18,13 @@ FINAL_GATE_CONFIG = CONFIG.protocol.final_gate
 
 
 def test_admitted_state_requires_valid_final_gate_artifact() -> None:
-    validate_admission_requires_final_gate(ClaimState.ADMITTED, True)
+    validate_admission_requires_final_gate(AdmissionState.ADMITTED, True)
     with pytest.raises(ValueError, match="final-gate"):
-        validate_admission_requires_final_gate(ClaimState.ADMITTED, False)
+        validate_admission_requires_final_gate(AdmissionState.ADMITTED, False)
 
 
 def test_non_admitted_state_does_not_require_final_gate_artifact() -> None:
-    validate_admission_requires_final_gate(ClaimState.DORMANT, False)
+    validate_admission_requires_final_gate(AdmissionState.DORMANT, False)
 
 
 def test_apply_production_update_is_anchor_plus_update() -> None:
@@ -103,70 +99,3 @@ def test_final_gate_predicates_pass_requires_all_four_thresholds_and_no_invarian
         FINAL_GATE_CONFIG,
     )
     assert not fails_on_na
-
-
-def _content(
-    source_commitment_identity: str | None = "5" * 64,
-    krum_configuration_identity: str | None = "6" * 64,
-    verifier_record: tuple[str, ...] | VerificationOmissionMarker = ("7" * 64,),
-) -> AdmissionArtifactContent:
-    return AdmissionArtifactContent(
-        anchor_checkpoint_identity="a" * 64,
-        source_commitment_identity=source_commitment_identity,
-        claim_identity="c" * 64,
-        reproducer_assignment_order=NBAIOT_DOMAIN_ORDER[:5],
-        reproduction_commitment_hashes=("8" * 64,),
-        verifier_record=verifier_record,
-        krum_configuration_identity=krum_configuration_identity,
-        production_update_identity="9" * 64,
-        final_gate_sample_manifest_identity="1" * 64,
-        final_gate_metrics_identity="e" * 64,
-        seed_bundle=SeedBundle(master_seeds=(1,), analysis_seed=424242, smoke_seed=1),
-        semantic_cell_key="cell-key",
-        cell_phase_identity="phase-key",
-        upstream_dependency_fingerprints=("2" * 64,),
-        producer_component_fingerprint="3" * 64,
-        runtime_dependency_fingerprint="4" * 64,
-        repository_commit="deadbeef",
-        dependency_lock_digest="b" * 64,
-        environment_fingerprint="ef" + "0" * 62,
-    )
-
-
-def test_admission_artifact_requires_source_commitment_when_proposal_assisted() -> None:
-    validate_admission_artifact_content(_content(), ClaimOpeningMode.PROPOSAL_ASSISTED, True)
-    with pytest.raises(ValueError, match="source commitment"):
-        validate_admission_artifact_content(
-            _content(source_commitment_identity=None), ClaimOpeningMode.PROPOSAL_ASSISTED, True
-        )
-
-
-def test_admission_artifact_candidate_free_does_not_require_source_commitment() -> None:
-    validate_admission_artifact_content(
-        _content(source_commitment_identity=None), ClaimOpeningMode.CANDIDATE_FREE, True
-    )
-
-
-def test_validate_admission_artifact_content_requires_krum_identity_on_plurality_path() -> None:
-    with pytest.raises(ValueError, match="Krum"):
-        validate_admission_artifact_content(
-            _content(krum_configuration_identity=None), ClaimOpeningMode.CANDIDATE_FREE, True
-        )
-    validate_admission_artifact_content(
-        _content(krum_configuration_identity=None), ClaimOpeningMode.CANDIDATE_FREE, False
-    )
-
-
-def test_validate_admission_artifact_content_rejects_empty_verifier_record() -> None:
-    with pytest.raises(ValueError, match="External Verification Not Used"):
-        validate_admission_artifact_content(
-            _content(verifier_record=()), ClaimOpeningMode.CANDIDATE_FREE, False
-        )
-
-
-def test_validate_admission_artifact_content_accepts_explicit_omission_marker() -> None:
-    validate_admission_artifact_content(
-        _content(verifier_record=VerificationOmissionMarker.EXTERNAL_VERIFICATION_NOT_USED),
-        ClaimOpeningMode.CANDIDATE_FREE,
-        False,
-    )

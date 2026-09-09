@@ -79,7 +79,7 @@ class CommunicationMessageType(StrEnum):
     SOURCE_COMMITMENT = "SOURCE_COMMITMENT"
     MODEL_DISTRIBUTION = "MODEL_DISTRIBUTION"
     UPDATE_SUBMISSION = "UPDATE_SUBMISSION"
-    CLAIM_CONTRACT = "CLAIM_CONTRACT"
+    CAPABILITY_CONTRACT = "CAPABILITY_CONTRACT"
     REVIEW_ASSIGNMENT = "REVIEW_ASSIGNMENT"
     REVIEW_REPORT = "REVIEW_REPORT"
     VERIFIER_ASSIGNMENT = "VERIFIER_ASSIGNMENT"
@@ -102,7 +102,7 @@ class CommunicationMessageMetadata(FrozenDomainModel):
     round_index: RoundIndex | None
     sender: MessageEndpoint
     receiver: MessageEndpoint
-    claim_contract_hash: ArtifactDigest | None
+    capability_contract_hash: ArtifactDigest | None
     payload_tensor_count: TensorPayloadCount
 
 
@@ -119,7 +119,7 @@ class TensorEnvelopePayload(FrozenDomainModel):
 
 
 class _CommunicationMetadataWire(FrozenDomainModel):
-    claim_contract_hash: ArtifactDigest | None
+    capability_contract_hash: ArtifactDigest | None
     dataset_manifest_hash: ArtifactDigest
     master_seed: MasterSeed
     message_type: CommunicationMessageType
@@ -152,7 +152,7 @@ def length_prefixed_bytes(payload: EncodedBytes, prefix_bytes: LengthPrefixBytes
 
 def encode_message_metadata(metadata: CommunicationMessageMetadata) -> EncodedBytes:
     wire = _CommunicationMetadataWire(
-        claim_contract_hash=metadata.claim_contract_hash,
+        capability_contract_hash=metadata.capability_contract_hash,
         dataset_manifest_hash=metadata.dataset_manifest_hash,
         master_seed=metadata.master_seed,
         message_type=metadata.message_type,

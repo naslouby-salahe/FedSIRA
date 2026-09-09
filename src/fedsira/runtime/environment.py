@@ -1,6 +1,5 @@
 import importlib.metadata
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -10,15 +9,12 @@ import torch
 
 from fedsira.domain.types import (
     ByteCount,
-    DeterministicExecutionReady,
     EnvironmentText,
     FrozenDomainModel,
-    MasterSeed,
     RarArchivesPresent,
 )
 
 BYTES_PER_GIGABYTE: ByteCount = 1_073_741_824
-PREPROCESSING_OR_REPORT_ONLY_HASHSEED: EnvironmentText = "0"
 REFERENCE_OS_NAME: EnvironmentText = "Ubuntu"
 REFERENCE_OS_VERSION_ID: EnvironmentText = "24.04"
 REFERENCE_PYTHON_VERSION: EnvironmentText = "3.11.9"
@@ -26,7 +22,6 @@ REFERENCE_CUDA_RUNTIME_VERSION: EnvironmentText = "12.8"
 REFERENCE_GPU_NAME: EnvironmentText = "NVIDIA GeForce RTX 5060 Ti"
 REFERENCE_GPU_VRAM_GIGABYTES: ByteCount = 16
 REFERENCE_MINIMUM_CPU_RAM_GIGABYTES: ByteCount = 32
-REFERENCE_MINIMUM_FREE_STORAGE_GIGABYTES: ByteCount = 100
 REFERENCE_REQUIRED_GPU_COUNT: ByteCount = 1
 REFERENCE_UNRAR_VERSION: EnvironmentText = "1:7.0.7-1build1"
 REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
@@ -61,18 +56,6 @@ class EnvironmentMismatch(FrozenDomainModel):
 
 class _Fp32PrecisionController(Protocol):
     fp32_precision: EnvironmentText
-
-
-def pythonhashseed_for_master_seed_subprocess(master_seed: MasterSeed) -> EnvironmentText:
-    return str(master_seed)
-
-
-def pythonhashseed_for_smoke_subprocess(smoke_seed: MasterSeed) -> EnvironmentText:
-    return str(smoke_seed)
-
-
-def pythonhashseed_for_preprocessing_or_report_subprocess() -> EnvironmentText:
-    return PREPROCESSING_OR_REPORT_ONLY_HASHSEED
 
 
 def check_python_version() -> tuple[EnvironmentMismatch, ...]:
@@ -203,7 +186,7 @@ def check_operating_system() -> tuple[EnvironmentMismatch, ...]:
     return ()
 
 
-def check_hardware_resources(workspace_path: Path) -> tuple[EnvironmentMismatch, ...]:
+def check_hardware_resources() -> tuple[EnvironmentMismatch, ...]:
     mismatches: list[EnvironmentMismatch] = []
     total_ram_gigabytes = (
         os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
@@ -214,15 +197,6 @@ def check_hardware_resources(workspace_path: Path) -> tuple[EnvironmentMismatch,
                 component="cpu_ram_gigabytes",
                 expected=f">={REFERENCE_MINIMUM_CPU_RAM_GIGABYTES}",
                 actual=f"{total_ram_gigabytes:.1f}",
-            )
-        )
-    free_storage_gigabytes = shutil.disk_usage(workspace_path).free / BYTES_PER_GIGABYTE
-    if free_storage_gigabytes < REFERENCE_MINIMUM_FREE_STORAGE_GIGABYTES:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="free_storage_gigabytes",
-                expected=f">={REFERENCE_MINIMUM_FREE_STORAGE_GIGABYTES}",
-                actual=f"{free_storage_gigabytes:.1f}",
             )
         )
     return tuple(mismatches)
@@ -272,7 +246,6 @@ def configure_deterministic_backend() -> None:
 
 
 def collect_environment_mismatches(
-    workspace_path: Path,
     rar_archives_present: RarArchivesPresent,
 ) -> tuple[EnvironmentMismatch, ...]:
     return (
@@ -280,13 +253,6 @@ def collect_environment_mismatches(
         + check_python_version()
         + check_installed_package_versions()
         + check_gpu_requirements()
-        + check_hardware_resources(workspace_path)
+        + check_hardware_resources()
         + check_unrar_availability(rar_archives_present)
     )
-
-
-def deterministic_execution_available(
-    workspace_path: Path,
-    rar_archives_present: RarArchivesPresent,
-) -> DeterministicExecutionReady:
-    return not collect_environment_mismatches(workspace_path, rar_archives_present)

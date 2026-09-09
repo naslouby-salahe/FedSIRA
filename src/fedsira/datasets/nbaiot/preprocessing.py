@@ -45,6 +45,7 @@ from fedsira.domain.types import (
     PredictorCount,
     PreparedViewKey,
     RelativePathText,
+    RetainMaterializedViews,
     RowCount,
     SampleIdPrefix,
     SamplingCap,
@@ -400,6 +401,7 @@ def materialize_nbaiot_prepared_views(
     prepared_root: Path,
     scaler_root: Path,
     overwrite: OverwriteExisting = False,
+    retain_materialized_views: RetainMaterializedViews = True,
 ) -> tuple[tuple[PreparedView, ...], FeatureMoments]:
     config = current_application_context().scientific_config
     if not discovered:
@@ -424,6 +426,8 @@ def materialize_nbaiot_prepared_views(
         pooled_statistics,
         config.datasets.primary.scaling,
     )
+    prepared_root.mkdir(parents=True, exist_ok=True)
+    scaler_root.mkdir(parents=True, exist_ok=True)
     views: list[PreparedView] = []
     for item in discovered:
         row_count = count_csv_data_rows(item.absolute_path)
@@ -456,34 +460,31 @@ def materialize_nbaiot_prepared_views(
                 )
                 for original_row_index in selected_rows
             )
-            views.append(
-                PreparedView(
-                    domain=item.domain,
-                    class_id=item.class_id,
-                    role=role,
-                    sample_ids=tuple(
-                        _sample_id_for_row(assignments, original_row_index)
-                        for original_row_index in selected_rows
-                    ),
-                    features=features,
-                    labels=tuple(item.class_id.value for _ in selected_rows),
-                )
+            view = PreparedView(
+                domain=item.domain,
+                class_id=item.class_id,
+                role=role,
+                sample_ids=tuple(
+                    _sample_id_for_row(assignments, original_row_index)
+                    for original_row_index in selected_rows
+                ),
+                features=features,
+                labels=tuple(item.class_id.value for _ in selected_rows),
             )
-    prepared_root.mkdir(parents=True, exist_ok=True)
-    scaler_root.mkdir(parents=True, exist_ok=True)
-    for view in views:
-        _write_metadata(
-            (prepared_root / _view_key(view)).with_suffix(".json"),
-            PreparedViewMetadata(
-                schema_version=PREPARED_VIEW_SCHEMA_VERSION,
-                domain=view.domain,
-                class_id=view.class_id,
-                role=view.role,
-                row_count=view.row_count,
-            ),
-            overwrite,
-        )
-        _write_prepared_view_parquet(prepared_root, view, feature_names, overwrite)
+            _write_metadata(
+                (prepared_root / _view_key(view)).with_suffix(".json"),
+                PreparedViewMetadata(
+                    schema_version=PREPARED_VIEW_SCHEMA_VERSION,
+                    domain=view.domain,
+                    class_id=view.class_id,
+                    role=view.role,
+                    row_count=view.row_count,
+                ),
+                overwrite,
+            )
+            _write_prepared_view_parquet(prepared_root, view, feature_names, overwrite)
+            if retain_materialized_views:
+                views.append(view)
     _write_metadata(
         scaler_root / "nbaiot_scaler.json",
         ScalerMetadata(

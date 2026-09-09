@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from fedsira.analysis.claims import ClaimStateResult, FinalClaimState
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.types import (
     CheckpointIdentity,
-    ClaimDefinitionCount,
     ExperimentName,
     FrozenDomainModel,
     ReportVerificationFailure,
@@ -111,20 +109,3 @@ def verify_no_stale_ancestors(
         passed=not stale_ancestor_identities,
         failures=tuple(stale_ancestor_identities),
     )
-
-
-def verify_claim_states_derivable(
-    claim_states: tuple[ClaimStateResult, ...],
-    expected_claim_count: ClaimDefinitionCount,
-) -> CompletenessVerificationResult:
-    failures: list[ReportVerificationFailure] = []
-    if len(claim_states) != expected_claim_count:
-        failures.append(
-            f"derived {len(claim_states)} claim states, expected {expected_claim_count}"
-        )
-    unresolved = tuple(
-        claim.claim_id for claim in claim_states if claim.state is FinalClaimState.NOT_TESTED
-    )
-    if unresolved:
-        failures.append(f"claims lack complete verified evidence: {', '.join(unresolved)}")
-    return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))

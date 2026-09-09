@@ -5,7 +5,7 @@ import torch
 from fedsira.baselines.references import post_reference_retrain_maximum_local_epochs
 from fedsira.config.models import MaterialityConfig
 from fedsira.datasets.common import Role
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 from fedsira.domain.types import (
     CapabilityContractSatisfied,
     DiscardSourceWeights,
@@ -51,9 +51,9 @@ def validate_client_review_reviewer_count(reviewer_count: ReviewerCount) -> None
 
 
 def client_review_then_retrain_should_discard_source_weights(
-    review_outcome: ClaimState,
+    review_outcome: AdmissionState,
 ) -> DiscardSourceWeights:
-    return review_outcome is ClaimState.ADMITTED
+    return review_outcome is AdmissionState.ADMITTED
 
 
 def client_review_then_retrain_local_epochs() -> LocalEpochCount:

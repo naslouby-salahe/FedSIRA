@@ -14,7 +14,7 @@ from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     AblationVariant,
-    ClaimFamily,
+    ComparisonFamily,
     PrimaryScenario,
     ReproducerCondition,
 )
@@ -24,7 +24,7 @@ CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
 def test_registry_has_all_ten_claim_families() -> None:
     families = frozenset(definition.family for definition in build_comparison_registry())
-    assert families == frozenset(ClaimFamily)
+    assert families == frozenset(ComparisonFamily)
 
 
 def test_registry_has_unique_comparison_names() -> None:
@@ -34,7 +34,7 @@ def test_registry_has_unique_comparison_names() -> None:
 
 def test_comparison_name_follows_section_18_9_pattern() -> None:
     name = build_comparison_name(
-        ClaimFamily.PLURALITY_NECESSITY,
+        ComparisonFamily.PLURALITY_NECESSITY,
         "Single-Reproduction Necessity",
         "One Byzantine Source-Copy Reproducer",
         "Full Plurality Path",
@@ -54,7 +54,7 @@ def test_source_exclusion_family_has_only_asr_superiority() -> None:
     definitions = tuple(
         definition
         for definition in build_comparison_registry()
-        if definition.family is ClaimFamily.SOURCE_EXCLUSION_CENTRAL_CLAIM
+        if definition.family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT
     )
     assert len(definitions) == 1
     assert definitions[0].metric is ComparisonMetric.ATTACK_SUCCESS_RATE
@@ -65,7 +65,7 @@ def test_primary_family_contains_only_structurally_applicable_metrics() -> None:
     definitions = tuple(
         definition
         for definition in build_comparison_registry()
-        if definition.family is ClaimFamily.PRIMARY_BASELINE_SUPERIORITY
+        if definition.family is ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY
     )
     legitimate = tuple(
         definition
@@ -113,7 +113,7 @@ def test_model_replacement_reproducer_conditions_include_asr() -> None:
     definitions = tuple(
         definition
         for definition in build_comparison_registry()
-        if definition.family is ClaimFamily.REPRODUCER_ROBUSTNESS
+        if definition.family is ComparisonFamily.REPRODUCER_ROBUSTNESS
         and definition.scientific_scenario
         in (
             ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR.value,
@@ -148,7 +148,7 @@ def test_capability_granularity_ablation_treats_false_certification_as_harm() ->
     definition = next(
         definition
         for definition in build_comparison_registry()
-        if definition.family is ClaimFamily.MECHANISM_ABLATION
+        if definition.family is ComparisonFamily.MECHANISM_ABLATION
         and definition.method == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY.value
     )
     assert definition.metric is ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE
@@ -195,7 +195,7 @@ def test_holm_adjustment_marks_passed_and_failed() -> None:
     )
     adjusted = apply_holm_adjustment(
         ComparisonFamilyResult(
-            family=ClaimFamily.PROPOSAL_SCREEN_NECESSITY,
+            family=ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
             comparisons=(passing, failing),
         ),
         CONFIG.metrics_and_statistics.multiplicity,

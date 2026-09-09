@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 
 from fedsira.config.models import FinalGateConfig
-from fedsira.domain.enums import ClaimState
+from fedsira.domain.enums import AdmissionState
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     CommitteeSize,
@@ -23,12 +23,12 @@ def synthesis_pending_transition(
     adequate_final_gate_domain_count: AdequateFinalGateDomainCount,
     final_gate_predicates_pass: FinalGatePredicatesPass,
     final_gate_config: FinalGateConfig,
-) -> ClaimState:
+) -> AdmissionState:
     if adequate_final_gate_domain_count < final_gate_config.minimum_adequate_non_source_domains:
-        return ClaimState.DORMANT
+        return AdmissionState.DORMANT
     if final_gate_predicates_pass:
-        return ClaimState.ADMITTED
-    return ClaimState.REJECTED_CLAIM
+        return AdmissionState.ADMITTED
+    return AdmissionState.REJECTED
 
 
 def krum_input_excludes_source(

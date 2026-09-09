@@ -10,9 +10,7 @@ runner = CliRunner()
 REAL_NBAIOT_ROOT = preprocess.REPOSITORY_ROOT / "data" / "raw" / "N-BaIoT"
 
 
-def _no_mismatches(
-    _workspace_path: object, _rar_archives_present: object
-) -> tuple[EnvironmentMismatch, ...]:
+def _no_mismatches(_rar_archives_present: object) -> tuple[EnvironmentMismatch, ...]:
     return ()
 
 
