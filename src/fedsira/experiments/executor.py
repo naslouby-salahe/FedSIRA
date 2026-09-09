@@ -330,6 +330,7 @@ from fedsira.experiments.workflow import (
     PreparedRows,
     RealAnchor,
     RootCauseScope,
+    apply_heterogeneity_shift,
     poison_backdoor_rows,
 )
 from fedsira.io.paths import prepared_evidence_root
@@ -1073,27 +1074,6 @@ CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 
 
-def _apply_heterogeneity_shift(
-    rows: PreparedRows, domain: NBaiotDomain, scope: HeterogeneityScope
-) -> PreparedRows:
-    feature_indices_and_signs = tuple(
-        (
-            scope.feature_names.index(feature_name),
-            feature_shift_sign(domain, feature_name, scope.heterogeneity_namespace_seed),
-        )
-        for feature_name in scope.selected_feature_names
-    )
-    shifted_features: list[tuple[float, ...]] = []
-    for features in rows.features:
-        tensor = torch.tensor(features, dtype=torch.float32)
-        for feature_index, sign in feature_indices_and_signs:
-            tensor[feature_index] = tensor[feature_index] + sign * scope.shift_magnitude
-        shifted_features.append(tuple(float(value) for value in tensor))
-    return PreparedRows(
-        sample_ids=rows.sample_ids, features=tuple(shifted_features), labels=rows.labels
-    )
-
-
 def _scope_and_shift_rows(
     rows: PreparedRows, root_cause_scope: RootCauseScope
 ) -> PreparedRows | None:
@@ -1799,7 +1779,7 @@ def _combined_post_reference_rows(
     ):
         target_rows = _apply_epistemic_target_marker(target_rows, epistemic_failure_scope)
     if target_rows is not None and heterogeneity_scope is not None:
-        target_rows = _apply_heterogeneity_shift(target_rows, domain, heterogeneity_scope)
+        target_rows = apply_heterogeneity_shift(target_rows, domain, heterogeneity_scope)
     target_tensor = _tensor_view(target_rows)
     if target_tensor is None:
         return None
@@ -1823,7 +1803,7 @@ def _combined_post_reference_rows(
         if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and (backdoor_scope is not None):
             rows = poison_backdoor_rows(rows, backdoor_scope)
         if rows is not None and heterogeneity_scope is not None:
-            rows = _apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
+            rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
         replay_tensor = _tensor_view(rows)
         if replay_tensor is None:
             continue
@@ -2700,7 +2680,7 @@ def evaluate_domain(
             ):
                 rows = _scope_and_shift_rows(rows, root_cause_scope)
             if rows is not None and heterogeneity_scope is not None:
-                rows = _apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
+                rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
             tensor_view = _tensor_view(rows)
             if tensor_view is None:
                 continue

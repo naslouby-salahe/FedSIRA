@@ -10,7 +10,7 @@ from fedsira.attacks import (
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
 )
-from fedsira.datasets.nbaiot.schema import NBaiotClass
+from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -26,6 +26,7 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
+from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
 
 
 @dataclass(frozen=True)
@@ -120,4 +121,25 @@ def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRo
         kept_labels.append(relabeled[sample_id].value)
     return PreparedRows(
         sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
+    )
+
+
+def apply_heterogeneity_shift(
+    rows: PreparedRows, domain: NBaiotDomain, scope: HeterogeneityScope
+) -> PreparedRows:
+    feature_indices_and_signs = tuple(
+        (
+            scope.feature_names.index(feature_name),
+            feature_shift_sign(domain, feature_name, scope.heterogeneity_namespace_seed),
+        )
+        for feature_name in scope.selected_feature_names
+    )
+    shifted_features: list[tuple[float, ...]] = []
+    for features in rows.features:
+        tensor = torch.tensor(features, dtype=torch.float32)
+        for feature_index, sign in feature_indices_and_signs:
+            tensor[feature_index] = tensor[feature_index] + sign * scope.shift_magnitude
+        shifted_features.append(tuple(float(value) for value in tensor))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(shifted_features), labels=rows.labels
     )
