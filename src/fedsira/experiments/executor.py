@@ -8,9 +8,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.artifacts import (
-    collect_reconstruction_provenance,
-)
 from fedsira.attacks import (
     resolve_byzantine_verifier_vote,
     scale_model_replacement_delta,
@@ -170,14 +167,12 @@ from fedsira.domain.types import (
     MetricValue,
     MinimumCompletePairCount,
     ModuleName,
-    OverwriteExisting,
     PairedDifference,
     PreparedReproductionTargetCount,
     PreparedScreenTargetCount,
     PreparedSupportedReplayCount,
     ReconstructionError,
     RequiredReproductionRowCount,
-    ResolvedCoreComplete,
     RoundIndex,
     RowCount,
     ScenarioName,
@@ -265,17 +260,11 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     CellExecutor,
     ExecutionRecordStore,
-    ExperimentExecutionResult,
     PersistedExecutionRecord,
     ProtocolPhaseDurations,
-    derive_experiment_lifecycle,
-    execute_cell_with_retry,
-    execution_digest,
 )
 from fedsira.experiments.planning import (
-    ExperimentPlan,
     ScientificCell,
-    build_plan,
 )
 from fedsira.experiments.scenarios.capability_granularity import (
     root_cause_for_sample,
@@ -304,12 +293,8 @@ from fedsira.experiments.scenarios.heterogeneity import (
     select_heterogeneity_shift_features,
 )
 from fedsira.experiments.validation import (
-    ExperimentPrerequisiteState,
     run_data_and_domain_evidence_validation,
     run_protocol_invariant_validation,
-    validate_condition_vocabulary,
-    validate_experiment_prerequisites_met,
-    validate_no_duplicate_semantic_cells,
 )
 from fedsira.experiments.workflow import (
     BackdoorScope,
@@ -894,87 +879,6 @@ def collapse_evaluation_from_records(
             external_verification_legitimate_admission_degradation=legitimate,
         )
     return None
-
-
-def _prerequisite_states_from_store(
-    plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
-) -> tuple[ExperimentPrerequisiteState, ...]:
-    definition = experiment_by_name(experiment)
-    return tuple(
-        ExperimentPrerequisiteState(
-            experiment=prerequisite,
-            lifecycle_state=derive_experiment_lifecycle(
-                plan.experiment(prerequisite),
-                store.read_planned_outcomes(plan.experiment(prerequisite)),
-            ),
-        )
-        for prerequisite in definition.prerequisites
-    )
-
-
-def execute_experiment(
-    experiment: ExperimentName,
-    executor: CellExecutor,
-    *,
-    overwrite: OverwriteExisting = False,
-    resolved_core_complete: ResolvedCoreComplete = False,
-    prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
-) -> ExperimentExecutionResult:
-    resolved_config = current_application_context().scientific_config
-    definition = experiment_by_name(experiment)
-    plan = build_plan(
-        resolved_core_complete=resolved_core_complete,
-        master_seeds=resolved_config.seeds_and_determinism.master_seeds,
-        smoke_seed=resolved_config.seeds_and_determinism.smoke_seed,
-    )
-    validate_condition_vocabulary(plan)
-    validate_no_duplicate_semantic_cells(plan)
-    planned = plan.experiment(experiment)
-    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
-        return ExperimentExecutionResult(
-            experiment=experiment, lifecycle_state=ExperimentLifecycleState.BLOCKED, outcomes=()
-        )
-    store = ExecutionRecordStore(
-        Path(resolved_config.execution.repository_layout.execution_workspace),
-        reconstruction_provenance=collect_reconstruction_provenance(
-            current_application_context().repository_root
-        ),
-    )
-    states = prerequisite_states or _prerequisite_states_from_store(plan, experiment, store)
-    validate_experiment_prerequisites_met(experiment, states)
-    outcomes: list[CellExecutionOutcome] = []
-    for cell in planned.cells:
-        existing = store.read_outcome(experiment, cell.semantic_key)
-        if (
-            existing is not None
-            and (not overwrite)
-            and existing.terminal_state is ExperimentLifecycleState.COMPLETED
-        ):
-            outcomes.append(
-                CellExecutionOutcome(
-                    cell=cell,
-                    terminal_state=existing.terminal_state,
-                    failure=None,
-                    metrics=existing.metrics,
-                )
-            )
-            continue
-        outcome = execute_cell_with_retry(cell, executor)
-        store.write_outcome(outcome)
-        outcomes.append(outcome)
-    outcome_tuple = tuple(outcomes)
-    persisted = store.read_planned_outcomes(planned)
-    lifecycle_state = derive_experiment_lifecycle(planned, persisted)
-    comparison_results = comparison_results_for_experiment(
-        experiment, definition.dataset, outcome_tuple, store
-    )
-    return ExperimentExecutionResult(
-        experiment=experiment,
-        lifecycle_state=lifecycle_state,
-        outcomes=outcome_tuple,
-        comparison_results=comparison_results,
-        execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
-    )
 
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"

@@ -4,8 +4,13 @@ import hashlib
 from pathlib import Path
 from typing import Protocol
 
-from fedsira.artifacts import ReconstructionProvenance
-from fedsira.domain.enums import ExperimentLifecycleState, FailureClass, ScientificCellPhase
+from fedsira.artifacts import ReconstructionProvenance, collect_reconstruction_provenance
+from fedsira.domain.enums import (
+    DatasetId,
+    ExperimentLifecycleState,
+    FailureClass,
+    ScientificCellPhase,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     CellCompletionStatus,
@@ -17,13 +22,27 @@ from fedsira.domain.types import (
     MethodName,
     MetricObservation,
     MetricValue,
+    OverwriteExisting,
+    ResolvedCoreComplete,
     ScenarioName,
     ScientificCellCount,
     ScientificCellSemanticKey,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
-from fedsira.experiments.planning import PlannedExperiment, ScientificCell
-from fedsira.experiments.validation import validate_cell_terminal_record
+from fedsira.experiments.definitions import experiment_by_name
+from fedsira.experiments.planning import (
+    ExperimentPlan,
+    PlannedExperiment,
+    ScientificCell,
+    build_plan,
+)
+from fedsira.experiments.validation import (
+    ExperimentPrerequisiteState,
+    validate_cell_terminal_record,
+    validate_condition_vocabulary,
+    validate_experiment_prerequisites_met,
+    validate_no_duplicate_semantic_cells,
+)
 from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
 from fedsira.runtime_execution import framed_bytes
 
@@ -176,6 +195,99 @@ def derive_experiment_lifecycle(
         for cell in planned.cells
     )
     return ExperimentLifecycleState.COMPLETED if complete else ExperimentLifecycleState.RUNNING
+
+
+class ComparisonResultBuilder(Protocol):
+    def __call__(
+        self,
+        experiment: ExperimentName,
+        dataset: DatasetId,
+        outcomes: tuple[CellExecutionOutcome, ...],
+        store: ExecutionRecordStore,
+    ) -> tuple[ComparisonFamilyResult, ...]: ...
+
+
+def _prerequisite_states_from_store(
+    plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
+) -> tuple[ExperimentPrerequisiteState, ...]:
+    definition = experiment_by_name(experiment)
+    return tuple(
+        ExperimentPrerequisiteState(
+            experiment=prerequisite,
+            lifecycle_state=derive_experiment_lifecycle(
+                plan.experiment(prerequisite),
+                store.read_planned_outcomes(plan.experiment(prerequisite)),
+            ),
+        )
+        for prerequisite in definition.prerequisites
+    )
+
+
+def execute_experiment(
+    experiment: ExperimentName,
+    executor: CellExecutor,
+    comparison_builder: ComparisonResultBuilder | None = None,
+    *,
+    overwrite: OverwriteExisting = False,
+    resolved_core_complete: ResolvedCoreComplete = False,
+    prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
+) -> ExperimentExecutionResult:
+    resolved_config = current_application_context().scientific_config
+    definition = experiment_by_name(experiment)
+    plan = build_plan(
+        resolved_core_complete=resolved_core_complete,
+        master_seeds=resolved_config.seeds_and_determinism.master_seeds,
+        smoke_seed=resolved_config.seeds_and_determinism.smoke_seed,
+    )
+    validate_condition_vocabulary(plan)
+    validate_no_duplicate_semantic_cells(plan)
+    planned = plan.experiment(experiment)
+    if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
+        return ExperimentExecutionResult(
+            experiment=experiment, lifecycle_state=ExperimentLifecycleState.BLOCKED, outcomes=()
+        )
+    store = ExecutionRecordStore(
+        Path(resolved_config.execution.repository_layout.execution_workspace),
+        reconstruction_provenance=collect_reconstruction_provenance(
+            current_application_context().repository_root
+        ),
+    )
+    states = prerequisite_states or _prerequisite_states_from_store(plan, experiment, store)
+    validate_experiment_prerequisites_met(experiment, states)
+    outcomes: list[CellExecutionOutcome] = []
+    for cell in planned.cells:
+        existing = store.read_outcome(experiment, cell.semantic_key)
+        if (
+            existing is not None
+            and not overwrite
+            and existing.terminal_state is ExperimentLifecycleState.COMPLETED
+        ):
+            outcomes.append(
+                CellExecutionOutcome(
+                    cell=cell,
+                    terminal_state=existing.terminal_state,
+                    failure=None,
+                    metrics=existing.metrics,
+                )
+            )
+            continue
+        outcome = execute_cell_with_retry(cell, executor)
+        store.write_outcome(outcome)
+        outcomes.append(outcome)
+    outcome_tuple = tuple(outcomes)
+    lifecycle_state = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
+    comparisons = (
+        ()
+        if comparison_builder is None
+        else comparison_builder(experiment, definition.dataset, outcome_tuple, store)
+    )
+    return ExperimentExecutionResult(
+        experiment=experiment,
+        lifecycle_state=lifecycle_state,
+        outcomes=outcome_tuple,
+        comparison_results=comparisons,
+        execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
+    )
 
 
 class ExecutionRecordStore:

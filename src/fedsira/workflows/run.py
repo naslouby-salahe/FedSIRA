@@ -19,12 +19,12 @@ from fedsira.experiments.execution import (
     ExecutionRecordStore,
     ExperimentExecutionResult,
     derive_experiment_lifecycle,
+    execute_experiment,
 )
 from fedsira.experiments.executor import (
     ProtocolCellExecutor,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
-    execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.io.paths import workspace_root_for_family
@@ -163,6 +163,7 @@ def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     result = execute_experiment(
         name,
         ProtocolCellExecutor(resolved_core=resolved_core),
+        comparison_results_for_experiment,
         overwrite=overwrite,
         resolved_core_complete=resolved_core is not None,
     )

@@ -11,8 +11,8 @@ from fedsira.experiments.execution import (
     ExecutionRecordStore,
     PersistedExecutionRecord,
     derive_experiment_lifecycle,
+    execute_experiment,
 )
-from fedsira.experiments.executor import execute_experiment
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.experiments.validation import (
     ExperimentPrerequisiteState,
@@ -45,7 +45,7 @@ def _override_workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     def path_factory(_value: str) -> Path:
         return tmp_path
 
-    monkeypatch.setattr("fedsira.experiments.executor.Path", path_factory)
+    monkeypatch.setattr("fedsira.experiments.execution.Path", path_factory)
 
 
 def test_terminal_experiment_states_are_exact() -> None:
