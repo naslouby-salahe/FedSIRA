@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 from collections import OrderedDict
 from dataclasses import dataclass
+from pathlib import Path
 
+import pandas
 import torch
 
 from fedsira.attacks import (
@@ -10,12 +13,20 @@ from fedsira.attacks import (
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,
 )
-from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
+from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_CLASS_ORDER,
+    NBaiotClass,
+    NBaiotDomain,
+    nbaiot_domain_hash_token,
+)
 from fedsira.domain.enums import CapabilityContractScope, RootCause
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
+    ClassIndex,
     ClassLabel,
     DerivedSeed,
     ExampleCount,
@@ -23,6 +34,8 @@ from fedsira.domain.types import (
     FeatureIndex,
     FeatureName,
     FeatureVector,
+    PreparedEvidencePresent,
+    PreparedViewKey,
     Probability,
     TriggerFeatureValue,
 )
@@ -41,6 +54,7 @@ from fedsira.experiments.scenarios.evidence_scarcity import (
     select_spurious_feature_rows,
 )
 from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
+from fedsira.runtime_execution import framed_bytes
 
 
 @dataclass(frozen=True)
@@ -106,6 +120,70 @@ class EpistemicFailureScope:
     spurious_feature_value: TriggerFeatureValue
     common_context_feature_names: tuple[FeatureName, ...]
     common_context_trigger_value: TriggerFeatureValue
+
+
+def prepared_view_key(
+    domain: NBaiotDomain, class_id: NBaiotClass, role: Role
+) -> PreparedViewKey:
+    return f"{nbaiot_domain_hash_token(domain)}_{class_id.value}_{role_hash_token(role)}"
+
+
+def real_evidence_available(prepared_root: Path) -> PreparedEvidencePresent:
+    return prepared_root.exists() and any(prepared_root.glob("*.parquet"))
+
+
+def load_prepared_rows(
+    prepared_root: Path, domain: NBaiotDomain, class_id: NBaiotClass, role: Role
+) -> PreparedRows | None:
+    path = view_parquet_path(prepared_root, prepared_view_key(domain, class_id, role))
+    if not path.exists():
+        return None
+    frame: pandas.DataFrame = pandas.read_parquet(path)
+    if len(frame) == 0:
+        return None
+    feature_names = tuple(
+        column for column in frame.columns if column not in ("sample_id", "label")
+    )
+    sample_id_column: pandas.Series[str] = frame["sample_id"].astype(str)
+    features = tuple(
+        tuple(float(value) for value in row)
+        for row in frame[list(feature_names)].itertuples(index=False)
+    )
+    label_column: pandas.Series[str] = frame["label"].astype(str)
+    return PreparedRows(
+        sample_ids=tuple(sample_id_column), features=features, labels=tuple(label_column)
+    )
+
+
+def prepared_feature_names(prepared_root: Path) -> tuple[FeatureName, ...] | None:
+    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
+    if not parquet_files:
+        return None
+    frame: pandas.DataFrame = pandas.read_parquet(parquet_files[0])
+    return tuple(column for column in frame.columns if column not in ("sample_id", "label"))
+
+
+def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
+    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
+    if not parquet_files:
+        return "0" * 64
+    hasher = hashlib.sha256()
+    for path in parquet_files:
+        hasher.update(framed_bytes(path.name, path.stat().st_size))
+    return hasher.hexdigest()
+
+
+def tensor_view(
+    rows: PreparedRows | None,
+) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...]] | None:
+    if rows is None:
+        return None
+    features = torch.tensor(rows.features, dtype=torch.float32)
+    label_to_index: OrderedDict[ClassLabel, ClassIndex] = OrderedDict(
+        (class_id.value, index) for index, class_id in enumerate(NBAIOT_CLASS_ORDER)
+    )
+    labels = torch.tensor([label_to_index[label] for label in rows.labels], dtype=torch.long)
+    return (features, labels, rows.sample_ids)
 
 
 def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:

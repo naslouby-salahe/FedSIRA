@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-import pandas
 import torch
 
 from fedsira.artifacts import (
@@ -97,7 +96,6 @@ from fedsira.baselines.source_model import (
 from fedsira.config import VerificationConfig
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
-from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -146,7 +144,6 @@ from fedsira.domain.types import (
     ByzantineDomainCount,
     CapabilityContractSatisfied,
     CapabilityIdentity,
-    ClassIndex,
     ClassLabel,
     CommunicationMessageCount,
     CompleteSeedCount,
@@ -176,11 +173,9 @@ from fedsira.domain.types import (
     ModuleName,
     OverwriteExisting,
     PairedDifference,
-    PreparedEvidencePresent,
     PreparedReproductionTargetCount,
     PreparedScreenTargetCount,
     PreparedSupportedReplayCount,
-    PreparedViewKey,
     ReconstructionError,
     RequiredReproductionRowCount,
     ResolvedCoreComplete,
@@ -327,10 +322,17 @@ from fedsira.experiments.workflow import (
     RootCauseScope,
     apply_epistemic_target_marker,
     apply_heterogeneity_shift,
+    dataset_manifest_hash,
+    load_prepared_rows,
     mark_epistemic_rows,
     poison_backdoor_rows,
+    prepared_feature_names,
+    real_evidence_available,
     relabel_shared_label_error_rows_for_scope,
     scope_and_shift_rows,
+)
+from fedsira.experiments.workflow import (
+    tensor_view as _tensor_view,
 )
 from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
@@ -440,7 +442,6 @@ from fedsira.runtime import (
 from fedsira.runtime_execution import (
     ElapsedTimer,
     derive_uint32,
-    framed_bytes,
     local_training_seed,
     namespace_seed,
     peak_gpu_memory_bytes,
@@ -1071,68 +1072,6 @@ RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURC
 CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_ANCHOR"
 CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_POST_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
-
-
-def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> PreparedViewKey:
-    return f"{nbaiot_domain_hash_token(domain)}_{class_id.value}_{role_hash_token(role)}"
-
-
-def real_evidence_available(prepared_root: Path) -> PreparedEvidencePresent:
-    return prepared_root.exists() and any(prepared_root.glob("*.parquet"))
-
-
-def load_prepared_rows(
-    prepared_root: Path, domain: NBaiotDomain, class_id: NBaiotClass, role: Role
-) -> PreparedRows | None:
-    path = view_parquet_path(prepared_root, _view_key(domain, class_id, role))
-    if not path.exists():
-        return None
-    frame: pandas.DataFrame = pandas.read_parquet(path)
-    if len(frame) == 0:
-        return None
-    feature_names = tuple(
-        column for column in frame.columns if column not in ("sample_id", "label")
-    )
-    sample_id_column: pandas.Series[str] = frame["sample_id"].astype(str)
-    sample_ids = tuple(sample_id_column)
-    features = tuple(
-        tuple(float(value) for value in row)
-        for row in frame[list(feature_names)].itertuples(index=False)
-    )
-    label_column: pandas.Series[str] = frame["label"].astype(str)
-    labels = tuple(label_column)
-    return PreparedRows(sample_ids=sample_ids, features=features, labels=labels)
-
-
-def prepared_feature_names(prepared_root: Path) -> tuple[FeatureName, ...] | None:
-    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
-    if not parquet_files:
-        return None
-    frame: pandas.DataFrame = pandas.read_parquet(parquet_files[0])
-    return tuple(column for column in frame.columns if column not in ("sample_id", "label"))
-
-
-def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
-    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
-    if not parquet_files:
-        return "0" * 64
-    hasher = hashlib.sha256()
-    for path in parquet_files:
-        hasher.update(framed_bytes(path.name, path.stat().st_size))
-    return hasher.hexdigest()
-
-
-def _tensor_view(
-    rows: PreparedRows | None,
-) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...]] | None:
-    if rows is None:
-        return None
-    features = torch.tensor(rows.features, dtype=torch.float32)
-    label_to_index: OrderedDict[ClassLabel, ClassIndex] = OrderedDict(
-        ((class_id.value, index) for index, class_id in enumerate(NBAIOT_CLASS_ORDER))
-    )
-    labels = torch.tensor([label_to_index[label] for label in rows.labels], dtype=torch.long)
-    return (features, labels, rows.sample_ids)
 
 
 def _training_seed(
