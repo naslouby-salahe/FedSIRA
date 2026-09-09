@@ -34,7 +34,7 @@ from fedsira.experiments.definitions import (
     ReproducerCondition,
     VerifierCondition,
 )
-from fedsira.experiments.executor import CellExecutionOutcome
+from fedsira.experiments.execution import CellExecutionOutcome
 from fedsira.runtime import current_application_context
 
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (

@@ -31,7 +31,7 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
 )
-from fedsira.experiments.executor import CellExecutionOutcome, ExperimentExecutionResult
+from fedsira.experiments.execution import CellExecutionOutcome, ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (

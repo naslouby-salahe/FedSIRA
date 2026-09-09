@@ -3,7 +3,6 @@ from fedsira.artifacts import (
     DatasetManifestPayload,
     NBaiotDatasetManifestPayload,
 )
-from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.datasets.ciciot2023.loading import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
 from fedsira.datasets.ciciot2023.schema import (
@@ -45,6 +44,7 @@ from fedsira.runtime import (
     bound_application_context,
     current_application_context,
 )
+from fedsira.workflows import REPOSITORY_ROOT
 
 
 def _publish_dataset_manifest(

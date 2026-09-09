@@ -2253,15 +2253,16 @@ FedSIRA/
 │       │
 │       ├── cli/
 │       │   ├── __init__.py
-│       │   ├── main.py
-│       │   └── commands/
-│       │       ├── __init__.py
-│       │       ├── doctor.py
-│       │       ├── preprocess.py
-│       │       ├── plan.py
-│       │       ├── smoke.py
-│       │       ├── run.py
-│       │       └── report.py
+│       │   └── main.py
+│       │
+│       ├── workflows/
+│       │   ├── __init__.py
+│       │   ├── doctor.py
+│       │   ├── preprocess.py
+│       │   ├── plan.py
+│       │   ├── smoke.py
+│       │   ├── run.py
+│       │   └── report.py
 │       │
 │       ├── config/
 │       │   ├── __init__.py
@@ -2327,6 +2328,7 @@ FedSIRA/
 │       ├── experiments/
 │       │   ├── __init__.py
 │       │   ├── definitions.py
+│       │   ├── execution.py
 │       │   ├── planning.py
 │       │   ├── executor.py
 │       │   └── scenarios/

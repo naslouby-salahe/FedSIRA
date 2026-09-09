@@ -2,7 +2,6 @@ from pathlib import Path
 
 from rich.console import Console
 
-from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
 from fedsira.domain.types import (
     BooleanValue,
@@ -34,7 +33,8 @@ from fedsira.experiments.definitions import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
 )
-from fedsira.experiments.executor import ExecutionRecordStore, derive_experiment_lifecycle
+from fedsira.experiments.execution import ExecutionRecordStore
+from fedsira.experiments.executor import derive_experiment_lifecycle
 from fedsira.experiments.planning import ExperimentPlan, build_plan
 from fedsira.experiments.validation import PersistedSmokeRecord
 from fedsira.io.paths import (
@@ -48,6 +48,7 @@ from fedsira.runtime_execution import (
     collect_environment_mismatches,
     get_structured_logger,
 )
+from fedsira.workflows import REPOSITORY_ROOT
 
 _LOGGER = get_structured_logger("doctor")
 _CICIOT2023_RAW_RELATIVE = Path("CIC_IOT_Dataset2023") / "CSV"

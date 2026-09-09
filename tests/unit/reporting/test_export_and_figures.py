@@ -3,10 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.cli.commands.report import (
-    project_efficiency_telemetry,
-    project_evidence_trajectory,
-)
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -30,7 +26,7 @@ from fedsira.experiments.definitions import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     PrimaryScenario,
 )
-from fedsira.experiments.executor import CellExecutionOutcome, ExecutionRecordStore
+from fedsira.experiments.execution import CellExecutionOutcome, ExecutionRecordStore
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.reporting.export import (
     ReportExportResult,
@@ -54,6 +50,10 @@ from fedsira.reporting.tables import (
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
+)
+from fedsira.workflows.report import (
+    project_efficiency_telemetry,
+    project_evidence_trajectory,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

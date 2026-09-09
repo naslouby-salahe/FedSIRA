@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from fedsira.artifacts import load_published_artifact_graph, stale_artifact_identities
-from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import AdmissionState, ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import (
     BooleanValue,
@@ -24,12 +23,14 @@ from fedsira.experiments.definitions import (
     ComparisonFamily,
     experiment_by_name,
 )
-from fedsira.experiments.executor import (
+from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
     PersistedExecutionRecord,
     PersistedFailureDetail,
+)
+from fedsira.experiments.executor import (
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
     derive_experiment_lifecycle,
@@ -67,6 +68,7 @@ from fedsira.runtime import (
     bound_application_context,
     current_application_context,
 )
+from fedsira.workflows import REPOSITORY_ROOT
 
 _COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
     ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,

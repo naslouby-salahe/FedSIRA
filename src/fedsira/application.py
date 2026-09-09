@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from fedsira.cli.commands import doctor as doctor_command
-from fedsira.cli.commands import plan as plan_command
-from fedsira.cli.commands import preprocess as preprocess_command
-from fedsira.cli.commands import report as report_command
-from fedsira.cli.commands import run as run_command
-from fedsira.cli.commands import smoke as smoke_command
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import ApplicationExitCode, ExperimentName, OverwriteExisting
+from fedsira.workflows import doctor as doctor_command
+from fedsira.workflows import plan as plan_command
+from fedsira.workflows import preprocess as preprocess_command
+from fedsira.workflows import report as report_command
+from fedsira.workflows import run as run_command
+from fedsira.workflows import smoke as smoke_command
 
 
 class FedSIRAApplication:

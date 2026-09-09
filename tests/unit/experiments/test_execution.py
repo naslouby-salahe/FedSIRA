@@ -5,11 +5,13 @@ import pytest
 
 from fedsira.artifacts import ReconstructionProvenance
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
-from fedsira.experiments.executor import (
+from fedsira.experiments.execution import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedExecutionRecord,
+)
+from fedsira.experiments.executor import (
     derive_experiment_lifecycle,
     execute_experiment,
 )

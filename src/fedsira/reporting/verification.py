@@ -9,7 +9,7 @@ from fedsira.domain.types import (
     ScientificCellCount,
     VerificationPassed,
 )
-from fedsira.experiments.executor import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
+from fedsira.experiments.execution import TERMINAL_EXPERIMENT_STATES, PersistedExecutionRecord
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
 
 

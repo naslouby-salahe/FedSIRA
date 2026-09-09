@@ -4,12 +4,12 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, module_name
 
 APPLICATION_ENTRY_MODULES = (
     "fedsira.cli.main",
-    "fedsira.cli.commands.doctor",
-    "fedsira.cli.commands.preprocess",
-    "fedsira.cli.commands.plan",
-    "fedsira.cli.commands.smoke",
-    "fedsira.cli.commands.run",
-    "fedsira.cli.commands.report",
+    "fedsira.workflows.doctor",
+    "fedsira.workflows.preprocess",
+    "fedsira.workflows.plan",
+    "fedsira.workflows.smoke",
+    "fedsira.workflows.run",
+    "fedsira.workflows.report",
 )
 
 
@@ -17,7 +17,10 @@ def _application_modules() -> frozenset[str]:
     finder = ModuleFinder(path=[str(SRC_ROOT.parent)])
     finder.run_script(str(SRC_ROOT / "cli" / "main.py"))
     return frozenset(
-        name for name in finder.modules if name == "fedsira" or name.startswith("fedsira.")
+        (
+            "fedsira.cli.main",
+            *(name for name in finder.modules if name == "fedsira" or name.startswith("fedsira.")),
+        )
     )
 
 

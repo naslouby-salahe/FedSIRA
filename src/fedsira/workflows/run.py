@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from fedsira.cli.commands import REPOSITORY_ROOT
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import BooleanValue, ExperimentName, OverwriteExisting, RunRenderText
 from fedsira.experiments.collapse import (
@@ -15,10 +14,12 @@ from fedsira.experiments.definitions import (
     ComparisonFamily,
     experiment_by_name,
 )
-from fedsira.experiments.executor import (
+from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+)
+from fedsira.experiments.executor import (
     ProtocolCellExecutor,
     collapse_evaluation_from_records,
     comparison_results_for_experiment,
@@ -33,6 +34,7 @@ from fedsira.runtime import (
     current_application_context,
 )
 from fedsira.runtime_execution import configure_deterministic_backend
+from fedsira.workflows import REPOSITORY_ROOT
 
 RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
     ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
