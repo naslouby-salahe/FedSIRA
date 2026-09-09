@@ -324,6 +324,7 @@ from fedsira.experiments.workflow import (
     apply_heterogeneity_shift,
     dataset_manifest_hash,
     domain_anchor_train_feature_mean,
+    flat_parameters_identity,
     load_prepared_rows,
     mark_epistemic_rows,
     poison_backdoor_rows,
@@ -1093,12 +1094,6 @@ def _training_seed(
         CLEAN_TRAINING_CONDITION_TOKEN,
         round_index,
     )
-
-
-def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
-    values = flat_parameters.detach().cpu()
-    joined = "|".join(repr(values[index].item()) for index in range(values.numel()))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
 def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | None:

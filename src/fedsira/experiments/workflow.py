@@ -198,6 +198,12 @@ def domain_anchor_train_feature_mean(
     return None if not combined_features else torch.cat(combined_features, dim=0).mean(dim=0)
 
 
+def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
+    values = flat_parameters.detach().cpu()
+    joined = "|".join(repr(values[index].item()) for index in range(values.numel()))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRows:
     poisoned_ids = select_source_backdoor_poison_rows(
         rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
