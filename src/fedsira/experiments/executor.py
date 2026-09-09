@@ -299,8 +299,6 @@ from fedsira.experiments.scenarios.evidence_scarcity import (
     apply_shared_spurious_feature,
     diagnostic_marker_metric_or_insufficient,
     match_diagnostic_benign_report_test_rows,
-    relabel_shared_label_error_rows,
-    select_shared_label_error_rows,
     select_spurious_feature_rows,
 )
 from fedsira.experiments.scenarios.heterogeneity import (
@@ -330,6 +328,7 @@ from fedsira.experiments.workflow import (
     RootCauseScope,
     apply_heterogeneity_shift,
     poison_backdoor_rows,
+    relabel_shared_label_error_rows_for_scope,
     scope_and_shift_rows,
 )
 from fedsira.io.paths import prepared_evidence_root
@@ -1073,31 +1072,6 @@ CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 
 
-def _relabel_shared_label_error_rows(
-    rows: PreparedRows, scope: EpistemicFailureScope
-) -> tuple[PreparedRows, tuple[BooleanValue, ...]]:
-    selected = (
-        select_shared_label_error_rows(
-            rows.sample_ids, scope.strength, scope.attack_generation_seed
-        )
-        or ()
-    )
-    selected_ids = frozenset(selected)
-    labels_by_row_id = OrderedDict(
-        (
-            (sample_id, NBaiotClass(label))
-            for sample_id, label in zip(rows.sample_ids, rows.labels, strict=True)
-        )
-    )
-    relabeled = relabel_shared_label_error_rows(labels_by_row_id, selected)
-    new_labels = tuple(relabeled[sample_id].value for sample_id in rows.sample_ids)
-    is_supported_mask = tuple(sample_id not in selected_ids for sample_id in rows.sample_ids)
-    return (
-        PreparedRows(sample_ids=rows.sample_ids, features=rows.features, labels=new_labels),
-        is_supported_mask,
-    )
-
-
 def _mark_rows(
     rows: PreparedRows, scope: EpistemicFailureScope, selected_ids: frozenset[ArtifactDigest]
 ) -> PreparedRows:
@@ -1752,7 +1726,9 @@ def _combined_post_reference_rows(
             and (epistemic_failure_scope is not None)
             and (epistemic_failure_scope.failure_type is EpistemicFailureType.SHARED_LABEL_ERROR)
         ):
-            rows, relabeled_mask = _relabel_shared_label_error_rows(rows, epistemic_failure_scope)
+            rows, relabeled_mask = relabel_shared_label_error_rows_for_scope(
+                rows, epistemic_failure_scope
+            )
         if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and (backdoor_scope is not None):
             rows = poison_backdoor_rows(rows, backdoor_scope)
         if rows is not None and heterogeneity_scope is not None:

@@ -15,6 +15,7 @@ from fedsira.domain.enums import CapabilityContractScope, RootCause
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     ArtifactDigest,
+    BooleanValue,
     ClassLabel,
     DerivedSeed,
     ExampleCount,
@@ -31,6 +32,10 @@ from fedsira.experiments.scenarios.capability_granularity import (
     balanced_capability_selection,
     root_cause_for_sample,
     target_row_ids_for_contract,
+)
+from fedsira.experiments.scenarios.evidence_scarcity import (
+    relabel_shared_label_error_rows,
+    select_shared_label_error_rows,
 )
 from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
 
@@ -193,4 +198,29 @@ def scope_and_shift_rows(
         return None
     return PreparedRows(
         sample_ids=tuple(kept_sample_ids), features=tuple(kept_features), labels=tuple(kept_labels)
+    )
+
+
+def relabel_shared_label_error_rows_for_scope(
+    rows: PreparedRows, scope: EpistemicFailureScope
+) -> tuple[PreparedRows, tuple[BooleanValue, ...]]:
+    selected = (
+        select_shared_label_error_rows(
+            rows.sample_ids, scope.strength, scope.attack_generation_seed
+        )
+        or ()
+    )
+    selected_ids = frozenset(selected)
+    labels_by_row_id = OrderedDict(
+        (sample_id, NBaiotClass(label))
+        for sample_id, label in zip(rows.sample_ids, rows.labels, strict=True)
+    )
+    relabeled = relabel_shared_label_error_rows(labels_by_row_id, selected)
+    return (
+        PreparedRows(
+            sample_ids=rows.sample_ids,
+            features=rows.features,
+            labels=tuple(relabeled[sample_id].value for sample_id in rows.sample_ids),
+        ),
+        tuple(sample_id not in selected_ids for sample_id in rows.sample_ids),
     )
