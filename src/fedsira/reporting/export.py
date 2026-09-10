@@ -37,8 +37,17 @@ from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
+    render_admission_delay_decomposition,
+    render_capability_granularity_boundary,
+    render_compromised_reproducer_boundary,
+    render_compromised_verifier_boundary,
+    render_heterogeneity_synthesis_boundary,
     render_mandatory_figures,
     render_protocol_schematic,
+    render_secondary_generalization,
+    render_security_utility_tradeoff,
+    render_shared_epistemic_failure,
+    render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
 from fedsira.reporting.tables import (
@@ -121,6 +130,88 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
     return destination
 
 
+def _render_experiment_figures(
+    result: ExperimentExecutionResult,
+    figures_root: Path,
+) -> tuple[Path, ...]:
+    figures: list[Path] = [
+        render_protocol_schematic(figures_root / "FedSIRA Protocol Schematic.png")
+    ]
+    if not result.comparison_results:
+        return tuple(figures)
+    if result.experiment is PRIMARY_CONFIRMATORY_EVALUATION_NAME:
+        figures.append(
+            render_security_utility_tradeoff(
+                result.comparison_results,
+                figures_root / "Primary Security-Utility Tradeoff.png",
+            )
+        )
+    elif result.experiment is SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+        figures.append(
+            render_useful_backdoored_source(
+                result.comparison_results,
+                figures_root / "Useful Backdoored Source.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
+        figures.append(
+            render_compromised_reproducer_boundary(
+                result.comparison_results,
+                figures_root / "Compromised-Reproducer Boundary.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
+        figures.append(
+            render_compromised_verifier_boundary(
+                result.comparison_results,
+                figures_root / "Compromised-Verifier Boundary.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
+        figures.append(
+            render_shared_epistemic_failure(
+                result.comparison_results,
+                figures_root / "Shared Epistemic Failure.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
+        figures.append(
+            render_capability_granularity_boundary(
+                result.comparison_results,
+                figures_root / "Capability-Granularity Boundary.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
+        figures.append(
+            render_heterogeneity_synthesis_boundary(
+                result.comparison_results,
+                figures_root / "Heterogeneity Synthesis Boundary.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is ADMISSION_DELAY_DECOMPOSITION_NAME:
+        figures.append(
+            render_admission_delay_decomposition(
+                result.comparison_results,
+                figures_root / "Admission-Delay Decomposition.png",
+                result.outcomes,
+            )
+        )
+    elif result.experiment is SECONDARY_DATASET_GENERALIZATION_NAME:
+        figures.append(
+            render_secondary_generalization(
+                result.comparison_results,
+                figures_root / "Secondary Generalization.png",
+            )
+        )
+    return tuple(figures)
+
+
 def export_experiment_report(
     result: ExperimentExecutionResult,
     experiment_root: Path,
@@ -145,7 +236,7 @@ def export_experiment_report(
 
     exported: list[Path] = [
         _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
-        render_protocol_schematic(figures_root / "FedSIRA Protocol Schematic.png"),
+        *_render_experiment_figures(result, figures_root),
     ]
     if result.comparison_results:
         statistical_table = table_renderers.render_statistical_summary_table(
