@@ -42,3 +42,15 @@ def test_report_workflow_reaches_persisted_evidence_and_publication_export() -> 
     assert (
         expected <= calls
     ), f"report workflow bypasses required publication path: {expected - calls}"
+
+
+def test_status_workflow_reaches_persisted_evidence_without_execution() -> None:
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "workflows" / "status.py")
+    expected: frozenset[str] = frozenset(
+        (
+            "ExecutionRecordStore",
+            "derive_experiment_lifecycle",
+        )
+    )
+    assert expected <= calls, f"status workflow bypasses persisted evidence: {expected - calls}"
+    assert "execute_experiment" not in calls
