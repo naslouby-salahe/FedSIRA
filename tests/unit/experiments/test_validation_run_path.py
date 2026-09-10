@@ -8,11 +8,9 @@ from fedsira.experiments.definitions import (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
-from fedsira.experiments.executor import (
-    PreparedEvidenceCounts,
-    ProtocolCellExecutor,
-)
+from fedsira.experiments.executor import ProtocolCellExecutor
 from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.prerequisites import PreparedEvidenceCounts
 from fedsira.experiments.validation import run_data_and_domain_evidence_validation
 
 
