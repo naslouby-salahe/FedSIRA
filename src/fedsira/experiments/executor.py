@@ -281,18 +281,13 @@ from fedsira.experiments.workflow import (
     PreparedRows,
     RealAnchor,
     RootCauseScope,
-    apply_epistemic_target_marker,
-    apply_heterogeneity_shift,
     dataset_manifest_hash,
     domain_anchor_train_feature_mean,
     flat_parameters_identity,
     load_prepared_rows,
     mark_epistemic_rows,
-    poison_backdoor_rows,
     prepared_feature_names,
     real_evidence_available,
-    relabel_shared_label_error_rows_for_scope,
-    scope_and_shift_rows,
 )
 from fedsira.experiments.workflow import (
     tensor_view as _tensor_view,
@@ -318,6 +313,11 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
 )
 from fedsira.learning.post_reference import run_post_reference_training
+from fedsira.learning.post_reference_training import (
+    combined_post_reference_rows,
+    train_domain_reproduction_delta,
+    train_source_candidate_delta,
+)
 from fedsira.learning.reference import (
     train_centralized_reference_checkpoint,
     train_local_only_reference_checkpoint,
@@ -417,9 +417,7 @@ from fedsira.runtime_execution import (
     seed_job_local_rng_streams,
 )
 
-SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"
 GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN = "GENERIC_HARD_SUPPORTED_EXAMPLES"
-REPRODUCTION_TRAINING_ALGORITHM_TOKEN = "REPRODUCTION"
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
 SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
 LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
@@ -599,7 +597,7 @@ def train_update_reconstruction_filter_delta(
         accepted_states: list[WeightedModelState] = []
         for domain in participants:
             target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            combined = combined_post_reference_rows(prepared_root, domain, target_role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -682,188 +680,6 @@ def train_source_update_sanitization_delta(
         calibration_updates, config.baselines.source_update_sanitization.coordinate_bound_percentile
     )
     return clip_source_update(source_delta, clip_bounds)
-
-
-def _combined_post_reference_rows(
-    prepared_root: Path,
-    domain: NBaiotDomain,
-    target_role: Role,
-    root_cause_scope: RootCauseScope | None = None,
-    epistemic_failure_scope: EpistemicFailureScope | None = None,
-    backdoor_scope: BackdoorScope | None = None,
-    heterogeneity_scope: HeterogeneityScope | None = None,
-) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
-    target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
-    if target_rows is not None and root_cause_scope is not None:
-        target_rows = scope_and_shift_rows(target_rows, root_cause_scope)
-    if (
-        target_rows is not None
-        and epistemic_failure_scope is not None
-        and (
-            epistemic_failure_scope.failure_type
-            in (
-                EpistemicFailureType.SHARED_SPURIOUS_FEATURE,
-                EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT,
-            )
-        )
-    ):
-        target_rows = apply_epistemic_target_marker(target_rows, epistemic_failure_scope)
-    if target_rows is not None and heterogeneity_scope is not None:
-        target_rows = apply_heterogeneity_shift(target_rows, domain, heterogeneity_scope)
-    target_tensor = _tensor_view(target_rows)
-    if target_tensor is None:
-        return None
-    target_features, target_labels, target_sample_ids = target_tensor
-    supported_features: list[torch.Tensor] = [target_features]
-    supported_labels: list[torch.Tensor] = [target_labels]
-    supported_sample_ids: list[ArtifactDigest] = list(target_sample_ids)
-    is_supported: list[torch.Tensor] = [torch.zeros(target_features.shape[0], dtype=torch.bool)]
-    for class_id in NBAIOT_CLASS_ORDER:
-        if class_id is NBaiotClass.GAFGYT_COMBO:
-            continue
-        rows = load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
-        relabeled_mask: tuple[bool, ...] | None = None
-        if (
-            rows is not None
-            and class_id is NBaiotClass.BENIGN
-            and (epistemic_failure_scope is not None)
-            and (epistemic_failure_scope.failure_type is EpistemicFailureType.SHARED_LABEL_ERROR)
-        ):
-            rows, relabeled_mask = relabel_shared_label_error_rows_for_scope(
-                rows, epistemic_failure_scope
-            )
-        if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and (backdoor_scope is not None):
-            rows = poison_backdoor_rows(rows, backdoor_scope)
-        if rows is not None and heterogeneity_scope is not None:
-            rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
-        replay_tensor = _tensor_view(rows)
-        if replay_tensor is None:
-            continue
-        features, labels, sample_ids = replay_tensor
-        supported_features.append(features)
-        supported_labels.append(labels)
-        supported_sample_ids.extend(sample_ids)
-        if relabeled_mask is not None:
-            is_supported.append(torch.tensor(relabeled_mask, dtype=torch.bool))
-        else:
-            is_supported.append(torch.ones(features.shape[0], dtype=torch.bool))
-    return (
-        torch.cat(supported_features, dim=0),
-        torch.cat(supported_labels, dim=0),
-        tuple(supported_sample_ids),
-        torch.cat(is_supported, dim=0),
-    )
-
-
-def train_domain_reproduction_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    domain: NBaiotDomain,
-    root_cause_scope: RootCauseScope | None = None,
-    epistemic_failure_scope: EpistemicFailureScope | None = None,
-    heterogeneity_scope: HeterogeneityScope | None = None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    combined = _combined_post_reference_rows(
-        prepared_root,
-        domain,
-        Role.REPRODUCTION,
-        root_cause_scope,
-        epistemic_failure_scope,
-        heterogeneity_scope=heterogeneity_scope,
-    )
-    if combined is None:
-        return None
-    features, labels, sample_ids, is_supported = combined
-    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
-    current_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(current_model, anchor.flat_parameters)
-    training_seed = _training_seed(
-        master_seed,
-        anchor.dataset_manifest_hash,
-        flat_parameters_identity(anchor.flat_parameters),
-        REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
-        domain,
-        -1,
-    )
-    seed_job_local_rng_streams(training_seed)
-    optimizer = torch.optim.AdamW(
-        current_model.parameters(),
-        lr=config.model.optimizer.post_reference_learning_rate,
-        betas=config.model.optimizer.betas,
-        eps=config.model.optimizer.epsilon,
-        weight_decay=config.model.optimizer.weight_decay,
-    )
-    loss_function = torch.nn.CrossEntropyLoss()
-    run_post_reference_training(
-        anchor_model,
-        current_model,
-        optimizer,
-        loss_function,
-        config.model.training,
-        config.model.post_reference,
-        features,
-        labels,
-        is_supported,
-        sample_ids,
-        training_seed,
-        config.model.post_reference.local_epochs,
-    )
-    return flatten_trainable_parameters(current_model) - anchor.flat_parameters
-
-
-def train_source_candidate_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain,
-    backdoor_scope: BackdoorScope | None = None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    combined = _combined_post_reference_rows(
-        prepared_root, source_domain, Role.SOURCE_PROPOSAL, backdoor_scope=backdoor_scope
-    )
-    if combined is None:
-        return None
-    features, labels, sample_ids, is_supported = combined
-    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
-    current_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(current_model, anchor.flat_parameters)
-    training_seed = _training_seed(
-        master_seed,
-        anchor.dataset_manifest_hash,
-        flat_parameters_identity(anchor.flat_parameters),
-        SOURCE_TRAINING_ALGORITHM_TOKEN,
-        source_domain,
-        -1,
-    )
-    seed_job_local_rng_streams(training_seed)
-    optimizer = torch.optim.AdamW(
-        current_model.parameters(),
-        lr=config.model.optimizer.post_reference_learning_rate,
-        betas=config.model.optimizer.betas,
-        eps=config.model.optimizer.epsilon,
-        weight_decay=config.model.optimizer.weight_decay,
-    )
-    loss_function = torch.nn.CrossEntropyLoss()
-    run_post_reference_training(
-        anchor_model,
-        current_model,
-        optimizer,
-        loss_function,
-        config.model.training,
-        config.model.post_reference,
-        features,
-        labels,
-        is_supported,
-        sample_ids,
-        training_seed,
-        config.model.post_reference.local_epochs,
-    )
-    return flatten_trainable_parameters(current_model) - anchor.flat_parameters
 
 
 def train_generic_hard_supported_examples_delta(
@@ -974,7 +790,7 @@ def _train_ordinary_fedavg_delta(
         round_clients: list[LocalTrainingClient] = []
         for domain in participants:
             target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            combined = combined_post_reference_rows(prepared_root, domain, target_role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -1170,7 +986,7 @@ def _group_post_reference_round_clients(
         if target_rows is not None:
             has_target_bearing_member = True
             group_target_row_count += target_rows.row_count
-        combined = _combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
+        combined = combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
         if combined is not None:
             features, labels, sample_ids, _is_supported = combined
         else:
@@ -1354,7 +1170,7 @@ def train_krum_reference_delta(
         committee: list[CertifiedReproductionRow] = []
         for domain in participants:
             target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = _combined_post_reference_rows(
+            combined = combined_post_reference_rows(
                 prepared_root, domain, target_role, heterogeneity_scope=heterogeneity_scope
             )
             if combined is None:
@@ -1433,7 +1249,7 @@ def train_density_cluster_trimmed_mean_delta(
         raw_updates: list[torch.Tensor] = []
         for domain in participants:
             target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = _combined_post_reference_rows(prepared_root, domain, target_role)
+            combined = combined_post_reference_rows(prepared_root, domain, target_role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined

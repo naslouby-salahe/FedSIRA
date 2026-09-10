@@ -30,14 +30,12 @@ from fedsira.experiments.executor import (
     train_centralized_reference_checkpoint,
     train_certified_ensemble_group_checkpoints,
     train_density_cluster_trimmed_mean_delta,
-    train_domain_reproduction_delta,
     train_fedavg_reference_delta,
     train_generic_hard_supported_examples_delta,
     train_krum_reference_delta,
     train_local_only_reference_checkpoint,
     train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,
-    train_source_candidate_delta,
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
     triggered_to_benign_rate,
@@ -51,6 +49,10 @@ from fedsira.experiments.workflow import (
     domain_anchor_train_feature_mean,
 )
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
+from fedsira.learning.post_reference_training import (
+    train_domain_reproduction_delta,
+    train_source_candidate_delta,
+)
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training; skipped by default"
