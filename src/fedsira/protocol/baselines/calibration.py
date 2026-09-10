@@ -187,7 +187,8 @@ def _mean_within_cluster_distance(
     indices: tuple[MemberIndex, ...],
     distance_matrix: PairwiseDistanceMatrix,
 ) -> PairwiseDistance:
-    if len(indices) < 2:
+    minimum_pairwise_index_count = 2
+    if len(indices) < minimum_pairwise_index_count:
         return 0.0
     pairwise_distances = tuple(
         distance_matrix[first][second]

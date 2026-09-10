@@ -152,7 +152,8 @@ def interquartile_range(domain_target_f1: tuple[MetricResult, ...]) -> MetricRes
 
 
 def coefficient_of_variation(values: tuple[MetricValue, ...]) -> MetricResult:
-    if len(values) < 2:
+    minimum_dispersion_sample_count = 2
+    if len(values) < minimum_dispersion_sample_count:
         return MetricResult(value=None, denominator=len(values))
     mean = sum(values) / len(values)
     if mean == 0:

@@ -48,7 +48,7 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR2004"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 15
@@ -60,6 +60,7 @@ max-returns = 16
 max-statements = 80
 
 [tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004"]
 "tests/unit/domain/test_records.py" = ["B010"]
 "tests/unit/config/test_loading.py" = ["B010"]
 "tests/unit/artifacts/test_records.py" = ["B010"]

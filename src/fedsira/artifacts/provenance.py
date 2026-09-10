@@ -196,7 +196,8 @@ def collect_reconstruction_provenance(repository_root: Path) -> ReconstructionPr
         check=False,
     )
     commit = result.stdout.strip()
-    if result.returncode != 0 or len(commit) != 40:
+    git_commit_hex_length = 40
+    if result.returncode != 0 or len(commit) != git_commit_hex_length:
         raise ValueError("unable to resolve the current repository commit for provenance")
     return ReconstructionProvenance(
         repository_commit=commit,

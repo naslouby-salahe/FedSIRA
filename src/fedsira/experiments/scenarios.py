@@ -160,7 +160,8 @@ def holder_count_at_cycle(
     if schedule is EvidenceArrivalSchedule.PERMANENT_SINGLETON:
         return 0
     if schedule is EvidenceArrivalSchedule.ONE_HONEST_HOLDER:
-        return 0 if cycle < 2 else min(1, eligible_domain_count)
+        first_holder_cycle = 2
+        return 0 if cycle < first_holder_cycle else min(1, eligible_domain_count)
     if schedule is EvidenceArrivalSchedule.IMMEDIATE_QUORUM:
         return eligible_domain_count
     count: EligibleEvidenceHolderCount = 0

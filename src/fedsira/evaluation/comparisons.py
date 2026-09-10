@@ -159,7 +159,8 @@ class ComparisonTemplate(FrozenDomainModel):
 
 
 def _effect_size(values: tuple[PairedDifference, ...]) -> EffectSize | None:
-    if len(values) < 2:
+    minimum_paired_sample_count = 2
+    if len(values) < minimum_paired_sample_count:
         return None
     mean = sum(values) / len(values)
     variance = sum((value - mean) ** 2 for value in values) / (len(values) - 1)
