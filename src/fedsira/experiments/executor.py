@@ -192,6 +192,19 @@ from fedsira.evaluation.comparisons import (
     build_comparison_registry,
     evaluate_comparison,
 )
+from fedsira.evaluation.indexing import (
+    MetricCellKey,
+    MetricCellRecord,
+)
+from fedsira.evaluation.indexing import (
+    extend_index_from_records as _extend_index_from_records,
+)
+from fedsira.evaluation.indexing import (
+    metric_index_from_outcomes as _metric_index_from_outcomes,
+)
+from fedsira.evaluation.indexing import (
+    metric_value as _metric_value,
+)
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
     boundary_metric_set,
@@ -434,86 +447,6 @@ from fedsira.runtime_execution import (
     reset_peak_gpu_memory_counter,
     seed_job_local_rng_streams,
 )
-
-
-class MetricCellKey(FrozenDomainModel):
-    dataset: DatasetId
-    experiment: ExperimentName
-    scientific_scenario: ScenarioName
-    master_seed: MasterSeed
-    method: MethodName
-
-
-class MetricCellRecord(FrozenDomainModel):
-    key: MetricCellKey
-    metrics: tuple[MetricObservation, ...]
-
-
-def _merge_metric_record(
-    records: tuple[MetricCellRecord, ...], incoming: MetricCellRecord
-) -> tuple[MetricCellRecord, ...]:
-    retained = tuple(record for record in records if record.key != incoming.key)
-    return (*retained, incoming)
-
-
-def _metric_value(
-    records: tuple[MetricCellRecord, ...], key: MetricCellKey, metric: MetricName
-) -> MetricValue | None:
-    for record in reversed(records):
-        if record.key != key:
-            continue
-        for metric_name, metric_result in reversed(record.metrics):
-            if metric_name == metric:
-                return metric_result
-    return None
-
-
-def _metric_index_from_outcomes(
-    dataset: DatasetId, outcomes: tuple[CellExecutionOutcome, ...]
-) -> tuple[MetricCellRecord, ...]:
-    records: tuple[MetricCellRecord, ...] = ()
-    for outcome in outcomes:
-        if outcome.terminal_state is not ExperimentLifecycleState.COMPLETED:
-            continue
-        records = _merge_metric_record(
-            records,
-            MetricCellRecord(
-                key=MetricCellKey(
-                    dataset=dataset,
-                    experiment=outcome.cell.experiment,
-                    scientific_scenario=outcome.cell.condition,
-                    master_seed=outcome.cell.master_seed,
-                    method=outcome.cell.method,
-                ),
-                metrics=outcome.metrics,
-            ),
-        )
-    return records
-
-
-def _extend_index_from_records(
-    records: tuple[MetricCellRecord, ...],
-    dataset: DatasetId,
-    persisted_records: tuple[PersistedExecutionRecord, ...],
-) -> tuple[MetricCellRecord, ...]:
-    merged = records
-    for record in persisted_records:
-        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
-            continue
-        merged = _merge_metric_record(
-            merged,
-            MetricCellRecord(
-                key=MetricCellKey(
-                    dataset=dataset,
-                    experiment=record.experiment,
-                    scientific_scenario=record.condition,
-                    master_seed=record.master_seed,
-                    method=record.method,
-                ),
-                metrics=record.metrics,
-            ),
-        )
-    return merged
 
 
 def _benefit_difference(

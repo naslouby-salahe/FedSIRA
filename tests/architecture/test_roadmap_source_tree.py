@@ -46,6 +46,7 @@ ROADMAP_MODULES = frozenset(
         "domain/models.py",
         "domain/types.py",
         "evaluation/__init__.py",
+        "evaluation/indexing.py",
         "evaluation/comparisons.py",
         "evaluation/metrics.py",
         "evaluation/statistics.py",
