@@ -205,6 +205,72 @@ def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_pa
     assert any(CELL_METRICS_PARQUET_NAME in failure for failure in verification.failures)
 
 
+def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export_experiment_report(result, tmp_path)
+    table_path = tmp_path / "tables" / "main" / "Cell Metrics.csv"
+    table_path.write_text("")
+    verification = verify_experiment_artifacts(
+        result,
+        tmp_path / "tables" / "main",
+        tmp_path / "figures" / "main",
+        tmp_path / "metrics" / "primary",
+        tmp_path / "metrics" / "primary" / "summary.json",
+    )
+    assert not verification.passed
+    assert any("required table Cell Metrics" in failure for failure in verification.failures)
+
+
+def test_experiment_evidence_verification_rejects_empty_required_figure(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export_experiment_report(result, tmp_path)
+    figure_path = tmp_path / "figures" / "main" / "FedSIRA Protocol Schematic.png"
+    figure_path.write_bytes(b"")
+    verification = verify_experiment_artifacts(
+        result,
+        tmp_path / "tables" / "main",
+        tmp_path / "figures" / "main",
+        tmp_path / "metrics" / "primary",
+        tmp_path / "metrics" / "primary" / "summary.json",
+    )
+    assert not verification.passed
+    assert any(
+        "required figure FedSIRA Protocol Schematic" in failure for failure in verification.failures
+    )
+
+
 def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() -> None:
     table = render_primary_results_table(
         (),
