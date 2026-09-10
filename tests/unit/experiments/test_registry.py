@@ -12,6 +12,13 @@ def test_experiment_by_name_resolves_every_registered_experiment() -> None:
         assert experiment_by_name(definition.name).name == definition.name
 
 
+def test_every_experiment_declares_required_evidence_artifacts() -> None:
+    for definition in experiment_registry():
+        assert definition.artifacts.metrics_required
+        assert definition.artifacts.required_tables
+        assert definition.artifacts.required_figures
+
+
 def test_planned_cells_match_nominal_registry_counts() -> None:
     plan = build_plan(resolved_core_complete=True)
     assert plan.total_cell_count == PLAN_CELL_COUNT_CONTRACT.complete_scientific_plan
