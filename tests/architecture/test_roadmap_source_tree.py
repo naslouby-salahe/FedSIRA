@@ -94,6 +94,7 @@ ROADMAP_MODULES = frozenset(
         "reporting/__init__.py",
         "reporting/export.py",
         "reporting/figures.py",
+        "reporting/materialization.py",
         "reporting/tables.py",
         "reporting/verification.py",
         "runtime.py",

@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 
+import pandas
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -44,6 +45,13 @@ from fedsira.reporting.figures import (
     render_security_utility_tradeoff,
     render_useful_backdoored_source,
     validate_mandatory_figures_covered,
+)
+from fedsira.reporting.materialization import (
+    AGGREGATE_METRICS_PARQUET_NAME,
+    CELL_METRICS_PARQUET_NAME,
+    RESOURCES_PARQUET_NAME,
+    SEED_METRICS_PARQUET_NAME,
+    TIMINGS_PARQUET_NAME,
 )
 from fedsira.reporting.tables import (
     format_metric_value,
@@ -129,7 +137,40 @@ def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_p
     exported = {Path(path).name for path in export.exported_paths}
     assert "Cell Metrics.csv" in exported
     assert "FedSIRA Protocol Schematic.png" in exported
+    assert CELL_METRICS_PARQUET_NAME in exported
+    assert SEED_METRICS_PARQUET_NAME in exported
+    assert AGGREGATE_METRICS_PARQUET_NAME in exported
     assert "manifest.json" in exported
+    cell_metrics = pandas.read_parquet(tmp_path / "metrics" / "primary" / CELL_METRICS_PARQUET_NAME)
+    assert cell_metrics.shape[0] == 1
+    assert cell_metrics.iloc[0]["metric"] == "target-f1"
+
+
+def test_export_experiment_report_materializes_efficiency_telemetry(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=EFFICIENCY_MEASUREMENT_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=EFFICIENCY_MEASUREMENT_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="timed",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(
+                    ("post-evidence-wall-clock-seconds", 1.5),
+                    ("peak-host-rss-bytes", 32.0),
+                ),
+            ),
+        ),
+    )
+    export = export_experiment_report(result, tmp_path)
+    assert export.verification.passed
+    assert (tmp_path / "telemetry" / TIMINGS_PARQUET_NAME).is_file()
+    assert (tmp_path / "telemetry" / RESOURCES_PARQUET_NAME).is_file()
 
 
 def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() -> None:

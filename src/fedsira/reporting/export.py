@@ -65,6 +65,7 @@ from fedsira.reporting.figures import (
     render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
+from fedsira.reporting.materialization import materialize_experiment_evidence
 from fedsira.reporting.tables import (
     MANUSCRIPT_TABLE_NAMES,
     RenderedTable,
@@ -295,14 +296,18 @@ def export_experiment_report(
     tables_root = experiment_root / "tables" / "main"
     figures_root = experiment_root / "figures" / "main"
     metrics_root = experiment_root / "metrics" / "primary"
+    telemetry_root = experiment_root / "telemetry"
     tables_root.mkdir(parents=True, exist_ok=True)
     figures_root.mkdir(parents=True, exist_ok=True)
     metrics_root.mkdir(parents=True, exist_ok=True)
+    telemetry_root.mkdir(parents=True, exist_ok=True)
 
     exported: list[Path] = [
         _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
         *_render_experiment_figures(result, figures_root),
     ]
+    evidence = materialize_experiment_evidence(result, metrics_root, telemetry_root)
+    exported.extend(Path(path) for path in evidence.paths)
     if result.comparison_results:
         statistical_table = table_renderers.render_statistical_summary_table(
             result.comparison_results,
