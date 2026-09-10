@@ -30,6 +30,7 @@ from fedsira.experiments.definitions import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    experiment_by_name,
 )
 from fedsira.experiments.execution import CellExecutionOutcome, ExperimentExecutionResult
 from fedsira.experiments.planning import ExperimentPlan
@@ -128,6 +129,31 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
     return destination
+
+
+def _verify_experiment_artifacts(
+    result: ExperimentExecutionResult,
+    tables_root: Path,
+    figures_root: Path,
+    summary_path: Path,
+) -> CompletenessVerificationResult:
+    specification = experiment_by_name(result.experiment).artifacts
+    failures: list[ReportVerificationFailure] = []
+    if specification.metrics_required and (
+        not summary_path.is_file() or not summary_path.read_text(encoding="utf-8").strip()
+    ):
+        failures.append(f"{result.experiment}: metric summary is missing or empty")
+    for table_name in specification.required_tables:
+        path = tables_root / f"{table_name}.csv"
+        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+            failures.append(f"{result.experiment}: required table {table_name} is missing or empty")
+    for figure_name in specification.required_figures:
+        path = figures_root / f"{figure_name}.png"
+        if not path.is_file() or path.stat().st_size == 0:
+            failures.append(
+                f"{result.experiment}: required figure {figure_name} is missing or empty"
+            )
+    return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
 
 def _render_experiment_figures(
@@ -254,7 +280,7 @@ def export_experiment_report(
     summary_path = metrics_root / "summary.json"
     summary_path.write_text(summary.model_dump_json(indent=2) + "\n")
     exported.append(summary_path)
-    verification = CompletenessVerificationResult(passed=True, failures=())
+    verification = _verify_experiment_artifacts(result, tables_root, figures_root, summary_path)
     return ReportExportResult(
         experiment=result.experiment,
         exported_paths=tuple(str(path) for path in exported),

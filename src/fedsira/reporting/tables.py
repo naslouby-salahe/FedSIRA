@@ -57,6 +57,7 @@ from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+    CELL_METRICS_TABLE_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
@@ -94,7 +95,6 @@ MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Generalization Results",
     "Statistical Summary",
 )
-EXPERIMENT_CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
 
 
 class RenderedTable(FrozenDomainModel):
@@ -119,7 +119,7 @@ def render_experiment_cell_metrics_table(
                 )
             )
     return RenderedTable(
-        name=EXPERIMENT_CELL_METRICS_TABLE_NAME,
+        name=CELL_METRICS_TABLE_NAME,
         csv_text=_csv_text(
             (
                 "method",

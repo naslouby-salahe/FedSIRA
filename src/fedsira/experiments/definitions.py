@@ -10,12 +10,15 @@ from fedsira.baselines.registry import (
 )
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.types import (
+    BooleanValue,
     ConditionName,
     ExperimentName,
+    FigureName,
     FrozenDomainModel,
     MethodName,
     ScientificCellCount,
     SeedCount,
+    TableName,
 )
 from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedule
 from fedsira.runtime import current_application_context
@@ -178,6 +181,23 @@ class SecondaryScenario(StrEnum):
     ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
 
 
+CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
+PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
+
+
+class ExperimentArtifactSpecification(FrozenDomainModel):
+    metrics_required: BooleanValue
+    required_tables: tuple[TableName, ...]
+    required_figures: tuple[FigureName, ...]
+
+
+DEFAULT_EXPERIMENT_ARTIFACT_SPECIFICATION = ExperimentArtifactSpecification(
+    metrics_required=True,
+    required_tables=(CELL_METRICS_TABLE_NAME,),
+    required_figures=(PROTOCOL_SCHEMATIC_FIGURE_NAME,),
+)
+
+
 class ExperimentDefinition(FrozenDomainModel):
     name: ExperimentName
     experiment_class: ExperimentClass
@@ -188,6 +208,7 @@ class ExperimentDefinition(FrozenDomainModel):
     comparison_family: ComparisonFamily | None
     prerequisites: tuple[ExperimentName, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
+    artifacts: ExperimentArtifactSpecification = DEFAULT_EXPERIMENT_ARTIFACT_SPECIFICATION
 
 
 DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
