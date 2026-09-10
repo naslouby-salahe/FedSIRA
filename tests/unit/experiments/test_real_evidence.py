@@ -21,9 +21,11 @@ from fedsira.domain.types import FeatureName
 from fedsira.evaluation.capability_boundary import (
     compute_capability_under_specification_summary,
 )
+from fedsira.evaluation.epistemic_boundary import (
+    compute_shared_epistemic_failure_summary,
+)
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.experiments.executor import (
-    compute_shared_epistemic_failure_summary,
     compute_source_backdoor_asr,
     evaluate_domain,
     non_source_domains,
