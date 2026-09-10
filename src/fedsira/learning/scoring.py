@@ -20,3 +20,12 @@ def logits_for_samples(
 
 def probabilities_for_samples(logits: torch.Tensor) -> torch.Tensor:
     return torch_functional.softmax(logits, dim=-1)
+
+
+def per_sample_cross_entropy(
+    model: nn.Module,
+    features: torch.Tensor,
+    labels: torch.Tensor,
+) -> torch.Tensor:
+    logits = logits_for_samples(model, features)
+    return torch_functional.cross_entropy(logits, labels, reduction="none")

@@ -322,7 +322,7 @@ from fedsira.learning.reference import (
     train_centralized_reference_checkpoint,
     train_local_only_reference_checkpoint,
 )
-from fedsira.learning.scoring import logits_for_samples
+from fedsira.learning.scoring import logits_for_samples, per_sample_cross_entropy
 from fedsira.protocol.admission import (
     apply_production_update,
     final_gate_predicates_pass,
@@ -885,7 +885,7 @@ def train_generic_hard_supported_examples_delta(
             continue
         features, labels, sample_ids = tensor_view
         losses = [
-            float(value) for value in _per_sample_cross_entropy(anchor_model, features, labels)
+            float(value) for value in per_sample_cross_entropy(anchor_model, features, labels)
         ]
         boundaries = decile_boundaries(tuple(losses))
         top_decile_bin = len(boundaries)
@@ -1513,15 +1513,6 @@ def certified_domain_delta_committee(
     return deltas
 
 
-def _per_sample_cross_entropy(
-    model: FedSIRAClassifier, features: torch.Tensor, labels: torch.Tensor
-) -> torch.Tensor:
-    model.eval()
-    with torch.no_grad():
-        logits = logits_for_samples(model, features)
-        return torch.nn.functional.cross_entropy(logits, labels, reduction="none")
-
-
 def compute_unmatched_screen_differential(
     prepared_root: Path, anchor: RealAnchor, source_delta: torch.Tensor, domain: NBaiotDomain
 ) -> MetricValue | None:
@@ -1535,8 +1526,8 @@ def compute_unmatched_screen_differential(
     load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
     source_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
     load_flat_trainable_parameters(source_model, anchor.flat_parameters + source_delta)
-    target_anchor_loss = _per_sample_cross_entropy(anchor_model, target_features, target_labels)
-    target_source_loss = _per_sample_cross_entropy(source_model, target_features, target_labels)
+    target_anchor_loss = per_sample_cross_entropy(anchor_model, target_features, target_labels)
+    target_source_loss = per_sample_cross_entropy(source_model, target_features, target_labels)
     return float(torch.mean(target_anchor_loss - target_source_loss))
 
 
@@ -1577,10 +1568,10 @@ def compute_screen_differential(
     load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
     source_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
     load_flat_trainable_parameters(source_model, anchor.flat_parameters + source_delta)
-    target_anchor_loss = _per_sample_cross_entropy(anchor_model, target_features, target_labels)
-    target_source_loss = _per_sample_cross_entropy(source_model, target_features, target_labels)
-    control_anchor_loss = _per_sample_cross_entropy(anchor_model, control_features, control_labels)
-    control_source_loss = _per_sample_cross_entropy(source_model, control_features, control_labels)
+    target_anchor_loss = per_sample_cross_entropy(anchor_model, target_features, target_labels)
+    target_source_loss = per_sample_cross_entropy(source_model, target_features, target_labels)
+    control_anchor_loss = per_sample_cross_entropy(anchor_model, control_features, control_labels)
+    control_source_loss = per_sample_cross_entropy(source_model, control_features, control_labels)
     screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", master_seed)
     fold_count = config.protocol.proposal_screen.fold_count
     fold_assignment: OrderedDict[ArtifactDigest, FoldIndex] = OrderedDict()
@@ -1723,7 +1714,7 @@ def _diagnostic_marker_for_domain(
     selected_target_labels = torch.full(
         (len(selected_target_ids),), target_class_index, dtype=torch.long
     )
-    target_losses = _per_sample_cross_entropy(
+    target_losses = per_sample_cross_entropy(
         anchor_model, selected_target_features, selected_target_labels
     )
     target_report_losses = tuple(
@@ -1732,7 +1723,7 @@ def _diagnostic_marker_for_domain(
     benign_class_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
     benign_features = torch.tensor(benign_rows.features, dtype=torch.float32)
     benign_labels = torch.full((len(benign_rows.sample_ids),), benign_class_index, dtype=torch.long)
-    benign_losses = _per_sample_cross_entropy(anchor_model, benign_features, benign_labels)
+    benign_losses = per_sample_cross_entropy(anchor_model, benign_features, benign_labels)
     benign_report_losses = tuple(
         zip(benign_rows.sample_ids, (float(value) for value in benign_losses), strict=True)
     )

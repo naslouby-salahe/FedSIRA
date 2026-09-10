@@ -1,7 +1,11 @@
 import torch
 
 from fedsira.learning.model import FedSIRAClassifier
-from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
+from fedsira.learning.scoring import (
+    logits_for_samples,
+    per_sample_cross_entropy,
+    probabilities_for_samples,
+)
 from fedsira.learning.training import build_loss_function
 
 
@@ -48,3 +52,12 @@ def test_scoring_composes_with_loss_function() -> None:
     loss = loss_function(logits, torch.zeros(4, dtype=torch.long))
     assert loss.dim() == 0
     assert float(loss) >= 0.0
+
+
+def test_per_sample_cross_entropy_returns_one_loss_per_example() -> None:
+    model = _model()
+    features = torch.randn(4, 8)
+    labels = torch.zeros(4, dtype=torch.long)
+    losses = per_sample_cross_entropy(model, features, labels)
+    assert losses.shape == (4,)
+    assert losses.requires_grad is False
