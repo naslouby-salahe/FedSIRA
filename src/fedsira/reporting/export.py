@@ -104,6 +104,13 @@ class ExperimentReportSummary(FrozenDomainModel):
     planned_cell_count: ScientificCellCount
 
 
+class ExperimentArtifactManifest(FrozenDomainModel):
+    schema_version: SchemaVersion
+    experiment: ExperimentName
+    lifecycle_state: ExperimentLifecycleState
+    artifacts: tuple[RepositoryPath, ...]
+
+
 class ProjectReproducibilitySummary(FrozenDomainModel):
     schema_version: SchemaVersion
     experiment_states: tuple[ExperimentLifecycleRecord, ...]
@@ -278,6 +285,15 @@ def export_experiment_report(
     summary_path = metrics_root / "summary.json"
     summary_path.write_text(summary.model_dump_json(indent=2) + "\n")
     exported.append(summary_path)
+    manifest_path = experiment_root / "manifest.json"
+    manifest = ExperimentArtifactManifest(
+        schema_version=EXPORT_SCHEMA_VERSION,
+        experiment=result.experiment,
+        lifecycle_state=result.lifecycle_state,
+        artifacts=tuple(str(path) for path in exported),
+    )
+    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n")
+    exported.append(manifest_path)
     verification = _verify_experiment_artifacts(result, tables_root, figures_root, summary_path)
     return ReportExportResult(
         experiment=result.experiment,

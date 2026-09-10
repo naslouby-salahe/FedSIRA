@@ -129,6 +129,7 @@ def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_p
     exported = {Path(path).name for path in export.exported_paths}
     assert "Cell Metrics.csv" in exported
     assert "FedSIRA Protocol Schematic.png" in exported
+    assert "manifest.json" in exported
 
 
 def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() -> None:
