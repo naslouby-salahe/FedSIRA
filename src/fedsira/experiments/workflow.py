@@ -8,8 +8,7 @@ from pathlib import Path
 import pandas
 import torch
 
-from fedsira.datasets.common import Role, role_hash_token
-from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
+from fedsira.datasets.common import Role, role_hash_token, view_parquet_path
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBaiotClass,

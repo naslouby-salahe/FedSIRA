@@ -74,6 +74,7 @@ TrainingConditionId = TextValue
 SeedDerivationLabel = TextValue
 SampleId = TextValue
 SampleIdPrefix = TextValue
+SamplingSelectionDigest = Annotated[bytes, Field(min_length=32, max_length=32)]
 RelativePathText = TextValue
 PathToken = TextValue
 ModuleName = TextValue
@@ -313,9 +314,6 @@ SquaredFeatureAccumulator = NonNegativeFloat
 FeatureValue = FiniteFloat
 FeatureVector: TypeAlias = tuple[FeatureValue, ...]
 FeatureMatrix: TypeAlias = tuple[FeatureVector, ...]
-FeaturePayloadBytes = Annotated[bytes, Field(min_length=8)]
-SqliteScalar: TypeAlias = TextValue | NonNegativeInt | FeaturePayloadBytes
-ParquetScalar: TypeAlias = TextValue | NonNegativeInt | FiniteFloat
 PreparedEvidencePresent = BooleanValue
 ArtifactComplete = BooleanValue
 ArtifactActive = BooleanValue

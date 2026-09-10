@@ -8,6 +8,7 @@ from fedsira.domain.types import (
     FeatureName,
     NamespaceSeed,
     PathToken,
+    PredictorCount,
     RelativePathText,
     SeedDerivationLabel,
 )
@@ -60,13 +61,13 @@ class NBaiotClass(StrEnum):
 NBAIOT_DOMAIN_ORDER: tuple[NBaiotDomain, ...] = tuple(NBaiotDomain)
 NBAIOT_CLASS_ORDER: tuple[NBaiotClass, ...] = tuple(NBaiotClass)
 NBAIOT_TARGET_CLASS = NBaiotClass.GAFGYT_COMBO
+NBAIOT_PRIMARY_PREDICTOR_COUNT: PredictorCount = 115
 NBAIOT_TRIGGER_FEATURES: tuple[FeatureName, ...] = (
     "MI_dir_L0.1_weight",
     "H_L0.1_weight",
     "HH_L0.1_magnitude",
     "HpHp_L0.1_mean",
 )
-
 _NON_ALPHANUMERIC = re.compile(r"[^0-9a-zA-Z]+")
 
 
@@ -75,10 +76,10 @@ def nbaiot_domain_hash_token(domain: NBaiotDomain) -> DomainId:
 
 
 def nbaiot_domain_from_hash_token(token: DomainId) -> NBaiotDomain:
-    for domain in NBAIOT_DOMAIN_ORDER:
-        if domain.name == token:
-            return domain
-    raise ValueError(f"unknown N-BaIoT domain hash token: {token}")
+    try:
+        return NBaiotDomain[token]
+    except KeyError as error:
+        raise ValueError(f"unknown N-BaIoT domain hash token: {token}") from error
 
 
 def normalize_path_token(raw_token: RelativePathText) -> PathToken:
@@ -90,55 +91,7 @@ def resolve_domain(directory_name: RelativePathText) -> NBaiotDomain | None:
         directory = _NBaiotDirectory(directory_name)
     except ValueError:
         return None
-    if directory is _NBaiotDirectory.DANMINI_DOORBELL:
-        return NBaiotDomain.DANMINI_DOORBELL
-    if directory is _NBaiotDirectory.ENNIO_DOORBELL:
-        return NBaiotDomain.ENNIO_DOORBELL
-    if directory is _NBaiotDirectory.ECOBEE_THERMOSTAT:
-        return NBaiotDomain.ECOBEE_THERMOSTAT
-    if directory is _NBaiotDirectory.PHILIPS_BABY_MONITOR:
-        return NBaiotDomain.PHILIPS_BABY_MONITOR
-    if directory is _NBaiotDirectory.PROVISION_PT737E_CAMERA:
-        return NBaiotDomain.PROVISION_PT737E_CAMERA
-    if directory is _NBaiotDirectory.PROVISION_PT838_CAMERA:
-        return NBaiotDomain.PROVISION_PT838_CAMERA
-    if directory is _NBaiotDirectory.SIMPLEHOME_1002_CAMERA:
-        return NBaiotDomain.SIMPLEHOME_1002_CAMERA
-    if directory is _NBaiotDirectory.SIMPLEHOME_1003_CAMERA:
-        return NBaiotDomain.SIMPLEHOME_1003_CAMERA
-    if directory is _NBaiotDirectory.SAMSUNG_WEBCAM:
-        return NBaiotDomain.SAMSUNG_WEBCAM
-    raise ValueError(f"unsupported N-BaIoT directory: {directory.value}")
-
-
-def _resolve_gafgyt_class(basename: AttackBasename) -> NBaiotClass | None:
-    normalized = basename.strip().lower()
-    if normalized == "combo":
-        return NBaiotClass.GAFGYT_COMBO
-    if normalized == "junk":
-        return NBaiotClass.GAFGYT_JUNK
-    if normalized == "scan":
-        return NBaiotClass.GAFGYT_SCAN
-    if normalized == "tcp":
-        return NBaiotClass.GAFGYT_TCP
-    if normalized == "udp":
-        return NBaiotClass.GAFGYT_UDP
-    return None
-
-
-def _resolve_mirai_class(basename: AttackBasename) -> NBaiotClass | None:
-    normalized = basename.strip().lower()
-    if normalized == "ack":
-        return NBaiotClass.MIRAI_ACK
-    if normalized == "scan":
-        return NBaiotClass.MIRAI_SCAN
-    if normalized == "syn":
-        return NBaiotClass.MIRAI_SYN
-    if normalized == "udp":
-        return NBaiotClass.MIRAI_UDP
-    if normalized == "udpplain":
-        return NBaiotClass.MIRAI_UDPPLAIN
-    return None
+    return NBaiotDomain[directory.name]
 
 
 def resolve_attack_class(
@@ -149,11 +102,10 @@ def resolve_attack_class(
         family = NBaiotAttackFamily(attack_family_token.strip().lower())
     except ValueError:
         return None
-    if family is NBaiotAttackFamily.GAFGYT:
-        return _resolve_gafgyt_class(basename_token)
-    if family is NBaiotAttackFamily.MIRAI:
-        return _resolve_mirai_class(basename_token)
-    raise ValueError(f"unsupported N-BaIoT attack family: {family.value}")
+    try:
+        return NBaiotClass[f"{family.name}_{basename_token.strip().upper()}"]
+    except KeyError:
+        return None
 
 
 def deterministic_domain_order(

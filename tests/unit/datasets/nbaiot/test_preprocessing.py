@@ -1,28 +1,32 @@
-import math
 from pathlib import Path
 from typing import cast
 
+import duckdb
 import pandas
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.common import DatasetExclusionReason, Role, role_hash_token
-from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
-from fedsira.datasets.nbaiot.preprocessing import (
-    NBAIOT_PRIMARY_PREDICTOR_COUNT,
+from fedsira.datasets.common import (
+    DatasetExclusionReason,
+    Role,
+    open_tabular_engine,
+    role_hash_token,
+    view_parquet_path,
+)
+from fedsira.datasets.nbaiot.prepare import (
+    DiscoveredCsvFile,
     PreparedView,
     RoleSamplingCap,
     assign_stream_roles_and_sample_ids,
-    classify_row_finiteness,
+    ingest_primary_numeric_csv,
     materialize_nbaiot_prepared_views,
     supported_class_sampling_caps,
     target_class_sampling_caps,
-    validate_all_predictors_finite,
     validate_consistent_predictor_schema,
     validate_predictor_schema,
-    view_parquet_path,
 )
 from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_PRIMARY_PREDICTOR_COUNT,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
@@ -50,7 +54,7 @@ def _cap_for_role(caps: tuple[RoleSamplingCap, ...], role: Role) -> int | None:
     for role_cap in caps:
         if role_cap.role is role:
             return role_cap.cap
-    raise AssertionError(f"missing cap for {role.value}")
+    raise AssertionError(f"missing cap for {role.name}")
 
 
 def test_validate_predictor_schema_accepts_a_well_formed_header() -> None:
@@ -85,18 +89,6 @@ def test_validate_consistent_predictor_schema_rejects_mismatched_headers() -> No
     reordered = (header[1], header[0], *header[2:])
     with pytest.raises(ValueError, match="does not match the fixed reference schema"):
         validate_consistent_predictor_schema(header, reordered)
-
-
-def test_classify_row_finiteness_accepts_finite_values() -> None:
-    assert classify_row_finiteness((1.0, -2.0, 0.0)) is None
-
-
-def test_classify_row_finiteness_detects_nan() -> None:
-    assert classify_row_finiteness((1.0, math.nan)) is DatasetExclusionReason.NON_FINITE_PREDICTOR
-
-
-def test_classify_row_finiteness_detects_infinity() -> None:
-    assert classify_row_finiteness((1.0, math.inf)) is DatasetExclusionReason.NON_FINITE_PREDICTOR
 
 
 def test_supported_class_sampling_caps_uses_benign_cap_for_benign() -> None:
@@ -244,24 +236,32 @@ def test_assign_stream_roles_and_sample_ids_never_assigns_guard_gap_rows() -> No
     assert assigned_indices.isdisjoint(guard_gap_indices)
 
 
-def test_validate_all_predictors_finite_accepts_finite_numeric_data(tmp_path: Path) -> None:
+def _assert_numeric_file(path: Path, header: tuple[str, ...]) -> None:
+    connection = open_tabular_engine()
+    try:
+        ingest_primary_numeric_csv(connection, path, header)
+    finally:
+        connection.close()
+
+
+def test_numeric_csv_accepts_finite_numeric_data(tmp_path: Path) -> None:
     path = tmp_path / "clean.csv"
     path.write_text("a,b\n1.0,2.0\n3.0,4.0\n")
-    validate_all_predictors_finite(path, ("a", "b"))
+    _assert_numeric_file(path, ("a", "b"))
 
 
-def test_validate_all_predictors_finite_rejects_nan(tmp_path: Path) -> None:
+def test_numeric_csv_rejects_nan(tmp_path: Path) -> None:
     path = tmp_path / "with_nan.csv"
     path.write_text("a,b\n1.0,2.0\n,4.0\n")
     with pytest.raises(ValueError):
-        validate_all_predictors_finite(path, ("a", "b"))
+        _assert_numeric_file(path, ("a", "b"))
 
 
-def test_validate_all_predictors_finite_rejects_nonnumeric_columns(tmp_path: Path) -> None:
+def test_numeric_csv_rejects_nonnumeric_columns(tmp_path: Path) -> None:
     path = tmp_path / "with_text.csv"
     path.write_text("a,b\n1.0,not_a_number\n3.0,also_text\n")
     with pytest.raises(ValueError, match=DatasetExclusionReason.UNPARSEABLE_PREDICTOR.value):
-        validate_all_predictors_finite(path, ("a", "b"))
+        _assert_numeric_file(path, ("a", "b"))
 
 
 def _feature_names() -> list[str]:
@@ -298,8 +298,8 @@ def test_prepared_view_row_count() -> None:
         class_id=NBaiotClass.BENIGN,
         role=Role.ANCHOR_TRAIN,
         sample_ids=("a" * 64, "b" * 64),
-        features=((0.0,), (1.0,)),
         labels=("BENIGN", "BENIGN"),
+        parquet_path=Path("unused.parquet"),
     )
     assert view.row_count == 2
 
@@ -357,12 +357,14 @@ def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) ->
     assert views
     view = views[0]
     view_key = (
-        f"{nbaiot_domain_hash_token(view.domain)}_{view.class_id.value}_"
-        f"{role_hash_token(view.role)}"
+        f"{nbaiot_domain_hash_token(view.domain)}_{view.class_id}_{role_hash_token(view.role)}"
     )
     parquet_path = view_parquet_path(prepared_root, view_key)
     assert parquet_path.exists()
-    frame: pandas.DataFrame = pandas.read_parquet(parquet_path)
+    connection = duckdb.connect()
+    frame = connection.execute(
+        f"SELECT * FROM read_parquet('{parquet_path.as_posix()}')"
+    ).fetch_df()
     assert len(frame) == view.row_count
     sample_ids = cast("pandas.Series[str]", frame["sample_id"])
     labels = cast("pandas.Series[str]", frame["label"])
@@ -384,8 +386,11 @@ def test_materialization_standardized_features_are_finite_and_clipped(tmp_path: 
     )
     assert views
     scaling = current_application_context().scientific_config.datasets.primary.scaling
-    clip_max = scaling.clip_max
-    clip_min = scaling.clip_min
+    connection = duckdb.connect()
     for view in views:
-        for row in view.features:
-            assert all(clip_min <= value <= clip_max for value in row)
+        frame = connection.execute(
+            "SELECT * EXCLUDE (sample_id, label) FROM read_parquet(?)",
+            [view.parquet_path.as_posix()],
+        ).fetch_df()
+        assert frame.to_numpy().min() >= scaling.clip_min
+        assert frame.to_numpy().max() <= scaling.clip_max

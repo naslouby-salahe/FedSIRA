@@ -42,31 +42,31 @@ RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIG
 
 
 def preprocessing_root() -> Path:
-    return OUTPUTS_ROOT / "preprocessing" #TODO: use enum instead of hardcoded string
+    return OUTPUTS_ROOT / "preprocessing"
 
 
 def preprocessing_metadata_root() -> Path:
-    return preprocessing_root() / "metadata" #TODO: use enum instead of hardcoded string
+    return preprocessing_root() / "metadata"
 
 
 def prepared_evidence_root(dataset: DatasetId) -> Path:
-    return preprocessing_root() / "prepared" / dataset #TODO: use enum instead of hardcoded string
+    return preprocessing_root() / "prepared" / dataset
 
 
 def prepared_feature_root() -> Path:
-    return preprocessing_root() / "features" #TODO: use enum instead of hardcoded string
+    return preprocessing_root() / "features"
 
 
 def smoke_record_path() -> Path:
-    return preprocessing_root() / "validation" / "smoke_record.json" #TODO: use enum instead of hardcoded string
+    return preprocessing_root() / "validation" / "smoke_record.json"
 
 
 def experiment_execution_root(experiment: ExperimentName) -> Path:
-    return OUTPUTS_ROOT / "experiments" / experiment #TODO: use enum instead of hardcoded string
+    return OUTPUTS_ROOT / "experiments" / experiment
 
 
 def experiment_log_path(experiment: ExperimentName) -> Path:
-    return experiment_execution_root(experiment) / "logs" / "experiment.log" #TODO: use enum instead of hardcoded string
+    return experiment_execution_root(experiment) / "logs" / "experiment.log"
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
@@ -89,11 +89,11 @@ def workspace_root_for_family(
     if scope is ArtifactPathScope.PREPROCESSING:
         return preprocessing_root()
     if scope is ArtifactPathScope.PROJECT_ARTIFACT:
-        return OUTPUTS_ROOT / "artifacts" #TODO: use enum instead of hardcoded string
+        return OUTPUTS_ROOT / "artifacts"
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:
         if experiment is None:
             raise ValueError(f"artifact family {family.value} requires an owning experiment name")
         return experiment_execution_root(experiment)
     if experiment is None:
         raise ValueError(f"artifact family {family.value} requires an owning experiment name")
-    return RESULTS_ROOT / "experiments" / experiment #TODO: use enum instead of hardcoded string
+    return RESULTS_ROOT / "experiments" / experiment

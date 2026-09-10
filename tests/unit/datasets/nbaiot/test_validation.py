@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.datasets.nbaiot.validation import (
+from fedsira.datasets.nbaiot.prepare import (
+    DiscoveredCsvFile,
     classes_structurally_unavailable,
     domains_missing_target_stream,
     domains_with_target_stream,
     validate_target_holder_feasibility,
 )
+from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
 
 
 def _file(domain: NBaiotDomain, class_id: NBaiotClass) -> DiscoveredCsvFile:

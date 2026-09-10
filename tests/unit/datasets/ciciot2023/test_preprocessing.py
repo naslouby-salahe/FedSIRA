@@ -1,55 +1,45 @@
 from pathlib import Path
 
+import duckdb
+
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.ciciot2023.loading import SecondaryCsvFile
-from fedsira.datasets.ciciot2023.preprocessing import (
-    SecondaryPreparationStore,
-    SecondaryRawRow,
-    SecondaryRetainedRow,
-    assign_roles,
+from fedsira.datasets.ciciot2023.prepare import (
+    SecondaryCsvFile,
+    assign_secondary_roles,
     compute_stable_row_id,
-    parse_complete_case_rows,
+    materialize_ciciot2023_prepared_views,
     resolve_predictor_columns,
     resolve_row_identifier_columns,
 )
-from fedsira.datasets.ciciot2023.schema import (
-    BENIGN_LABEL,
-    TARGET_LABEL,
-    CICIoT2023PseudoDomain,
-)
+from fedsira.datasets.ciciot2023.schema import TARGET_LABEL, CICIoT2023PseudoDomain
 from fedsira.datasets.common import DatasetExclusionReason, Role
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
 
-def _store_with_rows(
+def _seed_retained(
     database_path: Path,
     label: str,
     domain: CICIoT2023PseudoDomain,
     row_count: int,
-) -> SecondaryPreparationStore:
-    store = SecondaryPreparationStore(database_path)
-    store.reset()
-    rows = tuple(
-        SecondaryRetainedRow(
-            stable_row_id=f"{index:064x}",
-            file_sha256="a" * 64,
-            relative_path="part.csv",
-            original_row_index=index,
-            normalized_label=label,
-            pseudo_domain=domain,
-            features=(float(index),),
-        )
-        for index in range(row_count)
+) -> None:
+    connection = duckdb.connect(str(database_path))
+    connection.execute(
+        "CREATE TABLE retained ("
+        "stable_row_id VARCHAR, normalized_label VARCHAR, pseudo_domain INTEGER)"
     )
-    store.add_rows(rows, ())
-    return store
+    connection.executemany(
+        "INSERT INTO retained VALUES (?, ?, ?)",
+        [(f"{index:064x}", label, int(domain)) for index in range(row_count)],
+    )
+    connection.close()
 
 
-def _roles_by_stable_row_id(
-    store: SecondaryPreparationStore,
-) -> dict[str, Role]:
-    return {assignment.stable_row_id: assignment.role for assignment in store.iter_role_manifest()}
+def _roles_by_stable_row_id(database_path: Path) -> dict[str, Role]:
+    connection = duckdb.connect(str(database_path))
+    rows = connection.execute("SELECT stable_row_id, role FROM role_assignments").fetchall()
+    connection.close()
+    return {str(stable_row_id): Role[str(role_token)] for stable_row_id, role_token in rows}
 
 
 def test_compute_stable_row_id_is_a_sha256_hex_digest() -> None:
@@ -76,55 +66,66 @@ def test_resolve_predictor_columns_keeps_identifier_like_predictor_when_not_vali
     assert predictors == ("index", "feature_a")
 
 
-def test_complete_case_parsing_records_unparseable_and_nonfinite_rows() -> None:
-    raw_rows = (
-        SecondaryRawRow(original_row_index=0, values=("1.0", "2.0", "BenignTraffic")),
-        SecondaryRawRow(
-            original_row_index=1,
-            values=("bad", "3.0", "Backdoor_Malware"),
-        ),
-        SecondaryRawRow(
-            original_row_index=2,
-            values=("inf", "4.0", "Backdoor_Malware"),
+def _write_csv(path: Path, header: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> None:
+    lines = [",".join(header)]
+    lines.extend(",".join(row) for row in rows)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _secondary_csv_file(path: Path) -> SecondaryCsvFile:
+    return SecondaryCsvFile(absolute_path=path, relative_path=path.name, file_sha256="a" * 64)
+
+
+def test_complete_case_parsing_records_unparseable_and_nonfinite_rows(tmp_path: Path) -> None:
+    csv_path = tmp_path / "part.csv"
+    _write_csv(
+        csv_path,
+        ("feature_a", "feature_b", "Label"),
+        (
+            ("1.0", "2.0", "BenignTraffic"),
+            ("bad", "3.0", "Backdoor_Malware"),
+            ("inf", "4.0", "Backdoor_Malware"),
         ),
     )
-    retained, exclusions = parse_complete_case_rows(
-        raw_rows,
-        header=("feature_a", "feature_b", "Label"),
-        relative_path="part.csv",
-        file_sha256="a" * 64,
-        label_column="Label",
-        predictor_columns=("feature_a", "feature_b"),
-        dataset_manifest_hash="b" * 64,
-        pseudo_domain_partition_salt=CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+    summary = materialize_ciciot2023_prepared_views(
+        (_secondary_csv_file(csv_path),),
+        tmp_path / "prepared",
+        tmp_path / "scaler",
+        tmp_path / "metadata",
+        tmp_path / "cache",
+        overwrite=True,
     )
-    assert len(retained) == 1
-    assert retained[0].normalized_label == BENIGN_LABEL
-    assert retained[0].original_row_index == 0
-    assert tuple(row.original_row_index for row in exclusions) == (1, 2)
-    assert tuple(row.reason for row in exclusions) == (
+    assert summary.raw_row_count == 3
+    assert summary.retained_row_count == 1
+    assert summary.excluded_row_count == 2
+    connection = duckdb.connect()
+    exclusion_path = tmp_path / "metadata" / "dataset_exclusions.parquet"
+    exclusions = connection.execute(
+        "SELECT original_row_index, reason FROM read_parquet(?) ORDER BY original_row_index",
+        [exclusion_path.as_posix()],
+    ).fetchall()
+    assert tuple(int(row[0]) for row in exclusions) == (1, 2)
+    assert tuple(str(row[1]) for row in exclusions) == (
         DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
         DatasetExclusionReason.NON_FINITE_PREDICTOR,
     )
 
 
-def test_complete_case_parsing_rejects_mismatched_row_width() -> None:
-    raw_rows = (
-        SecondaryRawRow(
-            original_row_index=7,
-            values=("1.0", "BenignTraffic"),
-        ),
+def test_complete_case_parsing_rejects_mismatched_row_width(tmp_path: Path) -> None:
+    csv_path = tmp_path / "part.csv"
+    _write_csv(
+        csv_path,
+        ("feature_a", "feature_b", "Label"),
+        (("1.0", "BenignTraffic"),),
     )
     try:
-        parse_complete_case_rows(
-            raw_rows,
-            header=("feature_a", "feature_b", "Label"),
-            relative_path="part.csv",
-            file_sha256="a" * 64,
-            label_column="Label",
-            predictor_columns=("feature_a", "feature_b"),
-            dataset_manifest_hash="b" * 64,
-            pseudo_domain_partition_salt=CONFIG.datasets.secondary.pseudo_domain_partition_salt,
+        materialize_ciciot2023_prepared_views(
+            (_secondary_csv_file(csv_path),),
+            tmp_path / "prepared",
+            tmp_path / "scaler",
+            tmp_path / "metadata",
+            tmp_path / "cache",
+            overwrite=True,
         )
     except ValueError as error:
         assert "row width" in str(error)
@@ -133,11 +134,10 @@ def test_complete_case_parsing_rejects_mismatched_row_width() -> None:
 
 
 def test_assign_roles_uses_target_windows_for_the_target_label(tmp_path: Path) -> None:
-    store = _store_with_rows(
-        tmp_path / "target.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
-    )
-    assign_roles(store, "b" * 64)
-    roles_seen = frozenset(_roles_by_stable_row_id(store).values())
+    database_path = tmp_path / "target.duckdb"
+    _seed_retained(database_path, TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000)
+    assign_secondary_roles(database_path, "b" * 64)
+    roles_seen = frozenset(_roles_by_stable_row_id(database_path).values())
     assert roles_seen.issubset(
         frozenset(
             (
@@ -154,14 +154,10 @@ def test_assign_roles_uses_target_windows_for_the_target_label(tmp_path: Path) -
 
 
 def test_assign_roles_uses_supported_windows_for_other_labels(tmp_path: Path) -> None:
-    store = _store_with_rows(
-        tmp_path / "supported.sqlite3",
-        "DDOS_SYN_FLOOD",
-        CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1,
-        1000,
-    )
-    assign_roles(store, "b" * 64)
-    roles_seen = frozenset(_roles_by_stable_row_id(store).values())
+    database_path = tmp_path / "supported.duckdb"
+    _seed_retained(database_path, "DDOS_SYN_FLOOD", CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000)
+    assign_secondary_roles(database_path, "b" * 64)
+    roles_seen = frozenset(_roles_by_stable_row_id(database_path).values())
     assert roles_seen.issubset(
         frozenset(
             (
@@ -178,36 +174,32 @@ def test_assign_roles_uses_supported_windows_for_other_labels(tmp_path: Path) ->
 
 
 def test_assign_roles_has_guard_gap_at_boundary(tmp_path: Path) -> None:
-    store = _store_with_rows(
-        tmp_path / "guard-gap.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000
-    )
-    assign_roles(store, "b" * 64)
-    roles = _roles_by_stable_row_id(store)
+    database_path = tmp_path / "guard-gap.duckdb"
+    _seed_retained(database_path, TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 1000)
+    assign_secondary_roles(database_path, "b" * 64)
+    roles = _roles_by_stable_row_id(database_path)
     assert f"{145:064x}" not in roles
     assert roles[f"{144:064x}"] is Role.SOURCE_PROPOSAL
     assert roles[f"{150:064x}"] is Role.CANDIDATE_SCREEN
 
 
 def test_assign_roles_is_deterministic(tmp_path: Path) -> None:
-    first_store = _store_with_rows(
-        tmp_path / "first.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200
-    )
-    second_store = _store_with_rows(
-        tmp_path / "second.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200
-    )
-    assign_roles(first_store, "b" * 64)
-    assign_roles(second_store, "b" * 64)
-    assert _roles_by_stable_row_id(first_store) == _roles_by_stable_row_id(second_store)
+    first_path = tmp_path / "first.duckdb"
+    second_path = tmp_path / "second.duckdb"
+    _seed_retained(first_path, TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200)
+    _seed_retained(second_path, TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 200)
+    assign_secondary_roles(first_path, "b" * 64)
+    assign_secondary_roles(second_path, "b" * 64)
+    assert _roles_by_stable_row_id(first_path) == _roles_by_stable_row_id(second_path)
 
 
 def test_assign_roles_respects_sampling_cap_and_assigns_each_row_at_most_once(
     tmp_path: Path,
 ) -> None:
-    store = _store_with_rows(
-        tmp_path / "capped.sqlite3", TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 20000
-    )
-    assign_roles(store, "b" * 64)
-    roles = _roles_by_stable_row_id(store)
+    database_path = tmp_path / "capped.duckdb"
+    _seed_retained(database_path, TARGET_LABEL, CICIoT2023PseudoDomain.PSEUDO_DOMAIN_1, 20000)
+    assign_secondary_roles(database_path, "b" * 64)
+    roles = _roles_by_stable_row_id(database_path)
     candidate_screen_ids = tuple(
         stable_row_id for stable_row_id, role in roles.items() if role is Role.CANDIDATE_SCREEN
     )
@@ -215,16 +207,6 @@ def test_assign_roles_respects_sampling_cap_and_assigns_each_row_at_most_once(
     assert len(candidate_screen_ids) == expected_cap
     assert len(set(candidate_screen_ids)) == len(candidate_screen_ids)
     assert len(roles) == len(set(roles))
-
-
-def _write_csv(path: Path, header: tuple[str, ...], rows: tuple[tuple[str, ...], ...]) -> None:
-    lines = [",".join(header)]
-    lines.extend(",".join(row) for row in rows)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _secondary_csv_file(path: Path) -> SecondaryCsvFile:
-    return SecondaryCsvFile(absolute_path=path, relative_path=path.name, file_sha256="a" * 64)
 
 
 def test_resolve_row_identifier_columns_accepts_zero_based_sequence(tmp_path: Path) -> None:

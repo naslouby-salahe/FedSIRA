@@ -10,8 +10,11 @@ from fedsira.datasets.ciciot2023.schema import (
     PSEUDO_DOMAIN_COUNT,
     TARGET_LABEL,
 )
-from fedsira.datasets.nbaiot.preprocessing import NBAIOT_PRIMARY_PREDICTOR_COUNT
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBAIOT_DOMAIN_ORDER
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_CLASS_ORDER,
+    NBAIOT_DOMAIN_ORDER,
+    NBAIOT_PRIMARY_PREDICTOR_COUNT,
+)
 from fedsira.domain.types import (
     ExperimentName,
     FormattedStatisticText,

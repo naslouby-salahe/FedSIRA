@@ -1,10 +1,10 @@
 import pytest
 
-from fedsira.datasets.ciciot2023.schema import TARGET_LABEL
-from fedsira.datasets.ciciot2023.validation import (
+from fedsira.datasets.ciciot2023.prepare import (
     validate_label_collisions,
     validate_target_label_present,
 )
+from fedsira.datasets.ciciot2023.schema import TARGET_LABEL
 
 
 def test_validate_label_collisions_accepts_case_and_whitespace_variants() -> None:

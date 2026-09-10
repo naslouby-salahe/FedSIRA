@@ -243,6 +243,7 @@ REFERENCE_PACKAGE_REQUIREMENTS: tuple[PackageVersionRequirement, ...] = (
     PackageVersionRequirement(package="scikit-learn", version="1.5.2"),
     PackageVersionRequirement(package="pyarrow", version="17.0.0"),
     PackageVersionRequirement(package="pydantic", version="2.9.2"),
+    PackageVersionRequirement(package="duckdb", version="1.5.5"),
     PackageVersionRequirement(package="typer", version="0.12.5"),
     PackageVersionRequirement(package="rich", version="13.9.4"),
     PackageVersionRequirement(package="matplotlib", version="3.9.2"),

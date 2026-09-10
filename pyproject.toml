@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib==3.9.2",
     "statsmodels==0.14.4",
     "pyyaml==6.0.2",
+    "duckdb==1.5.5",
 ]
 
 [project.scripts]
@@ -75,7 +76,8 @@ max-statements = 80
 "src/fedsira/reporting/tables.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/reporting/figures.py" = ["C901", "PLR0912"]
 "src/fedsira/evaluation/comparisons.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/datasets/ciciot2023/preprocessing.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/nbaiot/prepare.py" = ["C901", "PLR0915"]
+"src/fedsira/datasets/ciciot2023/prepare.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/runtime/environment.py" = ["B009"]
 
 [tool.vulture]
@@ -86,6 +88,10 @@ ignore_names = ["model_config", "forward", "format"]
 include = ["src", "tests"]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/datasets/ciciot2023/prepare.py"
+reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/fedsira/cli.py"

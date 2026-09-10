@@ -1,6 +1,5 @@
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.common import Role
-from fedsira.datasets.roles import supported_role_windows, target_role_windows
+from fedsira.datasets.common import Role, supported_role_windows, target_role_windows
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 ROLE_INTERVALS = CONFIG.datasets.primary.role_intervals

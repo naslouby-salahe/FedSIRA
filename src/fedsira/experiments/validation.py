@@ -14,7 +14,7 @@ from fedsira.config import (
     load_test_fixture_config,
 )
 from fedsira.datasets.common import SUPPORTED_ROLE_ORDER, Role
-from fedsira.datasets.nbaiot.preprocessing import assign_stream_roles_and_sample_ids
+from fedsira.datasets.nbaiot.prepare import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import (
     AdmissionState,

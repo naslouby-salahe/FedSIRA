@@ -10,25 +10,19 @@ from fedsira.artifacts.provenance import (
     NBaiotDatasetManifestPayload,
 )
 from fedsira.artifacts.storage import compute_checksum, publish_or_reuse_artifact_payload
-from fedsira.datasets.ciciot2023.loading import discover_secondary_csv_files
-from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
+from fedsira.datasets.ciciot2023.prepare import (
+    discover_secondary_csv_files,
+    materialize_ciciot2023_prepared_views,
+)
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
 )
-from fedsira.datasets.nbaiot.loading import (
+from fedsira.datasets.nbaiot.prepare import (
+    classes_structurally_unavailable,
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
-)
-from fedsira.datasets.nbaiot.preprocessing import (
     materialize_nbaiot_prepared_views,
-    read_predictor_header,
-    validate_all_predictors_finite,
-    validate_consistent_predictor_schema,
-    validate_predictor_schema,
-)
-from fedsira.datasets.nbaiot.validation import (
-    classes_structurally_unavailable,
     validate_target_holder_feasibility,
 )
 from fedsira.domain.enums import ArtifactFamily, DatasetId
@@ -47,9 +41,7 @@ from fedsira.runtime import (
 )
 
 
-def _publish_dataset_manifest(
-    payload: DatasetManifestPayload,
-) -> ArtifactReuseDecision:
+def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseDecision:
     config = current_application_context().scientific_config
     serialized_payload = payload.model_dump_json().encode("utf-8")
     identity: ArtifactDigest = compute_checksum(serialized_payload)
@@ -78,6 +70,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         / "cache"
         / "preprocessing"
     )
+    print("N-BaIoT preprocessing: discovering CSV files")
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
     validate_target_holder_feasibility(
         discovered,
@@ -85,14 +78,8 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     )
     manifest_hash = compute_dataset_manifest_hash(discovered)
     unavailable_classes: tuple[DatasetClassToken, ...] = tuple(
-        class_id.value for class_id in classes_structurally_unavailable(discovered)
+        class_id for class_id in classes_structurally_unavailable(discovered)
     )
-    reference_header = read_predictor_header(discovered[0].absolute_path)
-    validate_predictor_schema(reference_header)
-    for item in discovered:
-        observed_header = read_predictor_header(item.absolute_path)
-        validate_consistent_predictor_schema(reference_header, observed_header)
-        validate_all_predictors_finite(item.absolute_path, reference_header)
     reused = _publish_dataset_manifest(
         NBaiotDatasetManifestPayload(
             dataset_file_manifest_hash=manifest_hash,
@@ -125,6 +112,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         / "CIC_IOT_Dataset2023"
         / "CSV"
     )
+    print("CICIoT2023 preprocessing: discovering CSV shards")
     discovered = discover_secondary_csv_files(csv_root)
     cache_root = (
         REPOSITORY_ROOT

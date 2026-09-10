@@ -1,4 +1,4 @@
-from fedsira.datasets.sampling import (
+from fedsira.datasets.common import (
     PREPROCESSING_SAMPLE_ORDER_SEED,
     apply_sampling_cap,
     sampling_cap_selection_digest,

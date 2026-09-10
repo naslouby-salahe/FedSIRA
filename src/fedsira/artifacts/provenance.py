@@ -68,7 +68,7 @@ class CICIoT2023DatasetManifestPayload(FrozenDomainModel):
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
 
-PUBLISHED_MANIFEST_SUFFIX = ".manifest.json" #TODO: use enum instead of hardcoded string and move to it's proper place
+PUBLISHED_MANIFEST_SUFFIX = ".manifest.json"
 
 
 class ArtifactGraph:
@@ -186,11 +186,11 @@ class ReconstructionProvenance(FrozenDomainModel):
 
 
 def collect_reconstruction_provenance(repository_root: Path) -> ReconstructionProvenance:
-    lock_path = repository_root / "uv.lock" #TODO: use enum instead of hardcoded string
+    lock_path = repository_root / "uv.lock"
     if not lock_path.is_file():
         raise ValueError(f"required dependency lock is missing: {lock_path}")
     result = subprocess.run(
-        ["git", "-C", str(repository_root), "rev-parse", "HEAD"], #TODO: use enum instead of hardcoded string
+        ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
         capture_output=True,
         text=True,
         check=False,

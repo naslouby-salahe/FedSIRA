@@ -5,9 +5,9 @@ import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
-from fedsira.datasets.nbaiot.preprocessing import (
+from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
+    DiscoveredCsvFile,
     materialize_nbaiot_prepared_views,
 )
 from fedsira.datasets.nbaiot.schema import (

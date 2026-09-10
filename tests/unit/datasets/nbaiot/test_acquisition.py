@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.nbaiot.loading import (
+from fedsira.datasets.nbaiot.prepare import (
     compute_dataset_manifest_hash,
     compute_file_checksum,
     discover_primary_csv_files,

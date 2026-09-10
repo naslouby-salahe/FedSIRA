@@ -3,11 +3,12 @@ from pathlib import Path
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role, compute_sample_id
-from fedsira.datasets.nbaiot.loading import (
+from fedsira.datasets.nbaiot.prepare import (
+    RoleAssignment,
+    assign_stream_roles_and_sample_ids,
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
 )
-from fedsira.datasets.nbaiot.preprocessing import RoleAssignment, assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
