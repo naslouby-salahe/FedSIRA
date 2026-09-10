@@ -25,13 +25,10 @@ def render_status() -> StatusRenderText:
     )
     lines: list[str] = ["FedSIRA experiment status", ""]
     for planned in plan.experiments:
-        state = derive_experiment_lifecycle(
-            planned,
-            store.read_planned_outcomes(planned),
-        )
+        records = store.read_planned_outcomes(planned)
+        state = derive_experiment_lifecycle(planned, records)
         completed = sum(
-            record.terminal_state is ExperimentLifecycleState.COMPLETED
-            for record in store.read_planned_outcomes(planned)
+            record.terminal_state is ExperimentLifecycleState.COMPLETED for record in records
         )
         lines.append(
             f"{planned.definition.name:<55} {completed:>4}/{len(planned.cells):<4} {state.value}"
