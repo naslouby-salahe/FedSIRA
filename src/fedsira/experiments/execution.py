@@ -37,12 +37,13 @@ from fedsira.experiments.planning import (
     build_plan,
 )
 from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
-from fedsira.runtime_execution import framed_bytes
+from fedsira.runtime_execution import framed_bytes, get_structured_logger
 
 if TYPE_CHECKING:
     from fedsira.experiments.validation import ExperimentPrerequisiteState
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
+EXECUTION_LOGGER = get_structured_logger("execution")
 
 
 class PersistedFailureDetail(FrozenDomainModel):
@@ -96,6 +97,14 @@ class ProtocolPhaseDurations(FrozenDomainModel):
             verify_seconds=self.verify_seconds,
             synthesize_seconds=elapsed_seconds,
         )
+
+
+class ExecutionLogFields(FrozenDomainModel):
+    experiment: ExperimentName
+    overwrite: OverwriteExisting | None = None
+    cell: ScientificCellSemanticKey | None = None
+    terminal_state: ExperimentLifecycleState | None = None
+    completed_cells: ScientificCellCount | None = None
 
 
 TERMINAL_EXPERIMENT_STATES: frozenset[ExperimentLifecycleState] = frozenset(
@@ -239,6 +248,10 @@ def execute_experiment(
     )
 
     resolved_config = current_application_context().scientific_config
+    EXECUTION_LOGGER.info(
+        "experiment execution started",
+        extra=ExecutionLogFields(experiment=experiment, overwrite=overwrite).model_dump(),
+    )
     definition = experiment_by_name(experiment)
     plan = build_plan(
         resolved_core_complete=resolved_core_complete,
@@ -268,6 +281,13 @@ def execute_experiment(
             and not overwrite
             and existing.terminal_state is ExperimentLifecycleState.COMPLETED
         ):
+            EXECUTION_LOGGER.info(
+                "reused completed cell outcome",
+                extra=ExecutionLogFields(
+                    experiment=experiment,
+                    cell=cell.semantic_key,
+                ).model_dump(),
+            )
             outcomes.append(
                 CellExecutionOutcome(
                     cell=cell,
@@ -279,6 +299,14 @@ def execute_experiment(
             continue
         outcome = execute_cell_with_retry(cell, executor)
         store.write_outcome(outcome)
+        EXECUTION_LOGGER.info(
+            "persisted cell outcome",
+            extra=ExecutionLogFields(
+                experiment=experiment,
+                cell=cell.semantic_key,
+                terminal_state=outcome.terminal_state,
+            ).model_dump(),
+        )
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
     lifecycle_state = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
@@ -287,13 +315,22 @@ def execute_experiment(
         if comparison_builder is None
         else comparison_builder(experiment, definition.dataset, outcome_tuple, store)
     )
-    return ExperimentExecutionResult(
+    result = ExperimentExecutionResult(
         experiment=experiment,
         lifecycle_state=lifecycle_state,
         outcomes=outcome_tuple,
         comparison_results=comparisons,
         execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
     )
+    EXECUTION_LOGGER.info(
+        "experiment execution finished",
+        extra=ExecutionLogFields(
+            experiment=experiment,
+            terminal_state=lifecycle_state,
+            completed_cells=result.cell_completion_count,
+        ).model_dump(),
+    )
+    return result
 
 
 class ExecutionRecordStore:
