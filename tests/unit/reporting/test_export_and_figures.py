@@ -211,6 +211,76 @@ def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_pa
     assert any(CELL_METRICS_PARQUET_NAME in failure for failure in verification.failures)
 
 
+def test_experiment_evidence_verification_rejects_wrong_summary_identity(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export_experiment_report(result, tmp_path)
+    summary_path = tmp_path / "metrics" / "primary" / "summary.json"
+    summary = ExperimentReportSummary.model_validate_json(summary_path.read_text())
+    summary_path.write_text(
+        summary.model_copy(update={"experiment": EFFICIENCY_MEASUREMENT_NAME}).model_dump_json()
+    )
+    verification = verify_experiment_artifacts(
+        result,
+        tmp_path / "tables" / "main",
+        tmp_path / "figures" / "main",
+        tmp_path / "metrics" / "primary",
+        summary_path,
+    )
+    assert not verification.passed
+    assert any("belongs to another experiment" in failure for failure in verification.failures)
+
+
+def test_experiment_evidence_verification_rejects_stale_summary_digest(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export_experiment_report(result, tmp_path)
+    summary_path = tmp_path / "metrics" / "primary" / "summary.json"
+    summary = ExperimentReportSummary.model_validate_json(summary_path.read_text())
+    summary_path.write_text(
+        summary.model_copy(update={"execution_digest": "0" * 64}).model_dump_json()
+    )
+    verification = verify_experiment_artifacts(
+        result,
+        tmp_path / "tables" / "main",
+        tmp_path / "figures" / "main",
+        tmp_path / "metrics" / "primary",
+        summary_path,
+    )
+    assert not verification.passed
+    assert any("execution digest is stale" in failure for failure in verification.failures)
+
+
 def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path: Path) -> None:
     result = ExperimentExecutionResult(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,

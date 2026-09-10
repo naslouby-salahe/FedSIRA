@@ -22,11 +22,6 @@ from fedsira.baselines.calibration import (
     density_cluster_labels,
     l2_normalize,
     parameter_similarity_certification_row_results,
-    reconstruction_error,
-    reconstruction_filter_accepts,
-    reconstruction_filter_calibration_error_count,
-    reconstruction_filter_reweight,
-    reconstruction_rejection_threshold,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
     sanitization_clip_bounds,
@@ -42,6 +37,10 @@ from fedsira.baselines.certified_ensemble import (
 from fedsira.baselines.independent_retraining import (
     candidate_free_full_path_opening_mode,
     one_independent_retrain_local_epochs,
+)
+from fedsira.baselines.reconstruction_training import (
+    anchor_round_calibration_updates,
+    train_update_reconstruction_filter_delta,
 )
 from fedsira.baselines.references import (
     fedavg_reference_post_reference_local_epochs,
@@ -140,13 +139,11 @@ from fedsira.domain.types import (
     DatasetClassToken,
     DomainCount,
     DomainId,
-    ExampleCount,
     FeatureCount,
     FederatedRoundCount,
     FoldIndex,
     FrozenDomainModel,
     GroupIndex,
-    LocalEpochCount,
     MasterSeed,
     MetricObservation,
     MetricValue,
@@ -154,7 +151,6 @@ from fedsira.domain.types import (
     PreparedReproductionTargetCount,
     PreparedScreenTargetCount,
     PreparedSupportedReplayCount,
-    ReconstructionError,
     RequiredReproductionRowCount,
     RoundIndex,
     RowCount,
@@ -295,12 +291,11 @@ from fedsira.experiments.workflow import (
 from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.aggregation import (
     ModelState,
-    WeightedModelState,
     load_model_state,
     model_state_from_classifier,
 )
 from fedsira.learning.anchor import run_anchor_fedavg_training
-from fedsira.learning.anchor_training import ANCHOR_TRAINING_ALGORITHM_TOKEN, train_anchor
+from fedsira.learning.anchor_training import train_anchor
 from fedsira.learning.anchor_training import training_seed as _training_seed
 from fedsira.learning.federated import (
     LocalTrainingClient,
@@ -423,242 +418,10 @@ SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSM
 LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
 CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CENTRALIZED_REFERENCE"
 DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
-CALIBRATION_TRAINING_ALGORITHM_TOKEN = "ANCHOR_ROUND_CALIBRATION"
-UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN = "UPDATE_RECONSTRUCTION_FILTER"
 RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURCE_ADMISSION"
 CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_ANCHOR"
 CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_POST_REFERENCE"
 CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
-
-
-def _client_delta_from_role(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    domain: NBaiotDomain,
-    round_index: RoundIndex,
-    round_start_flat: torch.Tensor,
-    role: Role,
-    local_epochs: LocalEpochCount,
-    algorithm_token: AlgorithmName,
-) -> tuple[torch.Tensor, ExampleCount] | None:
-    config = current_application_context().scientific_config
-    combined_features: list[torch.Tensor] = []
-    combined_labels: list[torch.Tensor] = []
-    combined_sample_ids: list[ArtifactDigest] = []
-    for class_id in NBAIOT_CLASS_ORDER:
-        if class_id is NBaiotClass.GAFGYT_COMBO:
-            continue
-        tensor_view = _tensor_view(load_prepared_rows(prepared_root, domain, class_id, role))
-        if tensor_view is None:
-            continue
-        features, labels, sample_ids = tensor_view
-        combined_features.append(features)
-        combined_labels.append(labels)
-        combined_sample_ids.extend(sample_ids)
-    if not combined_features:
-        return None
-    features = torch.cat(combined_features, dim=0)
-    labels = torch.cat(combined_labels, dim=0)
-    sample_ids = tuple(combined_sample_ids)
-    training_seed = _training_seed(
-        master_seed,
-        anchor.dataset_manifest_hash,
-        flat_parameters_identity(round_start_flat),
-        algorithm_token,
-        domain,
-        round_index,
-    )
-    round_start_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(round_start_model, round_start_flat)
-    round_start_state = model_state_from_classifier(round_start_model)
-    client_result = train_one_client_locally(
-        round_start_state,
-        anchor.input_width,
-        anchor.output_width,
-        config.model.optimizer.anchor_and_standard_fl_learning_rate,
-        config.model.optimizer,
-        config.model.training,
-        local_epochs,
-        LocalTrainingClient(
-            features=features, labels=labels, sample_ids=sample_ids, training_seed=training_seed
-        ),
-    )
-    client_flat = _flatten_model_state(anchor.input_width, anchor.output_width, client_result.state)
-    return (client_flat - round_start_flat, client_result.example_count)
-
-
-def anchor_round_calibration_updates(
-    prepared_root: Path, master_seed: MasterSeed, anchor: RealAnchor
-) -> tuple[torch.Tensor, ...]:
-    updates: list[torch.Tensor] = []
-    for round_index, round_start_flat in enumerate(anchor.round_start_flat_parameters):
-        for domain in NBAIOT_DOMAIN_ORDER:
-            result = _client_delta_from_role(
-                prepared_root,
-                master_seed,
-                anchor,
-                domain,
-                round_index,
-                round_start_flat,
-                Role.ANCHOR_VALIDATION,
-                1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
-            )
-            if result is None:
-                continue
-            updates.append(result[0])
-    return tuple(updates)
-
-
-def anchor_round_reconstruction_calibration_errors(
-    prepared_root: Path, master_seed: MasterSeed, anchor: RealAnchor
-) -> tuple[ReconstructionError, ...]:
-    config = current_application_context().scientific_config
-    errors: list[ReconstructionError] = []
-    expected_maximum_count = reconstruction_filter_calibration_error_count(
-        len(anchor.round_start_flat_parameters), len(NBAIOT_DOMAIN_ORDER)
-    )
-    for round_index, round_start_flat in enumerate(anchor.round_start_flat_parameters):
-        for domain in NBAIOT_DOMAIN_ORDER:
-            submitted = _client_delta_from_role(
-                prepared_root,
-                master_seed,
-                anchor,
-                domain,
-                round_index,
-                round_start_flat,
-                Role.ANCHOR_TRAIN,
-                config.model.anchor_fedavg.local_epochs_per_round,
-                ANCHOR_TRAINING_ALGORITHM_TOKEN,
-            )
-            reconstructed = _client_delta_from_role(
-                prepared_root,
-                master_seed,
-                anchor,
-                domain,
-                round_index,
-                round_start_flat,
-                Role.ANCHOR_VALIDATION,
-                1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
-            )
-            if submitted is None or reconstructed is None:
-                continue
-            errors.append(
-                reconstruction_error(
-                    submitted[0],
-                    reconstructed[0],
-                    config.baselines.reconstruction_filter.normalization_epsilon,
-                )
-            )
-    if len(errors) > expected_maximum_count:
-        raise ValueError(
-            f"computed {len(errors)} calibration errors, exceeding the derived maximum of "
-            f"{expected_maximum_count} for {len(NBAIOT_DOMAIN_ORDER)} domains and "
-            f"{len(anchor.round_start_flat_parameters)} anchor rounds"
-        )
-    return tuple(errors)
-
-
-def train_update_reconstruction_filter_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    calibration_errors = anchor_round_reconstruction_calibration_errors(
-        prepared_root, master_seed, anchor
-    )
-    if not calibration_errors:
-        return None
-    rejection_threshold = reconstruction_rejection_threshold(
-        calibration_errors, config.baselines.reconstruction_filter.calibration_percentile
-    )
-    source_rows_available = (
-        source_domain is not None
-        and load_prepared_rows(
-            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
-        )
-        is not None
-    )
-    participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
-    )
-    if not participants:
-        return None
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, anchor.flat_parameters)
-    state = model_state_from_classifier(model)
-    any_round_trained = False
-    for round_index in range(post_reference_retrain_maximum_local_epochs()):
-        current_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-        accepted_states: list[WeightedModelState] = []
-        for domain in participants:
-            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, target_role)
-            if combined is None:
-                continue
-            features, labels, sample_ids, _is_supported = combined
-            training_seed = _training_seed(
-                master_seed,
-                anchor.dataset_manifest_hash,
-                flat_parameters_identity(anchor.flat_parameters),
-                UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN,
-                domain,
-                round_index,
-            )
-            client_result = train_one_client_locally(
-                state,
-                anchor.input_width,
-                anchor.output_width,
-                config.model.optimizer.anchor_and_standard_fl_learning_rate,
-                config.model.optimizer,
-                config.model.training,
-                1,
-                LocalTrainingClient(
-                    features=features,
-                    labels=labels,
-                    sample_ids=sample_ids,
-                    training_seed=training_seed,
-                ),
-            )
-            client_flat = _flatten_model_state(
-                anchor.input_width, anchor.output_width, client_result.state
-            )
-            submitted_delta = client_flat - current_flat
-            reconstructed = _client_delta_from_role(
-                prepared_root,
-                master_seed,
-                anchor,
-                domain,
-                round_index,
-                current_flat,
-                Role.ANCHOR_VALIDATION,
-                1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
-            )
-            if reconstructed is None:
-                continue
-            error = reconstruction_error(
-                submitted_delta,
-                reconstructed[0],
-                config.baselines.reconstruction_filter.normalization_epsilon,
-            )
-            if reconstruction_filter_accepts(error, rejection_threshold):
-                accepted_states.append(client_result)
-        if not accepted_states:
-            continue
-        reweighted = reconstruction_filter_reweight(tuple(accepted_states))
-        if reweighted is None:
-            continue
-        state = reweighted
-        any_round_trained = True
-    if not any_round_trained:
-        return None
-    final_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-    return final_flat - anchor.flat_parameters
 
 
 def train_source_update_sanitization_delta(
