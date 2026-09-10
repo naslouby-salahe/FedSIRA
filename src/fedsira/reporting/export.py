@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.types import (
+    ArtifactDigest,
     ExperimentName,
     FigureName,
     FrozenDomainModel,
@@ -120,12 +121,14 @@ class ExperimentReportSummary(FrozenDomainModel):
     lifecycle_state: ExperimentLifecycleState
     completed_cell_count: ScientificCellCount
     planned_cell_count: ScientificCellCount
+    execution_digest: ArtifactDigest | None
 
 
 class ExperimentArtifactManifest(FrozenDomainModel):
     schema_version: SchemaVersion
     experiment: ExperimentName
     lifecycle_state: ExperimentLifecycleState
+    execution_digest: ArtifactDigest | None
     artifacts: tuple[RepositoryPath, ...]
 
 
@@ -165,10 +168,23 @@ def verify_experiment_artifacts(
 ) -> CompletenessVerificationResult:
     specification = experiment_by_name(result.experiment).artifacts
     failures: list[ReportVerificationFailure] = []
-    if specification.metrics_required and (
-        not summary_path.is_file() or not summary_path.read_text(encoding="utf-8").strip()
-    ):
-        failures.append(f"{result.experiment}: metric summary is missing or empty")
+    if specification.metrics_required:
+        if not summary_path.is_file() or not summary_path.read_text(encoding="utf-8").strip():
+            failures.append(f"{result.experiment}: metric summary is missing or empty")
+        else:
+            summary = ExperimentReportSummary.model_validate_json(
+                summary_path.read_text(encoding="utf-8")
+            )
+            if summary.experiment != result.experiment:
+                failures.append(
+                    f"{result.experiment}: metric summary belongs to another experiment"
+                )
+            if summary.lifecycle_state != result.lifecycle_state:
+                failures.append(f"{result.experiment}: metric summary lifecycle state is stale")
+            if summary.planned_cell_count != len(result.outcomes):
+                failures.append(f"{result.experiment}: metric summary planned cell count is stale")
+            if summary.execution_digest != result.execution_digest:
+                failures.append(f"{result.experiment}: metric summary execution digest is stale")
     for filename in specification.required_metric_artifacts:
         path = metrics_root / filename
         if not parquet_contains_rows(path):
@@ -330,6 +346,7 @@ def export_experiment_report(
         lifecycle_state=result.lifecycle_state,
         completed_cell_count=result.cell_completion_count,
         planned_cell_count=len(result.outcomes),
+        execution_digest=result.execution_digest,
     )
     summary_path = metrics_root / "summary.json"
     summary_path.write_text(summary.model_dump_json(indent=2) + "\n")
@@ -339,6 +356,7 @@ def export_experiment_report(
         schema_version=EXPORT_SCHEMA_VERSION,
         experiment=result.experiment,
         lifecycle_state=result.lifecycle_state,
+        execution_digest=result.execution_digest,
         artifacts=tuple(str(path) for path in exported),
     )
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n")
