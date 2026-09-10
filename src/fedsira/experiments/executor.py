@@ -160,6 +160,9 @@ from fedsira.evaluation.backdoor import (
     recovery_backdoor_alarm_threshold,
     triggered_to_benign_rate,
 )
+from fedsira.evaluation.capability_boundary import (
+    compute_capability_under_specification_summary,
+)
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
@@ -1091,86 +1094,6 @@ def certified_domain_delta_committee(
         if delta is not None:
             deltas[domain] = delta
     return deltas
-
-
-@dataclass(frozen=True)
-class CapabilityUnderSpecificationSummary:
-    defined_domain_count: DomainCount
-    aggregate_target_f1: MetricResult
-    target_f1_gain: MetricResult
-    supported_macro_f1_drop: MetricResult
-    benign_far_increase: MetricResult
-
-
-def compute_capability_under_specification_summary(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-    root_cause_scope: RootCauseScope,
-) -> CapabilityUnderSpecificationSummary:
-    target_f1_values: list[MetricResult] = []
-    anchor_target_f1_values: list[MetricResult] = []
-    supported_f1_harms: list[MetricResult] = []
-    benign_far_increases: list[MetricResult] = []
-    for domain in non_source_domains(source_domain):
-        delta = train_domain_reproduction_delta(
-            prepared_root, master_seed, anchor, domain, root_cause_scope
-        )
-        if delta is None:
-            continue
-        production_flat = anchor.flat_parameters + delta
-        anchor_metrics = evaluate_domain(
-            prepared_root,
-            anchor,
-            anchor.flat_parameters,
-            domain,
-            Role.REPORT_TEST,
-            root_cause_scope=root_cause_scope,
-        )
-        scoped_metrics = evaluate_domain(
-            prepared_root,
-            anchor,
-            production_flat,
-            domain,
-            Role.REPORT_TEST,
-            root_cause_scope=root_cause_scope,
-        )
-        if anchor_metrics is None or scoped_metrics is None:
-            continue
-        target_f1_values.append(scoped_metrics.target_f1)
-        anchor_target_f1_values.append(anchor_metrics.target_f1)
-        supported_f1_harms.append(
-            supported_macro_f1_harm(
-                anchor_metrics.supported_macro_f1, scoped_metrics.supported_macro_f1
-            )
-        )
-        if (
-            anchor_metrics.benign_far.value is not None
-            and scoped_metrics.benign_far.value is not None
-        ):
-            benign_far_increases.append(
-                MetricResult(
-                    value=scoped_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                    denominator=1,
-                )
-            )
-        else:
-            benign_far_increases.append(MetricResult(value=None, denominator=0))
-    aggregate_target_f1 = equal_weight_domain_mean(tuple(target_f1_values), 1)
-    anchor_target_f1 = equal_weight_domain_mean(tuple(anchor_target_f1_values), 1)
-    target_f1_gain = (
-        MetricResult(value=aggregate_target_f1.value - anchor_target_f1.value, denominator=1)
-        if aggregate_target_f1.value is not None and anchor_target_f1.value is not None
-        else MetricResult(value=None, denominator=0)
-    )
-    return CapabilityUnderSpecificationSummary(
-        defined_domain_count=len(target_f1_values),
-        aggregate_target_f1=aggregate_target_f1,
-        target_f1_gain=target_f1_gain,
-        supported_macro_f1_drop=equal_weight_domain_mean(tuple(supported_f1_harms), 1),
-        benign_far_increase=equal_weight_domain_mean(tuple(benign_far_increases), 1),
-    )
 
 
 def _diagnostic_marker_for_domain(

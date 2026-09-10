@@ -18,9 +18,11 @@ from fedsira.datasets.nbaiot.preprocessing import (
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.types import FeatureName
+from fedsira.evaluation.capability_boundary import (
+    compute_capability_under_specification_summary,
+)
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.experiments.executor import (
-    compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
     compute_source_backdoor_asr,
     evaluate_domain,
