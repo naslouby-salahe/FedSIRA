@@ -8,6 +8,7 @@ from fedsira.baselines.reconstruction_training import (
     anchor_round_calibration_updates,
     anchor_round_reconstruction_calibration_errors,
 )
+from fedsira.baselines.robust_training import train_krum_reference_delta
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
@@ -38,7 +39,6 @@ from fedsira.experiments.executor import (
     train_density_cluster_trimmed_mean_delta,
     train_fedavg_reference_delta,
     train_generic_hard_supported_examples_delta,
-    train_krum_reference_delta,
     train_local_only_reference_checkpoint,
     train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,

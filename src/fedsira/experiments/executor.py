@@ -60,13 +60,11 @@ from fedsira.baselines.registry import (
     validate_role_not_used_for_tuning,
 )
 from fedsira.baselines.robust_aggregation import (
-    client_sampling_round_order,
     coordinate_wise_median_synthesis,
     direct_krum_committee_rows,
-    krum_reference_post_reference_rounds,
-    krum_reference_round_participants,
     validate_three_row_coordinate_median_committee_size,
 )
+from fedsira.baselines.robust_training import train_krum_reference_delta
 from fedsira.baselines.source_model import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
@@ -904,78 +902,6 @@ def _flatten_model_state(
     model = FedSIRAClassifier(input_width, output_width)
     load_model_state(model, state)
     return flatten_trainable_parameters(model)
-
-
-def train_krum_reference_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-    heterogeneity_scope: HeterogeneityScope | None = None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    eligible_domains = non_source_domains(source_domain)
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, anchor.flat_parameters)
-    state = model_state_from_classifier(model)
-    participant_count = config.protocol.synthesis.committee_size
-    for round_index in range(krum_reference_post_reference_rounds()):
-        round_order = client_sampling_round_order(eligible_domains, master_seed, round_index)
-        participants = krum_reference_round_participants(round_order, None, participant_count)
-        if participants is None:
-            return None
-        current_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-        committee: list[CertifiedReproductionRow] = []
-        for domain in participants:
-            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(
-                prepared_root, domain, target_role, heterogeneity_scope=heterogeneity_scope
-            )
-            if combined is None:
-                continue
-            features, labels, sample_ids, _is_supported = combined
-            training_seed = _training_seed(
-                master_seed,
-                anchor.dataset_manifest_hash,
-                flat_parameters_identity(anchor.flat_parameters),
-                "KRUM_REFERENCE",
-                domain,
-                round_index,
-            )
-            client_result = train_one_client_locally(
-                state,
-                anchor.input_width,
-                anchor.output_width,
-                config.model.optimizer.anchor_and_standard_fl_learning_rate,
-                config.model.optimizer,
-                config.model.training,
-                1,
-                LocalTrainingClient(
-                    features=features,
-                    labels=labels,
-                    sample_ids=sample_ids,
-                    training_seed=training_seed,
-                ),
-            )
-            client_flat = _flatten_model_state(
-                anchor.input_width, anchor.output_width, client_result.state
-            )
-            committee.append(
-                CertifiedReproductionRow(
-                    reproducer_domain=domain, update_vector=client_flat - current_flat
-                )
-            )
-        if len(committee) < participant_count:
-            return None
-        krum_delta = select_krum_update(
-            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
-        ).update_vector
-        next_flat = current_flat + krum_delta
-        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-        load_flat_trainable_parameters(next_model, next_flat)
-        state = model_state_from_classifier(next_model)
-    final_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-    return final_flat - anchor.flat_parameters
 
 
 def train_density_cluster_trimmed_mean_delta(

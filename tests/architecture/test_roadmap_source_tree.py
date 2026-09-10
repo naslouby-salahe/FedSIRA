@@ -14,6 +14,7 @@ ROADMAP_MODULES = frozenset(
         "baselines/independent_retraining.py",
         "baselines/reconstruction_training.py",
         "baselines/references.py",
+        "baselines/robust_training.py",
         "baselines/registry.py",
         "baselines/robust_aggregation.py",
         "baselines/source_model.py",
