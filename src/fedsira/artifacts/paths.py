@@ -42,7 +42,7 @@ RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIG
 
 
 def preprocessing_root() -> Path:
-    return OUTPUTS_ROOT / "preprocessing"
+    return OUTPUTS_ROOT / "preprocessing" 
 
 
 def preprocessing_metadata_root() -> Path:

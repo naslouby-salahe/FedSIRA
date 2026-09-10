@@ -183,6 +183,7 @@ def train_domain_reproduction_delta(
     root_cause_scope: RootCauseScope | None = None,
     epistemic_failure_scope: EpistemicFailureScope | None = None,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    backdoor_scope: BackdoorScope | None = None,
 ) -> torch.Tensor | None:
     return _train_post_reference_delta(
         prepared_root,
@@ -193,7 +194,8 @@ def train_domain_reproduction_delta(
         REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
         root_cause_scope,
         epistemic_failure_scope,
-        heterogeneity_scope=heterogeneity_scope,
+        backdoor_scope,
+        heterogeneity_scope,
     )
 
 
@@ -254,11 +256,10 @@ def train_generic_hard_supported_examples_delta(
             float(value) for value in per_sample_cross_entropy(anchor_model, features, labels)
         ]
         boundaries = decile_boundaries(tuple(losses))
-        top_decile_bin = len(boundaries)
+        assigned_bins = tuple(decile_bin(loss, boundaries) for loss in losses)
+        top_decile_bin = max(assigned_bins)
         top_decile_indices = [
-            index
-            for index, loss in enumerate(losses)
-            if decile_bin(loss, boundaries) == top_decile_bin
+            index for index, bin_index in enumerate(assigned_bins) if bin_index == top_decile_bin
         ]
         if not top_decile_indices:
             continue

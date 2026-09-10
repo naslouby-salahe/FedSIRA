@@ -14,13 +14,15 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
 )
 from fedsira.domain.enums import RootCause
-from fedsira.domain.models import MetricResult
 from fedsira.domain.types import ArtifactDigest, ClassLabel
+from fedsira.evaluation.comparisons import ComparisonMetric
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
     compute_confusion_counts_by_class,
     f1_for_class,
     macro_f1,
+    metric_value,
+    report_metric_set,
 )
 from fedsira.experiments.scenarios import root_cause_for_sample
 from fedsira.experiments.workflow import (
@@ -86,14 +88,20 @@ def evaluate_domain(
     f1_by_class = OrderedDict(
         (token, f1_for_class(counts)) for token, counts in counts_by_class.items()
     )
+    supported_tokens = tuple(token for token in class_tokens if token != NBaiotClass.GAFGYT_COMBO)
     supported_f1 = OrderedDict(
-        (token, f1_by_class[token]) for token in class_tokens if token != NBaiotClass.GAFGYT_COMBO
+        (token, f1_by_class[token]) for token in supported_tokens if token in f1_by_class
+    )
+    report = report_metric_set(
+        true_labels,
+        predicted_labels,
+        class_tokens,
+        NBaiotClass.GAFGYT_COMBO,
+        NBaiotClass.BENIGN,
+        supported_tokens,
     )
     return DomainTargetMetrics(
-        target_f1=f1_by_class.get(
-            NBaiotClass.GAFGYT_COMBO,
-            MetricResult(value=None, denominator=0),
-        ),
+        target_f1=metric_value(report, ComparisonMetric.TARGET_F1.value),
         supported_macro_f1=macro_f1(supported_f1),
         benign_far=benign_false_alarm_rate(true_labels, predicted_labels, NBaiotClass.BENIGN),
     )

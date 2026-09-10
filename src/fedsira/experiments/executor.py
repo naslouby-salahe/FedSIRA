@@ -37,10 +37,7 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
-from fedsira.evaluation.report_summary import RealReportSummary
-from fedsira.experiments.cell_support import (
-    _metrics_from_state,
-)
+from fedsira.evaluation.report_summary import RealReportSummary, metrics_from_state
 from fedsira.experiments.cells import ProtocolCellDispatch
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
@@ -424,10 +421,10 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
                 evidence.reproduction_supported_count,
                 evidence.final_gate_adequate_domain_count,
             )
-            return (AdmissionState.ADMITTED, _metrics_from_state(AdmissionState.ADMITTED))
+            return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
         if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
             run_protocol_invariant_validation()
-            return (AdmissionState.ADMITTED, _metrics_from_state(AdmissionState.ADMITTED))
+            return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
         if cell.experiment == BASELINE_IMPLEMENTATION_VALIDATION_NAME:
             return self._execute_baseline_cell(cell, evidence)
         raise ValueError(f"no protocol executor is defined for experiment {cell.experiment}")

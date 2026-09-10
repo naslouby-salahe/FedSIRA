@@ -13,7 +13,7 @@ def application_context() -> ApplicationContext:
     return ApplicationContext.load(REPOSITORY_ROOT)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def bind_application_context(application_context: ApplicationContext) -> Iterator[None]:
     with bound_application_context(application_context):
         yield

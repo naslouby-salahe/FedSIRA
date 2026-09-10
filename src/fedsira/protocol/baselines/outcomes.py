@@ -33,7 +33,10 @@ from fedsira.evaluation.summaries import (
 )
 from fedsira.experiments.cell_support import (
     VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
+    _capability_contract_for_digest,
+    _commitment_digest,
     _final_gate_decision_from_production_checkpoint,
+    _honest_verifier_report,
     _source_domain_for_cell,
     _verifier_panel,
 )
@@ -94,9 +97,7 @@ from fedsira.protocol.baselines.source_model import (
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
     capability_contract_passes,
-)
-from fedsira.protocol.state_machine import (
-    resolve_ternary_outcome,
+    compute_capability_identity,
 )
 from fedsira.protocol.synthesis import (
     synthesis_pending_transition,
@@ -116,7 +117,7 @@ from fedsira.runtime import (
 class ProtocolBaselineOutcomes:
     def _client_review_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         positive_report_count = 0
         if real_anchor is not None and source_domain is not None:
@@ -143,7 +144,7 @@ class ProtocolBaselineOutcomes:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
@@ -181,7 +182,7 @@ class ProtocolBaselineOutcomes:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
@@ -191,12 +192,27 @@ class ProtocolBaselineOutcomes:
         if source_delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + source_delta
+        capability_identity = compute_capability_identity(
+            _capability_contract_for_digest(real_anchor.dataset_manifest_hash)
+        )
+        commitment_hash = _commitment_digest(
+            source_domain, cell.master_seed, capability_identity, production_checkpoint
+        )
         panel = _verifier_panel(
-            source_domain, source_domain, cell.master_seed, config.protocol.verification
+            source_domain,
+            source_domain,
+            cell.master_seed,
+            config.protocol.verification,
+            commitment_hash,
         )
         if not panel_votes_are_one_per_domain(panel):
             return AdmissionState.DORMANT
-        reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
+        reports = tuple(
+            _honest_verifier_report(
+                self._prepared_root, real_anchor, production_checkpoint, domain, None
+            )
+            for domain in panel
+        )
         positive_report_count = sum(1 for report in reports if report is TernaryOutcome.POSITIVE)
         review_state = review_style_baseline_outcome(
             adequate_reviewer_count=len(panel),
@@ -219,7 +235,7 @@ class ProtocolBaselineOutcomes:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
@@ -298,7 +314,7 @@ class ProtocolBaselineOutcomes:
     def _fedavg_reference_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -320,7 +336,7 @@ class ProtocolBaselineOutcomes:
     def _krum_reference_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -342,7 +358,7 @@ class ProtocolBaselineOutcomes:
     def _density_cluster_trimmed_mean_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -364,7 +380,7 @@ class ProtocolBaselineOutcomes:
     def _update_reconstruction_filter_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -386,14 +402,21 @@ class ProtocolBaselineOutcomes:
     def _secure_continual_assessment_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
-        if real_anchor is None:
+        if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
+        source_delta = train_source_candidate_delta(
+            self._prepared_root, cell.master_seed, real_anchor, source_domain
+        )
+        if source_delta is None:
+            return AdmissionState.DORMANT
+        candidate_flat = real_anchor.flat_parameters + source_delta
+        reviewers = non_source_domains(source_domain)[:SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT]
         positive_report_count = sum(
             1
-            for _reviewer in range(SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT)
-            if resolve_ternary_outcome(True, True) is TernaryOutcome.POSITIVE
+            for domain in reviewers
+            if self._candidate_capability_contract_passes(real_anchor, domain, candidate_flat)
         )
         review_state = review_style_baseline_outcome(
             adequate_reviewer_count=SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
@@ -420,7 +443,7 @@ class ProtocolBaselineOutcomes:
 
     def _local_only_reference_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -481,7 +504,7 @@ class ProtocolBaselineOutcomes:
 
     def _multiple_model_certified_ensemble_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -541,7 +564,7 @@ class ProtocolBaselineOutcomes:
     def _centralized_reference_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
@@ -561,7 +584,7 @@ class ProtocolBaselineOutcomes:
 
     def _independent_local_reference_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT

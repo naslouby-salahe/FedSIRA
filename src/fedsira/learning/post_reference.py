@@ -8,6 +8,7 @@ from fedsira.config import PostReferenceConfig, TrainingConfig
 from fedsira.domain.types import (
     DerivedSeed,
     LocalEpochCount,
+    LossWeight,
     SampleId,
     Temperature,
     TrainableParameterCount,
@@ -98,6 +99,10 @@ def run_post_reference_training(
     sample_ids: Sequence[SampleId],
     training_seed: DerivedSeed,
     local_epochs: LocalEpochCount,
+    triggered_features: torch.Tensor | None = None,
+    triggered_labels: torch.Tensor | None = None,
+    carrier_row_mask: torch.Tensor | None = None,
+    triggered_backdoor_loss_weight: LossWeight | None = None,
 ) -> tuple[TrainingLoss, ...]:
     anchor_flat_parameters = flatten_trainable_parameters(anchor_model).detach()
     parameter_count = trainable_parameter_count(current_model)
@@ -107,20 +112,48 @@ def run_post_reference_training(
         for indices in ordered_batch_indices(
             tuple(sample_ids), training_seed, epoch, training_config.batch_size
         ):
-            batch_losses.append(
-                post_reference_training_step(
-                    anchor_model,
-                    current_model,
-                    optimizer,
-                    loss_function,
-                    training_config,
-                    post_reference_config,
-                    features[indices],
-                    labels[indices],
-                    is_supported[indices],
-                    anchor_flat_parameters,
-                    parameter_count,
+            if (
+                triggered_features is not None
+                and triggered_labels is not None
+                and carrier_row_mask is not None
+                and triggered_backdoor_loss_weight is not None
+            ):
+                from fedsira.protocol.attacks.byzantine import verifier_aware_training_step
+
+                batch_losses.append(
+                    verifier_aware_training_step(
+                        anchor_model,
+                        current_model,
+                        optimizer,
+                        loss_function,
+                        training_config,
+                        post_reference_config,
+                        features[indices],
+                        labels[indices],
+                        is_supported[indices],
+                        anchor_flat_parameters,
+                        parameter_count,
+                        triggered_features[indices],
+                        triggered_labels[indices],
+                        carrier_row_mask[indices],
+                        triggered_backdoor_loss_weight,
+                    )
                 )
-            )
+            else:
+                batch_losses.append(
+                    post_reference_training_step(
+                        anchor_model,
+                        current_model,
+                        optimizer,
+                        loss_function,
+                        training_config,
+                        post_reference_config,
+                        features[indices],
+                        labels[indices],
+                        is_supported[indices],
+                        anchor_flat_parameters,
+                        parameter_count,
+                    )
+                )
         epoch_losses.append(sum(batch_losses) / len(batch_losses))
     return tuple(epoch_losses)

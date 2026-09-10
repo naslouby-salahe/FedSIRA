@@ -18,6 +18,7 @@ from fedsira.domain.enums import (
     AdmissionOpeningMode,
     AdmissionState,
     CoreMethodIdentity,
+    TernaryOutcome,
 )
 from fedsira.domain.models import (
     CommunicationMessageType,
@@ -34,61 +35,42 @@ from fedsira.domain.types import (
     CommunicationMessageCount,
     CompromisedReproducerCount,
     ConditionName,
+    ExampleCount,
     FrozenDomainModel,
     MasterSeed,
-    MetricObservation,
-    MetricValue,
-    ModuleName,
     RequiredReproductionRowCount,
 )
-from fedsira.evaluation.comparisons import (
-    ComparisonMetric,
-)
-from fedsira.evaluation.domain import (
-    evaluate_domain,
-    non_source_domains,
-)
-from fedsira.evaluation.metrics import (
-    dormant_admission_rate,
-    legitimate_admission_rate,
-    metric_value,
-    report_metric_set,
-    supported_macro_f1_harm,
-)
+from fedsira.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.evaluation.metrics import supported_macro_f1_harm, target_capability_gain
 from fedsira.evaluation.report_summary import RealReportSummary, compute_real_report_summary
 from fedsira.evaluation.summaries import (
-    coefficient_of_variation,
-    domain_disparity,
     equal_weight_domain_mean,
-    interquartile_range,
-    percentile_10_domain_target_f1,
     worst_domain_target_f1,
 )
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
     AblationVariant,
+    ExternalVerificationCondition,
     OpeningMode,
+    PluralityCondition,
+    ProposalEpisode,
     ReproducerCondition,
+    SecondaryScenario,
     VerifierCondition,
 )
-from fedsira.experiments.planning import (
-    ScientificCell,
-)
-from fedsira.experiments.prerequisites import (
-    PreparedEvidenceCounts,
-)
-from fedsira.experiments.scenarios import (
-    reproducer_order,
-)
+from fedsira.experiments.planning import ScientificCell
+from fedsira.experiments.prerequisites import PreparedEvidenceCounts
+from fedsira.experiments.scenarios import reproducer_order
 from fedsira.experiments.workflow import (
+    BackdoorScope,
     HeterogeneityScope,
     RealAnchor,
+    load_prepared_rows,
 )
-from fedsira.learning.anchor import run_anchor_fedavg_training
-from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.post_reference_training import (
     certified_domain_delta_committee,
+    train_domain_reproduction_delta,
     train_source_candidate_delta,
 )
 from fedsira.protocol.admission import (
@@ -99,8 +81,8 @@ from fedsira.protocol.admission import (
     validate_admission_requires_final_gate,
     validate_production_checkpoint_excludes_source,
 )
-from fedsira.protocol.attacks.byzantine import (
-    verifier_aware_training_step,
+from fedsira.protocol.attacks.source import (
+    scale_model_replacement_delta,
 )
 from fedsira.protocol.baselines.registry import (
     BaselineIdentity,
@@ -108,13 +90,14 @@ from fedsira.protocol.baselines.registry import (
     single_fresh_verifier_domain,
     single_fresh_verifier_outcome,
 )
-from fedsira.protocol.baselines.robust_aggregation import (
-    coordinate_wise_median_synthesis,
-)
+from fedsira.protocol.baselines.robust_aggregation import coordinate_wise_median_synthesis
 from fedsira.protocol.capability_contract import (
+    CapabilityContract,
     build_capability_contract,
     capability_contract_passes,
     compute_capability_identity,
+    reproduction_evidence_is_adequate,
+    verification_evidence_is_adequate,
 )
 from fedsira.protocol.proposal import (
     select_source_domain,
@@ -136,9 +119,7 @@ from fedsira.protocol.specification import (
     reproduction_update_vector,
     validate_exactly_one_source_domain,
 )
-from fedsira.protocol.state_machine import (
-    resolve_ternary_outcome,
-)
+from fedsira.protocol.state_machine import resolve_ternary_outcome
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,
     select_krum_update,
@@ -159,25 +140,8 @@ SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
 COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
 VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
 BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
-ANCHOR_FLAT_PARAMETERS = torch.zeros(1)
-
-
-def _training_entry_points(evidence: PreparedEvidenceCounts) -> tuple[ModuleName, ...]:
-    config = current_application_context().scientific_config
-    if (
-        evidence.reproduction_target_count
-        < config.capability_contract.evidence_minima.reproduction_target_examples
-    ):
-        return ()
-    if (
-        evidence.reproduction_supported_count
-        < config.capability_contract.evidence_minima.reproduction_supported_control_examples
-    ):
-        return ()
-    anchor_entry = run_anchor_fedavg_training.__module__
-    post_reference_entry = run_post_reference_training.__module__
-    verifier_aware_entry = verifier_aware_training_step.__module__
-    return (anchor_entry, post_reference_entry, verifier_aware_entry)
+ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"
+SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
 
 
 class OpeningIdentity(FrozenDomainModel):
@@ -195,39 +159,91 @@ def _opening_mode_for_cell(
     return AdmissionOpeningMode.CANDIDATE_FREE
 
 
-def _opening_identity() -> OpeningIdentity:
+def _target_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
+    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
+    return 0 if rows is None else rows.row_count
+
+
+def _first_target_sample_id(
+    prepared_root: Path, domain: NBaiotDomain, role: Role
+) -> ArtifactDigest | None:
+    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
+    if rows is None or not rows.sample_ids:
+        return None
+    return rows.sample_ids[0]
+
+
+def _supported_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
+    total: ExampleCount = 0
+    for class_id in NBAIOT_CLASS_ORDER:
+        if class_id is NBaiotClass.GAFGYT_COMBO:
+            continue
+        rows = load_prepared_rows(prepared_root, domain, class_id, role)
+        if rows is not None:
+            total += rows.row_count
+    return total
+
+
+def _domains_with_class(
+    prepared_root: Path, class_id: NBaiotClass, role: Role
+) -> frozenset[NBaiotDomain]:
+    return frozenset(
+        domain
+        for domain in NBAIOT_DOMAIN_ORDER
+        if load_prepared_rows(prepared_root, domain, class_id, role) is not None
+    )
+
+
+def _capability_contract_for_digest(dataset_manifest_hash: ArtifactDigest) -> CapabilityContract:
     config = current_application_context().scientific_config
-    contract = build_capability_contract(
-        "a" * 64,
+    return build_capability_contract(
+        dataset_manifest_hash,
         role_hash_token(Role.POST_REFERENCE_REPLAY),
         config.datasets.primary.name,
         len(NBAIOT_DOMAIN_ORDER),
-        "b" * 64,
+        dataset_manifest_hash,
         NBaiotClass.GAFGYT_COMBO,
         len(NBAIOT_CLASS_ORDER) - 1,
         config.capability_contract,
     )
-    capability_identity = compute_capability_identity(contract)
-    contract_passes = capability_contract_passes(
-        contract,
-        MetricResult(value=None, denominator=0),
-        MetricResult(value=None, denominator=0),
-        MetricResult(value=None, denominator=0),
-        MetricResult(value=None, denominator=0),
+
+
+def _opening_identity(dataset_manifest_hash: ArtifactDigest) -> OpeningIdentity:
+    contract = _capability_contract_for_digest(dataset_manifest_hash)
+    return OpeningIdentity(
+        capability_identity=compute_capability_identity(contract),
+        contract_passes=False,
     )
-    return OpeningIdentity(capability_identity=capability_identity, contract_passes=contract_passes)
 
 
-def _source_domain_for_cell(cell: ScientificCell) -> NBaiotDomain | None:
+def _source_requires_attack_carrier(cell: ScientificCell) -> BooleanValue:
+    return cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+
+
+def _source_domain_for_cell(
+    cell: ScientificCell, prepared_root: Path | None = None
+) -> NBaiotDomain | None:
     source_order = source_selection_order(
         NBAIOT_DOMAIN_ORDER, derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
     )
     validate_exactly_one_source_domain((source_order[0],))
+    if prepared_root is None:
+        domains_with_target: frozenset[NBaiotDomain] = frozenset(NBAIOT_DOMAIN_ORDER)
+        domains_with_carrier: frozenset[NBaiotDomain] = frozenset()
+        requires_carrier = False
+    else:
+        domains_with_target = _domains_with_class(
+            prepared_root, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+        ) | _domains_with_class(prepared_root, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION)
+        domains_with_carrier = _domains_with_class(
+            prepared_root, NBaiotClass.GAFGYT_UDP, Role.POST_REFERENCE_REPLAY
+        )
+        requires_carrier = _source_requires_attack_carrier(cell)
     selected = select_source_domain(
         source_order,
-        frozenset(NBAIOT_DOMAIN_ORDER),
-        requires_attack_carrier=False,
-        domains_with_attack_carrier=frozenset(),
+        domains_with_target,
+        requires_attack_carrier=requires_carrier,
+        domains_with_attack_carrier=domains_with_carrier,
     )
     return NBaiotDomain(selected) if selected is not None else None
 
@@ -260,12 +276,17 @@ def _row_requirement(
     return config.protocol.synthesis.committee_size
 
 
-def _commitment_digest(reproducer_domain: NBaiotDomain, master_seed: MasterSeed) -> ArtifactDigest:
+def _commitment_digest(
+    reproducer_domain: NBaiotDomain,
+    master_seed: MasterSeed,
+    capability_identity: ArtifactDigest,
+    reproduced_flat_parameters: torch.Tensor,
+) -> ArtifactDigest:
     return compute_reproduction_commitment_hash(
         reproducer_domain,
-        "c" * 64,
+        capability_identity,
         derive_uint32(COMMITMENT_HASH_SEPARATOR, master_seed),
-        ANCHOR_FLAT_PARAMETERS,
+        reproduced_flat_parameters,
     )
 
 
@@ -274,6 +295,7 @@ def _verifier_panel(
     reproducer_domain: NBaiotDomain,
     master_seed: MasterSeed,
     verification_config: VerificationConfig,
+    commitment_hash: ArtifactDigest,
     allow_source_as_verifier: AllowSourceAsVerifier = False,
 ) -> tuple[NBaiotDomain, ...]:
     eligible_verifiers = tuple(
@@ -283,7 +305,7 @@ def _verifier_panel(
     )
     row_seed = verifier_assignment_seed_for_row(
         derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, master_seed),
-        _commitment_digest(reproducer_domain, master_seed),
+        commitment_hash,
     )
     if not verifier_assignment_timestamp_is_valid(1.0, 0.0):
         raise ValueError("verifier assignment must follow the reproduction commitment")
@@ -293,34 +315,174 @@ def _verifier_panel(
     return tuple(NBaiotDomain(domain) for domain in panel)
 
 
+def _domain_is_reproduction_adequate(prepared_root: Path, domain: NBaiotDomain) -> BooleanValue:
+    config = current_application_context().scientific_config
+    return reproduction_evidence_is_adequate(
+        _target_role_count(prepared_root, domain, Role.REPRODUCTION),
+        _supported_role_count(prepared_root, domain, Role.POST_REFERENCE_REPLAY),
+        config.capability_contract.evidence_minima,
+    )
+
+
+def _benign_far_increase(
+    anchor_metrics: MetricResult, candidate_metrics: MetricResult
+) -> MetricResult:
+    if anchor_metrics.value is None or candidate_metrics.value is None:
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=candidate_metrics.value - anchor_metrics.value, denominator=1)
+
+
+def _honest_verifier_report(
+    prepared_root: Path,
+    anchor: RealAnchor,
+    candidate_flat_parameters: torch.Tensor,
+    verifier_domain: NBaiotDomain,
+    heterogeneity_scope: HeterogeneityScope | None,
+) -> TernaryOutcome:
+    config = current_application_context().scientific_config
+    if not verification_evidence_is_adequate(
+        _target_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
+        _supported_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
+        config.capability_contract.evidence_minima,
+    ):
+        return resolve_ternary_outcome(False, False)
+    anchor_metrics = evaluate_domain(
+        prepared_root,
+        anchor,
+        anchor.flat_parameters,
+        verifier_domain,
+        Role.ROW_VERIFICATION,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+    candidate_metrics = evaluate_domain(
+        prepared_root,
+        anchor,
+        candidate_flat_parameters,
+        verifier_domain,
+        Role.ROW_VERIFICATION,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+    if anchor_metrics is None or candidate_metrics is None:
+        return resolve_ternary_outcome(False, False)
+    contract = _capability_contract_for_digest(anchor.dataset_manifest_hash)
+    passes = capability_contract_passes(
+        contract,
+        candidate_metrics.target_f1,
+        target_capability_gain(candidate_metrics.target_f1, anchor_metrics.target_f1),
+        supported_macro_f1_harm(
+            anchor_metrics.supported_macro_f1, candidate_metrics.supported_macro_f1
+        ),
+        _benign_far_increase(anchor_metrics.benign_far, candidate_metrics.benign_far),
+    )
+    return resolve_ternary_outcome(True, passes)
+
+
+def _train_reproduction_update(
+    prepared_root: Path,
+    cell: ScientificCell,
+    anchor: RealAnchor,
+    domain: NBaiotDomain,
+    source_delta: torch.Tensor | None,
+    compromised_reproducers: frozenset[NBaiotDomain],
+    heterogeneity_scope: HeterogeneityScope | None,
+    backdoor_scope: BackdoorScope | None,
+) -> torch.Tensor | None:
+    config = current_application_context().scientific_config
+    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
+    if domain not in compromised_reproducers:
+        return train_domain_reproduction_delta(
+            prepared_root,
+            cell.master_seed,
+            anchor,
+            domain,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+    condition = cell.condition
+    if condition in (
+        ReproducerCondition.ONE_SOURCE_COPY,
+        ReproducerCondition.TWO_SOURCE_COPIES,
+        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+    ):
+        if source_delta is None:
+            return None
+        return reproduction_update_vector(
+            anchor.flat_parameters, anchor.flat_parameters + source_delta
+        )
+    trained = train_domain_reproduction_delta(
+        prepared_root,
+        cell.master_seed,
+        anchor,
+        domain,
+        heterogeneity_scope=heterogeneity_scope,
+        backdoor_scope=backdoor_scope,
+    )
+    if trained is None:
+        return None
+    if condition in (
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+    ):
+        return scale_model_replacement_delta(
+            trained,
+            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
+        )
+    return trained
+
+
 def _reproduction_progression(
     cell: ScientificCell,
     evidence: PreparedEvidenceCounts,
     external_verification_active: BooleanValue,
     row_requirement: RequiredReproductionRowCount,
     compromised_reproducers: frozenset[NBaiotDomain],
+    prepared_root: Path,
+    anchor: RealAnchor | None,
     include_source_as_first_reproducer: BooleanValue = False,
-) -> tuple[AdmissionState, tuple[ReproductionAttempt, ...], tuple[ArtifactDigest, ...]]:
+    heterogeneity_scope: HeterogeneityScope | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    source_delta: torch.Tensor | None = None,
+) -> tuple[
+    AdmissionState,
+    tuple[ReproductionAttempt, ...],
+    tuple[ArtifactDigest, ...],
+    OrderedDict[NBaiotDomain, torch.Tensor],
+]:
+    del evidence
+    if anchor is None:
+        return (AdmissionState.DORMANT, (), (), OrderedDict())
     reproducer_order = _reproducer_order(cell)
-    source_domain = _source_domain_for_cell(cell)
-    validate_reproduction_start_checkpoint("anchor-checkpoint", frozenset({"source-checkpoint"}))
-    validate_reproduction_starts_from_anchor(ANCHOR_FLAT_PARAMETERS.clone(), ANCHOR_FLAT_PARAMETERS)
+    source_domain = _source_domain_for_cell(cell, prepared_root)
+    validate_reproduction_start_checkpoint(
+        ANCHOR_CHECKPOINT_IDENTITY, frozenset({SOURCE_CHECKPOINT_IDENTITY})
+    )
+    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
+    capability_identity = compute_capability_identity(
+        _capability_contract_for_digest(anchor.dataset_manifest_hash)
+    )
     adequate_domains = frozenset(
-        domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain
+        domain
+        for domain in NBAIOT_DOMAIN_ORDER
+        if domain != source_domain and _domain_is_reproduction_adequate(prepared_root, domain)
     )
     attempts: list[ReproductionAttempt] = []
     commitment_hashes: list[ArtifactDigest] = []
+    updates: OrderedDict[NBaiotDomain, torch.Tensor] = OrderedDict()
     certified_count = 0
     state = AdmissionState.REPRODUCTION_PENDING
-    if include_source_as_first_reproducer and source_domain is not None:
-        commitment_hash = compute_reproduction_commitment_hash(
-            source_domain,
-            "c" * 64,
-            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
-            ANCHOR_FLAT_PARAMETERS,
+    if (
+        include_source_as_first_reproducer
+        and source_domain is not None
+        and source_delta is not None
+    ):
+        reproduced = anchor.flat_parameters + source_delta
+        commitment_hash = _commitment_digest(
+            source_domain, cell.master_seed, capability_identity, reproduced
         )
         commitment_hashes.append(commitment_hash)
         validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        updates[source_domain] = source_delta
         attempts.append(
             ReproductionAttempt(domain=source_domain, was_trained=True, is_certified=True)
         )
@@ -329,7 +491,7 @@ def _reproduction_progression(
             external_verification_active, certified_count >= row_requirement
         )
         if state is AdmissionState.SYNTHESIS_PENDING:
-            return (state, tuple(attempts), tuple(commitment_hashes))
+            return (state, tuple(attempts), tuple(commitment_hashes), updates)
     for _row_index in range(len(reproducer_order)):
         next_domain = next_reproducer_domain(
             reproducer_order, consumed_domains(attempts), adequate_domains
@@ -337,39 +499,64 @@ def _reproduction_progression(
         if next_domain is None:
             state = handle_no_adequate_unconsumed_domain(certified_count >= row_requirement)
             break
-        if next_domain in compromised_reproducers:
-            attempts.append(
-                ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=False)
-            )
+        domain = NBaiotDomain(next_domain)
+        update = _train_reproduction_update(
+            prepared_root,
+            cell,
+            anchor,
+            domain,
+            source_delta,
+            compromised_reproducers,
+            heterogeneity_scope,
+            backdoor_scope,
+        )
+        if update is None:
             state = handle_inadequate_domain()
             continue
-        commitment_hash = compute_reproduction_commitment_hash(
-            next_domain,
-            "c" * 64,
-            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
-            ANCHOR_FLAT_PARAMETERS,
+        reproduced = anchor.flat_parameters + update
+        commitment_hash = _commitment_digest(
+            domain, cell.master_seed, capability_identity, reproduced
         )
         commitment_hashes.append(commitment_hash)
         validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        updates[domain] = update
+        is_certified = domain not in compromised_reproducers or not external_verification_active
         attempts.append(
-            ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=True)
+            ReproductionAttempt(domain=domain, was_trained=True, is_certified=is_certified)
         )
-        certified_count += 1
+        if is_certified:
+            certified_count += 1
         state = handle_adequate_domain_trained(
             external_verification_active, certified_count >= row_requirement
         )
         if state is AdmissionState.SYNTHESIS_PENDING:
             break
-    return (state, tuple(attempts), tuple(commitment_hashes))
+    return (state, tuple(attempts), tuple(commitment_hashes), updates)
 
 
 def _single_verifier_progression(
-    cell: ScientificCell, source_domain: NBaiotDomain | None
-) -> tuple[AdmissionState, tuple[ReproductionAttempt, ...], tuple[ArtifactDigest, ...]]:
+    cell: ScientificCell,
+    source_domain: NBaiotDomain | None,
+    prepared_root: Path,
+    anchor: RealAnchor | None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> tuple[
+    AdmissionState,
+    tuple[ReproductionAttempt, ...],
+    tuple[ArtifactDigest, ...],
+    OrderedDict[NBaiotDomain, torch.Tensor],
+]:
+    if anchor is None:
+        return (AdmissionState.DORMANT, (), (), OrderedDict())
     config = current_application_context().scientific_config
     reproducer_order = _reproducer_order(cell)
     adequate_domains = frozenset(
-        domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain
+        domain
+        for domain in NBAIOT_DOMAIN_ORDER
+        if domain != source_domain and _domain_is_reproduction_adequate(prepared_root, domain)
+    )
+    capability_identity = compute_capability_identity(
+        _capability_contract_for_digest(anchor.dataset_manifest_hash)
     )
     consumed: set[NBaiotDomain] = set()
     while True:
@@ -377,30 +564,53 @@ def _single_verifier_progression(
             reproducer_order, adequate_domains - frozenset(consumed)
         )
         if candidate is None:
-            return (AdmissionState.DORMANT, (), ())
+            return (AdmissionState.DORMANT, (), (), OrderedDict())
         next_domain = NBaiotDomain(candidate)
         consumed.add(next_domain)
-        commitment_hash = compute_reproduction_commitment_hash(
+        update = train_domain_reproduction_delta(
+            prepared_root,
+            cell.master_seed,
+            anchor,
             next_domain,
-            "c" * 64,
-            derive_uint32(COMMITMENT_HASH_SEPARATOR, cell.master_seed),
-            ANCHOR_FLAT_PARAMETERS,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+        if update is None:
+            continue
+        reproduced = anchor.flat_parameters + update
+        commitment_hash = _commitment_digest(
+            next_domain, cell.master_seed, capability_identity, reproduced
         )
         validate_commitment_exists_before_verifier_assignment(commitment_hash)
         panel_order = _verifier_panel(
-            source_domain, next_domain, cell.master_seed, config.protocol.verification
+            source_domain,
+            next_domain,
+            cell.master_seed,
+            config.protocol.verification,
+            commitment_hash,
         )
         verifier_domain = single_fresh_verifier_domain(
             panel_order, frozenset(), frozenset(panel_order)
         )
         if verifier_domain is None:
             continue
-        verifier_outcome = single_fresh_verifier_outcome(
-            verifier_domain, resolve_ternary_outcome(True, True)
+        report = _honest_verifier_report(
+            prepared_root,
+            anchor,
+            reproduced,
+            NBaiotDomain(verifier_domain),
+            heterogeneity_scope,
         )
+        verifier_outcome = single_fresh_verifier_outcome(verifier_domain, report)
         if verifier_outcome is AdmissionState.ADMITTED:
             attempt = ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=True)
-            return (AdmissionState.SYNTHESIS_PENDING, (attempt,), (commitment_hash,))
+            return (
+                AdmissionState.SYNTHESIS_PENDING,
+                (attempt,),
+                (commitment_hash,),
+                OrderedDict(((next_domain, update),)),
+            )
+        if verifier_outcome is AdmissionState.REJECTED:
+            continue
 
 
 def _real_final_gate_metrics(
@@ -494,46 +704,42 @@ def _final_gate_decision(
     use_source_delta_for_source_domain: BooleanValue = False,
     force_first_row_to_source_delta: BooleanValue = False,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    precomputed_updates: OrderedDict[NBaiotDomain, torch.Tensor] | None = None,
 ) -> tuple[AdmissionState, RealReportSummary | None]:
+    if anchor is None:
+        return (AdmissionState.DORMANT, None)
     config = current_application_context().scientific_config
-    base_flat_parameters = anchor.flat_parameters if anchor is not None else ANCHOR_FLAT_PARAMETERS
+    base_flat_parameters = anchor.flat_parameters
     committee_deltas: OrderedDict[NBaiotDomain, torch.Tensor] = (
-        certified_domain_delta_committee(
+        OrderedDict(precomputed_updates)
+        if precomputed_updates is not None
+        else certified_domain_delta_committee(
             prepared_root,
             master_seed,
             anchor,
             reproducer_order,
             heterogeneity_scope=heterogeneity_scope,
         )
-        if anchor is not None
-        else OrderedDict()
     )
-    if use_source_delta_for_source_domain and anchor is not None and (source_domain is not None):
+    if use_source_delta_for_source_domain and source_domain is not None:
         source_delta = train_source_candidate_delta(
             prepared_root, master_seed, anchor, source_domain
         )
         if source_delta is not None:
             committee_deltas[source_domain] = source_delta
-    if (
-        force_first_row_to_source_delta
-        and anchor is not None
-        and (source_domain is not None)
-        and reproducer_order
-    ):
+    if force_first_row_to_source_delta and source_domain is not None and reproducer_order:
         source_delta = train_source_candidate_delta(
             prepared_root, master_seed, anchor, source_domain
         )
         if source_delta is not None:
             committee_deltas[reproducer_order[0]] = source_delta
+    available_updates = tuple(
+        committee_deltas[domain] for domain in reproducer_order if domain in committee_deltas
+    )
     if coordinate_median_active:
-        median_deltas = tuple(
-            committee_deltas.get(
-                domain,
-                reproduction_update_vector(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS),
-            )
-            for domain in reproducer_order
-        )
-        production_update = coordinate_wise_median_synthesis(median_deltas)
+        if not available_updates:
+            return (AdmissionState.DORMANT, None)
+        production_update = coordinate_wise_median_synthesis(available_updates)
         production_checkpoint = apply_production_update(base_flat_parameters, production_update)
         return _final_gate_decision_from_production_checkpoint(
             evidence,
@@ -548,20 +754,21 @@ def _final_gate_decision(
         committee = tuple(
             CertifiedReproductionRow(
                 reproducer_domain=domain,
-                update_vector=committee_deltas.get(
-                    domain,
-                    reproduction_update_vector(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS),
-                ),
+                update_vector=committee_deltas[domain],
             )
             for domain in reproducer_order
+            if domain in committee_deltas
         )
+        if not committee:
+            return (AdmissionState.DORMANT, None)
         krum_selected_update = select_krum_update(
             committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
         ).update_vector
+    first_domain = next((domain for domain in reproducer_order if domain in committee_deltas), None)
+    if first_domain is None and not is_plurality_active:
+        return (AdmissionState.DORMANT, None)
     single_reproduction_update = (
-        committee_deltas.get(reproducer_order[0], ANCHOR_FLAT_PARAMETERS)
-        if reproducer_order
-        else ANCHOR_FLAT_PARAMETERS
+        committee_deltas[first_domain] if first_domain is not None else None
     )
     production_update = resolve_production_update(
         is_plurality_active, krum_selected_update, single_reproduction_update
@@ -691,105 +898,3 @@ def _efficiency_message_counts() -> (
         (CommunicationMessageType.FINAL_GATE_REPORT, 6),
         (CommunicationMessageType.DECISION, 1),
     )
-
-
-def _metrics_from_state(
-    state: AdmissionState, real_report: RealReportSummary | None = None
-) -> tuple[MetricObservation, ...]:
-    is_admitted = state is AdmissionState.ADMITTED
-    is_dormant = state is AdmissionState.DORMANT
-    legitimate_result = legitimate_admission_rate([is_admitted])
-    dormant_result = dormant_admission_rate(
-        dormant_admission_count=1 if is_dormant else 0, eligible_admission_count=1
-    )
-    report_metrics = report_metric_set(
-        true_labels=(),
-        predicted_labels=(),
-        class_tokens=(NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO),
-        target_class_token=NBaiotClass.GAFGYT_COMBO,
-        benign_class_token=NBaiotClass.BENIGN,
-        supported_class_tokens=(NBaiotClass.BENIGN,),
-    )
-    if real_report is not None:
-        target_f1 = real_report.target_f1
-        target_f1_gain = MetricResult(value=None, denominator=0)
-        supported_macro_f1_harm_value = real_report.supported_macro_f1_harm
-        benign_far_increase_value = real_report.benign_far_increase
-        worst_domain = real_report.worst_domain_target_f1
-        p10_domain = real_report.p10_domain_target_f1
-        disparity = real_report.domain_disparity
-        iqr = real_report.domain_iqr
-        cv = real_report.coefficient_of_variation
-        equal_weight_mean = real_report.target_f1
-    else:
-        target_f1 = metric_value(report_metrics, ComparisonMetric.TARGET_F1)
-        target_f1_gain = metric_value(report_metrics, "target-f1-gain")
-        supported_macro_f1_harm_value = metric_value(
-            report_metrics, ComparisonMetric.SUPPORTED_MACRO_F1_HARM
-        )
-        benign_far_increase_value = metric_value(
-            report_metrics, ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE
-        )
-        domain_f1_values = (metric_value(report_metrics, ComparisonMetric.TARGET_F1),)
-        worst_domain = worst_domain_target_f1(domain_f1_values)
-        p10_domain = percentile_10_domain_target_f1(domain_f1_values)
-        disparity = domain_disparity(domain_f1_values)
-        iqr = interquartile_range(domain_f1_values)
-        defined_values = tuple(
-            result.value for result in domain_f1_values if result.value is not None
-        )
-        cv = (
-            coefficient_of_variation(defined_values)
-            if defined_values
-            else MetricResult(value=None, denominator=0)
-        )
-        equal_weight_mean = equal_weight_domain_mean(domain_f1_values, 1)
-    return (
-        ("terminal-state", _state_encoding(state)),
-        (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_result.value),
-        (ComparisonMetric.TARGET_F1, target_f1.value),
-        ("target-f1-gain", target_f1_gain.value),
-        (ComparisonMetric.SUPPORTED_MACRO_F1_HARM, supported_macro_f1_harm_value.value),
-        (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, benign_far_increase_value.value),
-        (
-            ComparisonMetric.ATTACK_SUCCESS_RATE,
-            metric_value(report_metrics, ComparisonMetric.ATTACK_SUCCESS_RATE).value,
-        ),
-        ("accuracy", metric_value(report_metrics, "accuracy").value),
-        ("macro-f1", metric_value(report_metrics, "macro-f1").value),
-        ("weighted-f1", metric_value(report_metrics, "weighted-f1").value),
-        ("balanced-accuracy", metric_value(report_metrics, "balanced-accuracy").value),
-        (
-            "verifier-abstention-rate",
-            metric_value(report_metrics, "verifier-abstention-rate").value,
-        ),
-        (
-            "reproduction-abstention-rate",
-            metric_value(report_metrics, "reproduction-abstention-rate").value,
-        ),
-        (ComparisonMetric.WORST_DOMAIN_TARGET_F1, worst_domain.value),
-        ("p10-domain-target-f1", p10_domain.value),
-        ("domain-disparity", disparity.value),
-        ("domain-iqr", iqr.value),
-        ("coefficient-of-variation", cv.value),
-        ("equal-weight-domain-mean-target-f1", equal_weight_mean.value),
-        (ComparisonMetric.REPRODUCTION_ATTEMPTS, 1.0 if is_admitted else 0.0),
-        (ComparisonMetric.FALSE_LAUNCH, 0.0),
-        (ComparisonMetric.POST_EVIDENCE_OVERHEAD, 1.0 if is_admitted else 0.0),
-        ("dormant-admission-rate", dormant_result.value),
-    )
-
-
-_STATE_ENCODINGS: tuple[tuple[AdmissionState, MetricValue], ...] = (
-    (AdmissionState.ADMITTED, 1.0),
-    (AdmissionState.REJECTED, -1.0),
-    (AdmissionState.EXPIRED, -2.0),
-    (AdmissionState.DORMANT, 0.0),
-)
-
-
-def _state_encoding(state: AdmissionState) -> MetricValue:
-    for encoded_state, encoding in _STATE_ENCODINGS:
-        if encoded_state is state:
-            return encoding
-    return 0.0

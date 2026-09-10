@@ -57,8 +57,10 @@ def reconstruction_error(
     reconstructed_update: torch.Tensor,
     normalization_epsilon: NumericalEpsilon,
 ) -> ReconstructionError:
-    squared_l2_distance = float(torch.sum((submitted_update - reconstructed_update) ** 2))
-    submitted_squared_norm = float(torch.sum(submitted_update**2))
+    squared_l2_distance = float(
+        torch.sum((submitted_update.detach() - reconstructed_update.detach()) ** 2)
+    )
+    submitted_squared_norm = float(torch.sum(submitted_update.detach() ** 2))
     return squared_l2_distance / (submitted_squared_norm + normalization_epsilon)
 
 
@@ -95,7 +97,7 @@ def reconstruction_filter_reweight(
 
 
 def vector_l2_norm(vector: torch.Tensor) -> VectorNorm:
-    return float(torch.sqrt(torch.sum(vector**2)))
+    return float(torch.sqrt(torch.sum(vector.detach() ** 2)))
 
 
 def l2_normalize(update_vectors: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:

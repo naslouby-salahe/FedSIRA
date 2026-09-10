@@ -63,8 +63,8 @@ def _diagnostic_marker_for_domain(
         [target_rows.features[target_index_by_id[sample_id]] for sample_id in selected_target_ids],
         dtype=torch.float32,
     )
-    selected_target_labels = torch.full(
-        (len(selected_target_ids),), target_class_index, dtype=torch.long
+    target_confidence_labels = torch.argmax(
+        logits_for_samples(anchor_model, selected_target_features), dim=-1
     )
     target_report_losses = tuple(
         zip(
@@ -72,21 +72,24 @@ def _diagnostic_marker_for_domain(
             (
                 float(value)
                 for value in per_sample_cross_entropy(
-                    anchor_model, selected_target_features, selected_target_labels
+                    anchor_model, selected_target_features, target_confidence_labels
                 )
             ),
             strict=True,
         )
     )
-    benign_class_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
     benign_features = torch.tensor(benign_rows.features, dtype=torch.float32)
-    benign_labels = torch.full((len(benign_rows.sample_ids),), benign_class_index, dtype=torch.long)
+    benign_confidence_labels = torch.argmax(
+        logits_for_samples(anchor_model, benign_features), dim=-1
+    )
     benign_report_losses = tuple(
         zip(
             benign_rows.sample_ids,
             (
                 float(value)
-                for value in per_sample_cross_entropy(anchor_model, benign_features, benign_labels)
+                for value in per_sample_cross_entropy(
+                    anchor_model, benign_features, benign_confidence_labels
+                )
             ),
             strict=True,
         )

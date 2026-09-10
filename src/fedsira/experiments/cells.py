@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 from fedsira.datasets.common import Role
@@ -34,7 +35,6 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     ArtifactDigest,
-    DatasetClassToken,
     MetricObservation,
 )
 from fedsira.evaluation.backdoor import (
@@ -47,7 +47,6 @@ from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
 from fedsira.evaluation.domain import (
-    evaluate_domain,
     non_source_domains,
     root_cause_partitioned_row_ids,
 )
@@ -61,22 +60,22 @@ from fedsira.evaluation.metrics import (
     legitimate_admission_rate,
     malicious_admission_rate,
     reproduction_attempt_count,
-    supported_macro_f1_harm,
-    target_capability_gain,
 )
+from fedsira.evaluation.report_summary import metrics_from_state
 from fedsira.evaluation.screening import (
     compute_screen_differential,
-    compute_unmatched_screen_differential,
+    evaluate_screen_domain,
 )
 from fedsira.experiments.cell_support import (
-    ANCHOR_FLAT_PARAMETERS,
     BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
     RESOLVED_FEDSIRA_CORE_METHOD,
+    _capability_contract_for_digest,
     _compromised_reproducer_count,
     _compromised_verifier_count,
     _efficiency_message_counts,
     _final_gate_decision,
-    _metrics_from_state,
+    _first_target_sample_id,
+    _honest_verifier_report,
     _opening_identity,
     _opening_mode_for_cell,
     _reproducer_order,
@@ -84,7 +83,6 @@ from fedsira.experiments.cell_support import (
     _row_requirement,
     _single_verifier_progression,
     _source_domain_for_cell,
-    _training_entry_points,
     _verifier_panel,
 )
 from fedsira.experiments.definitions import (
@@ -101,7 +99,6 @@ from fedsira.experiments.definitions import (
     HeterogeneityRegime,
     OpeningMode,
     PluralityCondition,
-    PrimaryScenario,
     ProposalEpisode,
     ReproducerCondition,
     SourceExclusionMethod,
@@ -133,6 +130,8 @@ from fedsira.experiments.scenarios import (
 from fedsira.experiments.workflow import (
     EpistemicFailureScope,
     RootCauseScope,
+    dataset_manifest_hash,
+    load_prepared_rows,
     prepared_feature_names,
 )
 from fedsira.learning.post_reference_training import (
@@ -144,7 +143,6 @@ from fedsira.protocol.attacks.byzantine import (
     resolve_byzantine_verifier_vote,
 )
 from fedsira.protocol.attacks.source import (
-    scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
 )
@@ -181,21 +179,17 @@ from fedsira.protocol.baselines.source_model import (
     validate_client_review_reviewer_count,
 )
 from fedsira.protocol.capability_contract import (
+    compute_capability_identity,
     reproduction_evidence_is_adequate,
-    screen_evidence_is_adequate,
     validate_source_excluded_production_weight,
     verification_evidence_is_adequate,
 )
 from fedsira.protocol.proposal import (
     ScreenDomainResult,
-    candidate_free_screen_domain_predicate,
     candidate_screen_transition,
-    raw_target_f1_screen_domain_decision_is_positive,
-    screen_domain_decision_is_positive,
     screen_domain_order,
     screen_fold_index,
     start_admission,
-    unmatched_control_screen_domain_decision_is_positive,
 )
 from fedsira.protocol.reproduction import (
     select_compromised_reproducers,
@@ -253,10 +247,10 @@ class ProtocolCellDispatch:
             return self._execute_verifier_robustness_cell(verifier_cell, evidence)
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW:
             state = self._client_review_outcome(cell)
-            return (state, _metrics_from_state(state, self._pending_real_report))
+            return (state, metrics_from_state(state, self._pending_real_report))
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK:
             state = self._source_release_after_full_external_check_outcome(cell, evidence)
-            return (state, _metrics_from_state(state, self._pending_real_report))
+            return (state, metrics_from_state(state, self._pending_real_report))
         if variant in (
             AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
             AblationVariant.NO_MATCHED_CONTROL,
@@ -270,15 +264,15 @@ class ProtocolCellDispatch:
                 opening_cell, evidence, screen_predicate_variant=AblationVariant(variant)
             )
         state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         extra: list[MetricObservation] = []
         if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION:
             domain_without_target_view_may_participate(True)
             real_anchor = self._real_anchor(cell.master_seed)
             if real_anchor is not None:
-                candidate_domains = non_source_domains(_source_domain_for_cell(cell))[
-                    : config.baselines.parameter_similarity.required_committed_rows
-                ]
+                candidate_domains = non_source_domains(
+                    _source_domain_for_cell(cell, self._prepared_root)
+                )[: config.baselines.parameter_similarity.required_committed_rows]
                 committee_deltas = certified_domain_delta_committee(
                     self._prepared_root, cell.master_seed, real_anchor, candidate_domains
                 )
@@ -311,7 +305,7 @@ class ProtocolCellDispatch:
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
             )
             real_anchor = self._real_anchor(cell.master_seed)
-            source_domain = _source_domain_for_cell(cell)
+            source_domain = _source_domain_for_cell(cell, self._prepared_root)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -385,7 +379,7 @@ class ProtocolCellDispatch:
             state = self._krum_reference_outcome(cell, evidence)
         else:
             state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         is_scoped_contract = cell.method != CapabilityContractScope.BROAD_TARGET_ONLY
         boundary_metrics = boundary_metric_set(
             true_labels=(),
@@ -429,7 +423,7 @@ class ProtocolCellDispatch:
                     self._prepared_root,
                     cell.master_seed,
                     real_anchor,
-                    _source_domain_for_cell(cell),
+                    _source_domain_for_cell(cell, self._prepared_root),
                     root_cause_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -459,7 +453,8 @@ class ProtocolCellDispatch:
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = root_cause_partitioned_row_ids(
-                    self._prepared_root, non_source_domains(_source_domain_for_cell(cell))
+                    self._prepared_root,
+                    non_source_domains(_source_domain_for_cell(cell, self._prepared_root)),
                 )
             else:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = (
@@ -496,7 +491,7 @@ class ProtocolCellDispatch:
                     self._prepared_root,
                     cell.master_seed,
                     real_anchor,
-                    _source_domain_for_cell(cell),
+                    _source_domain_for_cell(cell, self._prepared_root),
                     epistemic_failure_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -551,7 +546,7 @@ class ProtocolCellDispatch:
                     heterogeneity_seed,
                     config.attacks_and_boundaries.heterogeneity.quantity_skew_multipliers,
                 )
-                source_domain = _source_domain_for_cell(cell)
+                source_domain = _source_domain_for_cell(cell, self._prepared_root)
                 if source_domain is not None:
                     excluded = exclude_source_from_quantity_skew(
                         multiplier_by_domain, source_domain
@@ -599,190 +594,129 @@ class ProtocolCellDispatch:
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
         )
-        contract_passes = _opening_identity().contract_passes
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
-        source_training_function = (
-            train_generic_hard_supported_examples_delta
-            if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES
-            else train_source_candidate_delta
-        )
-        real_source_delta = (
-            source_training_function(
-                self._prepared_root, cell.master_seed, real_anchor, source_domain
-            )
-            if real_anchor is not None and source_domain is not None
+        opening_identity = (
+            _opening_identity(real_anchor.dataset_manifest_hash)
+            if real_anchor is not None
             else None
         )
-        real_differential_a: float | None = None
-        if not screen_evidence_is_adequate(
-            evidence.screen_target_count, config.capability_contract.evidence_minima
+        if (
+            real_anchor is not None
+            and source_domain is not None
+            and opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED
         ):
-            state = AdmissionState.DORMANT
+            if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES:
+                real_source_delta = train_generic_hard_supported_examples_delta(
+                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                )
+            else:
+                real_source_delta = train_source_candidate_delta(
+                    self._prepared_root,
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
+                    backdoor_scope=self._backdoor_scope_for_cell(cell),
+                )
         else:
+            real_source_delta = None
+        if real_anchor is None or source_domain is None:
+            state = AdmissionState.DORMANT
+            screen_results: tuple[ScreenDomainResult, ...] = ()
+            real_differential_a: float | None = None
+        else:
+            non_source = tuple(domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain)
             screen_order = screen_domain_order(
-                tuple(NBAIOT_DOMAIN_ORDER),
+                non_source,
                 screen_domain_order_namespace_seed=derive_uint32(
                     "SCREEN_DOMAIN_ORDER_SEED", cell.master_seed
                 ),
                 screen_domain_count=config.protocol.admission_opening.screen_domains,
             )
-            if opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED:
-                if (
-                    real_anchor is not None
-                    and real_source_delta is not None
-                    and (source_domain is not None)
-                ):
-                    differential_a = compute_screen_differential(
-                        self._prepared_root,
-                        cell.master_seed,
-                        real_anchor,
-                        real_source_delta,
-                        source_domain,
-                    )
-                    real_differential_a = differential_a
-                    anchor_screen = evaluate_domain(
-                        self._prepared_root,
-                        real_anchor,
-                        real_anchor.flat_parameters,
-                        source_domain,
-                        role=Role.POST_REFERENCE_REPLAY,
-                        target_role=Role.CANDIDATE_SCREEN,
-                    )
-                    source_screen = evaluate_domain(
-                        self._prepared_root,
-                        real_anchor,
-                        real_anchor.flat_parameters + real_source_delta,
-                        source_domain,
-                        role=Role.POST_REFERENCE_REPLAY,
-                        target_role=Role.CANDIDATE_SCREEN,
-                    )
-                    if anchor_screen is None or source_screen is None:
-                        target_f1_gain = MetricResult(value=None, denominator=0)
-                        supported_macro_f1_drop = MetricResult(value=None, denominator=0)
-                        benign_far_increase = MetricResult(value=None, denominator=0)
-                    else:
-                        target_f1_gain = target_capability_gain(
-                            source_screen.target_f1, anchor_screen.target_f1
-                        )
-                        supported_macro_f1_drop = supported_macro_f1_harm(
-                            anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
-                        )
-                        benign_far_increase = (
-                            MetricResult(
-                                value=source_screen.benign_far.value
-                                - anchor_screen.benign_far.value,
-                                denominator=1,
-                            )
-                            if source_screen.benign_far.value is not None
-                            and anchor_screen.benign_far.value is not None
-                            else MetricResult(value=None, denominator=0)
-                        )
-                    if screen_predicate_variant == AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
-                        screen_decision = raw_target_f1_screen_domain_decision_is_positive(
-                            target_f1_gain,
-                            supported_macro_f1_drop,
-                            benign_far_increase,
-                            config.capability_contract,
-                        )
-                    elif screen_predicate_variant == AblationVariant.NO_MATCHED_CONTROL:
-                        unmatched_differential = compute_unmatched_screen_differential(
-                            self._prepared_root, real_anchor, real_source_delta, source_domain
-                        )
-                        screen_decision = unmatched_control_screen_domain_decision_is_positive(
-                            unmatched_differential,
-                            target_f1_gain,
-                            supported_macro_f1_drop,
-                            benign_far_increase,
-                            config.protocol.proposal_screen,
-                            config.capability_contract,
-                        )
-                    else:
-                        screen_decision = screen_domain_decision_is_positive(
-                            differential_a,
-                            target_f1_gain,
-                            supported_macro_f1_drop,
-                            benign_far_increase,
-                            config.protocol.proposal_screen,
-                            config.capability_contract,
-                        )
-                elif screen_predicate_variant == AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
-                    screen_decision = raw_target_f1_screen_domain_decision_is_positive(
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        config.capability_contract,
-                    )
-                elif screen_predicate_variant == AblationVariant.NO_MATCHED_CONTROL:
-                    screen_decision = unmatched_control_screen_domain_decision_is_positive(
-                        None,
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        config.protocol.proposal_screen,
-                        config.capability_contract,
-                    )
-                else:
-                    screen_decision = screen_domain_decision_is_positive(
-                        None,
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        MetricResult(value=None, denominator=0),
-                        config.protocol.proposal_screen,
-                        config.capability_contract,
-                    )
-                opening_predicate = screen_decision or episode_is_legitimate
-            else:
-                opening_predicate = (
-                    candidate_free_screen_domain_predicate(
-                        MetricResult(value=None, denominator=0), config.capability_contract
-                    )
-                    or episode_is_legitimate
-                )
             screen_results = tuple(
-                ScreenDomainResult(
-                    domain=domain,
-                    is_evidence_adequate=True,
-                    meets_opening_predicate=opening_predicate,
+                evaluate_screen_domain(
+                    self._prepared_root,
+                    cell.master_seed,
+                    real_anchor,
+                    real_source_delta,
+                    NBaiotDomain(domain),
+                    opening_mode,
+                    screen_predicate_variant,
                 )
                 for domain in screen_order
+            )
+            real_differential_a = (
+                compute_screen_differential(
+                    self._prepared_root,
+                    cell.master_seed,
+                    real_anchor,
+                    real_source_delta,
+                    NBaiotDomain(screen_order[0]),
+                )
+                if real_source_delta is not None and screen_order
+                else None
             )
             state = candidate_screen_transition(
                 opening_mode, screen_results, config.protocol.admission_opening
             )
         if state is AdmissionState.ADMISSION_OPEN:
             state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         false_launch_result = false_launch_rate(
             false_launch_count=1
             if state is AdmissionState.ADMITTED and (not episode_is_legitimate)
             else 0,
-            adequate_defined_oracle_count=1,
+            adequate_defined_oracle_count=1 if screen_results else 0,
         )
-        training_started_domains: frozenset[DatasetClassToken] = (
-            frozenset({cell.condition}) if state is AdmissionState.ADMITTED else frozenset()
+        trained_domains = frozenset(
+            result.domain for result in screen_results if result.meets_opening_predicate
         )
         attempts = reproduction_attempt_count(
-            domains_with_training_start=training_started_domains,
-            evidence_inadequate_domains=frozenset(),
+            domains_with_training_start=trained_domains
+            if state is AdmissionState.ADMITTED
+            else frozenset(),
+            evidence_inadequate_domains=frozenset(
+                result.domain for result in screen_results if not result.is_evidence_adequate
+            ),
         )
         screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
-        screen_fold_for_target = screen_fold_index(
-            "target-sample", screen_fold_seed, config.protocol.proposal_screen.fold_count
+        fold_sample_id = (
+            _first_target_sample_id(
+                self._prepared_root, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
+            )
+            if screen_results
+            else None
         )
-        screen_differential = real_differential_a
+        screen_fold_for_target = (
+            screen_fold_index(
+                fold_sample_id, screen_fold_seed, config.protocol.proposal_screen.fold_count
+            )
+            if fold_sample_id is not None
+            else None
+        )
         return (
             state,
             (
                 *metrics,
-                ("capability-contract-passes", 1.0 if contract_passes else 0.0),
-                ("screen-fold-index", float(screen_fold_for_target)),
-                ("screen-differential-a", screen_differential),
+                (
+                    "capability-contract-passes",
+                    1.0
+                    if opening_identity is not None and state is AdmissionState.ADMITTED
+                    else 0.0,
+                ),
+                (
+                    "screen-fold-index",
+                    float(screen_fold_for_target) if screen_fold_for_target is not None else None,
+                ),
+                ("screen-differential-a", real_differential_a),
                 (ComparisonMetric.FALSE_LAUNCH, false_launch_result.value),
                 (ComparisonMetric.REPRODUCTION_ATTEMPTS, float(attempts)),
                 (
                     ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-                    1.0 if state is AdmissionState.ADMITTED else None,
+                    self._last_protocol_phase_durations.reproduce_seconds
+                    + self._last_protocol_phase_durations.verify_seconds
+                    + self._last_protocol_phase_durations.synthesize_seconds
+                    + self._last_protocol_phase_durations.assignment_seconds,
                 ),
                 (
                     ComparisonMetric.MALICIOUS_ADMISSION,
@@ -809,10 +743,10 @@ class ProtocolCellDispatch:
             evidence_minima,
         ):
             return AdmissionState.DORMANT
-        training_entries = _training_entry_points(evidence)
-        if not training_entries:
+        real_anchor = self._real_anchor(cell.master_seed)
+        if real_anchor is None:
             return AdmissionState.DORMANT
-        source_domain = _source_domain_for_cell(cell)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
         direct_krum_active = cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM
         coordinate_median_active = (
             cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE
@@ -894,23 +828,50 @@ class ProtocolCellDispatch:
             )
             single_verifier_active = False
         row_requirement = _row_requirement(cell, self._resolved_core)
+        source_delta = (
+            train_source_candidate_delta(
+                self._prepared_root,
+                cell.master_seed,
+                real_anchor,
+                source_domain,
+                backdoor_scope=self._backdoor_scope_for_cell(cell),
+            )
+            if source_domain is not None
+            and (
+                no_origin_exclusion_active
+                or byzantine_reproducer_copies_source_active
+                or self._backdoor_scope_for_cell(cell) is not None
+            )
+            else None
+        )
+        heterogeneity_scope = self._heterogeneity_scope_for_cell(cell)
+        backdoor_scope = self._backdoor_scope_for_cell(cell)
         if single_verifier_active:
             reproduction_timer = ElapsedTimer()
-            progression_state, attempts, _commitment_hashes = _single_verifier_progression(
-                cell, source_domain
+            progression_state, attempts, commitment_hashes, updates = _single_verifier_progression(
+                cell,
+                source_domain,
+                self._prepared_root,
+                real_anchor,
+                heterogeneity_scope,
             )
             self._last_protocol_phase_durations = ProtocolPhaseDurations(
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
             )
         else:
             reproduction_timer = ElapsedTimer()
-            progression_state, attempts, _commitment_hashes = _reproduction_progression(
+            progression_state, attempts, commitment_hashes, updates = _reproduction_progression(
                 cell,
                 evidence,
                 external_verification_active,
                 row_requirement,
                 frozenset(),
+                self._prepared_root,
+                real_anchor,
                 include_source_as_first_reproducer=no_origin_exclusion_active,
+                heterogeneity_scope=heterogeneity_scope,
+                backdoor_scope=backdoor_scope,
+                source_delta=source_delta,
             )
             self._last_protocol_phase_durations = ProtocolPhaseDurations(
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
@@ -918,29 +879,43 @@ class ProtocolCellDispatch:
             if progression_state is AdmissionState.VERIFICATION_PENDING:
                 verification_timer = ElapsedTimer()
                 certified_positive_report_count = 0
-                for attempt in attempts:
-                    if not attempt.is_certified:
+                certified_attempts = 0
+                for attempt, commitment_hash in zip(attempts, commitment_hashes, strict=False):
+                    if not attempt.was_trained:
                         continue
+                    attempt_domain = NBaiotDomain(attempt.domain)
+                    if attempt_domain not in updates:
+                        continue
+                    candidate_flat = real_anchor.flat_parameters + updates[attempt_domain]
                     if same_context_verification_active:
-                        panel = self._same_context_verifier_panel(
-                            source_domain, NBaiotDomain(attempt.domain)
-                        )
+                        panel = self._same_context_verifier_panel(source_domain, attempt_domain)
                     else:
                         panel = _verifier_panel(
                             source_domain,
-                            NBaiotDomain(attempt.domain),
+                            attempt_domain,
                             cell.master_seed,
                             config.protocol.verification,
+                            commitment_hash,
                             allow_source_as_verifier=no_origin_exclusion_active,
                         )
                     if not panel_votes_are_one_per_domain(panel):
                         return AdmissionState.DORMANT
-                    reports = tuple(resolve_ternary_outcome(True, True) for _domain in panel)
+                    reports = tuple(
+                        _honest_verifier_report(
+                            self._prepared_root,
+                            real_anchor,
+                            candidate_flat,
+                            NBaiotDomain(verifier_domain),
+                            heterogeneity_scope,
+                        )
+                        for verifier_domain in panel
+                    )
                     if reproduction_row_is_certified(
                         reports,
                         panel_size=config.protocol.verification.panel_size,
                         required_positive_reports=config.protocol.verification.required_positive_reports,
                     ):
+                        certified_attempts += 1
                         certified_positive_report_count += sum(
                             1 for report in reports if report is TernaryOutcome.POSITIVE
                         )
@@ -957,7 +932,7 @@ class ProtocolCellDispatch:
                 progression_state = verification_pending_transition(
                     eligible_verifier_count,
                     certified_positive_report_count,
-                    row_requirement <= len(attempts),
+                    certified_attempts >= row_requirement,
                     config.protocol.verification,
                 )
                 self._last_protocol_phase_durations = (
@@ -987,12 +962,13 @@ class ProtocolCellDispatch:
                 or byzantine_reproducer_copies_source_active,
                 prepared_root=self._prepared_root,
                 master_seed=cell.master_seed,
-                anchor=self._real_anchor(cell.master_seed),
+                anchor=real_anchor,
                 coordinate_median_active=coordinate_median_active,
                 no_final_synthesis_gate_active=no_final_synthesis_gate_active,
                 use_source_delta_for_source_domain=no_origin_exclusion_active,
                 force_first_row_to_source_delta=byzantine_reproducer_copies_source_active,
-                heterogeneity_scope=self._heterogeneity_scope_for_cell(cell),
+                heterogeneity_scope=heterogeneity_scope,
+                precomputed_updates=updates,
             )
             self._last_protocol_phase_durations = (
                 self._last_protocol_phase_durations.with_synthesize_seconds(
@@ -1012,7 +988,7 @@ class ProtocolCellDispatch:
         condition = cell.condition
         source_copy_condition = PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER
         has_legitimate = condition != source_copy_condition
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         legitimate_result = legitimate_admission_rate(
             [has_legitimate and state is AdmissionState.ADMITTED]
         )
@@ -1041,7 +1017,7 @@ class ProtocolCellDispatch:
         if method in (full_fedsira, SourceExclusionMethod.ONE_INDEPENDENT_RETRAIN):
             state = self._advance_protocol(cell, evidence)
             krum_input_excludes_source(
-                candidate_row_ids=("reproducer-a", "reproducer-b", "reproducer-c"),
+                candidate_row_ids=tuple(domain.name for domain in NBAIOT_DOMAIN_ORDER[:3]),
                 source_row_id=None,
             )
         elif method == SourceExclusionMethod.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
@@ -1058,7 +1034,7 @@ class ProtocolCellDispatch:
         extra: list[MetricObservation] = []
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             real_anchor = self._real_anchor(cell.master_seed)
-            source_domain = _source_domain_for_cell(cell)
+            source_domain = _source_domain_for_cell(cell, self._prepared_root)
             backdoor_scope = self._backdoor_scope_for_cell(cell)
             if (
                 real_anchor is not None
@@ -1082,7 +1058,7 @@ class ProtocolCellDispatch:
                         backdoor_scope.trigger_value,
                     )
                     extra.append(("source-backdoor-asr", asr.value))
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         malicious_admission = 0.0
         if method != full_fedsira and state is AdmissionState.ADMITTED:
             malicious_admission = 1.0
@@ -1095,7 +1071,7 @@ class ProtocolCellDispatch:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         condition = cell.condition
         has_malicious = condition in (
             ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
@@ -1113,13 +1089,9 @@ class ProtocolCellDispatch:
     def _execute_primary_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        scenario = cell.condition
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
-            if scenario == PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY:
-                state = self._advance_protocol(cell, evidence)
-            else:
-                state = AdmissionState.DORMANT
-            metrics = _metrics_from_state(state, self._pending_real_report)
+            state = self._advance_protocol(cell, evidence)
+            metrics = metrics_from_state(state, self._pending_real_report)
             return (state, metrics)
         return self._execute_baseline_cell(cell, evidence)
 
@@ -1129,7 +1101,9 @@ class ProtocolCellDispatch:
         config = current_application_context().scientific_config
         method = cell.method
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
-        domain_target_view(NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell))
+        domain_target_view(
+            NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell, self._prepared_root)
+        )
         state: AdmissionState
         if method == BaselineIdentity.LOCAL_ONLY_REFERENCE:
             state = self._local_only_reference_outcome(cell)
@@ -1145,9 +1119,17 @@ class ProtocolCellDispatch:
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
-            client_review_direct_admission_production_is_source(
-                ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS
+            real_anchor = self._real_anchor(cell.master_seed)
+            source_domain = _source_domain_for_cell(cell, self._prepared_root)
+            source_delta = (
+                train_source_candidate_delta(
+                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                )
+                if real_anchor is not None and source_domain is not None
+                else None
             )
+            if real_anchor is not None and source_delta is not None:
+                client_review_direct_admission_production_is_source(source_delta, source_delta)
             state = self._client_review_outcome(cell)
         elif method == BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
@@ -1185,7 +1167,7 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         else:
             state = AdmissionState.DORMANT
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_reproducer_robustness_cell(
@@ -1195,21 +1177,42 @@ class ProtocolCellDispatch:
         condition = cell.condition
         compromised_count = _compromised_reproducer_count(condition)
         attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-        if "Source Copy" in condition:
-            source_copy_update(ANCHOR_FLAT_PARAMETERS, ANCHOR_FLAT_PARAMETERS)
-        elif "Model-Replacement" in condition:
-            select_model_replacement_carrier_rows(
-                ("udp-1", "udp-2"),
-                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
-                attack_seed,
+        real_anchor = self._real_anchor(cell.master_seed)
+        source_domain = _source_domain_for_cell(cell, self._prepared_root)
+        carrier_rows = (
+            load_prepared_rows(
+                self._prepared_root,
+                source_domain,
+                NBaiotClass.GAFGYT_UDP,
+                Role.POST_REFERENCE_REPLAY,
             )
-            scale_model_replacement_delta(
-                ANCHOR_FLAT_PARAMETERS,
-                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
+            if source_domain is not None
+            else None
+        )
+        carrier_ids = carrier_rows.sample_ids if carrier_rows is not None else ()
+        if condition in (
+            ReproducerCondition.ONE_SOURCE_COPY,
+            ReproducerCondition.TWO_SOURCE_COPIES,
+        ):
+            source_delta = (
+                train_source_candidate_delta(
+                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                )
+                if real_anchor is not None and source_domain is not None
+                else None
             )
-        elif "Verifier-Aware" in condition:
+            if real_anchor is not None and source_delta is not None:
+                source_copy_update(
+                    real_anchor.flat_parameters + source_delta, real_anchor.flat_parameters
+                )
+        elif condition in (
+            ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+            ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+            ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+            ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+        ):
             select_model_replacement_carrier_rows(
-                ("udp-1", "udp-2"),
+                carrier_ids,
                 config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
                 attack_seed,
             )
@@ -1224,14 +1227,16 @@ class ProtocolCellDispatch:
                 if selected is not None
                 else frozenset()
             )
-            source_domain = _source_domain_for_cell(cell)
             row_requirement = _row_requirement(cell)
-            progression_state, attempts, _commitment_hashes = _reproduction_progression(
+            progression_state, attempts, _commitment_hashes, updates = _reproduction_progression(
                 cell,
                 evidence,
-                external_verification_active=False,
-                row_requirement=row_requirement,
-                compromised_reproducers=compromised_reproducers,
+                False,
+                row_requirement,
+                compromised_reproducers,
+                self._prepared_root,
+                real_anchor,
+                backdoor_scope=self._backdoor_scope_for_cell(cell),
             )
             if (
                 progression_state is AdmissionState.SYNTHESIS_PENDING
@@ -1246,12 +1251,13 @@ class ProtocolCellDispatch:
                     is_plurality_active=True,
                     prepared_root=self._prepared_root,
                     master_seed=cell.master_seed,
-                    anchor=self._real_anchor(cell.master_seed),
+                    anchor=real_anchor,
+                    precomputed_updates=updates,
                 )
             else:
                 state = AdmissionState.DORMANT
                 self._pending_real_report = None
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_verifier_robustness_cell(
@@ -1268,7 +1274,7 @@ class ProtocolCellDispatch:
         ):
             state = AdmissionState.DORMANT
         else:
-            source_domain = _source_domain_for_cell(cell)
+            source_domain = _source_domain_for_cell(cell, self._prepared_root)
             reproducer_domain = _reproducer_order(cell)[0]
             eligible_verifiers = tuple(
                 domain
@@ -1368,7 +1374,7 @@ class ProtocolCellDispatch:
                     and (honest_positive_bound >= 1)
                     else AdmissionState.DORMANT
                 )
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_byzantine_bound_cell(
@@ -1403,7 +1409,7 @@ class ProtocolCellDispatch:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         return (state, metrics)
 
     def _execute_evidence_scarcity_cell(
@@ -1433,16 +1439,16 @@ class ProtocolCellDispatch:
         )
         if tau_k is None:
             state = resume_dormant_admission(DormantOrigin.REPRODUCTION_PENDING, False)
-            metrics = _metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(state, self._pending_real_report)
             return (state, (*metrics, ("evidence-arrival-cycle", None)))
         try:
             validate_no_safety_completion_before_tau_k(0, tau_k)
         except ValueError:
             state = resume_dormant_admission(DormantOrigin.REPRODUCTION_PENDING, False)
-            metrics = _metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(state, self._pending_real_report)
             return (state, (*metrics, ("evidence-arrival-cycle", float(tau_k))))
         state = self._advance_protocol(cell, evidence)
-        metrics = _metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(state, self._pending_real_report)
         delay_decomposition = AdmissionDelayDecomposition(
             logical_information_arrival_cycles=tau_k,
             assignment_seconds=0.0,
@@ -1492,7 +1498,7 @@ class ProtocolCellDispatch:
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             state = self._advance_protocol(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
-            metrics = _metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(state, self._pending_real_report)
         else:
             state, metrics = self._execute_baseline_cell(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
@@ -1514,36 +1520,55 @@ class ProtocolCellDispatch:
     def _execute_efficiency_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        model_size_bytes = 115 * 256 * 4
+        real_anchor = self._real_anchor(cell.master_seed)
+        if real_anchor is None:
+            tensor_payload = b""
+            parameter_shape: tuple[int, ...] = (0,)
+            manifest_hash = dataset_manifest_hash(self._prepared_root)
+            capability_hash = manifest_hash
+        else:
+            flat_parameters = real_anchor.flat_parameters.detach().cpu().contiguous()
+            tensor_payload = flat_parameters.numpy().tobytes()
+            parameter_shape = (int(flat_parameters.numel()),)
+            manifest_hash = real_anchor.dataset_manifest_hash
+            capability_hash = compute_capability_identity(
+                _capability_contract_for_digest(manifest_hash)
+            )
+        model_size_bytes = len(tensor_payload)
+        semantic_cell_key_hash = hashlib.sha256(cell.semantic_key.encode("utf-8")).hexdigest()
         envelopes: list[bytes] = []
         metadata_records: list[CommunicationMessageMetadata] = []
-        tensor_name = parameter_tensor_name(TensorParameterKind.MODEL, "linear")
+        tensor_name = parameter_tensor_name(TensorParameterKind.MODEL, "linear.weight")
+        receiver = NBAIOT_DOMAIN_ORDER[0].name
         timer = ElapsedTimer()
         for message_type, count in _efficiency_message_counts():
             for _index in range(count):
                 metadata = CommunicationMessageMetadata(
                     message_type=message_type,
-                    dataset_manifest_hash="a" * 64,
-                    semantic_cell_key_hash="b" * 64,
+                    dataset_manifest_hash=manifest_hash,
+                    semantic_cell_key_hash=semantic_cell_key_hash,
                     master_seed=cell.master_seed,
                     round_index=None,
                     sender=SERVER_ID,
-                    receiver="CLIENT",
-                    capability_contract_hash="c" * 64,
-                    payload_tensor_count=1,
+                    receiver=receiver,
+                    capability_contract_hash=capability_hash,
+                    payload_tensor_count=1 if model_size_bytes else 0,
                 )
-                tensor_payload = b"\x00" * model_size_bytes
                 envelopes.append(
                     encode_message_envelope(
                         metadata,
                         (
                             TensorEnvelopePayload(
                                 metadata=TensorPayloadMetadata(
-                                    name=tensor_name, shape=(115, 256), nbytes=model_size_bytes
+                                    name=tensor_name,
+                                    shape=parameter_shape,
+                                    nbytes=model_size_bytes,
                                 ),
                                 payload=tensor_payload,
                             ),
-                        ),
+                        )
+                        if model_size_bytes
+                        else (),
                     )
                 )
                 metadata_records.append(metadata)

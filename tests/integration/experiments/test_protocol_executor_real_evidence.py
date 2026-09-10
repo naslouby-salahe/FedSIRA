@@ -46,20 +46,9 @@ from fedsira.learning.anchor_training import train_anchor
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed
 
-pytestmark = pytest.mark.skip(
-    reason="runs real anchor/reproduction gradient-descent training end-to-end through"
-    " ProtocolCellExecutor; skipped by default to avoid competing for CPU with other work."
-    " Re-enable deliberately when verifying fedsira.experiments.executor."
-)
-
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 RESOLVED_CORE = resolve_core_mapping(True, True, True)
 CLASSES = (NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO, NBaiotClass.GAFGYT_JUNK)
-CLASS_OFFSETS = {
-    NBaiotClass.BENIGN: 0.0,
-    NBaiotClass.GAFGYT_JUNK: 30.0,
-    NBaiotClass.GAFGYT_COMBO: 300.0,
-}
 
 
 def _feature_names() -> list[str]:
@@ -69,9 +58,19 @@ def _feature_names() -> list[str]:
     return names
 
 
-def _write_csv(path: Path, row_count: int, offset: float) -> None:
+def _write_csv(path: Path, row_count: int, domain_index: int, class_id: NBaiotClass) -> None:
+    names = _feature_names()
     frame = pandas.DataFrame(
-        {name: [offset + index * 0.0001 for index in range(row_count)] for name in _feature_names()}
+        {
+            name: [
+                ((0.0 if class_id is NBaiotClass.BENIGN else 2.0) if feature_index < 10 else 0.0)
+                + ((index + feature_index + domain_index) % 23) * 0.04
+                + (index % 7) * 0.01
+                + ((index * 13 + feature_index * 7) % 31) * 0.002
+                for index in range(row_count)
+            ]
+            for feature_index, name in enumerate(names)
+        }
     )
     frame.to_csv(path, index=False)
 
@@ -81,18 +80,17 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("protocol-executor-real-evidence")
     discovered: list[DiscoveredCsvFile] = []
     for domain_index, domain in enumerate(NBAIOT_DOMAIN_ORDER):
-        for class_id in CLASSES:
+        for class_index, class_id in enumerate(CLASSES):
             relative_path = f"{class_id.value}.csv"
             absolute_path = root / "raw" / domain.value / relative_path
             absolute_path.parent.mkdir(parents=True, exist_ok=True)
-            offset = domain_index * 0.001 + CLASS_OFFSETS[class_id]
-            _write_csv(absolute_path, row_count=3000, offset=offset)
+            _write_csv(absolute_path, 3000, domain_index, class_id)
             discovered.append(
                 DiscoveredCsvFile(
                     domain=domain,
                     class_id=class_id,
                     relative_path=relative_path,
-                    file_sha256=f"{domain_index}{class_id.value}".ljust(64, "0")[:64],
+                    file_sha256=f"{domain_index}{class_index}" * 32,
                     absolute_path=absolute_path,
                 )
             )
