@@ -61,6 +61,14 @@ def smoke_record_path() -> Path:
     return preprocessing_root() / "validation" / "smoke_record.json"
 
 
+def experiment_execution_root(experiment: ExperimentName) -> Path:
+    return OUTPUTS_ROOT / "experiments" / experiment
+
+
+def experiment_log_path(experiment: ExperimentName) -> Path:
+    return experiment_execution_root(experiment) / "logs" / "experiment.log"
+
+
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
     if family in PREPROCESSING_FAMILIES:
         return ArtifactPathScope.PREPROCESSING
@@ -85,7 +93,7 @@ def workspace_root_for_family(
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:
         if experiment is None:
             raise ValueError(f"artifact family {family.value} requires an owning experiment name")
-        return OUTPUTS_ROOT / "experiments" / experiment
+        return experiment_execution_root(experiment)
     if experiment is None:
         raise ValueError(f"artifact family {family.value} requires an owning experiment name")
     return RESULTS_ROOT / "experiments" / experiment

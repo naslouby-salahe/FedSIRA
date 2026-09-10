@@ -410,10 +410,24 @@ def get_structured_logger(component: RuntimeComponentName) -> logging.Logger:
     logger = logging.getLogger(f"{LOGGER_NAME_PREFIX}.{component}")
     if not logger.handlers:
         handler = logging.StreamHandler()
+        handler.setLevel(logging.WARNING)
         handler.setFormatter(StructuredJsonFormatter())
         logger.addHandler(handler)
         logger.propagate = False
     return logger
+
+
+def configure_structured_file_logging(logger: logging.Logger, log_path: Path) -> None:
+    resolved_path = log_path.resolve()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename) == resolved_path:
+            return
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(resolved_path, encoding="utf-8")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(StructuredJsonFormatter())
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
 BYTES_PER_KIBIBYTE = 1024

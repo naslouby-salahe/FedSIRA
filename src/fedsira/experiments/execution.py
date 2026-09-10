@@ -36,8 +36,13 @@ from fedsira.experiments.planning import (
     ScientificCell,
     build_plan,
 )
+from fedsira.io.paths import experiment_log_path
 from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
-from fedsira.runtime_execution import framed_bytes, get_structured_logger
+from fedsira.runtime_execution import (
+    configure_structured_file_logging,
+    framed_bytes,
+    get_structured_logger,
+)
 
 if TYPE_CHECKING:
     from fedsira.experiments.validation import ExperimentPrerequisiteState
@@ -248,6 +253,10 @@ def execute_experiment(
     )
 
     resolved_config = current_application_context().scientific_config
+    configure_structured_file_logging(
+        EXECUTION_LOGGER,
+        current_application_context().repository_root / experiment_log_path(experiment),
+    )
     EXECUTION_LOGGER.info(
         "experiment execution started",
         extra=ExecutionLogFields(experiment=experiment, overwrite=overwrite).model_dump(),

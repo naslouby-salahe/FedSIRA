@@ -1,7 +1,8 @@
 import json
 import logging
+from pathlib import Path
 
-from fedsira.runtime_execution import get_structured_logger
+from fedsira.runtime_execution import configure_structured_file_logging, get_structured_logger
 
 
 def test_get_structured_logger_emits_json_lines() -> None:
@@ -34,3 +35,11 @@ def test_get_structured_logger_reuses_handler_on_repeated_calls() -> None:
 def test_get_structured_logger_never_becomes_scientific_evidence_source() -> None:
     logger = get_structured_logger("evidence-component")
     assert logger.propagate is False
+
+
+def test_structured_file_logging_persists_json_line(tmp_path: Path) -> None:
+    logger = get_structured_logger("file-component")
+    log_path = tmp_path / "experiment.log"
+    configure_structured_file_logging(logger, log_path)
+    logger.info("cell completed")
+    assert json.loads(log_path.read_text(encoding="utf-8"))["message"] == "cell completed"
