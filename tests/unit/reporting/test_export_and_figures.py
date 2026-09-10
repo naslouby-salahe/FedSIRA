@@ -34,6 +34,7 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.reporting.export import (
+    ExperimentReportSummary,
     ReportExportResult,
     export_experiment_report,
     export_project_summary,
@@ -145,6 +146,11 @@ def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_p
     cell_metrics = pandas.read_parquet(tmp_path / "metrics" / "primary" / CELL_METRICS_PARQUET_NAME)
     assert cell_metrics.shape[0] == 1
     assert cell_metrics.iloc[0]["metric"] == "target-f1"
+    summary = ExperimentReportSummary.model_validate_json(
+        (tmp_path / "metrics" / "primary" / "summary.json").read_text()
+    )
+    assert summary.experiment == result.experiment
+    assert summary.execution_digest == result.execution_digest
 
 
 def test_export_experiment_report_materializes_efficiency_telemetry(tmp_path: Path) -> None:
