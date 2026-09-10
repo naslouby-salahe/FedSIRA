@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Sequence
 from pathlib import Path
 
 import torch
@@ -12,14 +13,16 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
+from fedsira.domain.enums import RootCause
 from fedsira.domain.models import MetricResult
-from fedsira.domain.types import ClassLabel
+from fedsira.domain.types import ArtifactDigest, ClassLabel
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
     compute_confusion_counts_by_class,
     f1_for_class,
     macro_f1,
 )
+from fedsira.experiments.scenarios.capability_granularity import root_cause_for_sample
 from fedsira.experiments.workflow import (
     DomainTargetMetrics,
     HeterogeneityScope,
@@ -98,3 +101,30 @@ def evaluate_domain(
 
 def non_source_domains(source_domain: NBaiotDomain | None) -> tuple[NBaiotDomain, ...]:
     return tuple(domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain)
+
+
+def root_cause_partitioned_row_ids(
+    prepared_root: Path, domains: Sequence[NBaiotDomain]
+) -> tuple[frozenset[ArtifactDigest], frozenset[ArtifactDigest], frozenset[ArtifactDigest]]:
+    root_cause_a_ids: set[ArtifactDigest] = set()
+    root_cause_b_ids: set[ArtifactDigest] = set()
+    supported_ids: set[ArtifactDigest] = set()
+    for domain in domains:
+        target_rows = load_prepared_rows(
+            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.POST_REFERENCE_REPLAY
+        )
+        if target_rows is not None:
+            for sample_id in target_rows.sample_ids:
+                if root_cause_for_sample(sample_id) is RootCause.A:
+                    root_cause_a_ids.add(sample_id)
+                else:
+                    root_cause_b_ids.add(sample_id)
+        for class_id in NBAIOT_CLASS_ORDER:
+            if class_id is NBaiotClass.GAFGYT_COMBO:
+                continue
+            supported_rows = load_prepared_rows(
+                prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY
+            )
+            if supported_rows is not None:
+                supported_ids.update(supported_rows.sample_ids)
+    return (frozenset(root_cause_a_ids), frozenset(root_cause_b_ids), frozenset(supported_ids))

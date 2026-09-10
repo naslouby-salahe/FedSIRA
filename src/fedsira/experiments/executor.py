@@ -111,7 +111,6 @@ from fedsira.domain.enums import (
     EvaluationInsufficiencyReason,
     ExperimentLifecycleState,
     FailureClass,
-    RootCause,
     ScientificCellPhase,
     SeedNamespace,
     TernaryOutcome,
@@ -173,7 +172,11 @@ from fedsira.evaluation.backdoor import compute_source_backdoor_asr
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
-from fedsira.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.evaluation.domain import (
+    evaluate_domain,
+    non_source_domains,
+    root_cause_partitioned_row_ids,
+)
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
     boundary_metric_set,
@@ -246,7 +249,6 @@ from fedsira.experiments.planning import (
     ScientificCell,
 )
 from fedsira.experiments.scenarios.capability_granularity import (
-    root_cause_for_sample,
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
 )
@@ -1682,33 +1684,6 @@ def train_density_cluster_trimmed_mean_delta(
         return None
     final_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
     return final_flat - anchor.flat_parameters
-
-
-def root_cause_partitioned_row_ids(
-    prepared_root: Path, domains: Sequence[NBaiotDomain]
-) -> tuple[frozenset[ArtifactDigest], frozenset[ArtifactDigest], frozenset[ArtifactDigest]]:
-    root_cause_a_ids: set[ArtifactDigest] = set()
-    root_cause_b_ids: set[ArtifactDigest] = set()
-    supported_ids: set[ArtifactDigest] = set()
-    for domain in domains:
-        target_rows = load_prepared_rows(
-            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.POST_REFERENCE_REPLAY
-        )
-        if target_rows is not None:
-            for sample_id in target_rows.sample_ids:
-                if root_cause_for_sample(sample_id) is RootCause.A:
-                    root_cause_a_ids.add(sample_id)
-                else:
-                    root_cause_b_ids.add(sample_id)
-        for class_id in NBAIOT_CLASS_ORDER:
-            if class_id is NBaiotClass.GAFGYT_COMBO:
-                continue
-            supported_rows = load_prepared_rows(
-                prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY
-            )
-            if supported_rows is not None:
-                supported_ids.update(supported_rows.sample_ids)
-    return (frozenset(root_cause_a_ids), frozenset(root_cause_b_ids), frozenset(supported_ids))
 
 
 def certified_domain_delta_committee(
