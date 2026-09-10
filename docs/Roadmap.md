@@ -2342,6 +2342,7 @@ FedSIRA/
 │       ├── evaluation/
 │       │   ├── __init__.py
 │       │   ├── indexing.py
+│       │   ├── service.py
 │       │   ├── metrics.py
 │       │   ├── statistics.py
 │       │   ├── comparisons.py

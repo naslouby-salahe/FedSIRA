@@ -11,6 +11,7 @@ from fedsira.domain.types import (
     OverwriteExisting,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
+from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -33,7 +34,6 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.executor import (
     collapse_evaluation_from_records,
-    comparison_results_for_experiment,
 )
 from fedsira.experiments.planning import (
     ExperimentPlan,

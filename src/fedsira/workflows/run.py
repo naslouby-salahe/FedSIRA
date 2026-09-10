@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import BooleanValue, ExperimentName, OverwriteExisting, RunRenderText
+from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -24,7 +25,6 @@ from fedsira.experiments.execution import (
 from fedsira.experiments.executor import (
     ProtocolCellExecutor,
     collapse_evaluation_from_records,
-    comparison_results_for_experiment,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.io.paths import workspace_root_for_family
