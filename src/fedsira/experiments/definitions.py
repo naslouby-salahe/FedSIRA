@@ -183,6 +183,17 @@ class SecondaryScenario(StrEnum):
 
 CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
 PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
+PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
+USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
+COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"
+COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"
+COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"
+SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"
+CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"
+HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"
+ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"
+EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"
+SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
 
 
 class ExperimentArtifactSpecification(FrozenDomainModel):
@@ -191,11 +202,14 @@ class ExperimentArtifactSpecification(FrozenDomainModel):
     required_figures: tuple[FigureName, ...]
 
 
-DEFAULT_EXPERIMENT_ARTIFACT_SPECIFICATION = ExperimentArtifactSpecification(
-    metrics_required=True,
-    required_tables=(CELL_METRICS_TABLE_NAME,),
-    required_figures=(PROTOCOL_SCHEMATIC_FIGURE_NAME,),
-)
+def experiment_artifacts(
+    *specialized_figures: FigureName,
+) -> ExperimentArtifactSpecification:
+    return ExperimentArtifactSpecification(
+        metrics_required=True,
+        required_tables=(CELL_METRICS_TABLE_NAME,),
+        required_figures=(PROTOCOL_SCHEMATIC_FIGURE_NAME, *specialized_figures),
+    )
 
 
 class ExperimentDefinition(FrozenDomainModel):
@@ -208,7 +222,7 @@ class ExperimentDefinition(FrozenDomainModel):
     comparison_family: ComparisonFamily | None
     prerequisites: tuple[ExperimentName, ...]
     dataset: DatasetId = DatasetId.N_BAIOT
-    artifacts: ExperimentArtifactSpecification = DEFAULT_EXPERIMENT_ARTIFACT_SPECIFICATION
+    artifacts: ExperimentArtifactSpecification
 
 
 DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
@@ -361,6 +375,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=1,
             comparison_family=None,
             prerequisites=(),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=PROTOCOL_INVARIANT_VALIDATION_NAME,
@@ -371,6 +386,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=1,
             comparison_family=None,
             prerequisites=(),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=BASELINE_IMPLEMENTATION_VALIDATION_NAME,
@@ -381,6 +397,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=17,
             comparison_family=None,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
@@ -391,6 +408,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=80,
             comparison_family=ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=SINGLE_REPRODUCTION_NECESSITY_NAME,
@@ -404,6 +422,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=60,
             comparison_family=ComparisonFamily.PLURALITY_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
@@ -414,6 +433,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=60,
             comparison_family=ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            artifacts=experiment_artifacts(
+                USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
+                COLLAPSE_DECISION_EFFECTS_FIGURE_NAME,
+            ),
         ),
         ExperimentDefinition(
             name=EXTERNAL_VERIFICATION_NECESSITY_NAME,
@@ -427,6 +450,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=80,
             comparison_family=ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
@@ -452,6 +476,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=420,
             comparison_family=ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY,
             prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
+            artifacts=experiment_artifacts(PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=MECHANISM_ABLATION_NAME,
@@ -462,6 +487,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=180,
             comparison_family=ComparisonFamily.MECHANISM_ABLATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
@@ -477,6 +503,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=280,
             comparison_family=ComparisonFamily.REPRODUCER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
@@ -487,6 +514,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=100,
             comparison_family=ComparisonFamily.VERIFIER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=BYZANTINE_BOUND_VIOLATION_NAME,
@@ -500,6 +528,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=80,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
@@ -510,6 +539,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=40,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
             name=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -524,6 +554,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=90,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(SHARED_EPISTEMIC_FAILURE_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -534,6 +565,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=60,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
@@ -549,6 +581,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=160,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -563,6 +596,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=120,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=EFFICIENCY_MEASUREMENT_NAME,
@@ -578,6 +612,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             nominal_cell_count=60,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            artifacts=experiment_artifacts(EFFICIENCY_PROFILE_FIGURE_NAME),
         ),
         ExperimentDefinition(
             name=SECONDARY_DATASET_GENERALIZATION_NAME,
@@ -595,6 +630,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             comparison_family=ComparisonFamily.SECONDARY_GENERALIZATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
             dataset=DatasetId.CICIOT2023,
+            artifacts=experiment_artifacts(SECONDARY_GENERALIZATION_FIGURE_NAME),
         ),
     )
 

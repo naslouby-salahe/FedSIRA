@@ -17,19 +17,31 @@ from fedsira.domain.types import (
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.collapse import CollapseDecision, ResolvedCore
 from fedsira.experiments.definitions import (
+    ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME,
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
+    CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+    COLLAPSE_DECISION_EFFECTS_FIGURE_NAME,
+    COLLAPSE_EXPERIMENT_NAMES,
+    COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+    COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    EFFICIENCY_PROFILE_FIGURE_NAME,
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+    HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME,
     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
     MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+    PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
+    SECONDARY_GENERALIZATION_FIGURE_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+    SHARED_EPISTEMIC_FAILURE_FIGURE_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
     experiment_by_name,
 )
 from fedsira.experiments.execution import CellExecutionOutcome, ExperimentExecutionResult
@@ -40,8 +52,10 @@ from fedsira.reporting.figures import (
     EvidenceStateFraction,
     render_admission_delay_decomposition,
     render_capability_granularity_boundary,
+    render_collapse_decision_effects,
     render_compromised_reproducer_boundary,
     render_compromised_verifier_boundary,
+    render_efficiency_profile,
     render_heterogeneity_synthesis_boundary,
     render_mandatory_figures,
     render_protocol_schematic,
@@ -168,46 +182,46 @@ def _render_specialized_figure(
     figures_root: Path,
 ) -> Path | None:
     figure: Path | None = None
-    if result.experiment is COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
+    if result.experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
         figure = render_compromised_reproducer_boundary(
             result.comparison_results,
-            figures_root / "Compromised-Reproducer Boundary.png",
+            figures_root / f"{COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
+    elif result.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
         figure = render_compromised_verifier_boundary(
             result.comparison_results,
-            figures_root / "Compromised-Verifier Boundary.png",
+            figures_root / f"{COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
+    elif result.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
         figure = render_shared_epistemic_failure(
             result.comparison_results,
-            figures_root / "Shared Epistemic Failure.png",
+            figures_root / f"{SHARED_EPISTEMIC_FAILURE_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
+    elif result.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
         figure = render_capability_granularity_boundary(
             result.comparison_results,
-            figures_root / "Capability-Granularity Boundary.png",
+            figures_root / f"{CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
+    elif result.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
         figure = render_heterogeneity_synthesis_boundary(
             result.comparison_results,
-            figures_root / "Heterogeneity Synthesis Boundary.png",
+            figures_root / f"{HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is ADMISSION_DELAY_DECOMPOSITION_NAME:
+    elif result.experiment == ADMISSION_DELAY_DECOMPOSITION_NAME:
         figure = render_admission_delay_decomposition(
             result.comparison_results,
-            figures_root / "Admission-Delay Decomposition.png",
+            figures_root / f"{ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME}.png",
             result.outcomes,
         )
-    elif result.experiment is SECONDARY_DATASET_GENERALIZATION_NAME:
+    elif result.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
         figure = render_secondary_generalization(
             result.comparison_results,
-            figures_root / "Secondary Generalization.png",
+            figures_root / f"{SECONDARY_GENERALIZATION_FIGURE_NAME}.png",
         )
     return figure
 
@@ -219,21 +233,41 @@ def _render_experiment_figures(
     figures: list[Path] = [
         render_protocol_schematic(figures_root / "FedSIRA Protocol Schematic.png")
     ]
-    if not result.comparison_results:
-        return tuple(figures)
-    if result.experiment is PRIMARY_CONFIRMATORY_EVALUATION_NAME:
+    if result.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME:
         figures.append(
             render_security_utility_tradeoff(
                 result.comparison_results,
-                figures_root / "Primary Security-Utility Tradeoff.png",
+                figures_root / f"{PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME}.png",
             )
         )
-    elif result.experiment is SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+    elif result.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
         figures.append(
             render_useful_backdoored_source(
                 result.comparison_results,
-                figures_root / "Useful Backdoored Source.png",
+                figures_root / f"{USEFUL_BACKDOORED_SOURCE_FIGURE_NAME}.png",
                 result.outcomes,
+            )
+        )
+        figures.append(
+            render_collapse_decision_effects(
+                result.comparison_results,
+                figures_root / f"{COLLAPSE_DECISION_EFFECTS_FIGURE_NAME}.png",
+            )
+        )
+    elif result.experiment in COLLAPSE_EXPERIMENT_NAMES:
+        figures.append(
+            render_collapse_decision_effects(
+                result.comparison_results,
+                figures_root / f"{COLLAPSE_DECISION_EFFECTS_FIGURE_NAME}.png",
+            )
+        )
+    elif result.experiment == EFFICIENCY_MEASUREMENT_NAME:
+        figures.append(
+            render_efficiency_profile(
+                (),
+                None,
+                figures_root / f"{EFFICIENCY_PROFILE_FIGURE_NAME}.png",
+                result.comparison_results,
             )
         )
     else:
