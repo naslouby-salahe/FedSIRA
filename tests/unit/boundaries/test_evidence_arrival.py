@@ -1,5 +1,5 @@
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
-from fedsira.experiments.scenarios.evidence_arrival import (
+from fedsira.experiments.scenarios import (
     EvidenceArrivalSchedule,
     compute_t_evidence,
     cycle_when_requirement_met,

@@ -35,20 +35,18 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.scenarios.capability_granularity import (
-    apply_root_cause_feature_shift,
-    balanced_capability_selection,
-    root_cause_for_sample,
-    target_row_ids_for_contract,
-)
-from fedsira.experiments.scenarios.evidence_scarcity import (
+from fedsira.experiments.scenarios import (
     apply_attacker_induced_common_context,
+    apply_root_cause_feature_shift,
     apply_shared_spurious_feature,
+    balanced_capability_selection,
+    feature_shift_sign,
     relabel_shared_label_error_rows,
+    root_cause_for_sample,
     select_shared_label_error_rows,
     select_spurious_feature_rows,
+    target_row_ids_for_contract,
 )
-from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
 from fedsira.protocol.attacks.source import (
     apply_trigger_transform,
     relabel_triggered_rows_as_benign,

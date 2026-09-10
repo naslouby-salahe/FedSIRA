@@ -79,7 +79,7 @@ from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
     load_prepared_evidence_counts,
 )
-from fedsira.experiments.scenarios.heterogeneity import (
+from fedsira.experiments.scenarios import (
     select_heterogeneity_shift_features,
 )
 from fedsira.experiments.validation import (

@@ -117,22 +117,18 @@ from fedsira.experiments.planning import (
 from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
 )
-from fedsira.experiments.scenarios.capability_granularity import (
-    target_row_ids_for_contract,
-    validate_excluded_root_cause_not_supported,
-)
-from fedsira.experiments.scenarios.evidence_arrival import (
+from fedsira.experiments.scenarios import (
     EvidenceArrivalSchedule,
-    compute_t_evidence,
-    first_holder_cycle_for_domain,
-    holder_count_at_cycle,
-)
-from fedsira.experiments.scenarios.heterogeneity import (
     apply_quantity_skew_to_cap,
+    compute_t_evidence,
     exclude_source_from_quantity_skew,
     feature_shift_sign,
+    first_holder_cycle_for_domain,
+    holder_count_at_cycle,
     quantity_skew_multiplier_by_domain,
     quantity_skew_multiplier_for_domain,
+    target_row_ids_for_contract,
+    validate_excluded_root_cause_not_supported,
 )
 from fedsira.experiments.workflow import (
     EpistemicFailureScope,

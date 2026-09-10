@@ -2227,10 +2227,6 @@ The authoritative implementation repository tree is:
 
 ```text
 FedSIRA/
-├── .github/
-│   └── workflows/
-│       └── quality.yml
-│
 ├── configs/
 │   └── fedsira.yaml
 │
@@ -2241,59 +2237,41 @@ FedSIRA/
 │   └── Roadmap.md
 │
 ├── outputs/
-│   └── .gitkeep
-│
 ├── results/
-│   └── .gitkeep
 │
 ├── src/
 │   └── fedsira/
 │       ├── __init__.py
 │       ├── application.py
-│       │
-│       ├── cli/
-│       │   ├── __init__.py
-│       │   └── main.py
-│       │
-│       ├── workflows/
-│       │   ├── __init__.py
-│       │   ├── doctor.py
-│       │   ├── preprocess.py
-│       │   ├── plan.py
-│       │   ├── smoke.py
-│       │   ├── status.py
-│       │   ├── run.py
-│       │   └── report.py
-│       │
-│       ├── config/
-│       │   ├── __init__.py
-│       │   ├── loading.py
-│       │   └── models.py
+│       ├── cli.py
+│       ├── config.py
+│       ├── runtime.py
 │       │
 │       ├── domain/
 │       │   ├── __init__.py
-│       │   ├── enums.py
 │       │   ├── types.py
-│       │   ├── models.py
-│       │   └── errors.py
+│       │   ├── enums.py
+│       │   └── models.py
 │       │
 │       ├── datasets/
 │       │   ├── __init__.py
 │       │   ├── common.py
+│       │   ├── preprocess.py
+│       │   ├── roles.py
 │       │   ├── sampling.py
 │       │   ├── scaling.py
-│       │   │
 │       │   ├── nbaiot/
 │       │   │   ├── __init__.py
 │       │   │   ├── loading.py
 │       │   │   ├── preprocessing.py
-│       │   │   └── schema.py
-│       │   │
+│       │   │   ├── schema.py
+│       │   │   └── validation.py
 │       │   └── ciciot2023/
 │       │       ├── __init__.py
 │       │       ├── loading.py
 │       │       ├── preprocessing.py
-│       │       └── schema.py
+│       │       ├── schema.py
+│       │       └── validation.py
 │       │
 │       ├── learning/
 │       │   ├── __init__.py
@@ -2311,91 +2289,83 @@ FedSIRA/
 │       ├── protocol/
 │       │   ├── __init__.py
 │       │   ├── specification.py
+│       │   ├── capability_contract.py
 │       │   ├── proposal.py
 │       │   ├── reproduction.py
 │       │   ├── verification.py
 │       │   ├── synthesis.py
-│       │   └── admission.py
-│       │
-│       ├── attacks/
-│       │   ├── __init__.py
-│       │   ├── source.py
-│       │   ├── reproduction.py
-│       │   └── verification.py
-│       │
-│       ├── baselines/
-│       │   ├── __init__.py
-│       │   ├── reconstruction_training.py
-│       │   ├── robust_training.py
-│       │   ├── source_model.py
-│       │   ├── independent_retraining.py
-│       │   ├── robust_aggregation.py
-│       │   └── certified_ensemble.py
+│       │   ├── admission.py
+│       │   ├── state_machine.py
+│       │   ├── attacks/
+│       │   │   ├── __init__.py
+│       │   │   ├── source.py
+│       │   │   └── byzantine.py
+│       │   └── baselines/
+│       │       ├── __init__.py
+│       │       ├── references.py
+│       │       ├── registry.py
+│       │       ├── calibration.py
+│       │       ├── source_model.py
+│       │       ├── independent_retraining.py
+│       │       ├── reconstruction_training.py
+│       │       ├── fedavg_training.py
+│       │       ├── robust_aggregation.py
+│       │       ├── robust_training.py
+│       │       ├── certified_ensemble.py
+│       │       └── outcomes.py
 │       │
 │       ├── experiments/
 │       │   ├── __init__.py
-│       │   ├── prerequisites.py
 │       │   ├── definitions.py
-│       │   ├── execution.py
 │       │   ├── planning.py
-│       │   ├── workflow.py
+│       │   ├── execution.py
 │       │   ├── executor.py
-│       │   └── scenarios/
-│       │       ├── __init__.py
-│       │       ├── capability_granularity.py
-│       │       ├── evidence_scarcity.py
-│       │       ├── evidence_arrival.py
-│       │       └── heterogeneity.py
+│       │   ├── cells.py
+│       │   ├── cell_support.py
+│       │   ├── scenarios.py
+│       │   ├── collapse.py
+│       │   ├── prerequisites.py
+│       │   ├── validation.py
+│       │   └── workflow.py
 │       │
 │       ├── evaluation/
 │       │   ├── __init__.py
-│       │   ├── capability_boundary.py
-│       │   ├── epistemic_boundary.py
-│       │   ├── screening.py
-│       │   ├── backdoor.py
-│       │   ├── domain.py
+│       │   ├── metrics.py
+│       │   ├── comparisons.py
+│       │   ├── statistics.py
+│       │   ├── summaries.py
 │       │   ├── indexing.py
 │       │   ├── service.py
-│       │   ├── metrics.py
-│       │   ├── report_summary.py
-│       │   ├── statistics.py
-│       │   ├── comparisons.py
-│       │   └── summaries.py
+│       │   ├── domain.py
+│       │   ├── screening.py
+│       │   ├── backdoor.py
+│       │   ├── capability_boundary.py
+│       │   ├── epistemic_boundary.py
+│       │   └── report_summary.py
 │       │
-│       ├── reporting/
+│       ├── artifacts/
 │       │   ├── __init__.py
-│       │   ├── tables.py
-│       │   ├── figures.py
-│       │   ├── materialization.py
-│       │   └── export.py
+│       │   ├── paths.py
+│       │   ├── storage.py
+│       │   └── provenance.py
 │       │
-│       └── io/
+│       └── reporting/
 │           ├── __init__.py
-│           ├── paths.py
-│           └── storage.py
+│           ├── tables.py
+│           ├── figures.py
+│           ├── materialization.py
+│           ├── verification.py
+│           └── export.py
 │
 ├── tests/
-│   ├── _repo.py
 │   ├── architecture/
-│   │   ├── test_file_tree.py
-│   │   ├── test_dependency_boundaries.py
-│   │   ├── test_no_primitive_domain_io.py
-│   │   ├── test_no_magic_strings.py
-│   │   ├── test_no_compatibility_code.py
-│   │   ├── test_no_dead_code.py
-│   │   ├── test_no_test_only_production_code.py
-│   │   ├── test_no_unwired_modules.py
-│   │   └── test_config_ownership.py
 │   ├── unit/
 │   ├── integration/
+│   ├── scientific/
 │   └── e2e/
 │
-├── .gitignore
-├── LICENSE
-├── Makefile
-├── README.md
-├── pyproject.toml
-└── uv.lock
+├── noxfile.py
+└── pyproject.toml
 ```
 
 The complete configuration file is:
@@ -2742,6 +2712,7 @@ fedsira preprocess ["N-BaIoT"|"CICIoT2023"] [--overwrite]
 fedsira plan
 fedsira smoke [--overwrite]
 fedsira run <experiment name> [--overwrite]
+fedsira status
 fedsira report [<experiment name>] [--overwrite]
 ```
 
@@ -2782,7 +2753,11 @@ A valid prepared-data artifact, split/role manifest, scaler, or deterministic pr
 
 `--overwrite` reruns the smoke suite only. It does not invalidate scientific artifacts unless the rerun discovers a true invariant/configuration defect that makes a scientific artifact invalid under Sections 25–27.
 
-## 24.5 `fedsira run <experiment name>`
+## 24.5 `fedsira status`
+
+`status` is a read-only experiment-progress command. It reports each planned experiment's completed-cell count and lifecycle state from persisted execution records. It does not execute cells, retrain models, or write scientific artifacts.
+
+## 24.6 `fedsira run <experiment name>`
 
 `<experiment name>` is the exact descriptive experiment name from Section 30. One invocation owns the complete scientific lifecycle for that experiment: prerequisite validation, planned cell execution, metric computation, statistical analysis, confidence intervals/effect sizes, multiplicity correction, scientific gates, invariant verification, provenance verification, and experiment completion.
 
@@ -2798,7 +2773,7 @@ If every required artifact for the experiment is validly complete, `run` returns
 
 `--overwrite` deliberately recomputes artifacts owned by the requested experiment under the same authoritative scientific contract but does not recursively rebuild compatible shared prerequisites. Each replacement is staged and atomically activated. If a recomputed artifact has the same dependency/content identity as the active artifact, downstream artifacts remain valid; otherwise only descendants become stale. `--overwrite` never creates a second logical scientific observation.
 
-## 24.6 `fedsira report [<experiment name>]`
+## 24.7 `fedsira report [<experiment name>]`
 
 `report` performs no scientific training, scoring, metric computation, or inferential recomputation. With an experiment identity it verifies that experiment's required scientific outputs and materializes the applicable Section 33–34 exports. Without an experiment identity it first performs project-completion verification: Section 31 nominal/completion counts, all required experiment terminal states, invariant/leakage checks, declared dependency compatibility, Section 18 statistical/multiplicity outputs, and Section 35 claim states must be internally consistent before project-summary exports are produced.
 

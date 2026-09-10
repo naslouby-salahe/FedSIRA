@@ -14,7 +14,7 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import FeatureIndex, FeatureName, MetricValue, TriggerFeatureValue
-from fedsira.experiments.scenarios.evidence_scarcity import apply_attacker_induced_common_context
+from fedsira.experiments.scenarios import apply_attacker_induced_common_context
 from fedsira.experiments.workflow import (
     RealAnchor,
     load_prepared_rows,

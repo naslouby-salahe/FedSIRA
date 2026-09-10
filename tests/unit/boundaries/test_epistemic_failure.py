@@ -2,7 +2,7 @@ import torch
 
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import EvaluationInsufficiencyReason
-from fedsira.experiments.scenarios.evidence_scarcity import (
+from fedsira.experiments.scenarios import (
     apply_attacker_induced_common_context,
     apply_shared_spurious_feature,
     diagnostic_marker_metric_or_insufficient,

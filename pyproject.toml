@@ -48,7 +48,16 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "C901", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-args = 16
+max-branches = 16
+max-returns = 16
+max-statements = 80
 
 [tool.ruff.lint.per-file-ignores]
 "tests/unit/domain/test_records.py" = ["B010"]
@@ -56,6 +65,16 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 "tests/unit/artifacts/test_records.py" = ["B010"]
 "tests/unit/artifacts/test_provenance.py" = ["B010"]
 "src/fedsira/cli.py" = ["B008"]
+"src/fedsira/experiments/cells.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/experiments/cell_support.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/protocol/baselines/outcomes.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/application.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/experiments/executor.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/reporting/export.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/reporting/tables.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/reporting/figures.py" = ["C901", "PLR0912"]
+"src/fedsira/evaluation/comparisons.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/ciciot2023/preprocessing.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/runtime/environment.py" = ["B009"]
 
 [tool.vulture]

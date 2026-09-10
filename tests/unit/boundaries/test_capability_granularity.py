@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from fedsira.domain.enums import CapabilityContractScope, RootCause
-from fedsira.experiments.scenarios.capability_granularity import (
+from fedsira.experiments.scenarios import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
     target_row_ids_for_contract,

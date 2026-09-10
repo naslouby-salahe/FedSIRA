@@ -22,7 +22,7 @@ from fedsira.evaluation.metrics import (
     f1_for_class,
     macro_f1,
 )
-from fedsira.experiments.scenarios.capability_granularity import root_cause_for_sample
+from fedsira.experiments.scenarios import root_cause_for_sample
 from fedsira.experiments.workflow import (
     DomainTargetMetrics,
     HeterogeneityScope,

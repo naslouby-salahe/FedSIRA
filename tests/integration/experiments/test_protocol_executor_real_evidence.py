@@ -17,6 +17,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
 )
 from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
+from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.experiments.collapse import resolve_core_mapping
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -39,10 +40,9 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.experiments.executor import ProtocolCellExecutor
-from fedsira.learning.anchor_training import train_anchor
 from fedsira.experiments.planning import ScientificCell
+from fedsira.learning.anchor_training import train_anchor
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed
 

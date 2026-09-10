@@ -78,7 +78,7 @@ from fedsira.experiments.planning import (
 from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
 )
-from fedsira.experiments.scenarios.evidence_arrival import (
+from fedsira.experiments.scenarios import (
     reproducer_order,
 )
 from fedsira.experiments.workflow import (

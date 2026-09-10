@@ -16,7 +16,7 @@ from fedsira.domain.types import (
     SeedCount,
     TableName,
 )
-from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedule
+from fedsira.experiments.scenarios import EvidenceArrivalSchedule
 from fedsira.protocol.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
     BaselineIdentity,

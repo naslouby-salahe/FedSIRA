@@ -53,4 +53,48 @@ def test_status_workflow_reaches_persisted_evidence_without_execution() -> None:
         )
     )
     assert expected <= calls, f"status workflow bypasses persisted evidence: {expected - calls}"
+    assert "execute_status" in _called_names(REPO_ROOT / "src" / "fedsira" / "application.py")
+    assert "execute_experiment" not in _called_names(REPO_ROOT / "src" / "fedsira" / "cli.py")
+
+
+def test_cli_only_dispatches_to_application() -> None:
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "cli.py")
+    expected = frozenset(("doctor", "preprocess", "plan", "smoke", "run", "status", "report"))
+    assert expected <= calls
     assert "execute_experiment" not in calls
+    assert "ProtocolCellExecutor" not in calls
+    assert "export_experiment_report" not in calls
+
+
+def test_preprocess_workflow_reaches_dataset_materialization() -> None:
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "datasets" / "preprocess.py")
+    expected: frozenset[str] = frozenset(
+        (
+            "materialize_nbaiot_prepared_views",
+            "materialize_ciciot2023_prepared_views",
+            "publish_or_reuse_artifact_payload",
+        )
+    )
+    assert expected <= calls, f"preprocess bypasses dataset artifacts: {expected - calls}"
+
+
+def test_plan_workflow_reaches_plan_construction() -> None:
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "experiments" / "planning.py")
+    expected: frozenset[str] = frozenset(("build_plan", "validate_planned_cell_count_invariant"))
+    assert expected <= calls, f"plan bypasses plan construction: {expected - calls}"
+
+
+def test_application_wires_every_cli_command() -> None:
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "application.py")
+    expected: frozenset[str] = frozenset(
+        (
+            "diagnose",
+            "execute_preprocess",
+            "execute_plan",
+            "execute_smoke",
+            "execute_run",
+            "execute_status",
+            "execute_report",
+        )
+    )
+    assert expected <= calls, f"application missing CLI workflow: {expected - calls}"

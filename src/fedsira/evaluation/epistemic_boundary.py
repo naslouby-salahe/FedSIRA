@@ -15,7 +15,7 @@ from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.evaluation.metrics import supported_macro_f1_harm
 from fedsira.evaluation.summaries import equal_weight_domain_mean
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.scenarios.evidence_scarcity import (
+from fedsira.experiments.scenarios import (
     diagnostic_marker_metric_or_insufficient,
     match_diagnostic_benign_report_test_rows,
     select_spurious_feature_rows,
