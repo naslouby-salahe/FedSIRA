@@ -149,7 +149,6 @@ from fedsira.domain.types import (
     DomainCount,
     DomainId,
     ExampleCount,
-    ExperimentName,
     FeatureCount,
     FeatureIndex,
     FeatureName,
@@ -159,12 +158,8 @@ from fedsira.domain.types import (
     GroupIndex,
     LocalEpochCount,
     MasterSeed,
-    MethodName,
-    MetricDifference,
-    MetricName,
     MetricObservation,
     MetricValue,
-    MinimumCompletePairCount,
     ModuleName,
     PreparedReproductionTargetCount,
     PreparedScreenTargetCount,
@@ -173,13 +168,11 @@ from fedsira.domain.types import (
     RequiredReproductionRowCount,
     RoundIndex,
     RowCount,
-    ScenarioName,
     SchemaVersion,
     TriggerFeatureValue,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
-    ComparisonOrientation,
 )
 from fedsira.evaluation.metrics import (
     benign_false_alarm_rate,
@@ -208,7 +201,7 @@ from fedsira.evaluation.summaries import (
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
 )
-from fedsira.experiments.collapse import CollapseEvaluationInput, ResolvedCore
+from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
@@ -247,7 +240,6 @@ from fedsira.experiments.definitions import (
 from fedsira.experiments.execution import (
     CellExecutionOutcome,
     CellExecutor,
-    PersistedExecutionRecord,
     ProtocolPhaseDurations,
 )
 from fedsira.experiments.planning import (
@@ -421,226 +413,6 @@ from fedsira.runtime_execution import (
     reset_peak_gpu_memory_counter,
     seed_job_local_rng_streams,
 )
-
-
-def _record_metric(record: PersistedExecutionRecord, metric: MetricName) -> MetricValue | None:
-    for metric_name, metric_result in reversed(record.metrics):
-        if metric_name == metric:
-            return metric_result
-    return None
-
-
-def _record_metric_for_seed_and_method(
-    records: tuple[PersistedExecutionRecord, ...],
-    condition: ScenarioName,
-    master_seed: MasterSeed,
-    method: MethodName,
-    metric: MetricName,
-) -> MetricValue | None:
-    for record in reversed(records):
-        if (
-            record.terminal_state is ExperimentLifecycleState.COMPLETED
-            and record.condition == condition
-            and (record.master_seed == master_seed)
-            and (record.method == method)
-        ):
-            return _record_metric(record, metric)
-    return None
-
-
-def _paired_constraint_means(
-    records: tuple[PersistedExecutionRecord, ...],
-    method: MethodName,
-    reference: MethodName,
-    conditions: tuple[ScenarioName, ...],
-    metric: MetricName,
-    *,
-    orientation: ComparisonOrientation,
-    minimum_complete_pairs: MinimumCompletePairCount,
-) -> tuple[MetricDifference, ...] | None:
-    means: list[MetricDifference] = []
-    for condition in conditions:
-        seeds = tuple(
-            sorted(
-                frozenset(
-                    record.master_seed
-                    for record in records
-                    if record.terminal_state is ExperimentLifecycleState.COMPLETED
-                    and record.condition == condition
-                    and (record.method in (method, reference))
-                )
-            )
-        )
-        differences: list[MetricDifference] = []
-        for seed in seeds:
-            method_value = _record_metric_for_seed_and_method(
-                records, condition, seed, method, metric
-            )
-            reference_value = _record_metric_for_seed_and_method(
-                records, condition, seed, reference, metric
-            )
-            if method_value is None or reference_value is None:
-                continue
-            differences.append(
-                method_value - reference_value
-                if orientation is ComparisonOrientation.LOWER_IS_BETTER
-                else reference_value - method_value
-            )
-        if len(differences) < minimum_complete_pairs:
-            return None
-        means.append(sum(differences) / len(differences))
-    return tuple(means)
-
-
-def _maximum_constraint(values: tuple[MetricDifference, ...] | None) -> MetricDifference | None:
-    return None if values is None else max(values)
-
-
-def collapse_evaluation_from_records(
-    experiment: ExperimentName, records: tuple[PersistedExecutionRecord, ...]
-) -> CollapseEvaluationInput | None:
-    config = current_application_context().scientific_config
-    minimum_pairs = (
-        config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_inference
-    )
-    if experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
-        legitimate = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                OpeningMode.PROPOSAL_ASSISTED,
-                OpeningMode.CANDIDATE_FREE,
-                (ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,),
-                ComparisonMetric.LEGITIMATE_ADMISSION,
-                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        malicious = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                OpeningMode.PROPOSAL_ASSISTED,
-                OpeningMode.CANDIDATE_FREE,
-                (ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,),
-                ComparisonMetric.MALICIOUS_ADMISSION,
-                orientation=ComparisonOrientation.LOWER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        return CollapseEvaluationInput(
-            proposal_legitimate_admission_degradation=legitimate,
-            proposal_malicious_admission_worsening=malicious,
-            plurality_legitimate_admission_degradation=None,
-            plurality_supported_harm=None,
-            source_exclusion_target_f1_drop=None,
-            source_exclusion_supported_harm=None,
-            source_exclusion_benign_far_increase=None,
-            external_verification_legitimate_admission_degradation=None,
-        )
-    if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
-        conditions = tuple(condition.value for condition in PluralityCondition)
-        legitimate = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                CoreMethodIdentity.FULL_PLURALITY_PATH,
-                BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
-                conditions,
-                ComparisonMetric.LEGITIMATE_ADMISSION,
-                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        supported = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                CoreMethodIdentity.FULL_PLURALITY_PATH,
-                BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
-                conditions,
-                ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
-                orientation=ComparisonOrientation.LOWER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        return CollapseEvaluationInput(
-            proposal_legitimate_admission_degradation=None,
-            proposal_malicious_admission_worsening=None,
-            plurality_legitimate_admission_degradation=legitimate,
-            plurality_supported_harm=supported,
-            source_exclusion_target_f1_drop=None,
-            source_exclusion_supported_harm=None,
-            source_exclusion_benign_far_increase=None,
-            external_verification_legitimate_admission_degradation=None,
-        )
-    if experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
-        conditions = (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,)
-        method = SourceExclusionMethod.FULL_FEDSIRA
-        reference = BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE
-        target = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                method,
-                reference,
-                conditions,
-                ComparisonMetric.TARGET_F1,
-                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        supported = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                method,
-                reference,
-                conditions,
-                ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
-                orientation=ComparisonOrientation.LOWER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        benign = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                method,
-                reference,
-                conditions,
-                ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
-                orientation=ComparisonOrientation.LOWER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        return CollapseEvaluationInput(
-            proposal_legitimate_admission_degradation=None,
-            proposal_malicious_admission_worsening=None,
-            plurality_legitimate_admission_degradation=None,
-            plurality_supported_harm=None,
-            source_exclusion_target_f1_drop=target,
-            source_exclusion_supported_harm=supported,
-            source_exclusion_benign_far_increase=benign,
-            external_verification_legitimate_admission_degradation=None,
-        )
-    if experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
-        legitimate = _maximum_constraint(
-            _paired_constraint_means(
-                records,
-                SourceExclusionMethod.FULL_FEDSIRA,
-                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
-                (ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY,),
-                ComparisonMetric.LEGITIMATE_ADMISSION,
-                orientation=ComparisonOrientation.HIGHER_IS_BETTER,
-                minimum_complete_pairs=minimum_pairs,
-            )
-        )
-        return CollapseEvaluationInput(
-            proposal_legitimate_admission_degradation=None,
-            proposal_malicious_admission_worsening=None,
-            plurality_legitimate_admission_degradation=None,
-            plurality_supported_harm=None,
-            source_exclusion_target_f1_drop=None,
-            source_exclusion_supported_harm=None,
-            source_exclusion_benign_far_increase=None,
-            external_verification_legitimate_admission_degradation=legitimate,
-        )
-    return None
-
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN = "ANCHOR_FEDAVG"
 SOURCE_TRAINING_ALGORITHM_TOKEN = "SOURCE_CANDIDATE"

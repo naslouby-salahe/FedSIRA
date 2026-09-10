@@ -6,6 +6,7 @@ from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
+    collapse_evaluation_from_records,
     materialize_resolved_core,
     publish_resolved_core,
     read_resolved_core,
@@ -24,7 +25,6 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.executor import (
     ProtocolCellExecutor,
-    collapse_evaluation_from_records,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.io.paths import workspace_root_for_family

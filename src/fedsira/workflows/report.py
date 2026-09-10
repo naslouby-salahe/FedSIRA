@@ -15,6 +15,7 @@ from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
+    collapse_evaluation_from_records,
     materialize_resolved_core,
     read_resolved_core,
 )
@@ -31,9 +32,6 @@ from fedsira.experiments.execution import (
     PersistedExecutionRecord,
     PersistedFailureDetail,
     derive_experiment_lifecycle,
-)
-from fedsira.experiments.executor import (
-    collapse_evaluation_from_records,
 )
 from fedsira.experiments.planning import (
     ExperimentPlan,

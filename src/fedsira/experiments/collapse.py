@@ -8,30 +8,56 @@ from fedsira.artifacts import (
     ArtifactPayloadBytes,
     validate_artifact_lifecycle_readable,
 )
+from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config import MaterialityConfig
-from fedsira.domain.enums import AdmissionOpeningMode, ArtifactFamily, ArtifactLifecycleState
+from fedsira.domain.enums import (
+    AdmissionOpeningMode,
+    ArtifactFamily,
+    ArtifactLifecycleState,
+    CoreMethodIdentity,
+    ExperimentLifecycleState,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     CollapseDecisionPassed,
     CollapseReason,
+    ExperimentName,
     FinalGateRequired,
     FrozenDomainModel,
     MaterialityDecision,
     MaterialThreshold,
+    MethodName,
     MetricDifference,
     MetricName,
+    MetricValue,
+    MinimumCompletePairCount,
     PValue,
     ResolvedCoreIdentity,
+    ScenarioName,
     SourceExcludedFromKrum,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
+    ComparisonOrientation,
     ComparisonResult,
     ComparisonState,
 )
-from fedsira.experiments.definitions import ComparisonFamily
+from fedsira.experiments.definitions import (
+    EXTERNAL_VERIFICATION_NECESSITY_NAME,
+    PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    SINGLE_REPRODUCTION_NECESSITY_NAME,
+    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    ComparisonFamily,
+    ExternalVerificationCondition,
+    OpeningMode,
+    PluralityCondition,
+    PrimaryScenario,
+    ProposalEpisode,
+    SourceExclusionMethod,
+)
+from fedsira.experiments.execution import PersistedExecutionRecord
 from fedsira.io.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
@@ -40,6 +66,7 @@ from fedsira.io.storage import (
     read_published_manifest,
     stage_payload,
 )
+from fedsira.runtime import current_application_context
 
 
 class CollapseDecisionKind(StrEnum):
@@ -125,6 +152,217 @@ class CollapseEvaluationInput(FrozenDomainModel):
     source_exclusion_supported_harm: MetricDifference | None
     source_exclusion_benign_far_increase: MetricDifference | None
     external_verification_legitimate_admission_degradation: MetricDifference | None
+
+
+def _record_metric(record: PersistedExecutionRecord, metric: MetricName) -> MetricValue | None:
+    for metric_name, metric_result in reversed(record.metrics):
+        if metric_name == metric:
+            return metric_result
+    return None
+
+
+def _paired_constraint_means(
+    records: tuple[PersistedExecutionRecord, ...],
+    method: MethodName,
+    reference: MethodName,
+    conditions: tuple[ScenarioName, ...],
+    metric: MetricName,
+    *,
+    orientation: ComparisonOrientation,
+    minimum_complete_pairs: MinimumCompletePairCount,
+) -> tuple[MetricDifference, ...] | None:
+    means: list[MetricDifference] = []
+    for condition in conditions:
+        seeds = tuple(
+            sorted(
+                frozenset(
+                    record.master_seed
+                    for record in records
+                    if record.terminal_state is ExperimentLifecycleState.COMPLETED
+                    and record.condition == condition
+                    and record.method in (method, reference)
+                )
+            )
+        )
+        differences: list[MetricDifference] = []
+        for seed in seeds:
+            method_value = next(
+                (
+                    value
+                    for record in reversed(records)
+                    if record.terminal_state is ExperimentLifecycleState.COMPLETED
+                    and record.condition == condition
+                    and record.master_seed == seed
+                    and record.method == method
+                    if (value := _record_metric(record, metric)) is not None
+                ),
+                None,
+            )
+            reference_value = next(
+                (
+                    value
+                    for record in reversed(records)
+                    if record.terminal_state is ExperimentLifecycleState.COMPLETED
+                    and record.condition == condition
+                    and record.master_seed == seed
+                    and record.method == reference
+                    if (value := _record_metric(record, metric)) is not None
+                ),
+                None,
+            )
+            if method_value is None or reference_value is None:
+                continue
+            differences.append(
+                method_value - reference_value
+                if orientation is ComparisonOrientation.LOWER_IS_BETTER
+                else reference_value - method_value
+            )
+        if len(differences) < minimum_complete_pairs:
+            return None
+        means.append(sum(differences) / len(differences))
+    return tuple(means)
+
+
+def _maximum_constraint(values: tuple[MetricDifference, ...] | None) -> MetricDifference | None:
+    return None if values is None else max(values)
+
+
+def collapse_evaluation_from_records(
+    experiment: ExperimentName, records: tuple[PersistedExecutionRecord, ...]
+) -> CollapseEvaluationInput | None:
+    config = current_application_context().scientific_config
+    minimum_pairs = (
+        config.metrics_and_statistics.technical_completion.minimum_complete_pairs_for_inference
+    )
+    if experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
+        return CollapseEvaluationInput(
+            proposal_legitimate_admission_degradation=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    OpeningMode.PROPOSAL_ASSISTED,
+                    OpeningMode.CANDIDATE_FREE,
+                    (ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,),
+                    ComparisonMetric.LEGITIMATE_ADMISSION,
+                    orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            proposal_malicious_admission_worsening=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    OpeningMode.PROPOSAL_ASSISTED,
+                    OpeningMode.CANDIDATE_FREE,
+                    (ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,),
+                    ComparisonMetric.MALICIOUS_ADMISSION,
+                    orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
+        conditions = tuple(condition.value for condition in PluralityCondition)
+        return CollapseEvaluationInput(
+            plurality_legitimate_admission_degradation=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    CoreMethodIdentity.FULL_PLURALITY_PATH,
+                    BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+                    conditions,
+                    ComparisonMetric.LEGITIMATE_ADMISSION,
+                    orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            plurality_supported_harm=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    CoreMethodIdentity.FULL_PLURALITY_PATH,
+                    BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+                    conditions,
+                    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+                    orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
+        conditions = (PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,)
+        method = SourceExclusionMethod.FULL_FEDSIRA
+        reference = BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE
+        return CollapseEvaluationInput(
+            source_exclusion_target_f1_drop=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    method,
+                    reference,
+                    conditions,
+                    ComparisonMetric.TARGET_F1,
+                    orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            source_exclusion_supported_harm=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    method,
+                    reference,
+                    conditions,
+                    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+                    orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            source_exclusion_benign_far_increase=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    method,
+                    reference,
+                    conditions,
+                    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+                    orientation=ComparisonOrientation.LOWER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            external_verification_legitimate_admission_degradation=None,
+        )
+    if experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
+        return CollapseEvaluationInput(
+            external_verification_legitimate_admission_degradation=_maximum_constraint(
+                _paired_constraint_means(
+                    records,
+                    SourceExclusionMethod.FULL_FEDSIRA,
+                    BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+                    (ExternalVerificationCondition.LEGITIMATE_TRANSFERABLE_CAPABILITY,),
+                    ComparisonMetric.LEGITIMATE_ADMISSION,
+                    orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+                    minimum_complete_pairs=minimum_pairs,
+                )
+            ),
+            proposal_legitimate_admission_degradation=None,
+            proposal_malicious_admission_worsening=None,
+            plurality_legitimate_admission_degradation=None,
+            plurality_supported_harm=None,
+            source_exclusion_target_f1_drop=None,
+            source_exclusion_supported_harm=None,
+            source_exclusion_benign_far_increase=None,
+        )
+    return None
 
 
 def resolve_core_mapping(

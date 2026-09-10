@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from fedsira.artifacts import ReconstructionProvenance, collect_reconstruction_provenance
 from fedsira.domain.enums import (
@@ -36,15 +36,11 @@ from fedsira.experiments.planning import (
     ScientificCell,
     build_plan,
 )
-from fedsira.experiments.validation import (
-    ExperimentPrerequisiteState,
-    validate_cell_terminal_record,
-    validate_condition_vocabulary,
-    validate_experiment_prerequisites_met,
-    validate_no_duplicate_semantic_cells,
-)
 from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
 from fedsira.runtime_execution import framed_bytes
+
+if TYPE_CHECKING:
+    from fedsira.experiments.validation import ExperimentPrerequisiteState
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 
@@ -147,6 +143,8 @@ def execution_digest(
 
 
 def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> CellExecutionOutcome:
+    from fedsira.experiments.validation import validate_cell_terminal_record
+
     config = current_application_context().scientific_config
     attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
     last_outcome: CellExecutionOutcome | None = None
@@ -210,6 +208,8 @@ class ComparisonResultBuilder(Protocol):
 def _prerequisite_states_from_store(
     plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
 ) -> tuple[ExperimentPrerequisiteState, ...]:
+    from fedsira.experiments.validation import ExperimentPrerequisiteState
+
     definition = experiment_by_name(experiment)
     return tuple(
         ExperimentPrerequisiteState(
@@ -232,6 +232,12 @@ def execute_experiment(
     resolved_core_complete: ResolvedCoreComplete = False,
     prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
 ) -> ExperimentExecutionResult:
+    from fedsira.experiments.validation import (
+        validate_condition_vocabulary,
+        validate_experiment_prerequisites_met,
+        validate_no_duplicate_semantic_cells,
+    )
+
     resolved_config = current_application_context().scientific_config
     definition = experiment_by_name(experiment)
     plan = build_plan(
