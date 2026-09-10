@@ -5,11 +5,13 @@ from pathlib import Path
 import torch
 
 from fedsira.baselines.calibration import (
+    clip_source_update,
     reconstruction_error,
     reconstruction_filter_accepts,
     reconstruction_filter_calibration_error_count,
     reconstruction_filter_reweight,
     reconstruction_rejection_threshold,
+    sanitization_clip_bounds,
 )
 from fedsira.baselines.references import (
     fedavg_reference_post_reference_participants,
@@ -51,7 +53,10 @@ from fedsira.learning.model import (
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
-from fedsira.learning.post_reference_training import combined_post_reference_rows
+from fedsira.learning.post_reference_training import (
+    combined_post_reference_rows,
+    train_source_candidate_delta,
+)
 from fedsira.runtime import current_application_context
 
 CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION"
@@ -287,3 +292,24 @@ def train_update_reconstruction_filter_delta(
     if not any_round_trained:
         return None
     return _flatten_model_state(anchor, state) - anchor.flat_parameters
+
+
+def train_source_update_sanitization_delta(
+    prepared_root: Path,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: NBaiotDomain | None,
+) -> torch.Tensor | None:
+    config = current_application_context().scientific_config
+    if source_domain is None:
+        return None
+    source_delta = train_source_candidate_delta(prepared_root, master_seed, anchor, source_domain)
+    if source_delta is None:
+        return None
+    calibration_updates = anchor_round_calibration_updates(prepared_root, master_seed, anchor)
+    if not calibration_updates:
+        return None
+    clip_bounds = sanitization_clip_bounds(
+        calibration_updates, config.baselines.source_update_sanitization.coordinate_bound_percentile
+    )
+    return clip_source_update(source_delta, clip_bounds)

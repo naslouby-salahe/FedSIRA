@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -16,37 +16,30 @@ from fedsira.attacks import (
 )
 from fedsira.baselines.calibration import (
     DomainFeatureMean,
-    clip_source_update,
-    cosine_distance_matrix,
-    density_cluster_labels,
-    l2_normalize,
     parameter_similarity_certification_row_results,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
-    sanitization_clip_bounds,
-    select_largest_density_cluster,
-    trimmed_mean_aggregate,
 )
 from fedsira.baselines.certified_ensemble import (
-    certified_ensemble_domain_groups,
-    certified_ensemble_post_reference_rounds,
-    ensemble_predicted_label,
+    evaluate_certified_ensemble,
+    train_certified_ensemble_group_checkpoints,
     validate_group_without_target_member_uses_supported_only,
+)
+from fedsira.baselines.fedavg_training import (
+    train_fedavg_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
 )
 from fedsira.baselines.independent_retraining import (
     candidate_free_full_path_opening_mode,
     one_independent_retrain_local_epochs,
 )
 from fedsira.baselines.reconstruction_training import (
-    anchor_round_calibration_updates,
+    train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
 )
 from fedsira.baselines.references import (
-    fedavg_reference_post_reference_local_epochs,
-    fedavg_reference_post_reference_participants,
-    fedavg_reference_post_reference_rounds,
     local_only_reference_evaluation_is_domain_local,
-    post_reference_retrain_maximum_local_epochs,
     standard_fl_anchor_rounds,
 )
 from fedsira.baselines.registry import (
@@ -64,7 +57,10 @@ from fedsira.baselines.robust_aggregation import (
     direct_krum_committee_rows,
     validate_three_row_coordinate_median_committee_size,
 )
-from fedsira.baselines.robust_training import train_krum_reference_delta
+from fedsira.baselines.robust_training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_krum_reference_delta,
+)
 from fedsira.baselines.source_model import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
@@ -76,7 +72,6 @@ from fedsira.baselines.source_model import (
     client_review_then_retrain_local_epochs,
     client_review_then_retrain_should_discard_source_weights,
     independent_local_reference_reviewer_is_positive,
-    secure_continual_assessment_post_reference_rounds,
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
 )
@@ -101,7 +96,6 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
-    SeedNamespace,
     TernaryOutcome,
 )
 from fedsira.domain.models import (
@@ -121,28 +115,22 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
-    AlgorithmName,
     AllowSourceAsVerifier,
     ArtifactDigest,
     BooleanValue,
     ByzantineDomainCount,
     CapabilityContractSatisfied,
     CapabilityIdentity,
-    ClassLabel,
     CommunicationMessageCount,
     CompromisedReproducerCount,
     ConditionName,
     DatasetClassToken,
-    FeatureCount,
-    FederatedRoundCount,
     FrozenDomainModel,
-    GroupIndex,
     MasterSeed,
     MetricObservation,
     MetricValue,
     ModuleName,
     RequiredReproductionRowCount,
-    RoundIndex,
 )
 from fedsira.evaluation.backdoor import (
     compute_source_backdoor_asr,
@@ -164,15 +152,11 @@ from fedsira.evaluation.epistemic_boundary import (
     compute_shared_epistemic_failure_summary,
 )
 from fedsira.evaluation.metrics import (
-    benign_false_alarm_rate,
     boundary_metric_set,
     clean_proposal_oracle_label,
-    compute_confusion_counts_by_class,
     dormant_admission_rate,
-    f1_for_class,
     false_launch_rate,
     legitimate_admission_rate,
-    macro_f1,
     malicious_admission_rate,
     metric_value,
     report_metric_set,
@@ -187,8 +171,6 @@ from fedsira.evaluation.screening import (
 )
 from fedsira.evaluation.summaries import (
     coefficient_of_variation,
-    decile_bin,
-    decile_boundaries,
     domain_disparity,
     equal_weight_domain_mean,
     interquartile_range,
@@ -268,51 +250,28 @@ from fedsira.experiments.validation import (
 )
 from fedsira.experiments.workflow import (
     BackdoorScope,
-    DomainTargetMetrics,
     EpistemicFailureScope,
     HeterogeneityScope,
     RealAnchor,
     RootCauseScope,
-    dataset_manifest_hash,
     domain_anchor_train_feature_mean,
     flat_parameters_identity,
-    load_prepared_rows,
     prepared_feature_names,
     real_evidence_available,
 )
-from fedsira.experiments.workflow import (
-    tensor_view as _tensor_view,
-)
 from fedsira.io.paths import prepared_evidence_root
-from fedsira.learning.aggregation import (
-    ModelState,
-    load_model_state,
-    model_state_from_classifier,
-)
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.anchor_training import train_anchor
-from fedsira.learning.anchor_training import training_seed as _training_seed
-from fedsira.learning.federated import (
-    LocalTrainingClient,
-    run_fedavg_round,
-    train_one_client_locally,
-)
-from fedsira.learning.model import (
-    FedSIRAClassifier,
-    flatten_trainable_parameters,
-    load_flat_trainable_parameters,
-)
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.post_reference_training import (
     certified_domain_delta_committee,
-    combined_post_reference_rows,
+    train_generic_hard_supported_examples_delta,
     train_source_candidate_delta,
 )
 from fedsira.learning.reference import (
     train_centralized_reference_checkpoint,
     train_local_only_reference_checkpoint,
 )
-from fedsira.learning.scoring import logits_for_samples, per_sample_cross_entropy
 from fedsira.protocol.admission import (
     apply_production_update,
     final_gate_predicates_pass,
@@ -398,609 +357,16 @@ from fedsira.runtime import (
 from fedsira.runtime_execution import (
     ElapsedTimer,
     derive_uint32,
-    namespace_seed,
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,
     reset_peak_gpu_memory_counter,
-    seed_job_local_rng_streams,
 )
-
-GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN = "GENERIC_HARD_SUPPORTED_EXAMPLES"
-FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN = "FEDAVG_REFERENCE"
-SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN = "SECURE_CONTINUAL_ASSESSMENT"
-LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN = "LOCAL_ONLY_REFERENCE"
-CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CENTRALIZED_REFERENCE"
-DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
-RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN = "RECOVERY_AFTER_SOURCE_ADMISSION"
-CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_ANCHOR"
-CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN = "CERTIFIED_ENSEMBLE_POST_REFERENCE"
-CLEAN_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
-
-
-def train_source_update_sanitization_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    if source_domain is None:
-        return None
-    source_delta = train_source_candidate_delta(prepared_root, master_seed, anchor, source_domain)
-    if source_delta is None:
-        return None
-    calibration_updates = anchor_round_calibration_updates(prepared_root, master_seed, anchor)
-    if not calibration_updates:
-        return None
-    clip_bounds = sanitization_clip_bounds(
-        calibration_updates, config.baselines.source_update_sanitization.coordinate_bound_percentile
-    )
-    return clip_source_update(source_delta, clip_bounds)
-
-
-def train_generic_hard_supported_examples_delta(
-    prepared_root: Path, master_seed: MasterSeed, anchor: RealAnchor, source_domain: NBaiotDomain
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    anchor_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(anchor_model, anchor.flat_parameters)
-    selected_features: list[torch.Tensor] = []
-    selected_labels: list[torch.Tensor] = []
-    selected_sample_ids: list[ArtifactDigest] = []
-    for class_id in NBAIOT_CLASS_ORDER:
-        if class_id is NBaiotClass.GAFGYT_COMBO:
-            continue
-        tensor_view = _tensor_view(
-            load_prepared_rows(prepared_root, source_domain, class_id, Role.POST_REFERENCE_REPLAY)
-        )
-        if tensor_view is None:
-            continue
-        features, labels, sample_ids = tensor_view
-        losses = [
-            float(value) for value in per_sample_cross_entropy(anchor_model, features, labels)
-        ]
-        boundaries = decile_boundaries(tuple(losses))
-        top_decile_bin = len(boundaries)
-        top_decile_indices = [
-            index
-            for index, loss in enumerate(losses)
-            if decile_bin(loss, boundaries) == top_decile_bin
-        ]
-        if not top_decile_indices:
-            continue
-        selected_features.append(features[top_decile_indices])
-        selected_labels.append(labels[top_decile_indices])
-        selected_sample_ids.extend(sample_ids[index] for index in top_decile_indices)
-    if not selected_features:
-        return None
-    combined_features = torch.cat(selected_features, dim=0)
-    combined_labels = torch.cat(selected_labels, dim=0)
-    is_supported = torch.ones(combined_features.shape[0], dtype=torch.bool)
-    current_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(current_model, anchor.flat_parameters)
-    training_seed = _training_seed(
-        master_seed,
-        anchor.dataset_manifest_hash,
-        flat_parameters_identity(anchor.flat_parameters),
-        GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN,
-        source_domain,
-        -1,
-    )
-    seed_job_local_rng_streams(training_seed)
-    optimizer = torch.optim.AdamW(
-        current_model.parameters(),
-        lr=config.model.optimizer.post_reference_learning_rate,
-        betas=config.model.optimizer.betas,
-        eps=config.model.optimizer.epsilon,
-        weight_decay=config.model.optimizer.weight_decay,
-    )
-    loss_function = torch.nn.CrossEntropyLoss()
-    run_post_reference_training(
-        anchor_model,
-        current_model,
-        optimizer,
-        loss_function,
-        config.model.training,
-        config.model.post_reference,
-        combined_features,
-        combined_labels,
-        is_supported,
-        tuple(selected_sample_ids),
-        training_seed,
-        config.model.post_reference.local_epochs,
-    )
-    return flatten_trainable_parameters(current_model) - anchor.flat_parameters
-
-
-def _train_ordinary_fedavg_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-    rounds: FederatedRoundCount,
-    algorithm_token: AlgorithmName,
-    exclude_source_from_participants: BooleanValue = False,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    source_rows_available = (
-        not exclude_source_from_participants
-        and source_domain is not None
-        and (
-            load_prepared_rows(
-                prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
-            )
-            is not None
-        )
-    )
-    participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
-    )
-    if not participants:
-        return None
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, anchor.flat_parameters)
-    state = model_state_from_classifier(model)
-    local_epochs = fedavg_reference_post_reference_local_epochs()
-    any_round_trained = False
-    for round_index in range(rounds):
-        round_clients: list[LocalTrainingClient] = []
-        for domain in participants:
-            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, target_role)
-            if combined is None:
-                continue
-            features, labels, sample_ids, _is_supported = combined
-            training_seed = _training_seed(
-                master_seed,
-                anchor.dataset_manifest_hash,
-                flat_parameters_identity(anchor.flat_parameters),
-                algorithm_token,
-                domain,
-                round_index,
-            )
-            round_clients.append(
-                LocalTrainingClient(
-                    features=features,
-                    labels=labels,
-                    sample_ids=sample_ids,
-                    training_seed=training_seed,
-                )
-            )
-        if not round_clients:
-            continue
-        any_round_trained = True
-        state = run_fedavg_round(
-            state,
-            anchor.input_width,
-            anchor.output_width,
-            config.model.optimizer.anchor_and_standard_fl_learning_rate,
-            config.model.optimizer,
-            config.model.training,
-            local_epochs,
-            tuple(round_clients),
-        )
-    if not any_round_trained:
-        return None
-    final_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_model_state(final_model, state)
-    return flatten_trainable_parameters(final_model) - anchor.flat_parameters
-
-
-def train_fedavg_reference_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    return _train_ordinary_fedavg_delta(
-        prepared_root,
-        master_seed,
-        anchor,
-        source_domain,
-        fedavg_reference_post_reference_rounds(),
-        FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-    )
-
-
-def train_secure_continual_assessment_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    return _train_ordinary_fedavg_delta(
-        prepared_root,
-        master_seed,
-        anchor,
-        source_domain,
-        secure_continual_assessment_post_reference_rounds(),
-        SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN,
-    )
-
-
-def train_recovery_after_source_admission_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    return _train_ordinary_fedavg_delta(
-        prepared_root,
-        master_seed,
-        anchor,
-        source_domain,
-        post_reference_retrain_maximum_local_epochs(),
-        RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
-        exclude_source_from_participants=True,
-    )
-
-
-@dataclass(frozen=True)
-class GroupCheckpoint:
-    input_width: FeatureCount
-    output_width: FeatureCount
-    flat_parameters: torch.Tensor
-
-
-def _group_anchor_checkpoint(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    group_domains: Sequence[NBaiotDomain],
-    group_index: GroupIndex,
-) -> GroupCheckpoint | None:
-    config = current_application_context().scientific_config
-    first_rows = load_prepared_rows(
-        prepared_root, group_domains[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
-    )
-    if first_rows is None:
-        return None
-    input_width = len(first_rows.features[0])
-    output_width = len(NBAIOT_CLASS_ORDER)
-    initialization_seed = derive_uint32(
-        "CERTIFIED_ENSEMBLE_GROUP_INIT",
-        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
-        group_index,
-    )
-    seed_job_local_rng_streams(initialization_seed)
-    initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
-    start_checkpoint_identity = f"certified-ensemble-group-{group_index}-anchor-start"
-    clients_per_round: list[tuple[LocalTrainingClient, ...]] = []
-    for round_index in range(config.model.anchor_fedavg.rounds):
-        round_clients: list[LocalTrainingClient] = []
-        for domain in group_domains:
-            combined_features: list[torch.Tensor] = []
-            combined_labels: list[torch.Tensor] = []
-            combined_sample_ids: list[ArtifactDigest] = []
-            for class_id in NBAIOT_CLASS_ORDER:
-                if class_id is NBaiotClass.GAFGYT_COMBO:
-                    continue
-                tensor_view = _tensor_view(
-                    load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
-                )
-                if tensor_view is None:
-                    continue
-                features, labels, sample_ids = tensor_view
-                combined_features.append(features)
-                combined_labels.append(labels)
-                combined_sample_ids.extend(sample_ids)
-            if not combined_features:
-                continue
-            training_seed = _training_seed(
-                master_seed,
-                dataset_manifest_hash(prepared_root),
-                start_checkpoint_identity,
-                CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN,
-                domain,
-                round_index,
-            )
-            round_clients.append(
-                LocalTrainingClient(
-                    features=torch.cat(combined_features, dim=0),
-                    labels=torch.cat(combined_labels, dim=0),
-                    sample_ids=tuple(combined_sample_ids),
-                    training_seed=training_seed,
-                )
-            )
-        if not round_clients:
-            return None
-        clients_per_round.append(tuple(round_clients))
-    final_state, _round_checkpoints = run_anchor_fedavg_training(
-        input_width,
-        output_width,
-        initial_state,
-        config.model.optimizer.anchor_and_standard_fl_learning_rate,
-        config.model.optimizer,
-        config.model.training,
-        config.model.anchor_fedavg,
-        tuple(clients_per_round),
-    )
-    model = FedSIRAClassifier(input_width, output_width)
-    load_model_state(model, final_state)
-    return GroupCheckpoint(
-        input_width=input_width,
-        output_width=output_width,
-        flat_parameters=flatten_trainable_parameters(model),
-    )
-
-
-def _group_post_reference_round_clients(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    group_domains: Sequence[NBaiotDomain],
-    group_index: GroupIndex,
-    round_index: RoundIndex,
-) -> list[LocalTrainingClient]:
-    manifest_hash = dataset_manifest_hash(prepared_root)
-    start_checkpoint_identity = f"certified-ensemble-group-{group_index}-post-reference-start"
-    has_target_bearing_member = False
-    group_target_row_count = 0
-    clients: list[LocalTrainingClient] = []
-    for domain in group_domains:
-        target_rows = load_prepared_rows(
-            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION
-        )
-        if target_rows is not None:
-            has_target_bearing_member = True
-            group_target_row_count += target_rows.row_count
-        combined = combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
-        if combined is not None:
-            features, labels, sample_ids, _is_supported = combined
-        else:
-            supported_features: list[torch.Tensor] = []
-            supported_labels: list[torch.Tensor] = []
-            supported_sample_ids: list[ArtifactDigest] = []
-            for class_id in NBAIOT_CLASS_ORDER:
-                if class_id is NBaiotClass.GAFGYT_COMBO:
-                    continue
-                tensor_view = _tensor_view(
-                    load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
-                )
-                if tensor_view is None:
-                    continue
-                sf, sl, sid = tensor_view
-                supported_features.append(sf)
-                supported_labels.append(sl)
-                supported_sample_ids.extend(sid)
-            if not supported_features:
-                continue
-            features = torch.cat(supported_features, dim=0)
-            labels = torch.cat(supported_labels, dim=0)
-            sample_ids = tuple(supported_sample_ids)
-        training_seed = _training_seed(
-            master_seed,
-            manifest_hash,
-            start_checkpoint_identity,
-            CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-            domain,
-            round_index,
-        )
-        clients.append(
-            LocalTrainingClient(
-                features=features, labels=labels, sample_ids=sample_ids, training_seed=training_seed
-            )
-        )
-    validate_group_without_target_member_uses_supported_only(
-        has_target_bearing_member, 0 if has_target_bearing_member else group_target_row_count
-    )
-    return clients
-
-
-def train_certified_ensemble_group_checkpoints(
-    prepared_root: Path, master_seed: MasterSeed
-) -> tuple[GroupCheckpoint, ...] | None:
-    config = current_application_context().scientific_config
-    domain_partition_namespace_seed = namespace_seed(master_seed, SeedNamespace.DOMAIN_PARTITION)
-    groups = certified_ensemble_domain_groups(
-        domain_partition_namespace_seed,
-        config.baselines.multiple_model_certified_ensemble_group_count,
-    )
-    checkpoints: list[GroupCheckpoint] = []
-    for group_index, group_domains in enumerate(groups):
-        group_anchor = _group_anchor_checkpoint(
-            prepared_root, master_seed, group_domains, group_index
-        )
-        if group_anchor is None:
-            return None
-        model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
-        load_flat_trainable_parameters(model, group_anchor.flat_parameters)
-        state = model_state_from_classifier(model)
-        for round_index in range(certified_ensemble_post_reference_rounds()):
-            round_clients = _group_post_reference_round_clients(
-                prepared_root, master_seed, group_domains, group_index, round_index
-            )
-            if not round_clients:
-                continue
-            state = run_fedavg_round(
-                state,
-                group_anchor.input_width,
-                group_anchor.output_width,
-                config.model.optimizer.anchor_and_standard_fl_learning_rate,
-                config.model.optimizer,
-                config.model.training,
-                1,
-                tuple(round_clients),
-            )
-        final_model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
-        load_model_state(final_model, state)
-        checkpoints.append(
-            GroupCheckpoint(
-                input_width=group_anchor.input_width,
-                output_width=group_anchor.output_width,
-                flat_parameters=flatten_trainable_parameters(final_model),
-            )
-        )
-    return tuple(checkpoints)
-
-
-def _ensemble_predictions_for_domain(
-    prepared_root: Path,
-    group_checkpoints: Sequence[GroupCheckpoint],
-    domain: NBaiotDomain,
-    role: Role,
-) -> tuple[list[ClassLabel], list[ClassLabel]] | None:
-    true_labels: list[ClassLabel] = []
-    predicted_labels: list[ClassLabel] = []
-    models: list[FedSIRAClassifier] = []
-    for checkpoint in group_checkpoints:
-        model = FedSIRAClassifier(checkpoint.input_width, checkpoint.output_width)
-        load_flat_trainable_parameters(model, checkpoint.flat_parameters)
-        model.eval()
-        models.append(model)
-    for class_id in NBAIOT_CLASS_ORDER:
-        rows = load_prepared_rows(prepared_root, domain, class_id, role)
-        if rows is None:
-            continue
-        features = torch.tensor(rows.features, dtype=torch.float32)
-        with torch.no_grad():
-            per_model_logits = [logits_for_samples(model, features) for model in models]
-        for sample_index in range(features.shape[0]):
-            predicted_indices: list[int] = []
-            softmax_probabilities: list[tuple[float, ...]] = []
-            for logits in per_model_logits:
-                sample_logits = logits[sample_index]
-                predicted_indices.append(int(torch.argmax(sample_logits)))
-                probabilities = torch.softmax(sample_logits, dim=-1)
-                softmax_probabilities.append(tuple(float(value) for value in probabilities))
-            ensemble_index = ensemble_predicted_label(predicted_indices, softmax_probabilities)
-            true_labels.append(class_id.value)
-            predicted_labels.append(NBAIOT_CLASS_ORDER[ensemble_index].value)
-    if not true_labels:
-        return None
-    return (true_labels, predicted_labels)
-
-
-def evaluate_certified_ensemble(
-    prepared_root: Path,
-    group_checkpoints: Sequence[GroupCheckpoint],
-    domain: NBaiotDomain,
-    role: Role,
-) -> DomainTargetMetrics | None:
-    result = _ensemble_predictions_for_domain(prepared_root, group_checkpoints, domain, role)
-    if result is None:
-        return None
-    true_labels, predicted_labels = result
-    class_tokens = tuple(class_id.value for class_id in NBAIOT_CLASS_ORDER)
-    counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
-    f1_by_class = OrderedDict(
-        ((token, f1_for_class(counts)) for token, counts in counts_by_class.items())
-    )
-    supported_f1 = OrderedDict(
-        (token, f1_by_class[token]) for token in class_tokens if token != NBaiotClass.GAFGYT_COMBO
-    )
-    return DomainTargetMetrics(
-        target_f1=f1_by_class.get(
-            NBaiotClass.GAFGYT_COMBO, MetricResult(value=None, denominator=0)
-        ),
-        supported_macro_f1=macro_f1(supported_f1),
-        benign_far=benign_false_alarm_rate(true_labels, predicted_labels, NBaiotClass.BENIGN),
-    )
-
-
-def _flatten_model_state(
-    input_width: FeatureCount, output_width: FeatureCount, state: ModelState
-) -> torch.Tensor:
-    model = FedSIRAClassifier(input_width, output_width)
-    load_model_state(model, state)
-    return flatten_trainable_parameters(model)
-
-
-def train_density_cluster_trimmed_mean_delta(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    source_rows_available = (
-        source_domain is not None
-        and load_prepared_rows(
-            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
-        )
-        is not None
-    )
-    participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
-    )
-    if not participants:
-        return None
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, anchor.flat_parameters)
-    state = model_state_from_classifier(model)
-    any_round_trained = False
-    for round_index in range(post_reference_retrain_maximum_local_epochs()):
-        current_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-        contributing_domains: list[NBaiotDomain] = []
-        raw_updates: list[torch.Tensor] = []
-        for domain in participants:
-            target_role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, target_role)
-            if combined is None:
-                continue
-            features, labels, sample_ids, _is_supported = combined
-            training_seed = _training_seed(
-                master_seed,
-                anchor.dataset_manifest_hash,
-                flat_parameters_identity(anchor.flat_parameters),
-                DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
-                domain,
-                round_index,
-            )
-            client_result = train_one_client_locally(
-                state,
-                anchor.input_width,
-                anchor.output_width,
-                config.model.optimizer.anchor_and_standard_fl_learning_rate,
-                config.model.optimizer,
-                config.model.training,
-                1,
-                LocalTrainingClient(
-                    features=features,
-                    labels=labels,
-                    sample_ids=sample_ids,
-                    training_seed=training_seed,
-                ),
-            )
-            client_flat = _flatten_model_state(
-                anchor.input_width, anchor.output_width, client_result.state
-            )
-            contributing_domains.append(domain)
-            raw_updates.append(client_flat - current_flat)
-        if not raw_updates:
-            continue
-        normalized = l2_normalize(tuple(raw_updates))
-        distance_matrix = cosine_distance_matrix(normalized)
-        cluster_labels = density_cluster_labels(
-            distance_matrix, config.baselines.density_cluster_trimmed_mean
-        )
-        selected_domains = select_largest_density_cluster(
-            tuple(contributing_domains), cluster_labels, distance_matrix
-        )
-        if not selected_domains:
-            continue
-        selected_updates = tuple(
-            raw_updates[contributing_domains.index(domain)] for domain in selected_domains
-        )
-        aggregated_update = trimmed_mean_aggregate(
-            selected_updates,
-            config.baselines.density_cluster_trimmed_mean.minimum_cluster_size_for_trimming,
-            config.baselines.density_cluster_trimmed_mean.trim_each_tail_count,
-        )
-        next_flat = current_flat + aggregated_update
-        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-        load_flat_trainable_parameters(next_model, next_flat)
-        state = model_state_from_classifier(next_model)
-        any_round_trained = True
-    if not any_round_trained:
-        return None
-    final_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
-    return final_flat - anchor.flat_parameters
-
 
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
 COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
 VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
 BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
-ANCHOR_FLAT_PARAMETERS = torch.zeros(115 * 256)
+ANCHOR_FLAT_PARAMETERS = torch.zeros(1)
 
 
 def _training_entry_points(evidence: PreparedEvidenceCounts) -> tuple[ModuleName, ...]:

@@ -4,11 +4,22 @@ import pandas
 import pytest
 import torch
 
+from fedsira.baselines.certified_ensemble import train_certified_ensemble_group_checkpoints
+from fedsira.baselines.fedavg_training import (
+    train_fedavg_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+)
 from fedsira.baselines.reconstruction_training import (
     anchor_round_calibration_updates,
     anchor_round_reconstruction_calibration_errors,
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
 )
-from fedsira.baselines.robust_training import train_krum_reference_delta
+from fedsira.baselines.robust_training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_krum_reference_delta,
+)
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
@@ -19,33 +30,19 @@ from fedsira.datasets.nbaiot.preprocessing import (
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.types import FeatureName
+from fedsira.evaluation.backdoor import (
+    compute_source_backdoor_asr,
+    recovery_backdoor_alarm_threshold,
+    triggered_to_benign_rate,
+)
 from fedsira.evaluation.capability_boundary import (
     compute_capability_under_specification_summary,
 )
+from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.evaluation.epistemic_boundary import (
     compute_shared_epistemic_failure_summary,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.executor import (
-    compute_source_backdoor_asr,
-    evaluate_domain,
-    non_source_domains,
-    prepared_feature_names,
-    real_evidence_available,
-    recovery_backdoor_alarm_threshold,
-    train_anchor,
-    train_centralized_reference_checkpoint,
-    train_certified_ensemble_group_checkpoints,
-    train_density_cluster_trimmed_mean_delta,
-    train_fedavg_reference_delta,
-    train_generic_hard_supported_examples_delta,
-    train_local_only_reference_checkpoint,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
-    triggered_to_benign_rate,
-)
 from fedsira.experiments.workflow import (
     BackdoorScope,
     EpistemicFailureScope,
@@ -53,11 +50,19 @@ from fedsira.experiments.workflow import (
     RealAnchor,
     RootCauseScope,
     domain_anchor_train_feature_mean,
+    prepared_feature_names,
+    real_evidence_available,
 )
+from fedsira.learning.anchor_training import train_anchor
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 from fedsira.learning.post_reference_training import (
     train_domain_reproduction_delta,
+    train_generic_hard_supported_examples_delta,
     train_source_candidate_delta,
+)
+from fedsira.learning.reference import (
+    train_centralized_reference_checkpoint,
+    train_local_only_reference_checkpoint,
 )
 
 pytestmark = pytest.mark.skip(

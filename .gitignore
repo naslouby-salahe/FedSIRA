@@ -229,4 +229,5 @@ prompt.md
 
 # Temporary Graphify audit workspace
 docs/.graphify-audit/
+docs/.architecture-audit/
 graphify-out/
