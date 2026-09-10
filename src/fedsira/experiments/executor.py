@@ -44,8 +44,6 @@ from fedsira.baselines.independent_retraining import (
     one_independent_retrain_local_epochs,
 )
 from fedsira.baselines.references import (
-    centralized_reference_local_epochs,
-    centralized_reference_pooled_rows,
     fedavg_reference_post_reference_local_epochs,
     fedavg_reference_post_reference_participants,
     fedavg_reference_post_reference_rounds,
@@ -319,7 +317,10 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
 )
 from fedsira.learning.post_reference import run_post_reference_training
-from fedsira.learning.reference import train_local_only_reference_checkpoint
+from fedsira.learning.reference import (
+    train_centralized_reference_checkpoint,
+    train_local_only_reference_checkpoint,
+)
 from fedsira.learning.scoring import logits_for_samples
 from fedsira.protocol.admission import (
     apply_production_update,
@@ -680,80 +681,6 @@ def train_source_update_sanitization_delta(
         calibration_updates, config.baselines.source_update_sanitization.coordinate_bound_percentile
     )
     return clip_source_update(source_delta, clip_bounds)
-
-
-def train_centralized_reference_checkpoint(
-    prepared_root: Path, master_seed: MasterSeed
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    domain_features: OrderedDict[NBaiotDomain, torch.Tensor] = OrderedDict()
-    domain_labels: OrderedDict[NBaiotDomain, torch.Tensor] = OrderedDict()
-    domain_sample_ids: OrderedDict[NBaiotDomain, tuple[ArtifactDigest, ...]] = OrderedDict()
-    for domain in NBAIOT_DOMAIN_ORDER:
-        combined_features: list[torch.Tensor] = []
-        combined_labels: list[torch.Tensor] = []
-        combined_sample_ids: list[ArtifactDigest] = []
-        for class_id in NBAIOT_CLASS_ORDER:
-            if class_id is NBaiotClass.GAFGYT_COMBO:
-                continue
-            tensor_view = _tensor_view(
-                load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
-            )
-            if tensor_view is None:
-                continue
-            features, labels, sample_ids = tensor_view
-            combined_features.append(features)
-            combined_labels.append(labels)
-            combined_sample_ids.extend(sample_ids)
-        if not combined_features:
-            continue
-        domain_features[domain] = torch.cat(combined_features, dim=0)
-        domain_labels[domain] = torch.cat(combined_labels, dim=0)
-        domain_sample_ids[domain] = tuple(combined_sample_ids)
-    if not domain_features:
-        return None
-    pooled_features = centralized_reference_pooled_rows(domain_features)
-    pooled_labels = centralized_reference_pooled_rows(domain_labels)
-    pooled_sample_ids = tuple(
-        sample_id
-        for domain in NBAIOT_DOMAIN_ORDER
-        if domain in domain_sample_ids
-        for sample_id in domain_sample_ids[domain]
-    )
-    input_width = pooled_features.shape[1]
-    output_width = len(NBAIOT_CLASS_ORDER)
-    initialization_seed = derive_uint32(
-        "CENTRALIZED_REFERENCE_INIT",
-        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
-    )
-    seed_job_local_rng_streams(initialization_seed)
-    initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
-    training_seed = _training_seed(
-        master_seed,
-        dataset_manifest_hash(prepared_root),
-        "centralized-start",
-        CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-        NBAIOT_DOMAIN_ORDER[0],
-        0,
-    )
-    client_result = train_one_client_locally(
-        initial_state,
-        input_width,
-        output_width,
-        config.model.optimizer.anchor_and_standard_fl_learning_rate,
-        config.model.optimizer,
-        config.model.training,
-        centralized_reference_local_epochs(),
-        LocalTrainingClient(
-            features=pooled_features,
-            labels=pooled_labels,
-            sample_ids=pooled_sample_ids,
-            training_seed=training_seed,
-        ),
-    )
-    final_model = FedSIRAClassifier(input_width, output_width)
-    load_model_state(final_model, client_result.state)
-    return flatten_trainable_parameters(final_model)
 
 
 def _combined_post_reference_rows(
