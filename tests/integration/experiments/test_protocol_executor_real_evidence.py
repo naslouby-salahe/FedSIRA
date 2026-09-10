@@ -39,12 +39,9 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.experiments.executor import (
-    ProtocolCellExecutor,
-    evaluate_domain,
-    non_source_domains,
-    train_anchor,
-)
+from fedsira.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.experiments.executor import ProtocolCellExecutor
+from fedsira.learning.anchor_training import train_anchor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed

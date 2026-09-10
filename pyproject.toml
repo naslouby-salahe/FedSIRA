@@ -84,6 +84,30 @@ reportAttributeAccessIssue = "none"
 root = "src/fedsira/learning/model.py"
 reportUnknownMemberType = "none"
 
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/experiments/cell_support.py"
+reportUnusedFunction = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/experiments/executor.py"
+reportPrivateUsage = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/experiments/cells.py"
+reportUnknownMemberType = "none"
+reportAttributeAccessIssue = "none"
+reportPrivateUsage = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/protocol/baselines/outcomes.py"
+reportUnknownMemberType = "none"
+reportAttributeAccessIssue = "none"
+reportPrivateUsage = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
 [tool.deptry]
 extend_exclude = ["noxfile.py"]
 known_first_party = ["fedsira"]
