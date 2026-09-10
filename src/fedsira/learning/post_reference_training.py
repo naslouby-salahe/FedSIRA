@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+from collections.abc import Sequence
 from pathlib import Path
 
 import torch
@@ -189,6 +191,23 @@ def train_domain_reproduction_delta(
         epistemic_failure_scope,
         heterogeneity_scope=heterogeneity_scope,
     )
+
+
+def certified_domain_delta_committee(
+    prepared_root: Path,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    domains: Sequence[NBaiotDomain],
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> OrderedDict[NBaiotDomain, torch.Tensor]:
+    deltas: OrderedDict[NBaiotDomain, torch.Tensor] = OrderedDict()
+    for domain in domains:
+        delta = train_domain_reproduction_delta(
+            prepared_root, master_seed, anchor, domain, heterogeneity_scope=heterogeneity_scope
+        )
+        if delta is not None:
+            deltas[domain] = delta
+    return deltas
 
 
 def train_source_candidate_delta(

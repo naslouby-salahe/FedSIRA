@@ -306,8 +306,8 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.post_reference_training import (
+    certified_domain_delta_committee,
     combined_post_reference_rows,
-    train_domain_reproduction_delta,
     train_source_candidate_delta,
 )
 from fedsira.learning.reference import (
@@ -1068,23 +1068,6 @@ def train_density_cluster_trimmed_mean_delta(
         return None
     final_flat = _flatten_model_state(anchor.input_width, anchor.output_width, state)
     return final_flat - anchor.flat_parameters
-
-
-def certified_domain_delta_committee(
-    prepared_root: Path,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    domains: Sequence[NBaiotDomain],
-    heterogeneity_scope: HeterogeneityScope | None = None,
-) -> OrderedDict[NBaiotDomain, torch.Tensor]:
-    deltas: OrderedDict[NBaiotDomain, torch.Tensor] = OrderedDict()
-    for domain in domains:
-        delta = train_domain_reproduction_delta(
-            prepared_root, master_seed, anchor, domain, heterogeneity_scope=heterogeneity_scope
-        )
-        if delta is not None:
-            deltas[domain] = delta
-    return deltas
 
 
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
