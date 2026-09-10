@@ -8,6 +8,7 @@ APPLICATION_ENTRY_MODULES = (
     "fedsira.workflows.preprocess",
     "fedsira.workflows.plan",
     "fedsira.workflows.smoke",
+    "fedsira.workflows.status",
     "fedsira.workflows.run",
     "fedsira.workflows.report",
 )

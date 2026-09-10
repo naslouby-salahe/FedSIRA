@@ -10,6 +10,7 @@ from fedsira.workflows import preprocess as preprocess_command
 from fedsira.workflows import report as report_command
 from fedsira.workflows import run as run_command
 from fedsira.workflows import smoke as smoke_command
+from fedsira.workflows import status as status_command
 
 
 class FedSIRAApplication:
@@ -34,6 +35,10 @@ class FedSIRAApplication:
 
     def run(self, name: ExperimentName, overwrite: OverwriteExisting) -> ApplicationExitCode:
         run_command.execute(name, overwrite)
+        return 0
+
+    def status(self) -> ApplicationExitCode:
+        status_command.execute()
         return 0
 
     def report(

@@ -24,6 +24,7 @@ ROADMAP_MODULES = frozenset(
         "workflows/report.py",
         "workflows/run.py",
         "workflows/smoke.py",
+        "workflows/status.py",
         "cli/main.py",
         "config.py",
         "datasets/__init__.py",

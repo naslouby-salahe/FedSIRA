@@ -87,13 +87,20 @@ def test_run_rejects_post_core_experiment_without_resolved_core() -> None:
     assert "Blocked" in result.stdout
 
 
+def test_status_renders_planned_experiment_lifecycle() -> None:
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "FedSIRA experiment status" in result.stdout
+    assert "Primary Confirmatory Evaluation" in result.stdout
+
+
 def test_report_export_produces_summary() -> None:
     result = runner.invoke(app, ["report"])
     assert result.exit_code == 1
 
 
 def test_no_command_exposes_a_seed_or_method_override_option() -> None:
-    for command in ("doctor", "preprocess", "plan", "smoke", "run", "report"):
+    for command in ("doctor", "preprocess", "plan", "smoke", "run", "status", "report"):
         result = runner.invoke(app, [command, "--help"])
         lowered = result.stdout.lower()
         for forbidden in ("--seed", "--method", "--baseline", "--attack", "--phase"):

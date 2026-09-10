@@ -42,6 +42,11 @@ def run_experiment(
 
 
 @app.command()
+def status() -> None:
+    raise typer.Exit(code=application.status())
+
+
+@app.command()
 def report(
     name: ExperimentName | None = typer.Argument(None),
     overwrite: OverwriteExisting = typer.Option(False, "--overwrite"),

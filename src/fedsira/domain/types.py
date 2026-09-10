@@ -340,6 +340,7 @@ AutomaticallyRetriable = BooleanValue
 FinalGateRequired = BooleanValue
 PlanRenderText = TextValue
 RunRenderText = TextValue
+StatusRenderText = TextValue
 TableCsvText = TextValue
 FormattedStatisticText = TextValue
 LogRecordText = TextValue
