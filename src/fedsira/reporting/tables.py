@@ -94,11 +94,44 @@ MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
     "Generalization Results",
     "Statistical Summary",
 )
+EXPERIMENT_CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
 
 
 class RenderedTable(FrozenDomainModel):
     name: TableName
     csv_text: TableCsvText
+
+
+def render_experiment_cell_metrics_table(
+    outcomes: tuple[CellExecutionOutcome, ...],
+) -> RenderedTable:
+    rows: list[tuple[TextValue, ...]] = []
+    for outcome in outcomes:
+        for metric_name, metric_value in outcome.metrics:
+            rows.append(
+                (
+                    outcome.cell.method,
+                    outcome.cell.condition,
+                    f"{outcome.cell.master_seed}",
+                    outcome.terminal_state.value,
+                    metric_name,
+                    format_metric_value(metric_value),
+                )
+            )
+    return RenderedTable(
+        name=EXPERIMENT_CELL_METRICS_TABLE_NAME,
+        csv_text=_csv_text(
+            (
+                "method",
+                "condition",
+                "master_seed",
+                "terminal_state",
+                "metric",
+                "value",
+            ),
+            tuple(rows),
+        ),
+    )
 
 
 def _csv_text(

@@ -26,10 +26,15 @@ from fedsira.experiments.definitions import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     PrimaryScenario,
 )
-from fedsira.experiments.execution import CellExecutionOutcome, ExecutionRecordStore
+from fedsira.experiments.execution import (
+    CellExecutionOutcome,
+    ExecutionRecordStore,
+    ExperimentExecutionResult,
+)
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.reporting.export import (
     ReportExportResult,
+    export_experiment_report,
     export_project_summary,
 )
 from fedsira.reporting.figures import (
@@ -99,6 +104,31 @@ def test_render_experiment_plan_table_is_csv() -> None:
         lines[0] == "experiment,class,methods,conditions,seeds,nominal_run_count,comparison_family"
     )
     assert len(lines) - 1 == len(plan.experiments)
+
+
+def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export = export_experiment_report(result, tmp_path)
+    assert export.verification.passed
+    exported = {Path(path).name for path in export.exported_paths}
+    assert "Cell Metrics.csv" in exported
+    assert "FedSIRA Protocol Schematic.png" in exported
 
 
 def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() -> None:

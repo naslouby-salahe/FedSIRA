@@ -155,12 +155,9 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
 def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
     if result.lifecycle_state is not ExperimentLifecycleState.COMPLETED:
         return
-    config = current_application_context().scientific_config
-    experiment_root = (
-        REPOSITORY_ROOT
-        / Path(config.execution.repository_layout.manuscript_results)
-        / "experiments"
-        / result.experiment
+    experiment_root = REPOSITORY_ROOT / workspace_root_for_family(
+        ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
+        result.experiment,
     )
     export = export_experiment_report(result, experiment_root)
     if not export.verification.passed:

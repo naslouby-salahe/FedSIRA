@@ -38,9 +38,15 @@ from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
     render_mandatory_figures,
+    render_protocol_schematic,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.tables import MANUSCRIPT_TABLE_NAMES, RenderedTable, render_mandatory_tables
+from fedsira.reporting.tables import (
+    MANUSCRIPT_TABLE_NAMES,
+    RenderedTable,
+    render_experiment_cell_metrics_table,
+    render_mandatory_tables,
+)
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
@@ -131,11 +137,16 @@ def export_experiment_report(
         )
 
     tables_root = experiment_root / "tables" / "main"
+    figures_root = experiment_root / "figures" / "main"
     metrics_root = experiment_root / "metrics" / "primary"
     tables_root.mkdir(parents=True, exist_ok=True)
+    figures_root.mkdir(parents=True, exist_ok=True)
     metrics_root.mkdir(parents=True, exist_ok=True)
 
-    exported: list[Path] = []
+    exported: list[Path] = [
+        _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
+        render_protocol_schematic(figures_root / "FedSIRA Protocol Schematic.png"),
+    ]
     if result.comparison_results:
         statistical_table = table_renderers.render_statistical_summary_table(
             result.comparison_results,
