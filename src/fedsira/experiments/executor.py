@@ -27,7 +27,6 @@ from fedsira.baselines.calibration import (
     reconstruction_filter_calibration_error_count,
     reconstruction_filter_reweight,
     reconstruction_rejection_threshold,
-    recovery_alarm_threshold,
     recovery_rollback_is_triggered,
     same_context_verifier_panel,
     sanitization_clip_bounds,
@@ -148,7 +147,6 @@ from fedsira.domain.types import (
     DomainId,
     ExampleCount,
     FeatureCount,
-    FeatureName,
     FederatedRoundCount,
     FoldIndex,
     FrozenDomainModel,
@@ -166,9 +164,12 @@ from fedsira.domain.types import (
     RoundIndex,
     RowCount,
     SchemaVersion,
-    TriggerFeatureValue,
 )
-from fedsira.evaluation.backdoor import compute_source_backdoor_asr
+from fedsira.evaluation.backdoor import (
+    compute_source_backdoor_asr,
+    recovery_backdoor_alarm_threshold,
+    triggered_to_benign_rate,
+)
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
@@ -260,7 +261,6 @@ from fedsira.experiments.scenarios.evidence_arrival import (
     reproducer_order,
 )
 from fedsira.experiments.scenarios.evidence_scarcity import (
-    apply_attacker_induced_common_context,
     diagnostic_marker_metric_or_insufficient,
     match_diagnostic_benign_report_test_rows,
     select_spurious_feature_rows,
@@ -1454,63 +1454,6 @@ def evaluate_certified_ensemble(
         ),
         supported_macro_f1=macro_f1(supported_f1),
         benign_far=benign_false_alarm_rate(true_labels, predicted_labels, NBaiotClass.BENIGN),
-    )
-
-
-def triggered_to_benign_rate(
-    prepared_root: Path,
-    anchor: RealAnchor,
-    flat_parameters: torch.Tensor,
-    domain: NBaiotDomain,
-    role: Role,
-    trigger_feature_names: tuple[FeatureName, ...],
-    trigger_value: TriggerFeatureValue,
-) -> MetricResult:
-    feature_names = prepared_feature_names(prepared_root)
-    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_UDP, role)
-    if feature_names is None or rows is None:
-        return MetricResult(value=None, denominator=0)
-    trigger_indices = [feature_names.index(name) for name in trigger_feature_names]
-    features = torch.tensor(rows.features, dtype=torch.float32)
-    triggered_features = apply_attacker_induced_common_context(
-        features, trigger_indices, trigger_value
-    )
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, flat_parameters)
-    model.eval()
-    with torch.no_grad():
-        logits = logits_for_samples(model, triggered_features)
-        predictions = torch.argmax(logits, dim=-1)
-    benign_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
-    rate = float((predictions == benign_index).float().mean())
-    return MetricResult(value=rate, denominator=len(rows.sample_ids))
-
-
-def recovery_backdoor_alarm_threshold(
-    prepared_root: Path, anchor: RealAnchor
-) -> MetricValue | None:
-    config = current_application_context().scientific_config
-    trigger_feature_names = NBAIOT_TRIGGER_FEATURES
-    trigger_value = (
-        config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
-    )
-    rates: list[MetricValue] = []
-    for domain in NBAIOT_DOMAIN_ORDER:
-        rate = triggered_to_benign_rate(
-            prepared_root,
-            anchor,
-            anchor.flat_parameters,
-            domain,
-            Role.ANCHOR_VALIDATION,
-            trigger_feature_names,
-            trigger_value,
-        )
-        if rate.value is not None:
-            rates.append(rate.value)
-    if not rates:
-        return None
-    return recovery_alarm_threshold(
-        tuple(rates), config.baselines.recovery_after_source_admission.backdoor_alarm_percentile
     )
 
 
