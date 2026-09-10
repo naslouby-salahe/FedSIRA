@@ -96,31 +96,31 @@ PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
 ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"
 EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
-READ_BATCH_ROWS: RowCount = 25_000
-WRITE_BATCH_ROWS: RowCount = 25_000
+READ_BATCH_ROWS: RowCount = 25_000 #TODO: should be in yml and accessed through config
+WRITE_BATCH_ROWS: RowCount = 25_000 #TODO: should be in yml and accessed through config
 
 
-class _ParquetScalarKind(StrEnum):
+class _ParquetScalarKind(StrEnum):#TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     STRING = "string"
     INT64 = "int64"
     FLOAT64 = "float64"
 
 
-class _ArrowDataType(Protocol): ...
+class _ArrowDataType(Protocol): ... #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
 
 
-class _ArrowArray(Protocol): ...
+class _ArrowArray(Protocol): ... #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
 
 
-class _ArrowSchema(Protocol): ...
+class _ArrowSchema(Protocol): ... #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
 
 
-class _ArrowTable(Protocol):
+class _ArrowTable(Protocol): #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     @property
     def schema(self) -> _ArrowSchema: ...
 
 
-class _ArrowModule(Protocol):
+class _ArrowModule(Protocol): #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     def array(
         self,
         values: tuple[ParquetScalar, ...],
@@ -140,17 +140,17 @@ class _ArrowModule(Protocol):
     def float64(self) -> _ArrowDataType: ...
 
 
-class _ParquetWriter(Protocol):
+class _ParquetWriter(Protocol): #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     def write_table(self, table: _ArrowTable) -> None: ...
 
     def close(self) -> None: ...
 
 
-class _ParquetWriterFactory(Protocol):
+class _ParquetWriterFactory(Protocol): #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     def __call__(self, _where: RepositoryPath, schema: _ArrowSchema) -> _ParquetWriter: ...
 
 
-class _ParquetModule(Protocol):
+class _ParquetModule(Protocol): #TODO: all this parquet and arrow methods should not be within this file. Move to their proper more central location
     ParquetWriter: _ParquetWriterFactory
 
 
