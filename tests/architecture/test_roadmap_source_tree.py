@@ -71,6 +71,7 @@ ROADMAP_MODULES = frozenset(
         "learning/__init__.py",
         "learning/aggregation.py",
         "learning/anchor.py",
+        "learning/anchor_training.py",
         "learning/federated.py",
         "learning/model.py",
         "learning/post_reference.py",

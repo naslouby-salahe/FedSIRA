@@ -2301,7 +2301,8 @@ FedSIRA/
 │       │   ├── federated.py
 │       │   ├── aggregation.py
 │       │   ├── scoring.py
-│       │   └── anchor.py
+│       │   ├── anchor.py
+│       │   └── anchor_training.py
 │       │
 │       ├── protocol/
 │       │   ├── __init__.py
