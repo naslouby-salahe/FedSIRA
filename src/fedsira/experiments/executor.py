@@ -149,7 +149,6 @@ from fedsira.domain.types import (
     DomainId,
     ExampleCount,
     FeatureCount,
-    FeatureIndex,
     FeatureName,
     FederatedRoundCount,
     FoldIndex,
@@ -170,6 +169,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     TriggerFeatureValue,
 )
+from fedsira.evaluation.backdoor import compute_source_backdoor_asr
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
@@ -994,35 +994,6 @@ def train_source_candidate_delta(
         config.model.post_reference.local_epochs,
     )
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
-
-
-def compute_source_backdoor_asr(
-    prepared_root: Path,
-    anchor: RealAnchor,
-    production_flat_parameters: torch.Tensor,
-    source_domain: NBaiotDomain,
-    trigger_feature_indices: tuple[FeatureIndex, ...],
-    trigger_value: TriggerFeatureValue,
-) -> MetricResult:
-    rows = load_prepared_rows(
-        prepared_root, source_domain, NBaiotClass.GAFGYT_UDP, Role.REPORT_TEST
-    )
-    tensor_view = _tensor_view(rows)
-    if tensor_view is None:
-        return MetricResult(value=None, denominator=0)
-    features, _labels, _sample_ids = tensor_view
-    triggered_features = features.clone()
-    for feature_index in trigger_feature_indices:
-        triggered_features[:, feature_index] = trigger_value
-    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-    load_flat_trainable_parameters(model, production_flat_parameters)
-    model.eval()
-    with torch.no_grad():
-        logits = logits_for_samples(model, triggered_features)
-        predictions = torch.argmax(logits, dim=1)
-    benign_index = NBAIOT_CLASS_ORDER.index(NBaiotClass.BENIGN)
-    asr = float((predictions == benign_index).float().mean())
-    return MetricResult(value=asr, denominator=triggered_features.shape[0])
 
 
 def train_generic_hard_supported_examples_delta(
