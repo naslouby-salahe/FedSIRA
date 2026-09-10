@@ -28,6 +28,7 @@ from fedsira.experiments.executor import (
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.io.paths import workspace_root_for_family
+from fedsira.reporting.export import export_experiment_report
 from fedsira.runtime import (
     ApplicationContext,
     bound_application_context,
@@ -151,6 +152,25 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 
+def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
+    if result.lifecycle_state is not ExperimentLifecycleState.COMPLETED:
+        return
+    config = current_application_context().scientific_config
+    experiment_root = (
+        REPOSITORY_ROOT
+        / Path(config.execution.repository_layout.manuscript_results)
+        / "experiments"
+        / result.experiment
+    )
+    export = export_experiment_report(result, experiment_root)
+    if not export.verification.passed:
+        raise RuntimeError(
+            f"completed experiment report export failed: {', '.join(export.verification.failures)}"
+        )
+    for path in export.exported_paths:
+        print(f"exported {path}")
+
+
 def execute(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
@@ -168,6 +188,7 @@ def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
         resolved_core_complete=resolved_core is not None,
     )
     print(render_result(result))
+    _export_completed_experiment(result)
     if (
         result.lifecycle_state is ExperimentLifecycleState.COMPLETED
         and (not overwrite)
