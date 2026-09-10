@@ -18,8 +18,10 @@ from fedsira.domain.types import (
     ExperimentName,
     FailureMessage,
     FrozenDomainModel,
+    LogRecordText,
     MasterSeed,
     MethodName,
+    MetricName,
     MetricObservation,
     MetricValue,
     OverwriteExisting,
@@ -39,6 +41,7 @@ from fedsira.experiments.planning import (
 from fedsira.io.paths import experiment_log_path
 from fedsira.runtime import FailureDetail, automatic_recovery_permitted, current_application_context
 from fedsira.runtime_execution import (
+    ElapsedTimer,
     configure_structured_file_logging,
     framed_bytes,
     get_structured_logger,
@@ -108,8 +111,52 @@ class ExecutionLogFields(FrozenDomainModel):
     experiment: ExperimentName
     overwrite: OverwriteExisting | None = None
     cell: ScientificCellSemanticKey | None = None
+    method: MethodName | None = None
+    condition: ScenarioName | None = None
+    master_seed: MasterSeed | None = None
+    metric: MetricName | None = None
     terminal_state: ExperimentLifecycleState | None = None
     completed_cells: ScientificCellCount | None = None
+    total_cells: ScientificCellCount | None = None
+    elapsed_seconds: MetricValue | None = None
+
+    def with_cell_terminal_state(
+        self,
+        terminal_state: ExperimentLifecycleState,
+        completed_cells: ScientificCellCount,
+    ) -> ExecutionLogFields:
+        return ExecutionLogFields(
+            experiment=self.experiment,
+            overwrite=self.overwrite,
+            cell=self.cell,
+            method=self.method,
+            condition=self.condition,
+            master_seed=self.master_seed,
+            metric=self.metric,
+            terminal_state=terminal_state,
+            completed_cells=completed_cells,
+            total_cells=self.total_cells,
+            elapsed_seconds=self.elapsed_seconds,
+        )
+
+    def with_metric(self, metric: MetricName) -> ExecutionLogFields:
+        return ExecutionLogFields(
+            experiment=self.experiment,
+            overwrite=self.overwrite,
+            cell=self.cell,
+            method=self.method,
+            condition=self.condition,
+            master_seed=self.master_seed,
+            metric=metric,
+            terminal_state=self.terminal_state,
+            completed_cells=self.completed_cells,
+            total_cells=self.total_cells,
+            elapsed_seconds=self.elapsed_seconds,
+        )
+
+
+def _log_execution_event(event: LogRecordText, fields: ExecutionLogFields) -> None:
+    EXECUTION_LOGGER.info(event, extra=fields.model_dump())
 
 
 TERMINAL_EXPERIMENT_STATES: frozenset[ExperimentLifecycleState] = frozenset(
@@ -257,11 +304,15 @@ def execute_experiment(
         EXECUTION_LOGGER,
         current_application_context().repository_root / experiment_log_path(experiment),
     )
-    EXECUTION_LOGGER.info(
-        "experiment execution started",
-        extra=ExecutionLogFields(experiment=experiment, overwrite=overwrite).model_dump(),
+    timer = ElapsedTimer()
+    _log_execution_event(
+        "experiment.started",
+        ExecutionLogFields(experiment=experiment, overwrite=overwrite),
     )
     definition = experiment_by_name(experiment)
+    _log_execution_event(
+        "experiment.configuration.resolved", ExecutionLogFields(experiment=experiment)
+    )
     plan = build_plan(
         resolved_core_complete=resolved_core_complete,
         master_seeds=resolved_config.seeds_and_determinism.master_seeds,
@@ -270,6 +321,10 @@ def execute_experiment(
     validate_condition_vocabulary(plan)
     validate_no_duplicate_semantic_cells(plan)
     planned = plan.experiment(experiment)
+    _log_execution_event(
+        "experiment.plan.created",
+        ExecutionLogFields(experiment=experiment, total_cells=len(planned.cells)),
+    )
     if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
         return ExperimentExecutionResult(
             experiment=experiment, lifecycle_state=ExperimentLifecycleState.BLOCKED, outcomes=()
@@ -282,20 +337,28 @@ def execute_experiment(
     )
     states = prerequisite_states or _prerequisite_states_from_store(plan, experiment, store)
     validate_experiment_prerequisites_met(experiment, states)
+    _log_execution_event(
+        "experiment.prerequisites.validated", ExecutionLogFields(experiment=experiment)
+    )
     outcomes: list[CellExecutionOutcome] = []
     for cell in planned.cells:
+        fields = ExecutionLogFields(
+            experiment=experiment,
+            cell=cell.semantic_key,
+            method=cell.method,
+            condition=cell.condition,
+            master_seed=cell.master_seed,
+            total_cells=len(planned.cells),
+        )
         existing = store.read_outcome(experiment, cell.semantic_key)
         if (
             existing is not None
             and not overwrite
             and existing.terminal_state is ExperimentLifecycleState.COMPLETED
         ):
-            EXECUTION_LOGGER.info(
-                "reused completed cell outcome",
-                extra=ExecutionLogFields(
-                    experiment=experiment,
-                    cell=cell.semantic_key,
-                ).model_dump(),
+            _log_execution_event(
+                "cell.reused",
+                fields,
             )
             outcomes.append(
                 CellExecutionOutcome(
@@ -306,24 +369,28 @@ def execute_experiment(
                 )
             )
             continue
+        _log_execution_event("cell.started", fields)
         outcome = execute_cell_with_retry(cell, executor)
         store.write_outcome(outcome)
-        EXECUTION_LOGGER.info(
-            "persisted cell outcome",
-            extra=ExecutionLogFields(
-                experiment=experiment,
-                cell=cell.semantic_key,
-                terminal_state=outcome.terminal_state,
-            ).model_dump(),
-        )
+        completed_cells = len(outcomes) + 1
+        completed_fields = fields.with_cell_terminal_state(outcome.terminal_state, completed_cells)
+        _log_execution_event("cell.record.persisted", completed_fields)
+        for metric_name, _metric_value in outcome.metrics:
+            _log_execution_event(
+                "cell.metric.computed",
+                completed_fields.with_metric(metric_name),
+            )
+        _log_execution_event("cell.completed", completed_fields)
+        _log_execution_event("experiment.progress", completed_fields)
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
     lifecycle_state = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
-    comparisons = (
-        ()
-        if comparison_builder is None
-        else comparison_builder(experiment, definition.dataset, outcome_tuple, store)
-    )
+    if comparison_builder is None:
+        comparisons = ()
+    else:
+        _log_execution_event("comparison.started", ExecutionLogFields(experiment=experiment))
+        comparisons = comparison_builder(experiment, definition.dataset, outcome_tuple, store)
+        _log_execution_event("comparison.completed", ExecutionLogFields(experiment=experiment))
     result = ExperimentExecutionResult(
         experiment=experiment,
         lifecycle_state=lifecycle_state,
@@ -331,13 +398,17 @@ def execute_experiment(
         comparison_results=comparisons,
         execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
     )
-    EXECUTION_LOGGER.info(
-        "experiment execution finished",
-        extra=ExecutionLogFields(
+    _log_execution_event(
+        "experiment.completed"
+        if lifecycle_state is ExperimentLifecycleState.COMPLETED
+        else "experiment.failed",
+        ExecutionLogFields(
             experiment=experiment,
             terminal_state=lifecycle_state,
             completed_cells=result.cell_completion_count,
-        ).model_dump(),
+            total_cells=len(planned.cells),
+            elapsed_seconds=timer.elapsed_seconds(),
+        ),
     )
     return result
 
