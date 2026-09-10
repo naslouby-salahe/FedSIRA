@@ -48,6 +48,7 @@ Doi = Annotated[
         pattern=r"^10\.[0-9]{4,9}/\S+$",
     ),
 ]
+ArtifactFileName = TextValue
 RepositoryPath = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 ExperimentName = TextValue
 MethodName = TextValue

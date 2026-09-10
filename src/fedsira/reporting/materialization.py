@@ -7,6 +7,7 @@ import pandas
 
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.types import (
+    BooleanValue,
     ComparisonName,
     ExperimentName,
     FrozenDomainModel,
@@ -20,11 +21,13 @@ from fedsira.domain.types import (
     TextValue,
 )
 from fedsira.evaluation.comparisons import ComparisonFamily, ComparisonFamilyResult, ComparisonState
+from fedsira.experiments.definitions import (
+    AGGREGATE_METRICS_PARQUET_NAME,
+    CELL_METRICS_PARQUET_NAME,
+    SEED_METRICS_PARQUET_NAME,
+)
 from fedsira.experiments.execution import CellExecutionOutcome, ExperimentExecutionResult
 
-CELL_METRICS_PARQUET_NAME = "cell-metrics.parquet"
-SEED_METRICS_PARQUET_NAME = "seed-metrics.parquet"
-AGGREGATE_METRICS_PARQUET_NAME = "aggregate-metrics.parquet"
 COMPARISONS_PARQUET_NAME = "comparisons.parquet"
 TIMINGS_PARQUET_NAME = "timings.parquet"
 RESOURCES_PARQUET_NAME = "resources.parquet"
@@ -149,6 +152,10 @@ class ComparisonEvidenceRow(FrozenDomainModel):
 
 class ExperimentEvidenceMaterialization(FrozenDomainModel):
     paths: tuple[RepositoryPath, ...]
+
+
+def parquet_contains_rows(path: Path) -> BooleanValue:
+    return path.is_file() and not pandas.read_parquet(path).empty
 
 
 def _metric_rows(

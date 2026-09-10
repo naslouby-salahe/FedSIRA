@@ -10,6 +10,7 @@ from fedsira.baselines.registry import (
 )
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.types import (
+    ArtifactFileName,
     BooleanValue,
     ConditionName,
     ExperimentName,
@@ -182,6 +183,9 @@ class SecondaryScenario(StrEnum):
 
 
 CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
+CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
+SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
+AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
 PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
 PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
 USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
@@ -198,6 +202,7 @@ SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
 
 class ExperimentArtifactSpecification(FrozenDomainModel):
     metrics_required: BooleanValue
+    required_metric_artifacts: tuple[ArtifactFileName, ...]
     required_tables: tuple[TableName, ...]
     required_figures: tuple[FigureName, ...]
 
@@ -207,6 +212,11 @@ def experiment_artifacts(
 ) -> ExperimentArtifactSpecification:
     return ExperimentArtifactSpecification(
         metrics_required=True,
+        required_metric_artifacts=(
+            CELL_METRICS_PARQUET_NAME,
+            SEED_METRICS_PARQUET_NAME,
+            AGGREGATE_METRICS_PARQUET_NAME,
+        ),
         required_tables=(CELL_METRICS_TABLE_NAME,),
         required_figures=(PROTOCOL_SCHEMATIC_FIGURE_NAME, *specialized_figures),
     )

@@ -37,6 +37,7 @@ from fedsira.reporting.export import (
     ReportExportResult,
     export_experiment_report,
     export_project_summary,
+    verify_experiment_artifacts,
 )
 from fedsira.reporting.figures import (
     MANDATORY_FIGURE_NAMES,
@@ -171,6 +172,37 @@ def test_export_experiment_report_materializes_efficiency_telemetry(tmp_path: Pa
     assert export.verification.passed
     assert (tmp_path / "telemetry" / TIMINGS_PARQUET_NAME).is_file()
     assert (tmp_path / "telemetry" / RESOURCES_PARQUET_NAME).is_file()
+
+
+def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_path: Path) -> None:
+    result = ExperimentExecutionResult(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+        lifecycle_state=ExperimentLifecycleState.COMPLETED,
+        outcomes=(
+            CellExecutionOutcome(
+                cell=ScientificCell(
+                    experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+                    method="Resolved FedSIRA Core",
+                    condition="Legitimate Unsupported Capability",
+                    master_seed=1103,
+                ),
+                terminal_state=ExperimentLifecycleState.COMPLETED,
+                failure=None,
+                metrics=(("target-f1", 0.8),),
+            ),
+        ),
+    )
+    export_experiment_report(result, tmp_path)
+    (tmp_path / "metrics" / "primary" / CELL_METRICS_PARQUET_NAME).unlink()
+    verification = verify_experiment_artifacts(
+        result,
+        tmp_path / "tables" / "main",
+        tmp_path / "figures" / "main",
+        tmp_path / "metrics" / "primary",
+        tmp_path / "metrics" / "primary" / "summary.json",
+    )
+    assert not verification.passed
+    assert any(CELL_METRICS_PARQUET_NAME in failure for failure in verification.failures)
 
 
 def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() -> None:

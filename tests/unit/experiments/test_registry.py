@@ -15,6 +15,7 @@ def test_experiment_by_name_resolves_every_registered_experiment() -> None:
 def test_every_experiment_declares_required_evidence_artifacts() -> None:
     for definition in experiment_registry():
         assert definition.artifacts.metrics_required
+        assert definition.artifacts.required_metric_artifacts
         assert definition.artifacts.required_tables
         assert definition.artifacts.required_figures
 

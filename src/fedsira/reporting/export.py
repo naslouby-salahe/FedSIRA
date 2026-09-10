@@ -65,7 +65,10 @@ from fedsira.reporting.figures import (
     render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.materialization import materialize_experiment_evidence
+from fedsira.reporting.materialization import (
+    materialize_experiment_evidence,
+    parquet_contains_rows,
+)
 from fedsira.reporting.tables import (
     MANUSCRIPT_TABLE_NAMES,
     RenderedTable,
@@ -153,10 +156,11 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
     return destination
 
 
-def _verify_experiment_artifacts(
+def verify_experiment_artifacts(
     result: ExperimentExecutionResult,
     tables_root: Path,
     figures_root: Path,
+    metrics_root: Path,
     summary_path: Path,
 ) -> CompletenessVerificationResult:
     specification = experiment_by_name(result.experiment).artifacts
@@ -165,6 +169,12 @@ def _verify_experiment_artifacts(
         not summary_path.is_file() or not summary_path.read_text(encoding="utf-8").strip()
     ):
         failures.append(f"{result.experiment}: metric summary is missing or empty")
+    for filename in specification.required_metric_artifacts:
+        path = metrics_root / filename
+        if not parquet_contains_rows(path):
+            failures.append(
+                f"{result.experiment}: required metric artifact {filename} is missing or empty"
+            )
     for table_name in specification.required_tables:
         path = tables_root / f"{table_name}.csv"
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
@@ -333,7 +343,13 @@ def export_experiment_report(
     )
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n")
     exported.append(manifest_path)
-    verification = _verify_experiment_artifacts(result, tables_root, figures_root, summary_path)
+    verification = verify_experiment_artifacts(
+        result,
+        tables_root,
+        figures_root,
+        metrics_root,
+        summary_path,
+    )
     return ReportExportResult(
         experiment=result.experiment,
         exported_paths=tuple(str(path) for path in exported),
