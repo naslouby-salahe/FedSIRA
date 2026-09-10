@@ -18,7 +18,7 @@ def _called_names(path: Path) -> frozenset[str]:
 
 
 def test_run_workflow_reaches_execution_evaluation_and_evidence_export() -> None:
-    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "workflows" / "run.py")
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "application.py")
     expected: frozenset[str] = frozenset(
         (
             "ProtocolCellExecutor",
@@ -31,7 +31,7 @@ def test_run_workflow_reaches_execution_evaluation_and_evidence_export() -> None
 
 
 def test_report_workflow_reaches_persisted_evidence_and_publication_export() -> None:
-    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "workflows" / "report.py")
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "reporting" / "export.py")
     expected: frozenset[str] = frozenset(
         (
             "ExecutionRecordStore",
@@ -45,7 +45,7 @@ def test_report_workflow_reaches_persisted_evidence_and_publication_export() -> 
 
 
 def test_status_workflow_reaches_persisted_evidence_without_execution() -> None:
-    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "workflows" / "status.py")
+    calls = _called_names(REPO_ROOT / "src" / "fedsira" / "experiments" / "execution.py")
     expected: frozenset[str] = frozenset(
         (
             "ExecutionRecordStore",

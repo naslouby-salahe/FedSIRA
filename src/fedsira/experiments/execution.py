@@ -4,9 +4,10 @@ import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from fedsira.artifacts.paths import experiment_log_path
+from fedsira.artifacts.paths import experiment_log_path, workspace_root_for_family
 from fedsira.artifacts.provenance import ReconstructionProvenance, collect_reconstruction_provenance
 from fedsira.domain.enums import (
+    ArtifactFamily,
     DatasetId,
     ExperimentLifecycleState,
     FailureClass,
@@ -30,6 +31,7 @@ from fedsira.domain.types import (
     ScenarioName,
     ScientificCellCount,
     ScientificCellSemanticKey,
+    StatusRenderText,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.definitions import experiment_by_name
@@ -40,9 +42,13 @@ from fedsira.experiments.planning import (
     build_plan,
 )
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
+    ApplicationContext,
     ElapsedTimer,
     FailureDetail,
     automatic_recovery_permitted,
+    bound_application_context,
+    configure_deterministic_backend,
     configure_structured_file_logging,
     current_application_context,
     framed_bytes,
@@ -490,3 +496,45 @@ class ExecutionRecordStore:
             for record in self.read_all_outcomes(planned.definition.name)
             if record.semantic_key in expected_keys
         )
+
+
+def render_status() -> StatusRenderText:
+    from fedsira.experiments.collapse import read_resolved_core
+
+    config = current_application_context().scientific_config
+    resolved_core = read_resolved_core(
+        REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
+    )
+    plan = build_plan(resolved_core_complete=resolved_core is not None)
+    store = ExecutionRecordStore(
+        REPOSITORY_ROOT / Path(config.execution.repository_layout.execution_workspace)
+    )
+    lines: list[str] = ["FedSIRA experiment status", ""]
+    for planned in plan.experiments:
+        records = store.read_planned_outcomes(planned)
+        state = derive_experiment_lifecycle(planned, records)
+        completed = sum(
+            record.terminal_state is ExperimentLifecycleState.COMPLETED for record in records
+        )
+        lines.append(
+            f"{planned.definition.name:<55} {completed:>4}/{len(planned.cells):<4} {state.value}"
+        )
+    return "\n".join(lines)
+
+
+def execute_status() -> None:
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        print(render_status())
+
+
+def execute_smoke(overwrite: OverwriteExisting) -> None:
+    from fedsira.experiments.validation import render_smoke, run_smoke_suite
+
+    context = ApplicationContext.load(REPOSITORY_ROOT)
+    with bound_application_context(context):
+        configure_deterministic_backend()
+        result = run_smoke_suite(overwrite=overwrite)
+    print(render_smoke(result))
+    if not result.passed:
+        raise SystemExit(1)

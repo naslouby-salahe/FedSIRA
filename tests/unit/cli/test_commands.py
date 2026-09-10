@@ -1,13 +1,14 @@
 import pytest
 from typer.testing import CliRunner
 
+from fedsira import application as doctor
 from fedsira.cli import app
-from fedsira.runtime import EnvironmentMismatch
-from fedsira.workflows import doctor, preprocess
+from fedsira.datasets import preprocess
+from fedsira.runtime import REPOSITORY_ROOT, EnvironmentMismatch
 
 runner = CliRunner()
 
-REAL_NBAIOT_ROOT = preprocess.REPOSITORY_ROOT / "data" / "raw" / "N-BaIoT"
+REAL_NBAIOT_ROOT = REPOSITORY_ROOT / "data" / "raw" / "N-BaIoT"
 
 
 def _no_mismatches(_rar_archives_present: object) -> tuple[EnvironmentMismatch, ...]:
@@ -51,7 +52,7 @@ def test_preprocess_without_dataset_runs_all_roadmap_datasets(
     monkeypatch.setattr(preprocess, "_preprocess_nbaiot", record_nbaiot)
     monkeypatch.setattr(preprocess, "_preprocess_ciciot2023", record_ciciot2023)
 
-    preprocess.execute(None, True)
+    preprocess.execute_preprocess(None, True)
 
     assert calls == [("N-BaIoT", True), ("CICIoT2023", True)]
 

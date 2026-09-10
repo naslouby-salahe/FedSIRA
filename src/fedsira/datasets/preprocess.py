@@ -173,7 +173,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     )
 
 
-def execute(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
+def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
         _execute_bound(dataset, overwrite)

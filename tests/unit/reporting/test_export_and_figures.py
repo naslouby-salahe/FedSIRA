@@ -38,6 +38,8 @@ from fedsira.reporting.export import (
     ReportExportResult,
     export_experiment_report,
     export_project_summary,
+    project_efficiency_telemetry,
+    project_evidence_trajectory,
     verify_experiment_artifacts,
 )
 from fedsira.reporting.figures import (
@@ -65,10 +67,6 @@ from fedsira.reporting.tables import (
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
-)
-from fedsira.workflows.report import (
-    project_efficiency_telemetry,
-    project_evidence_trajectory,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

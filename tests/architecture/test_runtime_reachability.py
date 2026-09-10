@@ -4,13 +4,11 @@ from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, module_name
 
 APPLICATION_ENTRY_MODULES = (
     "fedsira.cli",
-    "fedsira.workflows.doctor",
-    "fedsira.workflows.preprocess",
-    "fedsira.workflows.plan",
-    "fedsira.workflows.smoke",
-    "fedsira.workflows.status",
-    "fedsira.workflows.run",
-    "fedsira.workflows.report",
+    "fedsira.application",
+    "fedsira.datasets.preprocess",
+    "fedsira.experiments.planning",
+    "fedsira.experiments.execution",
+    "fedsira.reporting.export",
 )
 
 

@@ -24,6 +24,7 @@ ROADMAP_MODULES = frozenset(
         "datasets/nbaiot/preprocessing.py",
         "datasets/nbaiot/schema.py",
         "datasets/nbaiot/validation.py",
+        "datasets/preprocess.py",
         "datasets/roles.py",
         "datasets/sampling.py",
         "datasets/scaling.py",
@@ -99,14 +100,6 @@ ROADMAP_MODULES = frozenset(
         "reporting/tables.py",
         "reporting/verification.py",
         "runtime.py",
-        "workflows/__init__.py",
-        "workflows/doctor.py",
-        "workflows/plan.py",
-        "workflows/preprocess.py",
-        "workflows/report.py",
-        "workflows/run.py",
-        "workflows/smoke.py",
-        "workflows/status.py",
     }
 )
 
