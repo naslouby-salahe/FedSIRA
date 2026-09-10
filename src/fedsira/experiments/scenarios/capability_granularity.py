@@ -11,7 +11,7 @@ from fedsira.domain.types import (
     SeedDerivationLabel,
     StandardizedValue,
 )
-from fedsira.runtime_execution import deterministic_order, framed_bytes
+from fedsira.runtime import deterministic_order, framed_bytes
 
 ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
 

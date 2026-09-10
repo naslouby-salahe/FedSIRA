@@ -5,12 +5,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.baselines.references import (
-    centralized_reference_local_epochs,
-    centralized_reference_pooled_rows,
-    local_only_reference_local_epochs,
-    local_only_reference_training_role,
-)
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -26,8 +20,18 @@ from fedsira.learning.aggregation import load_model_state, model_state_from_clas
 from fedsira.learning.anchor_training import training_seed
 from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
 from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import derive_uint32, namespace_seed, seed_job_local_rng_streams
+from fedsira.protocol.baselines.references import (
+    centralized_reference_local_epochs,
+    centralized_reference_pooled_rows,
+    local_only_reference_local_epochs,
+    local_only_reference_training_role,
+)
+from fedsira.runtime import (
+    current_application_context,
+    derive_uint32,
+    namespace_seed,
+    seed_job_local_rng_streams,
+)
 
 LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "LOCAL_ONLY_REFERENCE"
 CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "CENTRALIZED_REFERENCE"

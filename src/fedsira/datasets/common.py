@@ -16,7 +16,7 @@ from fedsira.domain.types import (
     SampleIdPrefix,
     SourceRowIndex,
 )
-from fedsira.runtime_execution import framed_bytes
+from fedsira.runtime import framed_bytes
 
 SUPPORTED_ROLE_ORDER: tuple[Role, ...] = (
     Role.ANCHOR_TRAIN,

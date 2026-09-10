@@ -11,7 +11,7 @@ from fedsira.domain.types import (
     RelativePathText,
     SeedDerivationLabel,
 )
-from fedsira.runtime_execution import deterministic_order
+from fedsira.runtime import deterministic_order
 
 
 class NBaiotDomain(StrEnum):

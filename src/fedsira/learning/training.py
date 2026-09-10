@@ -14,7 +14,7 @@ from fedsira.domain.types import (
     TrainingLoss,
 )
 from fedsira.learning.model import FedSIRAClassifier
-from fedsira.runtime_execution import minibatch_order
+from fedsira.runtime import minibatch_order
 
 
 class _SteppableOptimizer(Protocol):

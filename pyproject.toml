@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-fedsira = "fedsira.cli.main:app"
+fedsira = "fedsira.cli:app"
 
 [dependency-groups]
 dev = [
@@ -55,7 +55,7 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
 "tests/unit/config/test_loading.py" = ["B010"]
 "tests/unit/artifacts/test_records.py" = ["B010"]
 "tests/unit/artifacts/test_provenance.py" = ["B010"]
-"src/fedsira/cli/main.py" = ["B008"]
+"src/fedsira/cli.py" = ["B008"]
 "src/fedsira/runtime/environment.py" = ["B009"]
 
 [tool.vulture]
@@ -68,7 +68,7 @@ typeCheckingMode = "strict"
 pythonVersion = "3.11"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/cli/main.py"
+root = "src/fedsira/cli.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
@@ -76,7 +76,7 @@ root = "src/fedsira/reporting/figures.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/runtime_execution.py"
+root = "src/fedsira/runtime.py"
 reportUnknownMemberType = "none"
 reportAttributeAccessIssue = "none"
 

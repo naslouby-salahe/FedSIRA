@@ -1,6 +1,7 @@
 import torch
 
-from fedsira.attacks import (
+from fedsira.datasets.nbaiot.schema import NBaiotClass
+from fedsira.protocol.attacks.source import (
     apply_trigger_transform,
     attack_row_order,
     fraction_to_attack_count,
@@ -8,7 +9,6 @@ from fedsira.attacks import (
     select_fractional_attack_rows,
     select_source_backdoor_poison_rows,
 )
-from fedsira.datasets.nbaiot.schema import NBaiotClass
 
 
 def test_fraction_to_attack_count_floors() -> None:

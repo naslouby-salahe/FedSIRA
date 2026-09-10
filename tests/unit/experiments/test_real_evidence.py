@@ -4,22 +4,6 @@ import pandas
 import pytest
 import torch
 
-from fedsira.baselines.certified_ensemble import train_certified_ensemble_group_checkpoints
-from fedsira.baselines.fedavg_training import (
-    train_fedavg_reference_delta,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-)
-from fedsira.baselines.reconstruction_training import (
-    anchor_round_calibration_updates,
-    anchor_round_reconstruction_calibration_errors,
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
-)
-from fedsira.baselines.robust_training import (
-    train_density_cluster_trimmed_mean_delta,
-    train_krum_reference_delta,
-)
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.loading import DiscoveredCsvFile
@@ -63,6 +47,22 @@ from fedsira.learning.post_reference_training import (
 from fedsira.learning.reference import (
     train_centralized_reference_checkpoint,
     train_local_only_reference_checkpoint,
+)
+from fedsira.protocol.baselines.certified_ensemble import train_certified_ensemble_group_checkpoints
+from fedsira.protocol.baselines.fedavg_training import (
+    train_fedavg_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+)
+from fedsira.protocol.baselines.reconstruction_training import (
+    anchor_round_calibration_updates,
+    anchor_round_reconstruction_calibration_errors,
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
+)
+from fedsira.protocol.baselines.robust_training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_krum_reference_delta,
 )
 
 pytestmark = pytest.mark.skip(

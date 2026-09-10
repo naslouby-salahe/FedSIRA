@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from fedsira.artifacts import load_published_artifact_graph, stale_artifact_identities
+from fedsira.artifacts.paths import (
+    OUTPUTS_ROOT,
+    RESULTS_ROOT,
+    preprocessing_root,
+    workspace_root_for_family,
+)
+from fedsira.artifacts.provenance import load_published_artifact_graph, stale_artifact_identities
 from fedsira.domain.enums import AdmissionState, ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import (
     BooleanValue,
@@ -39,12 +45,6 @@ from fedsira.experiments.planning import (
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.io.paths import (
-    OUTPUTS_ROOT,
-    RESULTS_ROOT,
-    preprocessing_root,
-    workspace_root_for_family,
-)
 from fedsira.reporting.export import (
     export_experiment_report,
     export_project_summary,
@@ -61,12 +61,12 @@ from fedsira.reporting.verification import (
     verify_planned_cell_count_satisfied,
 )
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
     ApplicationContext,
     FailureDetail,
     bound_application_context,
     current_application_context,
 )
-from fedsira.workflows import REPOSITORY_ROOT
 
 _COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
     ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,

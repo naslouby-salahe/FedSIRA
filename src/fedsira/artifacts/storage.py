@@ -3,7 +3,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fedsira.artifacts import ArtifactGraph, ArtifactManifest, ArtifactPayloadBytes
+from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest, ArtifactPayloadBytes
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 from fedsira.domain.types import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
 

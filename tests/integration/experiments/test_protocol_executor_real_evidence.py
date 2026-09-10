@@ -47,7 +47,7 @@ from fedsira.experiments.executor import (
 )
 from fedsira.experiments.planning import ScientificCell
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
-from fedsira.runtime_execution import namespace_seed
+from fedsira.runtime import namespace_seed
 
 pytestmark = pytest.mark.skip(
     reason="runs real anchor/reproduction gradient-descent training end-to-end through"

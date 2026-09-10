@@ -57,8 +57,12 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.post_reference_training import combined_post_reference_rows
 from fedsira.learning.scoring import logits_for_samples
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import derive_uint32, namespace_seed, seed_job_local_rng_streams
+from fedsira.runtime import (
+    current_application_context,
+    derive_uint32,
+    namespace_seed,
+    seed_job_local_rng_streams,
+)
 
 DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
 CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "CERTIFIED_ENSEMBLE_ANCHOR"

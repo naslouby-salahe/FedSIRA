@@ -1,8 +1,8 @@
 import pytest
 
-from fedsira.artifacts import ArtifactManifest, validate_artifact_lifecycle_readable
+from fedsira.artifacts.provenance import ArtifactManifest, validate_artifact_lifecycle_readable
+from fedsira.artifacts.storage import compute_checksum
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.io.storage import compute_checksum
 
 
 def test_only_complete_artifacts_are_readable() -> None:

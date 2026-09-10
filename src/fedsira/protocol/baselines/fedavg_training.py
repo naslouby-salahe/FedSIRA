@@ -4,13 +4,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.baselines.references import (
-    fedavg_reference_post_reference_local_epochs,
-    fedavg_reference_post_reference_participants,
-    fedavg_reference_post_reference_rounds,
-    post_reference_retrain_maximum_local_epochs,
-)
-from fedsira.baselines.source_model import secure_continual_assessment_post_reference_rounds
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.types import AlgorithmName, BooleanValue, FederatedRoundCount, MasterSeed
@@ -29,6 +22,15 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
 )
 from fedsira.learning.post_reference_training import combined_post_reference_rows
+from fedsira.protocol.baselines.references import (
+    fedavg_reference_post_reference_local_epochs,
+    fedavg_reference_post_reference_participants,
+    fedavg_reference_post_reference_rounds,
+    post_reference_retrain_maximum_local_epochs,
+)
+from fedsira.protocol.baselines.source_model import (
+    secure_continual_assessment_post_reference_rounds,
+)
 from fedsira.runtime import current_application_context
 
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"

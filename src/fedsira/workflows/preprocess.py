@@ -1,8 +1,15 @@
-from fedsira.artifacts import (
+from fedsira.artifacts.paths import (
+    prepared_evidence_root,
+    prepared_feature_root,
+    preprocessing_metadata_root,
+    workspace_root_for_family,
+)
+from fedsira.artifacts.provenance import (
     CICIoT2023DatasetManifestPayload,
     DatasetManifestPayload,
     NBaiotDatasetManifestPayload,
 )
+from fedsira.artifacts.storage import compute_checksum, publish_or_reuse_artifact_payload
 from fedsira.datasets.ciciot2023.loading import discover_secondary_csv_files
 from fedsira.datasets.ciciot2023.preprocessing import materialize_ciciot2023_prepared_views
 from fedsira.datasets.ciciot2023.schema import (
@@ -32,19 +39,12 @@ from fedsira.domain.types import (
     OverwriteExisting,
     Probability,
 )
-from fedsira.io.paths import (
-    prepared_evidence_root,
-    prepared_feature_root,
-    preprocessing_metadata_root,
-    workspace_root_for_family,
-)
-from fedsira.io.storage import compute_checksum, publish_or_reuse_artifact_payload
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
     ApplicationContext,
     bound_application_context,
     current_application_context,
 )
-from fedsira.workflows import REPOSITORY_ROOT
 
 
 def _publish_dataset_manifest(

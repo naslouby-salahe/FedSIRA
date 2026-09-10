@@ -4,11 +4,6 @@ import csv
 import math
 from io import StringIO
 
-from fedsira.baselines.registry import (
-    BASELINE_VALIDATION_FIXTURE_MAP,
-    BaselineIdentity,
-    BaselineValidationFixture,
-)
 from fedsira.config import PublicationRoundingConfig
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
@@ -75,6 +70,11 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.execution import CellExecutionOutcome
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.protocol.baselines.registry import (
+    BASELINE_VALIDATION_FIXTURE_MAP,
+    BaselineIdentity,
+    BaselineValidationFixture,
+)
 from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (

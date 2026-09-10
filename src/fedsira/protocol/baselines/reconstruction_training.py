@@ -4,19 +4,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.baselines.calibration import (
-    clip_source_update,
-    reconstruction_error,
-    reconstruction_filter_accepts,
-    reconstruction_filter_calibration_error_count,
-    reconstruction_filter_reweight,
-    reconstruction_rejection_threshold,
-    sanitization_clip_bounds,
-)
-from fedsira.baselines.references import (
-    fedavg_reference_post_reference_participants,
-    post_reference_retrain_maximum_local_epochs,
-)
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -56,6 +43,19 @@ from fedsira.learning.model import (
 from fedsira.learning.post_reference_training import (
     combined_post_reference_rows,
     train_source_candidate_delta,
+)
+from fedsira.protocol.baselines.calibration import (
+    clip_source_update,
+    reconstruction_error,
+    reconstruction_filter_accepts,
+    reconstruction_filter_calibration_error_count,
+    reconstruction_filter_reweight,
+    reconstruction_rejection_threshold,
+    sanitization_clip_bounds,
+)
+from fedsira.protocol.baselines.references import (
+    fedavg_reference_post_reference_participants,
+    post_reference_retrain_maximum_local_epochs,
 )
 from fedsira.runtime import current_application_context
 

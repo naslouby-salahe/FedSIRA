@@ -1,3 +1,4 @@
+from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.domain.enums import ArtifactFamily
 from fedsira.domain.types import PlanRenderText, ResolvedCoreComplete
 from fedsira.experiments.collapse import read_resolved_core
@@ -10,9 +11,7 @@ from fedsira.experiments.planning import (
     build_plan,
     validate_planned_cell_count_invariant,
 )
-from fedsira.io.paths import workspace_root_for_family
-from fedsira.runtime import ApplicationContext, bound_application_context
-from fedsira.workflows import REPOSITORY_ROOT
+from fedsira.runtime import REPOSITORY_ROOT, ApplicationContext, bound_application_context
 
 
 def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> ExperimentPlan:

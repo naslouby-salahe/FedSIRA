@@ -19,7 +19,7 @@ from fedsira.domain.types import (
     VerifierEligible,
     VerifierReportCount,
 )
-from fedsira.runtime_execution import derive_uint32, deterministic_order
+from fedsira.runtime import derive_uint32, deterministic_order
 
 VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
 BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value

@@ -11,7 +11,7 @@ from fedsira.learning.post_reference import (
     run_post_reference_training,
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
-from fedsira.runtime_execution import seed_job_local_rng_streams
+from fedsira.runtime import seed_job_local_rng_streams
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

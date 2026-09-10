@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.artifacts import ArtifactGraph, ArtifactManifest
+from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 
@@ -53,11 +53,11 @@ def test_mark_stale_descendants_only_affects_downstream() -> None:
 def test_load_published_artifact_graph_walks_manifests_and_reports_stale(
     tmp_path: Path,
 ) -> None:
-    from fedsira.artifacts import (
+    from fedsira.artifacts.provenance import (
         load_published_artifact_graph,
         stale_artifact_identities,
     )
-    from fedsira.io.storage import ARTIFACT_MANIFEST_SUFFIX
+    from fedsira.artifacts.storage import ARTIFACT_MANIFEST_SUFFIX
 
     parent = complete_manifest("a" * 64)
     child = complete_manifest("b" * 64, upstream=("a" * 64,))

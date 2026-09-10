@@ -4,7 +4,7 @@ import numpy
 import torch
 
 from fedsira.domain.enums import SeedNamespace
-from fedsira.runtime_execution import (
+from fedsira.runtime import (
     derive_uint32,
     deterministic_order,
     framed_bytes,

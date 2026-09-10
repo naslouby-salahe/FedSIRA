@@ -3,7 +3,7 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from fedsira.artifacts import ReconstructionProvenance
+from fedsira.artifacts.provenance import ReconstructionProvenance
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.experiments.execution import (
     TERMINAL_EXPERIMENT_STATES,

@@ -4,7 +4,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.baselines.calibration import recovery_alarm_threshold
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -24,6 +23,7 @@ from fedsira.experiments.workflow import (
 )
 from fedsira.learning.model import FedSIRAClassifier, load_flat_trainable_parameters
 from fedsira.learning.scoring import logits_for_samples
+from fedsira.protocol.baselines.calibration import recovery_alarm_threshold
 from fedsira.runtime import current_application_context
 
 

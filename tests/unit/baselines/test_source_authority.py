@@ -1,6 +1,8 @@
 import torch
 
-from fedsira.baselines.source_model import (
+from fedsira.datasets.common import Role
+from fedsira.domain.enums import AdmissionState
+from fedsira.protocol.baselines.source_model import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
     SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
@@ -9,8 +11,6 @@ from fedsira.baselines.source_model import (
     client_review_then_retrain_local_epochs,
     client_review_then_retrain_should_discard_source_weights,
 )
-from fedsira.datasets.common import Role
-from fedsira.domain.enums import AdmissionState
 
 
 def test_client_review_composite_screen_roles_and_reviewer_count() -> None:

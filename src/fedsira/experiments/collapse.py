@@ -3,12 +3,19 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 
-from fedsira.artifacts import (
+from fedsira.artifacts.provenance import (
     ArtifactManifest,
     ArtifactPayloadBytes,
     validate_artifact_lifecycle_readable,
 )
-from fedsira.baselines.registry import BaselineIdentity
+from fedsira.artifacts.storage import (
+    compute_checksum,
+    is_artifact_complete_and_valid,
+    publish_artifact_to_disk,
+    published_artifact_paths,
+    read_published_manifest,
+    stage_payload,
+)
 from fedsira.config import MaterialityConfig
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -58,14 +65,7 @@ from fedsira.experiments.definitions import (
     SourceExclusionMethod,
 )
 from fedsira.experiments.execution import PersistedExecutionRecord
-from fedsira.io.storage import (
-    compute_checksum,
-    is_artifact_complete_and_valid,
-    publish_artifact_to_disk,
-    published_artifact_paths,
-    read_published_manifest,
-    stage_payload,
-)
+from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import current_application_context
 
 

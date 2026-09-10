@@ -4,22 +4,6 @@ from pathlib import Path
 
 import torch
 
-from fedsira.baselines.calibration import (
-    cosine_distance_matrix,
-    density_cluster_labels,
-    l2_normalize,
-    select_largest_density_cluster,
-    trimmed_mean_aggregate,
-)
-from fedsira.baselines.references import (
-    fedavg_reference_post_reference_participants,
-    post_reference_retrain_maximum_local_epochs,
-)
-from fedsira.baselines.robust_aggregation import (
-    client_sampling_round_order,
-    krum_reference_post_reference_rounds,
-    krum_reference_round_participants,
-)
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
 from fedsira.domain.types import MasterSeed
@@ -39,6 +23,22 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
 )
 from fedsira.learning.post_reference_training import combined_post_reference_rows
+from fedsira.protocol.baselines.calibration import (
+    cosine_distance_matrix,
+    density_cluster_labels,
+    l2_normalize,
+    select_largest_density_cluster,
+    trimmed_mean_aggregate,
+)
+from fedsira.protocol.baselines.references import (
+    fedavg_reference_post_reference_participants,
+    post_reference_retrain_maximum_local_epochs,
+)
+from fedsira.protocol.baselines.robust_aggregation import (
+    client_sampling_round_order,
+    krum_reference_post_reference_rounds,
+    krum_reference_round_participants,
+)
 from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime import current_application_context
 

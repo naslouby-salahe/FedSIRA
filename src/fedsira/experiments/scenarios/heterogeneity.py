@@ -18,7 +18,7 @@ from fedsira.domain.types import (
     SamplingCap,
     SeedDerivationLabel,
 )
-from fedsira.runtime_execution import deterministic_order, framed_bytes
+from fedsira.runtime import deterministic_order, framed_bytes
 
 QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY.value
 HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"

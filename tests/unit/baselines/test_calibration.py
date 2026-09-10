@@ -1,7 +1,11 @@
 import pytest
 import torch
 
-from fedsira.baselines.calibration import (
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+from fedsira.domain.models import MetricResult
+from fedsira.learning.aggregation import ModelParameter, ModelState, WeightedModelState
+from fedsira.protocol.baselines.calibration import (
     DomainFeatureMean,
     clip_source_update,
     cosine_distance,
@@ -24,10 +28,6 @@ from fedsira.baselines.calibration import (
     trimmed_mean_aggregate,
     vector_l2_norm,
 )
-from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.models import MetricResult
-from fedsira.learning.aggregation import ModelParameter, ModelState, WeightedModelState
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

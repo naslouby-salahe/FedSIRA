@@ -1,8 +1,8 @@
-from fedsira.baselines.independent_retraining import (
+from fedsira.domain.enums import AdmissionOpeningMode
+from fedsira.protocol.baselines.independent_retraining import (
     candidate_free_full_path_opening_mode,
     one_independent_retrain_local_epochs,
 )
-from fedsira.domain.enums import AdmissionOpeningMode
 
 
 def test_one_independent_retrain_local_epochs_is_five() -> None:

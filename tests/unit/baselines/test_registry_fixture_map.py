@@ -1,4 +1,4 @@
-from fedsira.baselines.registry import (
+from fedsira.protocol.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
     BaselineIdentity,
     BaselineValidationFixture,

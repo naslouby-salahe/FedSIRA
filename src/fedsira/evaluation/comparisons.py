@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from enum import StrEnum
 
-from fedsira.baselines.registry import BaselineIdentity
 from fedsira.config import BootstrapConfig, MultiplicityConfig
 from fedsira.domain.enums import CoreMethodIdentity, RootCauseMixture
 from fedsira.domain.types import (
@@ -60,6 +59,7 @@ from fedsira.experiments.definitions import (
     ablation_scenario_for_variant,
     epistemic_strength_tokens,
 )
+from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import current_application_context
 
 

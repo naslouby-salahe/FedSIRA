@@ -1,11 +1,11 @@
-from fedsira.baselines.robust_aggregation import (
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+from fedsira.protocol.baselines.robust_aggregation import (
     client_sampling_round_order,
     client_sampling_round_seed,
     krum_reference_post_reference_rounds,
     krum_reference_round_participants,
 )
-from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 BASELINES_CONFIG = CONFIG.baselines

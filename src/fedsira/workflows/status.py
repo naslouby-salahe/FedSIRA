@@ -1,17 +1,17 @@
 from pathlib import Path
 
+from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import StatusRenderText
 from fedsira.experiments.collapse import read_resolved_core
 from fedsira.experiments.execution import ExecutionRecordStore, derive_experiment_lifecycle
 from fedsira.experiments.planning import build_plan
-from fedsira.io.paths import workspace_root_for_family
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
     ApplicationContext,
     bound_application_context,
     current_application_context,
 )
-from fedsira.workflows import REPOSITORY_ROOT
 
 
 def render_status() -> StatusRenderText:

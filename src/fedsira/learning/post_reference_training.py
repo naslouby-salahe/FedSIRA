@@ -34,8 +34,7 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.post_reference import run_post_reference_training
 from fedsira.learning.scoring import per_sample_cross_entropy
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import seed_job_local_rng_streams
+from fedsira.runtime import current_application_context, seed_job_local_rng_streams
 
 SOURCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "REPRODUCTION"

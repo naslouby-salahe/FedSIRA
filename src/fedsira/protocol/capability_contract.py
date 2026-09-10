@@ -23,7 +23,7 @@ from fedsira.domain.types import (
     TargetF1,
     TargetF1Gain,
 )
-from fedsira.runtime_execution import framed_bytes
+from fedsira.runtime import framed_bytes
 
 CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0

@@ -1,5 +1,5 @@
-from fedsira.attacks import resolve_byzantine_verifier_vote
 from fedsira.domain.enums import ByzantineVerifierBehavior, TernaryOutcome
+from fedsira.protocol.attacks.byzantine import resolve_byzantine_verifier_vote
 
 
 def test_false_positive_behavior_always_votes_positive() -> None:

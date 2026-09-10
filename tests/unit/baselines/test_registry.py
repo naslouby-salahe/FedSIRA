@@ -1,11 +1,14 @@
 import pytest
 
-from fedsira.baselines.references import (
+from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+from fedsira.domain.enums import AdmissionState, TernaryOutcome
+from fedsira.protocol.baselines.references import (
     fedavg_reference_post_reference_local_epochs,
     post_reference_retrain_maximum_local_epochs,
     standard_fl_anchor_rounds,
 )
-from fedsira.baselines.registry import (
+from fedsira.protocol.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
     domain_target_view,
     domain_without_target_view_may_participate,
@@ -15,9 +18,6 @@ from fedsira.baselines.registry import (
     single_fresh_verifier_outcome,
     validate_role_not_used_for_tuning,
 )
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import AdmissionState, TernaryOutcome
 
 SOURCE = NBAIOT_DOMAIN_ORDER[0]
 NON_SOURCE = NBAIOT_DOMAIN_ORDER[1]

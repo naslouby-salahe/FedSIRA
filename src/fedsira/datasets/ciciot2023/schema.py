@@ -14,7 +14,7 @@ from fedsira.domain.types import (
     SampleId,
     SeedDerivationLabel,
 )
-from fedsira.runtime_execution import framed_bytes
+from fedsira.runtime import framed_bytes
 
 TARGET_LABEL: ClassLabel = "BACKDOOR_MALWARE"
 BENIGN_LABEL: ClassLabel = "BENIGN"

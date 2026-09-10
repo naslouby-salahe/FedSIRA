@@ -3,7 +3,7 @@ from modulefinder import ModuleFinder
 from _repo import REPO_ROOT, SRC_ROOT, iter_python_files, module_name
 
 APPLICATION_ENTRY_MODULES = (
-    "fedsira.cli.main",
+    "fedsira.cli",
     "fedsira.workflows.doctor",
     "fedsira.workflows.preprocess",
     "fedsira.workflows.plan",
@@ -16,10 +16,10 @@ APPLICATION_ENTRY_MODULES = (
 
 def _application_modules() -> frozenset[str]:
     finder = ModuleFinder(path=[str(SRC_ROOT.parent)])
-    finder.run_script(str(SRC_ROOT / "cli" / "main.py"))
+    finder.run_script(str(SRC_ROOT / "cli.py"))
     return frozenset(
         (
-            "fedsira.cli.main",
+            "fedsira.cli",
             *(name for name in finder.modules if name == "fedsira" or name.startswith("fedsira.")),
         )
     )

@@ -35,8 +35,8 @@ from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
 )
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import (
+from fedsira.runtime import (
+    current_application_context,
     local_training_seed,
     namespace_seed,
     seed_job_local_rng_streams,

@@ -8,11 +8,6 @@ from pathlib import Path
 import pandas
 import torch
 
-from fedsira.attacks import (
-    apply_trigger_transform,
-    relabel_triggered_rows_as_benign,
-    select_source_backdoor_poison_rows,
-)
 from fedsira.datasets.common import Role, role_hash_token
 from fedsira.datasets.nbaiot.preprocessing import view_parquet_path
 from fedsira.datasets.nbaiot.schema import (
@@ -54,7 +49,12 @@ from fedsira.experiments.scenarios.evidence_scarcity import (
     select_spurious_feature_rows,
 )
 from fedsira.experiments.scenarios.heterogeneity import feature_shift_sign
-from fedsira.runtime_execution import framed_bytes
+from fedsira.protocol.attacks.source import (
+    apply_trigger_transform,
+    relabel_triggered_rows_as_benign,
+    select_source_backdoor_poison_rows,
+)
+from fedsira.runtime import framed_bytes
 
 
 @dataclass(frozen=True)

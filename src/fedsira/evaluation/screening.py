@@ -16,8 +16,7 @@ from fedsira.protocol.proposal import (
     run_proposal_screen_for_domain,
     screen_fold_index,
 )
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import derive_uint32
+from fedsira.runtime import current_application_context, derive_uint32
 
 
 def _screen_models(

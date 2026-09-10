@@ -87,8 +87,7 @@ from fedsira.domain.types import (
     SqliteScalar,
     TextValue,
 )
-from fedsira.runtime import current_application_context
-from fedsira.runtime_execution import framed_bytes
+from fedsira.runtime import current_application_context, framed_bytes
 
 RawCsvValue = Annotated[str, Field(strict=True)]
 

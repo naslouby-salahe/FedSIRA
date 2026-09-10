@@ -7,74 +7,7 @@ from pathlib import Path
 
 import torch
 
-from fedsira.attacks import (
-    resolve_byzantine_verifier_vote,
-    scale_model_replacement_delta,
-    select_model_replacement_carrier_rows,
-    source_copy_update,
-    verifier_aware_training_step,
-)
-from fedsira.baselines.calibration import (
-    DomainFeatureMean,
-    parameter_similarity_certification_row_results,
-    recovery_rollback_is_triggered,
-    same_context_verifier_panel,
-)
-from fedsira.baselines.certified_ensemble import (
-    evaluate_certified_ensemble,
-    train_certified_ensemble_group_checkpoints,
-    validate_group_without_target_member_uses_supported_only,
-)
-from fedsira.baselines.fedavg_training import (
-    train_fedavg_reference_delta,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-)
-from fedsira.baselines.independent_retraining import (
-    candidate_free_full_path_opening_mode,
-    one_independent_retrain_local_epochs,
-)
-from fedsira.baselines.reconstruction_training import (
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
-)
-from fedsira.baselines.references import (
-    local_only_reference_evaluation_is_domain_local,
-    standard_fl_anchor_rounds,
-)
-from fedsira.baselines.registry import (
-    BaselineIdentity,
-    domain_target_view,
-    domain_without_target_view_may_participate,
-    first_eligible_non_source_reproducer,
-    review_style_baseline_outcome,
-    single_fresh_verifier_domain,
-    single_fresh_verifier_outcome,
-    validate_role_not_used_for_tuning,
-)
-from fedsira.baselines.robust_aggregation import (
-    coordinate_wise_median_synthesis,
-    direct_krum_committee_rows,
-    validate_three_row_coordinate_median_committee_size,
-)
-from fedsira.baselines.robust_training import (
-    train_density_cluster_trimmed_mean_delta,
-    train_krum_reference_delta,
-)
-from fedsira.baselines.source_model import (
-    CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
-    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
-    INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
-    INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
-    SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
-    SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
-    client_review_direct_admission_production_is_source,
-    client_review_then_retrain_local_epochs,
-    client_review_then_retrain_should_discard_source_weights,
-    independent_local_reference_reviewer_is_positive,
-    validate_client_review_composite_screen,
-    validate_client_review_reviewer_count,
-)
+from fedsira.artifacts.paths import prepared_evidence_root
 from fedsira.config import VerificationConfig
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
@@ -259,7 +192,6 @@ from fedsira.experiments.workflow import (
     prepared_feature_names,
     real_evidence_available,
 )
-from fedsira.io.paths import prepared_evidence_root
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.anchor_training import train_anchor
 from fedsira.learning.post_reference import run_post_reference_training
@@ -279,6 +211,76 @@ from fedsira.protocol.admission import (
     resolve_production_update,
     validate_admission_requires_final_gate,
     validate_production_checkpoint_excludes_source,
+)
+from fedsira.protocol.attacks.byzantine import (
+    resolve_byzantine_verifier_vote,
+    verifier_aware_training_step,
+)
+from fedsira.protocol.attacks.source import (
+    scale_model_replacement_delta,
+    select_model_replacement_carrier_rows,
+    source_copy_update,
+)
+from fedsira.protocol.baselines.calibration import (
+    DomainFeatureMean,
+    parameter_similarity_certification_row_results,
+    recovery_rollback_is_triggered,
+    same_context_verifier_panel,
+)
+from fedsira.protocol.baselines.certified_ensemble import (
+    evaluate_certified_ensemble,
+    train_certified_ensemble_group_checkpoints,
+    validate_group_without_target_member_uses_supported_only,
+)
+from fedsira.protocol.baselines.fedavg_training import (
+    train_fedavg_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+)
+from fedsira.protocol.baselines.independent_retraining import (
+    candidate_free_full_path_opening_mode,
+    one_independent_retrain_local_epochs,
+)
+from fedsira.protocol.baselines.reconstruction_training import (
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
+)
+from fedsira.protocol.baselines.references import (
+    local_only_reference_evaluation_is_domain_local,
+    standard_fl_anchor_rounds,
+)
+from fedsira.protocol.baselines.registry import (
+    BaselineIdentity,
+    domain_target_view,
+    domain_without_target_view_may_participate,
+    first_eligible_non_source_reproducer,
+    review_style_baseline_outcome,
+    single_fresh_verifier_domain,
+    single_fresh_verifier_outcome,
+    validate_role_not_used_for_tuning,
+)
+from fedsira.protocol.baselines.robust_aggregation import (
+    coordinate_wise_median_synthesis,
+    direct_krum_committee_rows,
+    validate_three_row_coordinate_median_committee_size,
+)
+from fedsira.protocol.baselines.robust_training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_krum_reference_delta,
+)
+from fedsira.protocol.baselines.source_model import (
+    CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
+    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+    INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
+    INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
+    SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
+    SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
+    client_review_direct_admission_production_is_source,
+    client_review_then_retrain_local_epochs,
+    client_review_then_retrain_should_discard_source_weights,
+    independent_local_reference_reviewer_is_positive,
+    validate_client_review_composite_screen,
+    validate_client_review_reviewer_count,
 )
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
@@ -351,11 +353,9 @@ from fedsira.protocol.verification import (
     verifier_is_eligible,
 )
 from fedsira.runtime import (
+    ElapsedTimer,
     FailureDetail,
     current_application_context,
-)
-from fedsira.runtime_execution import (
-    ElapsedTimer,
     derive_uint32,
     peak_gpu_memory_bytes,
     peak_host_resident_set_bytes,

@@ -1,8 +1,8 @@
 import pytest
 from typer.testing import CliRunner
 
-from fedsira.cli.main import app
-from fedsira.runtime_execution import EnvironmentMismatch
+from fedsira.cli import app
+from fedsira.runtime import EnvironmentMismatch
 from fedsira.workflows import doctor, preprocess
 
 runner = CliRunner()

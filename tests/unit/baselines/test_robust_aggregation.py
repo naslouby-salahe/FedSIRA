@@ -1,13 +1,13 @@
 import pytest
 import torch
 
-from fedsira.baselines.robust_aggregation import (
+from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
+from fedsira.protocol.baselines.robust_aggregation import (
     coordinate_wise_median_synthesis,
     direct_krum_committee_rows,
     validate_three_row_coordinate_median_committee_size,
 )
-from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)

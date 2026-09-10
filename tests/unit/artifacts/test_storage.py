@@ -2,9 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.artifacts import ArtifactGraph, ArtifactManifest
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.io.storage import (
+from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest
+from fedsira.artifacts.storage import (
     compute_checksum,
     is_artifact_complete_and_valid,
     publish,
@@ -15,6 +14,7 @@ from fedsira.io.storage import (
     stage_payload,
     verify_checksum,
 )
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 
 def staged_manifest(

@@ -7,8 +7,8 @@ from collections import OrderedDict
 import numpy
 import torch
 
-from fedsira.artifacts import ArtifactGraph, ArtifactManifest
-from fedsira.baselines.registry import validate_role_not_used_for_tuning
+from fedsira.artifacts.paths import smoke_record_path
+from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest
 from fedsira.config import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
@@ -55,7 +55,6 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
-from fedsira.io.paths import smoke_record_path
 from fedsira.learning.aggregation import (
     ModelParameter,
     ModelState,
@@ -74,6 +73,7 @@ from fedsira.learning.post_reference import (
 )
 from fedsira.learning.training import build_loss_function, build_optimizer
 from fedsira.protocol.admission import validate_admission_requires_final_gate
+from fedsira.protocol.baselines.registry import validate_role_not_used_for_tuning
 from fedsira.protocol.capability_contract import (
     SOURCE_DIRECT_PRODUCTION_WEIGHT,
     validate_source_excluded_production_weight,

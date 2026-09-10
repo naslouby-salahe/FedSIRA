@@ -3,11 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from enum import StrEnum
 
-from fedsira.baselines.registry import (
-    BASELINE_VALIDATION_FIXTURE_MAP,
-    BaselineIdentity,
-    BaselineValidationFixture,
-)
 from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
 from fedsira.domain.types import (
     ArtifactFileName,
@@ -22,6 +17,11 @@ from fedsira.domain.types import (
     TableName,
 )
 from fedsira.experiments.scenarios.evidence_arrival import EvidenceArrivalSchedule
+from fedsira.protocol.baselines.registry import (
+    BASELINE_VALIDATION_FIXTURE_MAP,
+    BaselineIdentity,
+    BaselineValidationFixture,
+)
 from fedsira.runtime import current_application_context
 
 
