@@ -50,8 +50,6 @@ from fedsira.baselines.references import (
     fedavg_reference_post_reference_participants,
     fedavg_reference_post_reference_rounds,
     local_only_reference_evaluation_is_domain_local,
-    local_only_reference_local_epochs,
-    local_only_reference_training_role,
     post_reference_retrain_maximum_local_epochs,
     standard_fl_anchor_rounds,
 )
@@ -97,7 +95,6 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
-    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -322,6 +319,7 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
 )
 from fedsira.learning.post_reference import run_post_reference_training
+from fedsira.learning.reference import train_local_only_reference_checkpoint
 from fedsira.learning.scoring import logits_for_samples
 from fedsira.protocol.admission import (
     apply_production_update,
@@ -682,65 +680,6 @@ def train_source_update_sanitization_delta(
         calibration_updates, config.baselines.source_update_sanitization.coordinate_bound_percentile
     )
     return clip_source_update(source_delta, clip_bounds)
-
-
-def train_local_only_reference_checkpoint(
-    prepared_root: Path, master_seed: MasterSeed, domain: NBaiotDomain
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    training_role = local_only_reference_training_role()
-    combined_features: list[torch.Tensor] = []
-    combined_labels: list[torch.Tensor] = []
-    combined_sample_ids: list[ArtifactDigest] = []
-    for class_id in NBAIOT_CLASS_ORDER:
-        if class_id is NBaiotClass.GAFGYT_COMBO:
-            continue
-        tensor_view = _tensor_view(
-            load_prepared_rows(prepared_root, domain, class_id, training_role)
-        )
-        if tensor_view is None:
-            continue
-        features, labels, sample_ids = tensor_view
-        combined_features.append(features)
-        combined_labels.append(labels)
-        combined_sample_ids.extend(sample_ids)
-    if not combined_features:
-        return None
-    features = torch.cat(combined_features, dim=0)
-    labels = torch.cat(combined_labels, dim=0)
-    sample_ids = tuple(combined_sample_ids)
-    input_width = features.shape[1]
-    output_width = len(NBAIOT_CLASS_ORDER)
-    initialization_seed = derive_uint32(
-        "LOCAL_ONLY_REFERENCE_INIT",
-        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
-        nbaiot_domain_hash_token(domain),
-    )
-    seed_job_local_rng_streams(initialization_seed)
-    initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
-    training_seed = _training_seed(
-        master_seed,
-        dataset_manifest_hash(prepared_root),
-        "local-only-start",
-        LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-        domain,
-        0,
-    )
-    client_result = train_one_client_locally(
-        initial_state,
-        input_width,
-        output_width,
-        config.model.optimizer.anchor_and_standard_fl_learning_rate,
-        config.model.optimizer,
-        config.model.training,
-        local_only_reference_local_epochs(),
-        LocalTrainingClient(
-            features=features, labels=labels, sample_ids=sample_ids, training_seed=training_seed
-        ),
-    )
-    final_model = FedSIRAClassifier(input_width, output_width)
-    load_model_state(final_model, client_result.state)
-    return flatten_trainable_parameters(final_model)
 
 
 def train_centralized_reference_checkpoint(
