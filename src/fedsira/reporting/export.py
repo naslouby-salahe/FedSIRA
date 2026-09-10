@@ -156,6 +156,55 @@ def _verify_experiment_artifacts(
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
 
+def _render_specialized_figure(
+    result: ExperimentExecutionResult,
+    figures_root: Path,
+) -> Path | None:
+    figure: Path | None = None
+    if result.experiment is COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
+        figure = render_compromised_reproducer_boundary(
+            result.comparison_results,
+            figures_root / "Compromised-Reproducer Boundary.png",
+            result.outcomes,
+        )
+    elif result.experiment is COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
+        figure = render_compromised_verifier_boundary(
+            result.comparison_results,
+            figures_root / "Compromised-Verifier Boundary.png",
+            result.outcomes,
+        )
+    elif result.experiment is SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
+        figure = render_shared_epistemic_failure(
+            result.comparison_results,
+            figures_root / "Shared Epistemic Failure.png",
+            result.outcomes,
+        )
+    elif result.experiment is CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
+        figure = render_capability_granularity_boundary(
+            result.comparison_results,
+            figures_root / "Capability-Granularity Boundary.png",
+            result.outcomes,
+        )
+    elif result.experiment is HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
+        figure = render_heterogeneity_synthesis_boundary(
+            result.comparison_results,
+            figures_root / "Heterogeneity Synthesis Boundary.png",
+            result.outcomes,
+        )
+    elif result.experiment is ADMISSION_DELAY_DECOMPOSITION_NAME:
+        figure = render_admission_delay_decomposition(
+            result.comparison_results,
+            figures_root / "Admission-Delay Decomposition.png",
+            result.outcomes,
+        )
+    elif result.experiment is SECONDARY_DATASET_GENERALIZATION_NAME:
+        figure = render_secondary_generalization(
+            result.comparison_results,
+            figures_root / "Secondary Generalization.png",
+        )
+    return figure
+
+
 def _render_experiment_figures(
     result: ExperimentExecutionResult,
     figures_root: Path,
@@ -180,61 +229,10 @@ def _render_experiment_figures(
                 result.outcomes,
             )
         )
-    elif result.experiment is COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
-        figures.append(
-            render_compromised_reproducer_boundary(
-                result.comparison_results,
-                figures_root / "Compromised-Reproducer Boundary.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-        figures.append(
-            render_compromised_verifier_boundary(
-                result.comparison_results,
-                figures_root / "Compromised-Verifier Boundary.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
-        figures.append(
-            render_shared_epistemic_failure(
-                result.comparison_results,
-                figures_root / "Shared Epistemic Failure.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
-        figures.append(
-            render_capability_granularity_boundary(
-                result.comparison_results,
-                figures_root / "Capability-Granularity Boundary.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
-        figures.append(
-            render_heterogeneity_synthesis_boundary(
-                result.comparison_results,
-                figures_root / "Heterogeneity Synthesis Boundary.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is ADMISSION_DELAY_DECOMPOSITION_NAME:
-        figures.append(
-            render_admission_delay_decomposition(
-                result.comparison_results,
-                figures_root / "Admission-Delay Decomposition.png",
-                result.outcomes,
-            )
-        )
-    elif result.experiment is SECONDARY_DATASET_GENERALIZATION_NAME:
-        figures.append(
-            render_secondary_generalization(
-                result.comparison_results,
-                figures_root / "Secondary Generalization.png",
-            )
-        )
+    else:
+        specialized = _render_specialized_figure(result, figures_root)
+        if specialized is not None:
+            figures.append(specialized)
     return tuple(figures)
 
 
