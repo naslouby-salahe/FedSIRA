@@ -7,13 +7,13 @@ from typing import cast
 import pandas
 
 from fedsira.artifacts.paths import (
-    RESULTS_ROOT,
     artifact_publication_root,
     execution_outputs_root,
     experiment_metrics_root,
     experiment_result_root,
     experiment_telemetry_root,
     manuscript_figures_root,
+    manuscript_results_root,
     manuscript_tables_root,
     preprocessing_log_path,
     preprocessing_root,
@@ -677,7 +677,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         REPOSITORY_ROOT / preprocessing_root(),
         REPOSITORY_ROOT / artifact_publication_root(),
         REPOSITORY_ROOT / execution_outputs_root(),
-        REPOSITORY_ROOT / RESULTS_ROOT,
+        REPOSITORY_ROOT / manuscript_results_root(),
     )
     manifest_dependency_verification = verify_artifact_manifest_dependencies(
         artifact_manifest_dependency_failures(load_published_manifests(artifact_roots))

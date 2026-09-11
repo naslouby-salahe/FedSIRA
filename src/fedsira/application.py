@@ -85,7 +85,6 @@ from fedsira.runtime import (
 )
 
 _LOGGER = get_structured_logger("doctor")
-_RESOLVED_CORE_DIRECTORY = workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
 _BOUNDARY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -101,6 +100,10 @@ _DELAY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
 )
+
+
+def resolved_core_directory() -> Path:
+    return REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
 
 
 class DoctorReport(FrozenDomainModel):
@@ -154,7 +157,7 @@ def _diagnose_bound(
         REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.execution_workspace
     )
     store = ExecutionRecordStore(workspace)
-    resolved_core = read_resolved_core(REPOSITORY_ROOT / _RESOLVED_CORE_DIRECTORY)
+    resolved_core = read_resolved_core(resolved_core_directory())
     plan = build_plan(
         resolved_core_complete=resolved_core is not None,
         master_seeds=context.scientific_config.seeds_and_determinism.master_seeds,
@@ -463,9 +466,6 @@ def render(report: DoctorReport, console: Console) -> None:
     console.print(f"next valid action: {report.next_valid_action}")
 
 
-RESOLVED_CORE_PUBLISHED_DIRECTORY = workspace_root_for_family(
-    ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
-)
 _COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
     ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
     ComparisonFamily.PLURALITY_NECESSITY,
@@ -574,7 +574,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
         return
     core = materialize_resolved_core(tuple(decisions))
-    publish_resolved_core(REPOSITORY_ROOT / RESOLVED_CORE_PUBLISHED_DIRECTORY, core)
+    publish_resolved_core(resolved_core_directory(), core)
     print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 
@@ -608,7 +608,7 @@ def execute_run(name: ExperimentName, overwrite: OverwriteExisting) -> None:
 
 
 def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
-    resolved_core = read_resolved_core(REPOSITORY_ROOT / RESOLVED_CORE_PUBLISHED_DIRECTORY)
+    resolved_core = read_resolved_core(resolved_core_directory())
     result = execute_experiment(
         name,
         ProtocolCellExecutor(resolved_core=resolved_core),

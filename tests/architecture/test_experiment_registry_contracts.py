@@ -151,3 +151,22 @@ def test_production_has_no_repository_state_or_source_fingerprint_machinery() ->
             if isinstance(node, ast.Name) and "fingerprint" in node.id.lower():
                 offenders.append(f"{path.name}: {node.id}")
     assert not offenders, f"repository-state/source-fingerprint machinery: {sorted(set(offenders))}"
+
+
+def test_every_registered_experiment_maps_to_a_live_cell_handler() -> None:
+    from fedsira.datasets.nbaiot.executor import (
+        CELL_HANDLER_REGISTRATIONS,
+        ProtocolCellExecutor,
+    )
+    from fedsira.experiments.definitions import REGISTERED_EXPERIMENT_NAMES
+
+    registered = {registration.experiment for registration in CELL_HANDLER_REGISTRATIONS}
+    assert registered == set(
+        REGISTERED_EXPERIMENT_NAMES
+    ), "cell handler registration must cover exactly the registered experiments"
+    missing = [
+        registration.handler
+        for registration in CELL_HANDLER_REGISTRATIONS
+        if not callable(getattr(ProtocolCellExecutor, registration.handler, None))
+    ]
+    assert not missing, f"registered cell handlers without a live implementation: {sorted(missing)}"
