@@ -2,6 +2,11 @@ import hashlib
 from typing import Final
 
 from fedsira.config import CapabilityContractConfig, EvidenceMinimaConfig
+from fedsira.datasets.common import (
+    DatasetAdapter,
+    Role,
+    role_hash_token,
+)
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -23,7 +28,7 @@ from fedsira.domain.types import (
     TargetF1,
     TargetF1Gain,
 )
-from fedsira.runtime import framed_bytes
+from fedsira.runtime import current_application_context, framed_bytes
 
 CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0
@@ -161,3 +166,19 @@ def validate_source_excluded_production_weight(direct_production_weight: Product
         raise ValueError(
             "source artifact must have zero direct production weight in a source-excluded path"
         )
+
+
+def capability_contract_for_digest(
+    adapter: DatasetAdapter, dataset_manifest_hash: ArtifactDigest
+) -> CapabilityContract:
+    config = current_application_context().scientific_config
+    return build_capability_contract(
+        dataset_manifest_hash,
+        role_hash_token(Role.POST_REFERENCE_REPLAY),
+        config.datasets.primary.name,
+        len(adapter.domain_ids),
+        dataset_manifest_hash,
+        adapter.target_class_token,
+        len(adapter.class_tokens) - 1,
+        config.capability_contract,
+    )

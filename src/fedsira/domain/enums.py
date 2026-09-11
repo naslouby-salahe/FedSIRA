@@ -217,3 +217,10 @@ class EpistemicFailureType(StrEnum):
     SHARED_LABEL_ERROR = "shared label/threat-intelligence error"
     SHARED_SPURIOUS_FEATURE = "shared spurious feature"
     ATTACKER_INDUCED_COMMON_CONTEXT = "attacker-induced common context"
+
+
+class ProposalEpisode(StrEnum):
+    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
+    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"
+    IRRELEVANT_SOURCE_IMPROVEMENT = "Irrelevant Source Improvement"
+    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"

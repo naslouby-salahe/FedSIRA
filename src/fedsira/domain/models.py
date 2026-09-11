@@ -6,21 +6,30 @@ from typing import Annotated
 from pydantic import Field
 
 from fedsira.domain.types import (
+    AdequateFinalGateDomainCount,
     ArtifactDigest,
     ByteCount,
+    ConditionName,
     ConfusionCount,
     ExampleCount,
+    ExperimentName,
     FrozenDomainModel,
     LengthPrefixBytes,
     LogicalEvidenceCycleCount,
     MasterSeed,
     MessageEndpoint,
+    MethodName,
     MetricValue,
     ModelTransmissionCount,
     ModelTransmissionPresent,
     ParameterName,
+    PreparedReproductionTargetCount,
+    PreparedScreenTargetCount,
+    PreparedSupportedReplayCount,
+    RepetitionIndex,
     RoundIndex,
     SchemaVersion,
+    ScientificCellSemanticKey,
     TensorAxisSize,
     TensorName,
     TensorPayloadCount,
@@ -208,3 +217,25 @@ def model_transmission_count(
     metadata_records: tuple[CommunicationMessageMetadata, ...],
 ) -> ModelTransmissionCount:
     return sum(1 for metadata in metadata_records if is_model_transmission(metadata))
+
+
+class ScientificCell(FrozenDomainModel):
+    experiment: ExperimentName
+    method: MethodName
+    condition: ConditionName
+    master_seed: MasterSeed
+    repetition: RepetitionIndex | None = None
+
+    @property
+    def semantic_key(self) -> ScientificCellSemanticKey:
+        repetition = "" if self.repetition is None else str(self.repetition)
+        return "|".join(
+            (self.experiment, self.method, self.condition, str(self.master_seed), repetition)
+        )
+
+
+class PreparedEvidenceCounts(FrozenDomainModel):
+    screen_target_count: PreparedScreenTargetCount
+    reproduction_target_count: PreparedReproductionTargetCount
+    reproduction_supported_count: PreparedSupportedReplayCount
+    final_gate_adequate_domain_count: AdequateFinalGateDomainCount

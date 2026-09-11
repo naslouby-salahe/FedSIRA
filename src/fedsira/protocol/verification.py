@@ -1,13 +1,23 @@
 from collections.abc import Sequence
 
+import torch
+
 from fedsira.config import VerificationConfig
+from fedsira.datasets.common import (
+    DatasetAdapter,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+)
 from fedsira.domain.enums import AdmissionState, SeedNamespace, TernaryOutcome
+from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     AllowSourceAsVerifier,
     ArtifactDigest,
     ByzantineDomainCount,
     DerivedSeed,
     DomainId,
+    MasterSeed,
     MonotonicTimestamp,
     NamespaceSeed,
     ObservedPositiveReportCount,
@@ -19,7 +29,22 @@ from fedsira.domain.types import (
     VerifierEligible,
     VerifierReportCount,
 )
-from fedsira.runtime import derive_uint32, deterministic_order
+from fedsira.evaluation.metrics import (
+    evaluate_domain,
+    supported_macro_f1_harm,
+    target_capability_gain,
+)
+from fedsira.protocol.capability_contract import (
+    capability_contract_for_digest,
+    capability_contract_passes,
+    verification_evidence_is_adequate,
+)
+from fedsira.protocol.proposal import (
+    supported_role_count,
+    target_role_count,
+)
+from fedsira.protocol.rules import resolve_ternary_outcome
+from fedsira.runtime import current_application_context, derive_uint32, deterministic_order
 
 VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
 BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value
@@ -125,3 +150,85 @@ def verification_pending_transition(
     if resolved_row_requirement_reached:
         return AdmissionState.SYNTHESIS_PENDING
     return AdmissionState.REPRODUCTION_PENDING
+
+
+VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
+
+
+def verifier_panel(
+    adapter: DatasetAdapter,
+    source_domain: DomainId | None,
+    reproducer_domain: DomainId,
+    master_seed: MasterSeed,
+    verification_config: VerificationConfig,
+    commitment_hash: ArtifactDigest,
+    allow_source_as_verifier: AllowSourceAsVerifier = False,
+) -> tuple[DomainId, ...]:
+    eligible_verifiers = tuple(
+        domain
+        for domain in adapter.domain_ids
+        if verifier_is_eligible(domain, source_domain, reproducer_domain, allow_source_as_verifier)
+    )
+    row_seed = verifier_assignment_seed_for_row(
+        derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, master_seed),
+        commitment_hash,
+    )
+    if not verifier_assignment_timestamp_is_valid(1.0, 0.0):
+        raise ValueError("verifier assignment must follow the reproduction commitment")
+    panel = deterministic_verifier_panel(
+        eligible_verifiers, row_seed=row_seed, panel_size=verification_config.panel_size
+    )
+    return tuple(domain for domain in panel)
+
+
+def honest_verifier_report(
+    adapter: DatasetAdapter,
+    anchor: RealAnchor,
+    candidate_flat_parameters: torch.Tensor,
+    verifier_domain: DomainId,
+    heterogeneity_scope: HeterogeneityScope | None,
+) -> TernaryOutcome:
+    config = current_application_context().scientific_config
+    if not verification_evidence_is_adequate(
+        target_role_count(adapter, verifier_domain, Role.ROW_VERIFICATION),
+        supported_role_count(adapter, verifier_domain, Role.ROW_VERIFICATION),
+        config.capability_contract.evidence_minima,
+    ):
+        return resolve_ternary_outcome(False, False)
+    anchor_metrics = evaluate_domain(
+        adapter,
+        anchor,
+        anchor.flat_parameters,
+        verifier_domain,
+        Role.ROW_VERIFICATION,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+    candidate_metrics = evaluate_domain(
+        adapter,
+        anchor,
+        candidate_flat_parameters,
+        verifier_domain,
+        Role.ROW_VERIFICATION,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+    if anchor_metrics is None or candidate_metrics is None:
+        return resolve_ternary_outcome(False, False)
+    contract = capability_contract_for_digest(adapter, anchor.dataset_manifest_hash)
+    passes = capability_contract_passes(
+        contract,
+        candidate_metrics.target_f1,
+        target_capability_gain(candidate_metrics.target_f1, anchor_metrics.target_f1),
+        supported_macro_f1_harm(
+            anchor_metrics.supported_macro_f1, candidate_metrics.supported_macro_f1
+        ),
+        benign_far_increase(anchor_metrics.benign_far, candidate_metrics.benign_far),
+    )
+    return resolve_ternary_outcome(True, passes)
+
+
+def benign_far_increase(
+    anchor_metrics: MetricResult, candidate_metrics: MetricResult
+) -> MetricResult:
+    if anchor_metrics.value is None or candidate_metrics.value is None:
+        return MetricResult(value=None, denominator=0)
+    return MetricResult(value=candidate_metrics.value - anchor_metrics.value, denominator=1)

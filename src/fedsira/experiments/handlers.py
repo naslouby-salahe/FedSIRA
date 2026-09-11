@@ -31,30 +31,9 @@ from fedsira.datasets.common import (
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
 )
-from fedsira.datasets.nbaiot.cell_support import (
-    BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
-    RESOLVED_FEDSIRA_CORE_METHOD,
-    capability_contract_for_digest,
-    compromised_reproducer_count,
-    compromised_verifier_count,
-    efficiency_message_counts,
-    final_gate_decision,
-    first_target_sample_id,
-    honest_verifier_report,
-    opening_identity,
-    opening_mode_for_cell,
-    reproducer_order_for_cell,
-    reproduction_progression,
-    row_requirement,
-    single_verifier_progression,
-    source_domain_for_cell,
-    verifier_panel,
-)
 from fedsira.datasets.nbaiot.schema import (
-    NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
-    NBaiotClass,
     NBaiotDomain,
     nbaiot_adapter,
 )
@@ -79,6 +58,7 @@ from fedsira.domain.models import (
     SERVER_ID,
     AdmissionDelayDecomposition,
     CommunicationMessageMetadata,
+    CommunicationMessageType,
     MetricResult,
     ProposalOracleLabel,
     TensorEnvelopePayload,
@@ -92,12 +72,17 @@ from fedsira.domain.models import (
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
+    ByzantineDomainCount,
     CellHandlerName,
+    CommunicationMessageCount,
+    CompromisedReproducerCount,
+    ConditionName,
     DomainId,
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MetricObservation,
+    RequiredReproductionRowCount,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
@@ -160,6 +145,7 @@ from fedsira.experiments.definitions import (
     PluralityCondition,
     ProposalEpisode,
     ReproducerCondition,
+    SecondaryScenario,
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
@@ -179,11 +165,16 @@ from fedsira.experiments.planning import (
 from fedsira.learning.federated import train_anchor
 from fedsira.learning.post_reference import (
     certified_domain_delta_committee,
+    train_domain_reproduction_delta,
     train_generic_hard_supported_examples_delta,
     train_source_candidate_delta,
 )
+from fedsira.protocol.admission import (
+    final_gate_decision,
+)
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
+    scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
 )
@@ -208,6 +199,9 @@ from fedsira.protocol.baselines.registry import (
     BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
+    first_eligible_non_source_reproducer,
+    single_fresh_verifier_domain,
+    single_fresh_verifier_outcome,
     standard_fl_anchor_rounds,
     validate_role_not_used_for_tuning,
 )
@@ -217,6 +211,7 @@ from fedsira.protocol.baselines.training import (
 )
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
+    capability_contract_for_digest,
     capability_contract_passes,
     compute_capability_identity,
     reproduction_evidence_is_adequate,
@@ -226,12 +221,27 @@ from fedsira.protocol.capability_contract import (
 from fedsira.protocol.proposal import (
     ScreenDomainResult,
     candidate_screen_transition,
+    first_target_sample_id,
+    opening_identity,
     screen_domain_order,
     screen_fold_index,
+    source_domain_for_cell,
     start_admission,
+    supported_role_count,
+    target_role_count,
 )
 from fedsira.protocol.reproduction import (
+    ReproductionAttempt,
+    commitment_digest,
+    consumed_domains,
+    handle_adequate_domain_trained,
+    handle_inadequate_domain,
+    handle_no_adequate_unconsumed_domain,
+    next_reproducer_domain,
     select_compromised_reproducers,
+    validate_commitment_exists_before_verifier_assignment,
+    validate_reproduction_start_checkpoint,
+    validate_reproduction_starts_from_anchor,
 )
 from fedsira.protocol.rules import (
     apply_logical_cycle_expiry,
@@ -244,6 +254,8 @@ from fedsira.protocol.rules import (
     krum_committee_is_admissible,
     minimum_honest_positive_count,
     report_for_domain,
+    reproducer_order_for_cell,
+    reproduction_update_vector,
     resolve_ternary_outcome,
     resume_dormant_admission,
     validate_no_safety_completion_before_tau_k,
@@ -256,11 +268,13 @@ from fedsira.protocol.verification import (
     byzantine_selection_order,
     construct_above_bound_panel,
     diagnostic_committee_panel,
+    honest_verifier_report,
     panel_votes_are_one_per_domain,
     reproduction_row_is_certified,
     select_compromised_verifiers,
     verification_pending_transition,
     verifier_is_eligible,
+    verifier_panel,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -383,11 +397,11 @@ class ProtocolCellDispatch:
             real_anchor = self.real_anchor(cell.master_seed)
             if real_anchor is not None:
                 candidate_domains = non_source_domains(
-                    nbaiot_adapter(self._prepared_root),
-                    source_domain_for_cell(cell, self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
+                    source_domain_for_cell(self._primary_adapter, cell),
                 )[: config.baselines.parameter_similarity.required_committed_rows]
                 committee_deltas = certified_domain_delta_committee(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     candidate_domains,
@@ -421,9 +435,11 @@ class ProtocolCellDispatch:
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
             )
             real_anchor = self.real_anchor(cell.master_seed)
-            source_domain = source_domain_for_cell(cell, self._prepared_root)
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
             real_feature_names = (
-                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
+                prepared_feature_names(self._primary_adapter.prepared_root)
+                if real_anchor is not None
+                else None
             )
             if (
                 real_anchor is not None
@@ -431,10 +447,10 @@ class ProtocolCellDispatch:
                 and (real_feature_names is not None)
             ):
                 candidate_domains = non_source_domains(
-                    nbaiot_adapter(self._prepared_root), source_domain
+                    nbaiot_adapter(self._primary_adapter.prepared_root), source_domain
                 )[: config.protocol.synthesis.committee_size]
                 committee_deltas = certified_domain_delta_committee(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     candidate_domains,
@@ -503,7 +519,10 @@ class ProtocolCellDispatch:
         boundary_metrics = boundary_metric_set(
             true_labels=(),
             predicted_labels=(),
-            class_tokens=(NBaiotClass.BENIGN, NBaiotClass.GAFGYT_COMBO),
+            class_tokens=(
+                self._primary_adapter.benign_class_token,
+                self._primary_adapter.target_class_token,
+            ),
             target_f1_delta=MetricResult(value=None, denominator=0),
             supported_macro_f1_drop=MetricResult(value=None, denominator=0),
             benign_far_increase=MetricResult(value=None, denominator=0),
@@ -528,7 +547,9 @@ class ProtocolCellDispatch:
             scope = CapabilityContractScope(cell.method)
             real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
-                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
+                prepared_feature_names(self._primary_adapter.prepared_root)
+                if real_anchor is not None
+                else None
             )
             if real_anchor is not None and real_feature_names is not None:
                 root_cause_scope = RootCauseScope(
@@ -539,10 +560,10 @@ class ProtocolCellDispatch:
                     shift_value=config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization,
                 )
                 capability_summary = compute_capability_under_specification_summary(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
-                    source_domain_for_cell(cell, self._prepared_root),
+                    source_domain_for_cell(self._primary_adapter, cell),
                     root_cause_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -584,10 +605,10 @@ class ProtocolCellDispatch:
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = root_cause_partitioned_row_ids(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     non_source_domains(
-                        nbaiot_adapter(self._prepared_root),
-                        source_domain_for_cell(cell, self._prepared_root),
+                        nbaiot_adapter(self._primary_adapter.prepared_root),
+                        source_domain_for_cell(self._primary_adapter, cell),
                     ),
                 )
             else:
@@ -608,7 +629,9 @@ class ProtocolCellDispatch:
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
             real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
-                prepared_feature_names(self._prepared_root) if real_anchor is not None else None
+                prepared_feature_names(self._primary_adapter.prepared_root)
+                if real_anchor is not None
+                else None
             )
             if real_anchor is not None and real_feature_names is not None:
                 epistemic_failure_scope = EpistemicFailureScope(
@@ -622,10 +645,10 @@ class ProtocolCellDispatch:
                     common_context_trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
                 )
                 epistemic_summary = compute_shared_epistemic_failure_summary(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
-                    source_domain_for_cell(cell, self._prepared_root),
+                    source_domain_for_cell(self._primary_adapter, cell),
                     epistemic_failure_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -681,7 +704,7 @@ class ProtocolCellDispatch:
                     heterogeneity_seed,
                     config.attacks_and_boundaries.heterogeneity.quantity_skew_multipliers,
                 )
-                source_domain = source_domain_for_cell(cell, self._prepared_root)
+                source_domain = source_domain_for_cell(self._primary_adapter, cell)
                 if source_domain is not None:
                     excluded = exclude_source_from_quantity_skew(
                         multiplier_by_domain, source_domain
@@ -729,10 +752,12 @@ class ProtocolCellDispatch:
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
         )
-        source_domain = source_domain_for_cell(cell, self._prepared_root)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
         real_anchor = self.real_anchor(cell.master_seed)
         resolved_opening_identity = (
-            opening_identity(real_anchor.dataset_manifest_hash) if real_anchor is not None else None
+            opening_identity(self._primary_adapter, real_anchor.dataset_manifest_hash)
+            if real_anchor is not None
+            else None
         )
         if (
             real_anchor is not None
@@ -741,14 +766,14 @@ class ProtocolCellDispatch:
         ):
             if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES:
                 real_source_delta = train_generic_hard_supported_examples_delta(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
                 )
             else:
                 real_source_delta = train_source_candidate_delta(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -771,7 +796,7 @@ class ProtocolCellDispatch:
             )
             screen_results = tuple(
                 evaluate_screen_domain(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     real_source_delta,
@@ -783,7 +808,7 @@ class ProtocolCellDispatch:
             )
             real_differential_a = (
                 compute_screen_differential(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     real_source_delta,
@@ -818,7 +843,7 @@ class ProtocolCellDispatch:
         screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
         fold_sample_id = (
             first_target_sample_id(
-                self._prepared_root, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
+                self._primary_adapter, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
             )
             if screen_results
             else None
@@ -882,7 +907,7 @@ class ProtocolCellDispatch:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
-        source_domain = source_domain_for_cell(cell, self._prepared_root)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
         direct_krum_active = cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM
         coordinate_median_active = (
             cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE
@@ -966,7 +991,7 @@ class ProtocolCellDispatch:
         required_row_count = row_requirement(cell, self._resolved_core)
         source_delta = (
             train_source_candidate_delta(
-                nbaiot_adapter(self._prepared_root),
+                nbaiot_adapter(self._primary_adapter.prepared_root),
                 cell.master_seed,
                 real_anchor,
                 source_domain,
@@ -987,7 +1012,7 @@ class ProtocolCellDispatch:
             progression_state, attempts, commitment_hashes, updates = single_verifier_progression(
                 cell,
                 source_domain,
-                self._prepared_root,
+                self._primary_adapter,
                 real_anchor,
                 heterogeneity_scope,
             )
@@ -1002,7 +1027,7 @@ class ProtocolCellDispatch:
                 external_verification_active,
                 required_row_count,
                 frozenset(),
-                self._prepared_root,
+                self._primary_adapter,
                 real_anchor,
                 include_source_as_first_reproducer=no_origin_exclusion_active,
                 heterogeneity_scope=heterogeneity_scope,
@@ -1027,6 +1052,7 @@ class ProtocolCellDispatch:
                         panel = self._same_context_verifier_panel(source_domain, attempt_domain)
                     else:
                         panel = verifier_panel(
+                            self._primary_adapter,
                             source_domain,
                             attempt_domain,
                             cell.master_seed,
@@ -1038,7 +1064,7 @@ class ProtocolCellDispatch:
                         return AdmissionState.DORMANT
                     reports = tuple(
                         honest_verifier_report(
-                            self._prepared_root,
+                            self._primary_adapter,
                             real_anchor,
                             candidate_flat,
                             NBaiotDomain(verifier_domain),
@@ -1057,7 +1083,7 @@ class ProtocolCellDispatch:
                         )
                 eligible_verifier_count = sum(
                     1
-                    for domain in NBAIOT_DOMAIN_ORDER
+                    for domain in self._primary_adapter.domain_ids
                     if verifier_is_eligible(
                         domain,
                         source_domain,
@@ -1096,7 +1122,7 @@ class ProtocolCellDispatch:
                 or no_final_synthesis_gate_active
                 or no_origin_exclusion_active
                 or byzantine_reproducer_copies_source_active,
-                prepared_root=self._prepared_root,
+                adapter=self._primary_adapter,
                 master_seed=cell.master_seed,
                 anchor=real_anchor,
                 coordinate_median_active=coordinate_median_active,
@@ -1170,7 +1196,7 @@ class ProtocolCellDispatch:
         extra: list[MetricObservation] = []
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             real_anchor = self.real_anchor(cell.master_seed)
-            source_domain = source_domain_for_cell(cell, self._prepared_root)
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
             backdoor_scope = self.backdoor_scope_for_cell(cell)
             if (
                 real_anchor is not None
@@ -1178,7 +1204,7 @@ class ProtocolCellDispatch:
                 and (backdoor_scope is not None)
             ):
                 source_delta = train_source_candidate_delta(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -1186,7 +1212,7 @@ class ProtocolCellDispatch:
                 )
                 if source_delta is not None:
                     asr = compute_source_backdoor_asr(
-                        nbaiot_adapter(self._prepared_root),
+                        nbaiot_adapter(self._primary_adapter.prepared_root),
                         real_anchor,
                         real_anchor.flat_parameters + source_delta,
                         source_domain,
@@ -1239,7 +1265,7 @@ class ProtocolCellDispatch:
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(
             NBAIOT_DOMAIN_ORDER[0],
-            source_domain_for_cell(cell, self._prepared_root),
+            source_domain_for_cell(self._primary_adapter, cell),
             ORDINARY_POST_REFERENCE_DATA_ACCESS,
         )
         state: AdmissionState
@@ -1258,10 +1284,10 @@ class ProtocolCellDispatch:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
             real_anchor = self.real_anchor(cell.master_seed)
-            source_domain = source_domain_for_cell(cell, self._prepared_root)
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
             source_delta = (
                 train_source_candidate_delta(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -1319,11 +1345,11 @@ class ProtocolCellDispatch:
         compromised_count = compromised_reproducer_count(condition)
         attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
         real_anchor = self.real_anchor(cell.master_seed)
-        source_domain = source_domain_for_cell(cell, self._prepared_root)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
         carrier_rows = (
-            nbaiot_adapter(self._prepared_root).load_rows(
+            nbaiot_adapter(self._primary_adapter.prepared_root).load_rows(
                 source_domain,
-                NBaiotClass.GAFGYT_UDP,
+                self._primary_adapter.attack_carrier_class_token(),
                 Role.POST_REFERENCE_REPLAY,
             )
             if source_domain is not None
@@ -1336,7 +1362,7 @@ class ProtocolCellDispatch:
         ):
             source_delta = (
                 train_source_candidate_delta(
-                    nbaiot_adapter(self._prepared_root),
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -1363,7 +1389,9 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         else:
             selected = select_compromised_reproducers(
-                reproducer_order_for_cell(cell), frozenset(NBAIOT_DOMAIN_ORDER), compromised_count
+                reproducer_order_for_cell(self._primary_adapter, cell),
+                frozenset(self._primary_adapter.domain_ids),
+                compromised_count,
             )
             compromised_reproducers: frozenset[DomainId] = (
                 frozenset(NBaiotDomain(domain) for domain in selected)
@@ -1377,7 +1405,7 @@ class ProtocolCellDispatch:
                 False,
                 required_row_count,
                 compromised_reproducers,
-                self._prepared_root,
+                self._primary_adapter,
                 real_anchor,
                 backdoor_scope=self.backdoor_scope_for_cell(cell),
             )
@@ -1392,7 +1420,7 @@ class ProtocolCellDispatch:
                     source_domain,
                     tuple(NBaiotDomain(attempt.domain) for attempt in attempts),
                     is_plurality_active=True,
-                    prepared_root=self._prepared_root,
+                    adapter=self._primary_adapter,
                     master_seed=cell.master_seed,
                     anchor=real_anchor,
                     coordinate_median_active=False,
@@ -1421,11 +1449,11 @@ class ProtocolCellDispatch:
         ):
             state = AdmissionState.DORMANT
         else:
-            source_domain = source_domain_for_cell(cell, self._prepared_root)
-            reproducer_domain = reproducer_order_for_cell(cell)[0]
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
+            reproducer_domain = reproducer_order_for_cell(self._primary_adapter, cell)[0]
             eligible_verifiers = tuple(
                 domain
-                for domain in NBAIOT_DOMAIN_ORDER
+                for domain in self._primary_adapter.domain_ids
                 if verifier_is_eligible(domain, source_domain, reproducer_domain)
             )
             byzantine_order = byzantine_selection_order(
@@ -1680,7 +1708,7 @@ class ProtocolCellDispatch:
         if real_anchor is None:
             tensor_payload = b""
             parameter_shape: tuple[int, ...] = (0,)
-            manifest_hash = dataset_manifest_hash(self._prepared_root)
+            manifest_hash = dataset_manifest_hash(self._primary_adapter.prepared_root)
             capability_hash = manifest_hash
         else:
             flat_parameters = real_anchor.flat_parameters.detach().cpu().contiguous()
@@ -1688,7 +1716,7 @@ class ProtocolCellDispatch:
             parameter_shape = (int(flat_parameters.numel()),)
             manifest_hash = real_anchor.dataset_manifest_hash
             capability_hash = compute_capability_identity(
-                capability_contract_for_digest(manifest_hash)
+                capability_contract_for_digest(self._primary_adapter, manifest_hash)
             )
         model_size_bytes = len(tensor_payload)
         semantic_cell_key_hash = hashlib.sha256(cell.semantic_key.encode("utf-8")).hexdigest()
@@ -1929,12 +1957,12 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         config = current_application_context().scientific_config
         eligible_verifiers = tuple(
             domain
-            for domain in NBAIOT_DOMAIN_ORDER
+            for domain in self._primary_adapter.domain_ids
             if verifier_is_eligible(domain, source_domain, reproducer_domain)
         )
-        reproducer_feature_mean = nbaiot_adapter(self._prepared_root).anchor_train_feature_mean(
-            reproducer_domain
-        )
+        reproducer_feature_mean = nbaiot_adapter(
+            self._primary_adapter.prepared_root
+        ).anchor_train_feature_mean(reproducer_domain)
         if reproducer_feature_mean is None:
             raise ValueError(
                 "same-context verification requires real anchor-train features for "
@@ -1942,7 +1970,9 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             )
         eligible_verifier_feature_means: list[DomainFeatureMean] = []
         for domain in eligible_verifiers:
-            feature_mean = nbaiot_adapter(self._prepared_root).anchor_train_feature_mean(domain)
+            feature_mean = nbaiot_adapter(
+                self._primary_adapter.prepared_root
+            ).anchor_train_feature_mean(domain)
             if feature_mean is None:
                 raise ValueError(
                     f"same-context verification requires real anchor-train features for {domain}"
@@ -1964,7 +1994,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     ) -> BooleanValue:
         config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
-            nbaiot_adapter(self._prepared_root),
+            nbaiot_adapter(self._primary_adapter.prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
@@ -1972,7 +2002,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             target_role=Role.CANDIDATE_SCREEN,
         )
         candidate_screen = evaluate_domain(
-            nbaiot_adapter(self._prepared_root),
+            nbaiot_adapter(self._primary_adapter.prepared_root),
             real_anchor,
             candidate_flat_parameters,
             source_domain,
@@ -1987,8 +2017,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             config.datasets.primary.name,
             len(NBAIOT_DOMAIN_ORDER),
             real_anchor.dataset_manifest_hash,
-            NBaiotClass.GAFGYT_COMBO,
-            len(NBAIOT_CLASS_ORDER) - 1,
+            self._primary_adapter.target_class_token,
+            len(self._primary_adapter.class_tokens) - 1,
             config.capability_contract,
         )
         target_f1_gain = target_capability_gain(candidate_screen.target_f1, anchor_screen.target_f1)
@@ -2021,7 +2051,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     ) -> BooleanValue:
         config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
-            nbaiot_adapter(self._prepared_root),
+            nbaiot_adapter(self._primary_adapter.prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
@@ -2030,7 +2060,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             root_cause_scope=root_cause_scope,
         )
         candidate_screen = evaluate_domain(
-            nbaiot_adapter(self._prepared_root),
+            nbaiot_adapter(self._primary_adapter.prepared_root),
             real_anchor,
             candidate_flat_parameters,
             source_domain,
@@ -2046,8 +2076,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             config.datasets.primary.name,
             len(NBAIOT_DOMAIN_ORDER),
             real_anchor.dataset_manifest_hash,
-            NBaiotClass.GAFGYT_COMBO,
-            len(NBAIOT_CLASS_ORDER) - 1,
+            self._primary_adapter.target_class_token,
+            len(self._primary_adapter.class_tokens) - 1,
             config.capability_contract,
         )
         target_f1_gain = target_capability_gain(candidate_screen.target_f1, anchor_screen.target_f1)
@@ -2075,7 +2105,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         config = current_application_context().scientific_config
         if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             return None
-        real_feature_names = prepared_feature_names(self._prepared_root)
+        real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
             return None
         trigger_indices = tuple(real_feature_names.index(name) for name in NBAIOT_TRIGGER_FEATURES)
@@ -2098,7 +2128,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             shift_magnitude = magnitudes[1]
         else:
             return None
-        real_feature_names = prepared_feature_names(self._prepared_root)
+        real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
             return None
         heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
@@ -2121,8 +2151,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             prepared_root = self._secondary_prepared_root
             target_class_token = CICIOT2023_TARGET_LABEL
         else:
-            prepared_root = self._prepared_root
-            target_class_token = NBaiotClass.GAFGYT_COMBO
+            prepared_root = self._primary_adapter.prepared_root
+            target_class_token = self._primary_adapter.target_class_token
         if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
             evidence = PreparedEvidenceCounts(
                 screen_target_count=0,
@@ -2218,3 +2248,344 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             raise ValueError(f"no registered cell handler for experiment {cell.experiment}")
         handler = cast(CellHandler, getattr(self, handler_name))
         return handler(cell, evidence)
+
+
+BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
+
+
+ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"
+
+
+SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
+
+
+def opening_mode_for_cell(
+    cell: ScientificCell, resolved_core: ResolvedCore | None = None
+) -> AdmissionOpeningMode:
+    if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
+        return resolved_core.opening_mode
+    if cell.method == OpeningMode.PROPOSAL_ASSISTED:
+        return AdmissionOpeningMode.PROPOSAL_ASSISTED
+    return AdmissionOpeningMode.CANDIDATE_FREE
+
+
+def row_requirement(
+    cell: ScientificCell, resolved_core: ResolvedCore | None = None
+) -> RequiredReproductionRowCount:
+    config = current_application_context().scientific_config
+    if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
+        return config.protocol.synthesis.committee_size if resolved_core.plurality_survives else 1
+    if cell.method in (
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
+    ) or (
+        cell.experiment == MECHANISM_ABLATION_NAME
+        and cell.method == AblationVariant.ONE_INDEPENDENT_REPRODUCTION
+    ):
+        return 1
+    if cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE or (
+        cell.experiment == MECHANISM_ABLATION_NAME
+        and cell.method == AblationVariant.GENERIC_THREE_ROW_THRESHOLD
+    ):
+        return config.baselines.three_row_coordinate_median.row_count
+    return config.protocol.synthesis.committee_size
+
+
+def _domain_is_reproduction_adequate(adapter: DatasetAdapter, domain: DomainId) -> BooleanValue:
+    config = current_application_context().scientific_config
+    return reproduction_evidence_is_adequate(
+        target_role_count(adapter, domain, Role.REPRODUCTION),
+        supported_role_count(adapter, domain, Role.POST_REFERENCE_REPLAY),
+        config.capability_contract.evidence_minima,
+    )
+
+
+def _train_reproduction_update(
+    adapter: DatasetAdapter,
+    cell: ScientificCell,
+    anchor: RealAnchor,
+    domain: DomainId,
+    source_delta: torch.Tensor | None,
+    compromised_reproducers: frozenset[DomainId],
+    heterogeneity_scope: HeterogeneityScope | None,
+    backdoor_scope: BackdoorScope | None,
+) -> torch.Tensor | None:
+    config = current_application_context().scientific_config
+    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
+    if domain not in compromised_reproducers:
+        return train_domain_reproduction_delta(
+            adapter,
+            cell.master_seed,
+            anchor,
+            domain,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+    condition = cell.condition
+    if condition in (
+        ReproducerCondition.ONE_SOURCE_COPY,
+        ReproducerCondition.TWO_SOURCE_COPIES,
+        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+    ):
+        if source_delta is None:
+            return None
+        return reproduction_update_vector(
+            anchor.flat_parameters, anchor.flat_parameters + source_delta
+        )
+    trained = train_domain_reproduction_delta(
+        adapter,
+        cell.master_seed,
+        anchor,
+        domain,
+        heterogeneity_scope=heterogeneity_scope,
+        backdoor_scope=backdoor_scope,
+    )
+    if trained is None:
+        return None
+    if condition in (
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+    ):
+        return scale_model_replacement_delta(
+            trained,
+            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
+        )
+    return trained
+
+
+def reproduction_progression(
+    cell: ScientificCell,
+    evidence: PreparedEvidenceCounts,
+    external_verification_active: BooleanValue,
+    row_requirement: RequiredReproductionRowCount,
+    compromised_reproducers: frozenset[DomainId],
+    adapter: DatasetAdapter,
+    anchor: RealAnchor | None,
+    include_source_as_first_reproducer: BooleanValue = False,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    source_delta: torch.Tensor | None = None,
+) -> tuple[
+    AdmissionState,
+    tuple[ReproductionAttempt, ...],
+    tuple[ArtifactDigest, ...],
+    OrderedDict[DomainId, torch.Tensor],
+]:
+    del evidence
+    if anchor is None:
+        return (AdmissionState.DORMANT, (), (), OrderedDict())
+    reproducer_order = reproducer_order_for_cell(adapter, cell)
+    source_domain = source_domain_for_cell(adapter, cell)
+    validate_reproduction_start_checkpoint(
+        ANCHOR_CHECKPOINT_IDENTITY, frozenset({SOURCE_CHECKPOINT_IDENTITY})
+    )
+    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
+    capability_identity = compute_capability_identity(
+        capability_contract_for_digest(adapter, anchor.dataset_manifest_hash)
+    )
+    adequate_domains = frozenset(
+        domain
+        for domain in adapter.domain_ids
+        if domain != source_domain and _domain_is_reproduction_adequate(adapter, domain)
+    )
+    attempts: list[ReproductionAttempt] = []
+    commitment_hashes: list[ArtifactDigest] = []
+    updates: OrderedDict[DomainId, torch.Tensor] = OrderedDict()
+    certified_count = 0
+    state = AdmissionState.REPRODUCTION_PENDING
+    if (
+        include_source_as_first_reproducer
+        and source_domain is not None
+        and source_delta is not None
+    ):
+        reproduced = anchor.flat_parameters + source_delta
+        commitment_hash = commitment_digest(
+            source_domain, cell.master_seed, capability_identity, reproduced
+        )
+        commitment_hashes.append(commitment_hash)
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        updates[source_domain] = source_delta
+        attempts.append(
+            ReproductionAttempt(domain=source_domain, was_trained=True, is_certified=True)
+        )
+        certified_count += 1
+        state = handle_adequate_domain_trained(
+            external_verification_active, certified_count >= row_requirement
+        )
+        if state is AdmissionState.SYNTHESIS_PENDING:
+            return (state, tuple(attempts), tuple(commitment_hashes), updates)
+    for _row_index in range(len(reproducer_order)):
+        next_domain = next_reproducer_domain(
+            reproducer_order, consumed_domains(attempts), adequate_domains
+        )
+        if next_domain is None:
+            state = handle_no_adequate_unconsumed_domain(certified_count >= row_requirement)
+            break
+        domain = NBaiotDomain(next_domain)
+        update = _train_reproduction_update(
+            adapter,
+            cell,
+            anchor,
+            domain,
+            source_delta,
+            compromised_reproducers,
+            heterogeneity_scope,
+            backdoor_scope,
+        )
+        if update is None:
+            state = handle_inadequate_domain()
+            continue
+        reproduced = anchor.flat_parameters + update
+        commitment_hash = commitment_digest(
+            domain, cell.master_seed, capability_identity, reproduced
+        )
+        commitment_hashes.append(commitment_hash)
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        updates[domain] = update
+        is_certified = domain not in compromised_reproducers or not external_verification_active
+        attempts.append(
+            ReproductionAttempt(domain=domain, was_trained=True, is_certified=is_certified)
+        )
+        if is_certified:
+            certified_count += 1
+        state = handle_adequate_domain_trained(
+            external_verification_active, certified_count >= row_requirement
+        )
+        if state is AdmissionState.SYNTHESIS_PENDING:
+            break
+    return (state, tuple(attempts), tuple(commitment_hashes), updates)
+
+
+def single_verifier_progression(
+    cell: ScientificCell,
+    source_domain: DomainId | None,
+    adapter: DatasetAdapter,
+    anchor: RealAnchor | None,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> tuple[
+    AdmissionState,
+    tuple[ReproductionAttempt, ...],
+    tuple[ArtifactDigest, ...],
+    OrderedDict[DomainId, torch.Tensor],
+]:
+    if anchor is None:
+        return (AdmissionState.DORMANT, (), (), OrderedDict())
+    config = current_application_context().scientific_config
+    reproducer_order = reproducer_order_for_cell(adapter, cell)
+    adequate_domains = frozenset(
+        domain
+        for domain in adapter.domain_ids
+        if domain != source_domain and _domain_is_reproduction_adequate(adapter, domain)
+    )
+    capability_identity = compute_capability_identity(
+        capability_contract_for_digest(adapter, anchor.dataset_manifest_hash)
+    )
+    consumed: set[NBaiotDomain] = set()
+    while True:
+        candidate = first_eligible_non_source_reproducer(
+            reproducer_order, adequate_domains - frozenset(consumed)
+        )
+        if candidate is None:
+            return (AdmissionState.DORMANT, (), (), OrderedDict())
+        next_domain = NBaiotDomain(candidate)
+        consumed.add(next_domain)
+        update = train_domain_reproduction_delta(
+            adapter,
+            cell.master_seed,
+            anchor,
+            next_domain,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+        if update is None:
+            continue
+        reproduced = anchor.flat_parameters + update
+        commitment_hash = commitment_digest(
+            next_domain, cell.master_seed, capability_identity, reproduced
+        )
+        validate_commitment_exists_before_verifier_assignment(commitment_hash)
+        panel_order = verifier_panel(
+            adapter,
+            source_domain,
+            next_domain,
+            cell.master_seed,
+            config.protocol.verification,
+            commitment_hash,
+        )
+        verifier_domain = single_fresh_verifier_domain(
+            panel_order, frozenset(), frozenset(panel_order)
+        )
+        if verifier_domain is None:
+            continue
+        report = honest_verifier_report(
+            adapter,
+            anchor,
+            reproduced,
+            NBaiotDomain(verifier_domain),
+            heterogeneity_scope,
+        )
+        verifier_outcome = single_fresh_verifier_outcome(verifier_domain, report)
+        if verifier_outcome is AdmissionState.ADMITTED:
+            attempt = ReproductionAttempt(domain=next_domain, was_trained=True, is_certified=True)
+            return (
+                AdmissionState.SYNTHESIS_PENDING,
+                (attempt,),
+                (commitment_hash,),
+                OrderedDict(((next_domain, update),)),
+            )
+        if verifier_outcome is AdmissionState.REJECTED:
+            continue
+
+
+def compromised_reproducer_count(condition: ConditionName) -> CompromisedReproducerCount:
+    if condition in (
+        ReproducerCondition.ONE_SOURCE_COPY,
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+    ):
+        return 1
+    if condition in (
+        ReproducerCondition.TWO_SOURCE_COPIES,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+    ):
+        return 2
+    return 0
+
+
+def compromised_verifier_count(condition: ConditionName) -> ByzantineDomainCount:
+    if condition in (
+        VerifierCondition.ONE_FALSE_POSITIVE,
+        VerifierCondition.ONE_FALSE_NEGATIVE,
+    ):
+        return 1
+    if condition in (
+        VerifierCondition.TWO_FALSE_POSITIVES,
+        VerifierCondition.TWO_FALSE_NEGATIVES,
+    ):
+        return 2
+    return 0
+
+
+RESOLVED_FEDSIRA_CORE_METHOD = CoreMethodIdentity.RESOLVED_FEDSIRA_CORE
+
+
+def efficiency_message_counts() -> (
+    tuple[
+        tuple[CommunicationMessageType, CommunicationMessageCount],
+        ...,
+    ]
+):
+    return (
+        (CommunicationMessageType.SOURCE_COMMITMENT, 1),
+        (CommunicationMessageType.MODEL_DISTRIBUTION, 8),
+        (CommunicationMessageType.UPDATE_SUBMISSION, 8),
+        (CommunicationMessageType.CAPABILITY_CONTRACT, 1),
+        (CommunicationMessageType.REVIEW_ASSIGNMENT, 3),
+        (CommunicationMessageType.REVIEW_REPORT, 3),
+        (CommunicationMessageType.VERIFIER_ASSIGNMENT, 5),
+        (CommunicationMessageType.VERIFIER_REPORT, 5),
+        (CommunicationMessageType.FINAL_GATE_ASSIGNMENT, 6),
+        (CommunicationMessageType.FINAL_GATE_REPORT, 6),
+        (CommunicationMessageType.DECISION, 1),
+    )

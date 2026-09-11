@@ -9,6 +9,7 @@ from fedsira.domain.enums import (
     CoreMethodIdentity,
     DatasetId,
     EpistemicFailureType,
+    ProposalEpisode,
     RootCauseMixture,
 )
 from fedsira.domain.types import (
@@ -96,13 +97,6 @@ ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric
 class OpeningMode(StrEnum):
     PROPOSAL_ASSISTED = "Proposal-Assisted"
     CANDIDATE_FREE = "Candidate-Free"
-
-
-class ProposalEpisode(StrEnum):
-    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
-    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"
-    IRRELEVANT_SOURCE_IMPROVEMENT = "Irrelevant Source Improvement"
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
 
 
 class PluralityCondition(StrEnum):

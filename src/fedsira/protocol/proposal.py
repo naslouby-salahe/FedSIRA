@@ -7,13 +7,28 @@ from fedsira.config import (
     CapabilityContractConfig,
     ProposalScreenConfig,
 )
-from fedsira.domain.enums import AdmissionOpeningMode, AdmissionState, SeedNamespace
-from fedsira.domain.models import MetricResult
+from fedsira.datasets.common import (
+    DatasetAdapter,
+    Role,
+)
+from fedsira.domain.enums import (
+    AdmissionOpeningMode,
+    AdmissionState,
+    ProposalEpisode,
+    SeedNamespace,
+)
+from fedsira.domain.models import MetricResult, ScientificCell
 from fedsira.domain.types import (
+    ArtifactDigest,
     AttackCarrierRequired,
+    BooleanValue,
+    CapabilityContractSatisfied,
+    CapabilityIdentity,
+    DatasetClassToken,
     DerivedSeed,
     DomainId,
     EvidenceAdequate,
+    ExampleCount,
     FoldCount,
     FoldIndex,
     FrozenDomainModel,
@@ -28,7 +43,12 @@ from fedsira.domain.types import (
     SourceCommitted,
 )
 from fedsira.evaluation.statistics import match_nearest_within_decile
-from fedsira.runtime import deterministic_order, framed_bytes
+from fedsira.protocol.capability_contract import (
+    capability_contract_for_digest,
+    compute_capability_identity,
+)
+from fedsira.protocol.rules import validate_exactly_one_source_domain
+from fedsira.runtime import derive_uint32, deterministic_order, framed_bytes
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
@@ -280,3 +300,81 @@ def candidate_screen_transition(
     if predicate_count >= required_count:
         return AdmissionState.ADMISSION_OPEN
     return AdmissionState.REJECTED
+
+
+SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
+
+
+class OpeningIdentity(FrozenDomainModel):
+    capability_identity: CapabilityIdentity
+    contract_passes: CapabilityContractSatisfied
+
+
+def target_role_count(adapter: DatasetAdapter, domain: DomainId, role: Role) -> ExampleCount:
+    rows = adapter.load_rows(domain, adapter.target_class_token, role)
+    return 0 if rows is None else rows.row_count
+
+
+def first_target_sample_id(
+    adapter: DatasetAdapter, domain: DomainId, role: Role
+) -> ArtifactDigest | None:
+    rows = adapter.load_rows(domain, adapter.target_class_token, role)
+    if rows is None or not rows.sample_ids:
+        return None
+    return rows.sample_ids[0]
+
+
+def supported_role_count(adapter: DatasetAdapter, domain: DomainId, role: Role) -> ExampleCount:
+    total: ExampleCount = 0
+    for class_id in adapter.class_tokens:
+        if class_id == adapter.target_class_token:
+            continue
+        rows = adapter.load_rows(domain, class_id, role)
+        if rows is not None:
+            total += rows.row_count
+    return total
+
+
+def domains_with_class(
+    adapter: DatasetAdapter, class_id: DatasetClassToken, role: Role
+) -> frozenset[DomainId]:
+    return frozenset(
+        domain
+        for domain in adapter.domain_ids
+        if adapter.load_rows(domain, class_id, role) is not None
+    )
+
+
+def opening_identity(
+    adapter: DatasetAdapter, dataset_manifest_hash: ArtifactDigest
+) -> OpeningIdentity:
+    contract = capability_contract_for_digest(adapter, dataset_manifest_hash)
+    return OpeningIdentity(
+        capability_identity=compute_capability_identity(contract),
+        contract_passes=False,
+    )
+
+
+def _source_requires_attack_carrier(cell: ScientificCell) -> BooleanValue:
+    return cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+
+
+def source_domain_for_cell(adapter: DatasetAdapter, cell: ScientificCell) -> DomainId | None:
+    source_order = source_selection_order(
+        adapter.domain_ids, derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
+    )
+    validate_exactly_one_source_domain((source_order[0],))
+    domains_with_target = domains_with_class(
+        adapter, adapter.target_class_token, Role.SOURCE_PROPOSAL
+    ) | domains_with_class(adapter, adapter.target_class_token, Role.REPRODUCTION)
+    domains_with_carrier = domains_with_class(
+        adapter, adapter.attack_carrier_class_token(), Role.POST_REFERENCE_REPLAY
+    )
+    requires_carrier = _source_requires_attack_carrier(cell)
+    selected = select_source_domain(
+        source_order,
+        domains_with_target,
+        requires_attack_carrier=requires_carrier,
+        domains_with_attack_carrier=domains_with_carrier,
+    )
+    return selected if selected is not None else None

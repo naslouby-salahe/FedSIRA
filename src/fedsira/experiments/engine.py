@@ -13,8 +13,11 @@ from fedsira.domain.enums import (
     FailureClass,
     ScientificCellPhase,
 )
+from fedsira.domain.models import (
+    PreparedEvidenceCounts,
+    ScientificCell,
+)
 from fedsira.domain.types import (
-    AdequateFinalGateDomainCount,
     ArtifactDigest,
     CellCompletionStatus,
     ClassLabel,
@@ -32,9 +35,6 @@ from fedsira.domain.types import (
     MetricObservation,
     MetricValue,
     OverwriteExisting,
-    PreparedReproductionTargetCount,
-    PreparedScreenTargetCount,
-    PreparedSupportedReplayCount,
     RepetitionIndex,
     RowCount,
     ScenarioName,
@@ -47,7 +47,6 @@ from fedsira.experiments.definitions import experiment_by_name
 from fedsira.experiments.planning import (
     ExperimentPlan,
     PlannedExperiment,
-    ScientificCell,
 )
 from fedsira.runtime import (
     FailureDetail,
@@ -376,13 +375,6 @@ class ExecutionRecordStore:
             for record in self.read_all_outcomes(planned.definition.name)
             if record.semantic_key in expected_keys
         )
-
-
-class PreparedEvidenceCounts(FrozenDomainModel):
-    screen_target_count: PreparedScreenTargetCount
-    reproduction_target_count: PreparedReproductionTargetCount
-    reproduction_supported_count: PreparedSupportedReplayCount
-    final_gate_adequate_domain_count: AdequateFinalGateDomainCount
 
 
 class PreparedViewSidecar(FrozenDomainModel):

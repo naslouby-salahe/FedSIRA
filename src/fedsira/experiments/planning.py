@@ -2,19 +2,18 @@ from __future__ import annotations
 
 from fedsira.artifacts.paths import workspace_root_for_family
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     CollapseDecisionPassed,
     ConditionName,
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
-    MethodName,
     PlanRenderText,
     RepetitionIndex,
     ResolvedCoreComplete,
     ResolvedCoreDependent,
     ScientificCellCount,
-    ScientificCellSemanticKey,
 )
 from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
@@ -38,21 +37,6 @@ from fedsira.runtime import (
     bound_application_context,
     current_application_context,
 )
-
-
-class ScientificCell(FrozenDomainModel):
-    experiment: ExperimentName
-    method: MethodName
-    condition: ConditionName
-    master_seed: MasterSeed
-    repetition: RepetitionIndex | None = None
-
-    @property
-    def semantic_key(self) -> ScientificCellSemanticKey:
-        repetition = "" if self.repetition is None else str(self.repetition)
-        return "|".join(
-            (self.experiment, self.method, self.condition, str(self.master_seed), repetition)
-        )
 
 
 class PlannedExperiment(FrozenDomainModel):

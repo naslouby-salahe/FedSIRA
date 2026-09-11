@@ -22,6 +22,9 @@ from fedsira.artifacts.paths import (
 )
 from fedsira.artifacts.store import load_published_manifests
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.models import (
+    ScientificCell,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -87,7 +90,6 @@ from fedsira.experiments.engine import (
 )
 from fedsira.experiments.planning import (
     ExperimentPlan,
-    ScientificCell,
     build_plan,
     validate_planned_cell_count_invariant,
 )

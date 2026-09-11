@@ -14,13 +14,14 @@ from fedsira.domain.types import (
     DomainId,
     ExternalVerificationActive,
     FrozenDomainModel,
+    MasterSeed,
     ModelParameterValue,
     ReproductionCertified,
     ReproductionWasTrained,
     ResolvedRowRequirementReached,
     SeedDerivationLabel,
 )
-from fedsira.runtime import framed_bytes
+from fedsira.runtime import derive_uint32, framed_bytes
 
 REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
 
@@ -125,3 +126,20 @@ def select_compromised_reproducers(
     if len(feasible_in_order) < requested_compromised_count:
         return None
     return tuple(feasible_in_order[:requested_compromised_count])
+
+
+COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
+
+
+def commitment_digest(
+    reproducer_domain: DomainId,
+    master_seed: MasterSeed,
+    capability_identity: ArtifactDigest,
+    reproduced_flat_parameters: torch.Tensor,
+) -> ArtifactDigest:
+    return compute_reproduction_commitment_hash(
+        reproducer_domain,
+        capability_identity,
+        derive_uint32(COMMITMENT_HASH_SEPARATOR, master_seed),
+        reproduced_flat_parameters,
+    )

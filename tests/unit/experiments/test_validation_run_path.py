@@ -4,14 +4,16 @@ import pytest
 
 from fedsira.datasets.nbaiot.validation import run_data_and_domain_evidence_validation
 from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.models import (
+    PreparedEvidenceCounts,
+    ScientificCell,
+)
 from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
-from fedsira.experiments.engine import PreparedEvidenceCounts
 from fedsira.experiments.handlers import ProtocolCellExecutor
-from fedsira.experiments.planning import ScientificCell
 
 
 def test_protocol_invariant_validation_cell_executes_smoke_invariants(

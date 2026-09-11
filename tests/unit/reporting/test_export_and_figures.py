@@ -11,6 +11,9 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     RootCauseMixture,
 )
+from fedsira.domain.models import (
+    ScientificCell,
+)
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
@@ -40,7 +43,9 @@ from fedsira.experiments.engine import (
     ExecutionRecordStore,
     ExperimentExecutionResult,
 )
-from fedsira.experiments.planning import ScientificCell, build_plan
+from fedsira.experiments.planning import (
+    build_plan,
+)
 from fedsira.reporting.export import (
     CELL_METRICS_PARQUET_NAME,
     ExperimentReportSummary,

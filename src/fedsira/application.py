@@ -15,6 +15,9 @@ from fedsira.datasets.common import dataset_specification
 from fedsira.datasets.nbaiot.validation import PersistedSmokeRecord
 from fedsira.datasets.preprocess import execute_preprocess
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
+from fedsira.domain.models import (
+    ScientificCell,
+)
 from fedsira.domain.types import (
     ApplicationExitCode,
     BooleanValue,
@@ -72,7 +75,11 @@ from fedsira.experiments.execution import (
 from fedsira.experiments.handlers import (
     ProtocolCellExecutor,
 )
-from fedsira.experiments.planning import ExperimentPlan, ScientificCell, build_plan, execute_plan
+from fedsira.experiments.planning import (
+    ExperimentPlan,
+    build_plan,
+    execute_plan,
+)
 from fedsira.reporting.export import execute_report, export_experiment_report
 from fedsira.runtime import (
     REPOSITORY_ROOT,

@@ -16,7 +16,15 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.enums import CapabilityContractScope, DatasetId, SeedNamespace
+from fedsira.domain.enums import (
+    CapabilityContractScope,
+    DatasetId,
+    ProposalEpisode,
+    SeedNamespace,
+)
+from fedsira.domain.models import (
+    ScientificCell,
+)
 from fedsira.evaluation.metrics import (
     evaluate_domain,
     non_source_domains,
@@ -40,11 +48,9 @@ from fedsira.experiments.definitions import (
     HeterogeneityRegime,
     OpeningMode,
     PrimaryScenario,
-    ProposalEpisode,
     SourceExclusionMethod,
 )
 from fedsira.experiments.handlers import ProtocolCellExecutor
-from fedsira.experiments.planning import ScientificCell
 from fedsira.learning.federated import train_anchor
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed

@@ -20,7 +20,10 @@ from fedsira.domain.enums import (
     ScientificCellPhase,
     TernaryOutcome,
 )
-from fedsira.domain.models import AdmissionDelayDecomposition
+from fedsira.domain.models import (
+    AdmissionDelayDecomposition,
+    ScientificCell,
+)
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     ComparisonName,
@@ -61,7 +64,9 @@ from fedsira.experiments.definitions import (
     epistemic_strength_tokens,
     experiment_by_name,
 )
-from fedsira.experiments.planning import ExperimentPlan, ScientificCell
+from fedsira.experiments.planning import (
+    ExperimentPlan,
+)
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,

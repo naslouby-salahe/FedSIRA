@@ -11,6 +11,9 @@ from fedsira.datasets.nbaiot.validation import (
     validate_no_duplicate_semantic_cells,
 )
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
+from fedsira.domain.models import (
+    ScientificCell,
+)
 from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
@@ -19,7 +22,9 @@ from fedsira.experiments.engine import (
     derive_experiment_lifecycle,
 )
 from fedsira.experiments.execution import execute_experiment
-from fedsira.experiments.planning import ScientificCell, build_plan
+from fedsira.experiments.planning import (
+    build_plan,
+)
 
 
 def _cell(experiment: str, method: str, condition: str, master_seed: int) -> ScientificCell:

@@ -7,6 +7,7 @@ import torch
 from fedsira.config import ResourceHorizonConfig
 from fedsira.datasets.common import DatasetAdapter
 from fedsira.domain.enums import AdmissionState, DormantOrigin, SeedNamespace, TernaryOutcome
+from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     AdmissionStateIsTerminal,
@@ -33,7 +34,7 @@ from fedsira.domain.types import (
     RequiredReproductionRowCount,
     UnderlyingVoteIsPositive,
 )
-from fedsira.runtime import deterministic_order
+from fedsira.runtime import derive_uint32, deterministic_order
 
 
 def minimum_honest_positive_count(
@@ -304,3 +305,15 @@ def compute_t_evidence(
     if t_reproduction_evidence is None or t_final_gate is None:
         return None
     return max(t_reproduction_evidence, t_final_gate)
+
+
+def reproducer_order_for_cell(
+    adapter: DatasetAdapter, cell: ScientificCell
+) -> tuple[DomainId, ...]:
+    tokens = tuple(adapter.domain_ids)
+    ordered_tokens = deterministic_order(
+        tokens,
+        REPRODUCER_ORDER_SEPARATOR,
+        derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed),
+    )
+    return tuple(tokens[tokens.index(token)] for token in ordered_tokens)

@@ -4,7 +4,12 @@ import math
 from enum import StrEnum
 
 from fedsira.config import BootstrapConfig, MultiplicityConfig
-from fedsira.domain.enums import ComparisonMetric, CoreMethodIdentity, RootCauseMixture
+from fedsira.domain.enums import (
+    ComparisonMetric,
+    CoreMethodIdentity,
+    ProposalEpisode,
+    RootCauseMixture,
+)
 from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
@@ -50,7 +55,6 @@ from fedsira.experiments.definitions import (
     OpeningMode,
     PluralityCondition,
     PrimaryScenario,
-    ProposalEpisode,
     ReproducerCondition,
     SecondaryScenario,
     SourceExclusionMethod,

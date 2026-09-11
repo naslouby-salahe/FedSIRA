@@ -21,6 +21,7 @@ from fedsira.domain.enums import (
     ArtifactLifecycleState,
     CoreMethodIdentity,
     ExperimentLifecycleState,
+    ProposalEpisode,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -59,7 +60,6 @@ from fedsira.experiments.definitions import (
     OpeningMode,
     PluralityCondition,
     PrimaryScenario,
-    ProposalEpisode,
     SourceExclusionMethod,
 )
 from fedsira.experiments.engine import (

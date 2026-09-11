@@ -1,17 +1,52 @@
+from __future__ import annotations
+
+from collections import OrderedDict
 from collections.abc import Sequence
 
 import torch
 
 from fedsira.config import FinalGateConfig
+from fedsira.datasets.common import (
+    DatasetAdapter,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+)
 from fedsira.domain.enums import AdmissionState
-from fedsira.domain.models import MetricResult
+from fedsira.domain.models import MetricResult, PreparedEvidenceCounts
 from fedsira.domain.types import (
+    AdequateFinalGateDomainCount,
+    BooleanValue,
+    DomainId,
     FinalGateArtifactValid,
     FinalGatePredicatesPass,
     InvariantChecksPassed,
+    MasterSeed,
     PluralityActive,
 )
-from fedsira.evaluation.statistics import quantile_type7
+from fedsira.evaluation.metrics import (
+    RealReportSummary,
+    compute_real_report_summary,
+    evaluate_domain,
+    non_source_domains,
+    supported_macro_f1_harm,
+)
+from fedsira.evaluation.statistics import (
+    equal_weight_domain_mean,
+    quantile_type7,
+    worst_domain_target_f1,
+)
+from fedsira.learning.post_reference import (
+    certified_domain_delta_committee,
+    train_source_candidate_delta,
+)
+from fedsira.protocol.baselines.defenses import coordinate_wise_median_synthesis
+from fedsira.protocol.synthesis import (
+    CertifiedReproductionRow,
+    select_krum_update,
+    synthesis_pending_transition,
+)
+from fedsira.runtime import current_application_context
 
 
 def validate_admission_requires_final_gate(
@@ -81,3 +116,222 @@ def final_gate_predicates_pass(
         and pooled_benign_far_increase.value
         <= final_gate_config.benign_false_alarm_rate_increase_maximum
     )
+
+
+def real_final_gate_metrics(
+    adapter: DatasetAdapter,
+    anchor: RealAnchor,
+    source_domain: DomainId | None,
+    production_checkpoint: torch.Tensor,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> tuple[AdequateFinalGateDomainCount, MetricResult, MetricResult, MetricResult, MetricResult]:
+    candidate_domains = non_source_domains(adapter, source_domain)
+    adequate_domains = tuple(
+        domain
+        for domain in candidate_domains
+        if evaluate_domain(
+            adapter,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+        is not None
+    )
+    if not adequate_domains:
+        return (
+            0,
+            MetricResult(value=None, denominator=0),
+            MetricResult(value=None, denominator=0),
+            MetricResult(value=None, denominator=0),
+            MetricResult(value=None, denominator=0),
+        )
+    target_f1_values: list[MetricResult] = []
+    supported_f1_harms: list[MetricResult] = []
+    benign_far_increases: list[MetricResult] = []
+    for domain in adequate_domains:
+        anchor_metrics = evaluate_domain(
+            adapter,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+        production_metrics = evaluate_domain(
+            adapter,
+            anchor,
+            production_checkpoint,
+            domain,
+            Role.FINAL_GATE,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+        if anchor_metrics is None or production_metrics is None:
+            continue
+        target_f1_values.append(production_metrics.target_f1)
+        supported_f1_harms.append(
+            supported_macro_f1_harm(
+                anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
+            )
+        )
+        if (
+            anchor_metrics.benign_far.value is not None
+            and production_metrics.benign_far.value is not None
+        ):
+            benign_far_increases.append(
+                MetricResult(
+                    value=production_metrics.benign_far.value - anchor_metrics.benign_far.value,
+                    denominator=1,
+                )
+            )
+        else:
+            benign_far_increases.append(MetricResult(value=None, denominator=0))
+    return (
+        len(adequate_domains),
+        median_domain_target_f1(target_f1_values),
+        worst_domain_target_f1(tuple(target_f1_values)),
+        equal_weight_domain_mean(tuple(supported_f1_harms), 1),
+        equal_weight_domain_mean(tuple(benign_far_increases), 1),
+    )
+
+
+def final_gate_decision(
+    evidence: PreparedEvidenceCounts,
+    source_domain: DomainId | None,
+    reproducer_order: Sequence[DomainId],
+    is_plurality_active: BooleanValue,
+    adapter: DatasetAdapter,
+    master_seed: MasterSeed,
+    anchor: RealAnchor | None,
+    coordinate_median_active: BooleanValue,
+    no_final_synthesis_gate_active: BooleanValue,
+    use_source_delta_for_source_domain: BooleanValue,
+    force_first_row_to_source_delta: BooleanValue,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+    precomputed_updates: OrderedDict[DomainId, torch.Tensor] | None = None,
+) -> tuple[AdmissionState, RealReportSummary | None]:
+    if anchor is None:
+        return (AdmissionState.DORMANT, None)
+    config = current_application_context().scientific_config
+    base_flat_parameters = anchor.flat_parameters
+    committee_deltas: OrderedDict[DomainId, torch.Tensor] = (
+        OrderedDict(precomputed_updates)
+        if precomputed_updates is not None
+        else certified_domain_delta_committee(
+            adapter,
+            master_seed,
+            anchor,
+            reproducer_order,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+    )
+    if use_source_delta_for_source_domain and source_domain is not None:
+        source_delta = train_source_candidate_delta(adapter, master_seed, anchor, source_domain)
+        if source_delta is not None:
+            committee_deltas[source_domain] = source_delta
+    if force_first_row_to_source_delta and source_domain is not None and reproducer_order:
+        source_delta = train_source_candidate_delta(adapter, master_seed, anchor, source_domain)
+        if source_delta is not None:
+            committee_deltas[reproducer_order[0]] = source_delta
+    available_updates = tuple(
+        committee_deltas[domain] for domain in reproducer_order if domain in committee_deltas
+    )
+    if coordinate_median_active:
+        if not available_updates:
+            return (AdmissionState.DORMANT, None)
+        production_update = coordinate_wise_median_synthesis(available_updates)
+        production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+        return final_gate_decision_from_production_checkpoint(
+            evidence,
+            source_domain,
+            adapter,
+            anchor,
+            production_checkpoint,
+            no_final_synthesis_gate_active,
+            heterogeneity_scope=heterogeneity_scope,
+        )
+    krum_selected_update: torch.Tensor | None = None
+    if is_plurality_active:
+        committee = tuple(
+            CertifiedReproductionRow(
+                reproducer_domain=domain,
+                update_vector=committee_deltas[domain],
+            )
+            for domain in reproducer_order
+            if domain in committee_deltas
+        )
+        if not committee:
+            return (AdmissionState.DORMANT, None)
+        krum_selected_update = select_krum_update(
+            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ).update_vector
+    first_domain = next((domain for domain in reproducer_order if domain in committee_deltas), None)
+    if first_domain is None and not is_plurality_active:
+        return (AdmissionState.DORMANT, None)
+    single_reproduction_update = (
+        committee_deltas[first_domain] if first_domain is not None else None
+    )
+    production_update = resolve_production_update(
+        is_plurality_active, krum_selected_update, single_reproduction_update
+    )
+    production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+    return final_gate_decision_from_production_checkpoint(
+        evidence,
+        source_domain,
+        adapter,
+        anchor,
+        production_checkpoint,
+        no_final_synthesis_gate_active,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+
+
+def final_gate_decision_from_production_checkpoint(
+    evidence: PreparedEvidenceCounts,
+    source_domain: DomainId | None,
+    adapter: DatasetAdapter,
+    anchor: RealAnchor,
+    production_checkpoint: torch.Tensor,
+    no_final_synthesis_gate_active: BooleanValue,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> tuple[AdmissionState, RealReportSummary | None]:
+    config = current_application_context().scientific_config
+    (
+        adequate_final_gate_domain_count,
+        median_target_f1,
+        minimum_target_f1,
+        pooled_supported_macro_f1_drop,
+        pooled_benign_far_increase,
+    ) = real_final_gate_metrics(
+        adapter,
+        anchor,
+        source_domain,
+        production_checkpoint,
+        heterogeneity_scope=heterogeneity_scope,
+    )
+    predicates_pass = final_gate_predicates_pass(
+        median_target_f1,
+        minimum_target_f1,
+        pooled_supported_macro_f1_drop,
+        pooled_benign_far_increase,
+        True,
+        config.protocol.final_gate,
+    )
+    final_gate_state = (
+        AdmissionState.ADMITTED
+        if no_final_synthesis_gate_active
+        else synthesis_pending_transition(
+            adequate_final_gate_domain_count=adequate_final_gate_domain_count,
+            final_gate_predicates_pass=predicates_pass,
+            final_gate_config=config.protocol.final_gate,
+        )
+    )
+    real_report_summary = compute_real_report_summary(
+        adapter, anchor, source_domain, production_checkpoint
+    )
+    if final_gate_state is not AdmissionState.ADMITTED:
+        return (final_gate_state, real_report_summary)
+    validate_production_checkpoint_excludes_source(production_checkpoint, None)
+    validate_admission_requires_final_gate(AdmissionState.ADMITTED, True)
+    return (AdmissionState.ADMITTED, real_report_summary)
