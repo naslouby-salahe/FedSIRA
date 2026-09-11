@@ -15,7 +15,9 @@ from fedsira.config import (
     ThreeRowCoordinateMedianConfig,
 )
 from fedsira.datasets.common import (
+    DatasetAdapter,
     DomainTargetMetrics,
+    RealAnchor,
     Role,
     dataset_manifest_hash,
 )
@@ -23,10 +25,8 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
-    NBaiotDomain,
     deterministic_domain_order,
     nbaiot_adapter,
-    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import AdmissionState, SeedNamespace
 from fedsira.domain.models import MetricResult
@@ -44,6 +44,7 @@ from fedsira.domain.types import (
     DeterministicInteger,
     DiscardSourceWeights,
     DomainCount,
+    DomainId,
     FeatureCount,
     FederatedRoundCount,
     FrozenDomainModel,
@@ -85,6 +86,7 @@ from fedsira.evaluation.metrics import (
     compute_confusion_counts_by_class,
     f1_for_class,
     macro_f1,
+    triggered_to_benign_rate,
 )
 from fedsira.evaluation.statistics import quantile_type7
 from fedsira.learning.federated import (
@@ -284,7 +286,7 @@ def certified_ensemble_post_reference_rounds() -> FederatedRoundCount:
 
 def certified_ensemble_domain_groups(
     domain_partition_namespace_seed: NamespaceSeed, group_count: GroupCount
-) -> tuple[tuple[NBaiotDomain, ...], ...]:
+) -> tuple[tuple[DomainId, ...], ...]:
     ordered = deterministic_domain_order(
         NBAIOT_DOMAIN_ORDER, DOMAIN_PARTITION_SEPARATOR, domain_partition_namespace_seed
     )
@@ -334,7 +336,7 @@ def ensemble_predicted_label(
 def _group_anchor_checkpoint(
     prepared_root: Path,
     master_seed: MasterSeed,
-    group_domains: Sequence[NBaiotDomain],
+    group_domains: Sequence[DomainId],
     group_index: GroupIndex,
 ) -> GroupCheckpoint | None:
     config = current_application_context().scientific_config
@@ -384,7 +386,7 @@ def _group_anchor_checkpoint(
                         dataset_manifest_hash(prepared_root),
                         start_checkpoint_identity,
                         CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN,
-                        nbaiot_domain_hash_token(domain),
+                        domain,
                         round_index,
                     ),
                 )
@@ -414,7 +416,7 @@ def _group_anchor_checkpoint(
 def _group_post_reference_round_clients(
     prepared_root: Path,
     master_seed: MasterSeed,
-    group_domains: Sequence[NBaiotDomain],
+    group_domains: Sequence[DomainId],
     group_index: GroupIndex,
     round_index: RoundIndex,
 ) -> list[LocalTrainingClient]:
@@ -468,7 +470,7 @@ def _group_post_reference_round_clients(
                     manifest_hash,
                     start_checkpoint_identity,
                     CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-                    nbaiot_domain_hash_token(domain),
+                    domain,
                     round_index,
                 ),
             )
@@ -529,7 +531,7 @@ def train_certified_ensemble_group_checkpoints(
 def _ensemble_predictions_for_domain(
     prepared_root: Path,
     group_checkpoints: Sequence[GroupCheckpoint],
-    domain: NBaiotDomain,
+    domain: DomainId,
     role: Role,
 ) -> tuple[list[ClassLabel], list[ClassLabel]] | None:
     true_labels: list[ClassLabel] = []
@@ -566,7 +568,7 @@ def _ensemble_predictions_for_domain(
 def evaluate_certified_ensemble(
     prepared_root: Path,
     group_checkpoints: Sequence[GroupCheckpoint],
-    domain: NBaiotDomain,
+    domain: DomainId,
     role: Role,
 ) -> DomainTargetMetrics | None:
     result = _ensemble_predictions_for_domain(prepared_root, group_checkpoints, domain, role)
@@ -595,7 +597,7 @@ _DBSCAN_NOISE: DeterministicInteger = -1
 
 
 class DomainFeatureMean(TensorDomainModel):
-    domain: NBaiotDomain
+    domain: DomainId
     feature_mean: torch.Tensor
 
 
@@ -762,9 +764,9 @@ def _cluster_members(
 
 
 def _ordered_cluster_domains(
-    domains: tuple[NBaiotDomain, ...],
+    domains: tuple[DomainId, ...],
     indices: tuple[MemberIndex, ...],
-) -> tuple[NBaiotDomain, ...]:
+) -> tuple[DomainId, ...]:
     return tuple(
         sorted(
             (domains[index] for index in indices),
@@ -774,10 +776,10 @@ def _ordered_cluster_domains(
 
 
 def select_largest_density_cluster(
-    domains: tuple[NBaiotDomain, ...],
+    domains: tuple[DomainId, ...],
     labels: tuple[DeterministicInteger, ...],
     distance_matrix: PairwiseDistanceMatrix,
-) -> tuple[NBaiotDomain, ...] | None:
+) -> tuple[DomainId, ...] | None:
     if len(domains) != len(labels) or len(labels) != len(distance_matrix):
         raise ValueError("domains, labels, and distance matrix must have matching sizes")
     cluster_labels = tuple(sorted(frozenset(label for label in labels if label != _DBSCAN_NOISE)))
@@ -917,7 +919,7 @@ def same_context_verifier_panel(
     reproducer_feature_mean: torch.Tensor,
     eligible_verifier_feature_means: tuple[DomainFeatureMean, ...],
     panel_size: VerifierCount,
-) -> tuple[NBaiotDomain, ...]:
+) -> tuple[DomainId, ...]:
     ranked = sorted(
         eligible_verifier_feature_means,
         key=lambda item: (
@@ -926,3 +928,30 @@ def same_context_verifier_panel(
         ),
     )
     return tuple(item.domain for item in ranked[:panel_size])
+
+
+def recovery_backdoor_alarm_threshold(
+    adapter: DatasetAdapter, anchor: RealAnchor
+) -> MetricValue | None:
+    config = current_application_context().scientific_config
+    trigger_value = (
+        config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization
+    )
+    rates: list[MetricValue] = []
+    for domain in adapter.domain_ids:
+        rate = triggered_to_benign_rate(
+            adapter,
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.ANCHOR_VALIDATION,
+            adapter.trigger_feature_names,
+            trigger_value,
+        )
+        if rate.value is not None:
+            rates.append(rate.value)
+    if not rates:
+        return None
+    return recovery_alarm_threshold(
+        tuple(rates), config.baselines.recovery_after_source_admission.backdoor_alarm_percentile
+    )

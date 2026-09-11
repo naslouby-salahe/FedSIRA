@@ -17,18 +17,6 @@ from fedsira.datasets.common import (
     prepared_feature_names,
     real_evidence_available,
 )
-from fedsira.datasets.nbaiot.evaluation.backdoor import (
-    compute_source_backdoor_asr,
-    recovery_backdoor_alarm_threshold,
-    triggered_to_benign_rate,
-)
-from fedsira.datasets.nbaiot.evaluation.capability_boundary import (
-    compute_capability_under_specification_summary,
-)
-from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.evaluation.epistemic_boundary import (
-    compute_shared_epistemic_failure_summary,
-)
 from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     DiscoveredCsvFile,
@@ -37,6 +25,16 @@ from fedsira.datasets.nbaiot.prepare import (
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
 from fedsira.domain.enums import CapabilityContractScope, DatasetId
 from fedsira.domain.types import FeatureName
+from fedsira.evaluation.metrics import (
+    compute_source_backdoor_asr,
+    evaluate_domain,
+    non_source_domains,
+    triggered_to_benign_rate,
+)
+from fedsira.evaluation.service import (
+    compute_capability_under_specification_summary,
+    compute_shared_epistemic_failure_summary,
+)
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.federated import train_anchor
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
@@ -48,6 +46,7 @@ from fedsira.learning.post_reference import (
     train_source_candidate_delta,
 )
 from fedsira.protocol.baselines.defenses import (
+    recovery_backdoor_alarm_threshold,
     train_certified_ensemble_group_checkpoints,
 )
 from fedsira.protocol.baselines.training import (
@@ -290,7 +289,7 @@ def test_compute_source_backdoor_asr_is_a_defined_rate(
     )
     assert delta is not None
     asr = compute_source_backdoor_asr(
-        prepared_root_with_udp,
+        real_evidence_adapter(prepared_root_with_udp),
         anchor_with_udp,
         anchor_with_udp.flat_parameters + delta,
         DOMAINS[0],
@@ -305,7 +304,12 @@ def test_compute_source_backdoor_asr_returns_na_without_report_test_rows(
     anchor: RealAnchor,
 ) -> None:
     asr = compute_source_backdoor_asr(
-        Path("/nonexistent"), anchor, anchor.flat_parameters, DOMAINS[0], (0,), 6.0
+        real_evidence_adapter(Path("/nonexistent")),
+        anchor,
+        anchor.flat_parameters,
+        DOMAINS[0],
+        (0,),
+        6.0,
     )
     assert asr.value is None
 
@@ -325,14 +329,18 @@ def test_evaluate_domain_with_large_heterogeneity_shift_changes_predictions(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     natural_metrics = evaluate_domain(
-        prepared_root, anchor, anchor.flat_parameters, DOMAINS[0], Role.REPORT_TEST
+        real_evidence_adapter(prepared_root),
+        anchor,
+        anchor.flat_parameters,
+        DOMAINS[0],
+        Role.REPORT_TEST,
     )
     assert natural_metrics is not None
     shift_differed = False
     for shift_magnitude in (10.0, 50.0, 200.0):
         scope = _heterogeneity_scope(prepared_root, shift_magnitude=shift_magnitude)
         shifted_metrics = evaluate_domain(
-            prepared_root,
+            real_evidence_adapter(prepared_root),
             anchor,
             anchor.flat_parameters,
             DOMAINS[0],
@@ -374,7 +382,11 @@ def test_evaluate_domain_reports_defined_target_metrics_on_report_test(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     metrics = evaluate_domain(
-        prepared_root, anchor, anchor.flat_parameters, DOMAINS[0], Role.REPORT_TEST
+        real_evidence_adapter(prepared_root),
+        anchor,
+        anchor.flat_parameters,
+        DOMAINS[0],
+        Role.REPORT_TEST,
     )
     assert metrics is not None
     assert metrics.target_f1.value is not None
@@ -386,7 +398,7 @@ def test_evaluate_domain_returns_none_without_report_test_rows(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     metrics = evaluate_domain(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         anchor,
         anchor.flat_parameters,
         NBaiotDomain.SAMSUNG_WEBCAM,
@@ -396,7 +408,10 @@ def test_evaluate_domain_returns_none_without_report_test_rows(
 
 
 def test_non_source_domains_excludes_only_the_source() -> None:
-    domains = non_source_domains(NBaiotDomain.DANMINI_DOORBELL)
+    domains = non_source_domains(
+        real_evidence_adapter(Path("outputs/preprocessing/prepared/N-BaIoT")),
+        NBaiotDomain.DANMINI_DOORBELL,
+    )
     assert NBaiotDomain.DANMINI_DOORBELL not in domains
     assert len(domains) == 8
 
@@ -474,7 +489,7 @@ def test_evaluate_domain_with_root_cause_scope_reports_defined_target_metrics(
     assert feature_names is not None
     scope = _root_cause_scope(feature_names, CapabilityContractScope.BROAD_TARGET_ONLY)
     metrics = evaluate_domain(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         anchor,
         anchor.flat_parameters,
         DOMAINS[0],
@@ -492,7 +507,7 @@ def test_compute_capability_under_specification_summary_is_genuinely_computed(
     assert feature_names is not None
     scope = _root_cause_scope(feature_names, CapabilityContractScope.BROAD_TARGET_ONLY)
     summary = compute_capability_under_specification_summary(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -541,7 +556,7 @@ def test_compute_shared_epistemic_failure_summary_for_label_error_is_genuinely_c
     assert feature_names is not None
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
     summary = compute_shared_epistemic_failure_summary(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -559,7 +574,7 @@ def test_compute_shared_epistemic_failure_summary_for_spurious_feature_reports_d
     assert feature_names is not None
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_SPURIOUS_FEATURE)
     summary = compute_shared_epistemic_failure_summary(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -578,7 +593,7 @@ def test_compute_shared_epistemic_failure_summary_for_common_context_reports_dia
         feature_names, EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT
     )
     summary = compute_shared_epistemic_failure_summary(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         source_domain=None,
@@ -723,7 +738,9 @@ def test_train_update_reconstruction_filter_delta_returns_none_without_prepared_
 def test_recovery_backdoor_alarm_threshold_is_a_finite_rate(
     prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
 ) -> None:
-    threshold = recovery_backdoor_alarm_threshold(prepared_root_with_udp, anchor=anchor_with_udp)
+    threshold = recovery_backdoor_alarm_threshold(
+        real_evidence_adapter(prepared_root_with_udp), anchor=anchor_with_udp
+    )
     assert threshold is not None
     assert 0.0 <= threshold <= 1.0
 
@@ -732,7 +749,7 @@ def test_triggered_to_benign_rate_is_defined_for_gafgyt_udp_rows(
     prepared_root_with_udp: Path, anchor_with_udp: RealAnchor
 ) -> None:
     rate = triggered_to_benign_rate(
-        prepared_root_with_udp,
+        real_evidence_adapter(prepared_root_with_udp),
         anchor_with_udp,
         anchor_with_udp.flat_parameters,
         DOMAINS[0],

@@ -20,15 +20,6 @@ from fedsira.datasets.nbaiot.cell_support import (
     source_domain_for_cell,
     verifier_panel,
 )
-from fedsira.datasets.nbaiot.evaluation.backdoor import (
-    recovery_backdoor_alarm_threshold,
-    triggered_to_benign_rate,
-)
-from fedsira.datasets.nbaiot.evaluation.domain import (
-    evaluate_domain,
-    non_source_domains,
-)
-from fedsira.datasets.nbaiot.evaluation.report_summary import RealReportSummary
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -46,11 +37,16 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     BooleanValue,
+    DomainId,
     MasterSeed,
 )
 from fedsira.evaluation.metrics import (
+    RealReportSummary,
+    evaluate_domain,
+    non_source_domains,
     supported_macro_f1_harm,
     target_capability_gain,
+    triggered_to_benign_rate,
 )
 from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
@@ -79,6 +75,7 @@ from fedsira.protocol.baselines.defenses import (
     SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
     evaluate_certified_ensemble,
     independent_local_reference_reviewer_is_positive,
+    recovery_backdoor_alarm_threshold,
     recovery_rollback_is_triggered,
     train_certified_ensemble_group_checkpoints,
 )
@@ -126,14 +123,14 @@ class ProtocolBaselineOutcomes:
     def candidate_capability_contract_passes(
         self,
         real_anchor: RealAnchor,
-        source_domain: NBaiotDomain,
+        source_domain: DomainId,
         candidate_flat_parameters: torch.Tensor,
     ) -> BooleanValue: ...
 
     def _final_gate_outcome(
         self,
         evidence: PreparedEvidenceCounts,
-        source_domain: NBaiotDomain | None,
+        source_domain: DomainId | None,
         real_anchor: RealAnchor,
         production_checkpoint: torch.Tensor,
     ) -> AdmissionState:
@@ -267,20 +264,22 @@ class ProtocolBaselineOutcomes:
             return AdmissionState.DORMANT
         admitted_checkpoint = real_anchor.flat_parameters + source_delta
         anchor_verification = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
             Role.ROW_VERIFICATION,
         )
         admitted_verification = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             admitted_checkpoint,
             source_domain,
             Role.ROW_VERIFICATION,
         )
-        alarm_threshold = recovery_backdoor_alarm_threshold(self._prepared_root, real_anchor)
+        alarm_threshold = recovery_backdoor_alarm_threshold(
+            nbaiot_adapter(self._prepared_root), real_anchor
+        )
         if anchor_verification is None or admitted_verification is None or alarm_threshold is None:
             return AdmissionState.DORMANT
         supported_macro_f1_drop = supported_macro_f1_harm(
@@ -296,7 +295,7 @@ class ProtocolBaselineOutcomes:
             else MetricResult(value=None, denominator=0)
         )
         triggered_rate = triggered_to_benign_rate(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             admitted_checkpoint,
             source_domain,
@@ -395,7 +394,9 @@ class ProtocolBaselineOutcomes:
         if source_delta is None:
             return AdmissionState.DORMANT
         candidate_flat = real_anchor.flat_parameters + source_delta
-        reviewers = non_source_domains(source_domain)[:SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT]
+        reviewers = non_source_domains(nbaiot_adapter(self._prepared_root), source_domain)[
+            :SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT
+        ]
         positive_report_count = sum(
             1
             for domain in reviewers
@@ -426,7 +427,7 @@ class ProtocolBaselineOutcomes:
         target_f1_values: list[MetricResult] = []
         supported_f1_harms: list[MetricResult] = []
         benign_far_increases: list[MetricResult] = []
-        for domain in non_source_domains(source_domain):
+        for domain in non_source_domains(nbaiot_adapter(self._prepared_root), source_domain):
             if not local_only_reference_evaluation_is_domain_local(domain, domain):
                 continue
             local_checkpoint = train_local_only_reference_checkpoint(
@@ -435,14 +436,18 @@ class ProtocolBaselineOutcomes:
             if local_checkpoint is None:
                 continue
             anchor_metrics = evaluate_domain(
-                self._prepared_root,
+                nbaiot_adapter(self._prepared_root),
                 real_anchor,
                 real_anchor.flat_parameters,
                 domain,
                 Role.FINAL_GATE,
             )
             local_metrics = evaluate_domain(
-                self._prepared_root, real_anchor, local_checkpoint, domain, Role.FINAL_GATE
+                nbaiot_adapter(self._prepared_root),
+                real_anchor,
+                local_checkpoint,
+                domain,
+                Role.FINAL_GATE,
             )
             if anchor_metrics is None or local_metrics is None:
                 continue
@@ -492,9 +497,9 @@ class ProtocolBaselineOutcomes:
         target_f1_values: list[MetricResult] = []
         supported_f1_harms: list[MetricResult] = []
         benign_far_increases: list[MetricResult] = []
-        for domain in non_source_domains(source_domain):
+        for domain in non_source_domains(nbaiot_adapter(self._prepared_root), source_domain):
             anchor_metrics = evaluate_domain(
-                self._prepared_root,
+                nbaiot_adapter(self._prepared_root),
                 real_anchor,
                 real_anchor.flat_parameters,
                 domain,
@@ -563,7 +568,7 @@ class ProtocolBaselineOutcomes:
         if source_delta is None:
             return AdmissionState.DORMANT
         source_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             real_anchor.flat_parameters + source_delta,
             source_domain,
@@ -583,7 +588,7 @@ class ProtocolBaselineOutcomes:
             config.capability_contract,
         )
         anchor_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
@@ -633,7 +638,7 @@ class ProtocolBaselineOutcomes:
             if local_checkpoint is None:
                 continue
             local_screen = evaluate_domain(
-                self._prepared_root,
+                nbaiot_adapter(self._prepared_root),
                 real_anchor,
                 local_checkpoint,
                 source_domain,

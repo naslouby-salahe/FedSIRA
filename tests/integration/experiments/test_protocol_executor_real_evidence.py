@@ -5,7 +5,6 @@ import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import DatasetAdapter, Role, dataset_specification
-from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     DiscoveredCsvFile,
@@ -18,6 +17,10 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
 )
 from fedsira.domain.enums import CapabilityContractScope, DatasetId, SeedNamespace
+from fedsira.evaluation.metrics import (
+    evaluate_domain,
+    non_source_domains,
+)
 from fedsira.experiments.collapse import resolve_core_mapping
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -181,11 +184,15 @@ def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_ro
         domains_with_attack_carrier=frozenset(),
     )
     source_domain = NBaiotDomain(selected_domain) if selected_domain is not None else None
-    adequate_domains = non_source_domains(source_domain)
+    adequate_domains = non_source_domains(real_evidence_adapter(prepared_root), source_domain)
     assert len(adequate_domains) == 8
     for domain in adequate_domains:
         metrics = evaluate_domain(
-            prepared_root, anchor, anchor.flat_parameters, domain, Role.FINAL_GATE
+            real_evidence_adapter(prepared_root),
+            anchor,
+            anchor.flat_parameters,
+            domain,
+            Role.FINAL_GATE,
         )
         assert metrics is not None
         assert metrics.target_f1.value is not None

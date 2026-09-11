@@ -50,25 +50,6 @@ from fedsira.datasets.nbaiot.cell_support import (
     source_domain_for_cell,
     verifier_panel,
 )
-from fedsira.datasets.nbaiot.evaluation.backdoor import (
-    compute_source_backdoor_asr,
-)
-from fedsira.datasets.nbaiot.evaluation.capability_boundary import (
-    compute_capability_under_specification_summary,
-)
-from fedsira.datasets.nbaiot.evaluation.domain import (
-    evaluate_domain,
-    non_source_domains,
-    root_cause_partitioned_row_ids,
-)
-from fedsira.datasets.nbaiot.evaluation.epistemic_boundary import (
-    compute_shared_epistemic_failure_summary,
-)
-from fedsira.datasets.nbaiot.evaluation.report_summary import RealReportSummary, metrics_from_state
-from fedsira.datasets.nbaiot.evaluation.screening import (
-    compute_screen_differential,
-    evaluate_screen_domain,
-)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -112,6 +93,7 @@ from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     CellHandlerName,
+    DomainId,
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
@@ -121,12 +103,20 @@ from fedsira.evaluation.comparisons import (
     ComparisonMetric,
 )
 from fedsira.evaluation.metrics import (
+    RealReportSummary,
     boundary_metric_set,
     clean_proposal_oracle_label,
+    compute_screen_differential,
+    compute_source_backdoor_asr,
+    evaluate_domain,
+    evaluate_screen_domain,
     false_launch_rate,
     legitimate_admission_rate,
     malicious_admission_rate,
+    metrics_from_state,
+    non_source_domains,
     reproduction_attempt_count,
+    root_cause_partitioned_row_ids,
     supported_macro_f1_harm,
     target_capability_gain,
 )
@@ -134,6 +124,8 @@ from fedsira.evaluation.service import (
     SingleProcessTimingWorker,
     TimingRepetitionObservation,
     TimingWorkerResult,
+    compute_capability_under_specification_summary,
+    compute_shared_epistemic_failure_summary,
 )
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
@@ -295,14 +287,14 @@ class ProtocolCellDispatch:
 
     def _same_context_verifier_panel(
         self,
-        source_domain: NBaiotDomain | None,
-        reproducer_domain: NBaiotDomain,
-    ) -> tuple[NBaiotDomain, ...]: ...
+        source_domain: DomainId | None,
+        reproducer_domain: DomainId,
+    ) -> tuple[DomainId, ...]: ...
 
     def _scoped_capability_contract_passes(
         self,
         real_anchor: RealAnchor,
-        source_domain: NBaiotDomain,
+        source_domain: DomainId,
         candidate_flat_parameters: torch.Tensor,
         root_cause_scope: RootCauseScope,
     ) -> BooleanValue: ...
@@ -391,7 +383,8 @@ class ProtocolCellDispatch:
             real_anchor = self.real_anchor(cell.master_seed)
             if real_anchor is not None:
                 candidate_domains = non_source_domains(
-                    source_domain_for_cell(cell, self._prepared_root)
+                    nbaiot_adapter(self._prepared_root),
+                    source_domain_for_cell(cell, self._prepared_root),
                 )[: config.baselines.parameter_similarity.required_committed_rows]
                 committee_deltas = certified_domain_delta_committee(
                     nbaiot_adapter(self._prepared_root),
@@ -437,9 +430,9 @@ class ProtocolCellDispatch:
                 and source_domain is not None
                 and (real_feature_names is not None)
             ):
-                candidate_domains = non_source_domains(source_domain)[
-                    : config.protocol.synthesis.committee_size
-                ]
+                candidate_domains = non_source_domains(
+                    nbaiot_adapter(self._prepared_root), source_domain
+                )[: config.protocol.synthesis.committee_size]
                 committee_deltas = certified_domain_delta_committee(
                     nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
@@ -546,7 +539,7 @@ class ProtocolCellDispatch:
                     shift_value=config.attacks_and_boundaries.capability_under_specification.shift_value_after_standardization,
                 )
                 capability_summary = compute_capability_under_specification_summary(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain_for_cell(cell, self._prepared_root),
@@ -591,8 +584,11 @@ class ProtocolCellDispatch:
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = root_cause_partitioned_row_ids(
-                    self._prepared_root,
-                    non_source_domains(source_domain_for_cell(cell, self._prepared_root)),
+                    nbaiot_adapter(self._prepared_root),
+                    non_source_domains(
+                        nbaiot_adapter(self._prepared_root),
+                        source_domain_for_cell(cell, self._prepared_root),
+                    ),
                 )
             else:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = (
@@ -626,7 +622,7 @@ class ProtocolCellDispatch:
                     common_context_trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
                 )
                 epistemic_summary = compute_shared_epistemic_failure_summary(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain_for_cell(cell, self._prepared_root),
@@ -775,7 +771,7 @@ class ProtocolCellDispatch:
             )
             screen_results = tuple(
                 evaluate_screen_domain(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     real_source_delta,
@@ -787,7 +783,7 @@ class ProtocolCellDispatch:
             )
             real_differential_a = (
                 compute_screen_differential(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     real_source_delta,
@@ -1190,7 +1186,7 @@ class ProtocolCellDispatch:
                 )
                 if source_delta is not None:
                     asr = compute_source_backdoor_asr(
-                        self._prepared_root,
+                        nbaiot_adapter(self._prepared_root),
                         real_anchor,
                         real_anchor.flat_parameters + source_delta,
                         source_domain,
@@ -1369,7 +1365,7 @@ class ProtocolCellDispatch:
             selected = select_compromised_reproducers(
                 reproducer_order_for_cell(cell), frozenset(NBAIOT_DOMAIN_ORDER), compromised_count
             )
-            compromised_reproducers: frozenset[NBaiotDomain] = (
+            compromised_reproducers: frozenset[DomainId] = (
                 frozenset(NBaiotDomain(domain) for domain in selected)
                 if selected is not None
                 else frozenset()
@@ -1459,7 +1455,7 @@ class ProtocolCellDispatch:
             if not panel_votes_are_one_per_domain(panel):
                 state = AdmissionState.DORMANT
             else:
-                false_negative_domains: frozenset[NBaiotDomain] = (
+                false_negative_domains: frozenset[DomainId] = (
                     frozenset(NBaiotDomain(domain) for domain in panel[:compromised_count])
                     if condition
                     in (
@@ -1927,9 +1923,9 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
 
     def _same_context_verifier_panel(
         self,
-        source_domain: NBaiotDomain | None,
-        reproducer_domain: NBaiotDomain,
-    ) -> tuple[NBaiotDomain, ...]:
+        source_domain: DomainId | None,
+        reproducer_domain: DomainId,
+    ) -> tuple[DomainId, ...]:
         config = current_application_context().scientific_config
         eligible_verifiers = tuple(
             domain
@@ -1963,12 +1959,12 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     def candidate_capability_contract_passes(
         self,
         real_anchor: RealAnchor,
-        source_domain: NBaiotDomain,
+        source_domain: DomainId,
         candidate_flat_parameters: torch.Tensor,
     ) -> BooleanValue:
         config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
@@ -1976,7 +1972,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             target_role=Role.CANDIDATE_SCREEN,
         )
         candidate_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             candidate_flat_parameters,
             source_domain,
@@ -2019,13 +2015,13 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     def _scoped_capability_contract_passes(
         self,
         real_anchor: RealAnchor,
-        source_domain: NBaiotDomain,
+        source_domain: DomainId,
         candidate_flat_parameters: torch.Tensor,
         root_cause_scope: RootCauseScope,
     ) -> BooleanValue:
         config = current_application_context().scientific_config
         anchor_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             real_anchor.flat_parameters,
             source_domain,
@@ -2034,7 +2030,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             root_cause_scope=root_cause_scope,
         )
         candidate_screen = evaluate_domain(
-            self._prepared_root,
+            nbaiot_adapter(self._prepared_root),
             real_anchor,
             candidate_flat_parameters,
             source_domain,

@@ -12,26 +12,27 @@ from fedsira.datasets.common import (
     Role,
     flat_parameters_identity,
 )
-from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
-    NBaiotDomain,
     nbaiot_adapter,
-    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import AdmissionOpeningMode
 from fedsira.domain.types import (
     AlgorithmName,
     ArtifactDigest,
     BooleanValue,
+    DomainId,
     ExampleCount,
     FederatedRoundCount,
     LocalEpochCount,
     MasterSeed,
     ReconstructionError,
     RoundIndex,
+)
+from fedsira.evaluation.metrics import (
+    non_source_domains,
 )
 from fedsira.learning.federated import (
     ANCHOR_TRAINING_ALGORITHM_TOKEN,
@@ -104,7 +105,7 @@ def train_ordinary_fedavg_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
     rounds: FederatedRoundCount,
     algorithm_token: AlgorithmName,
     exclude_source_from_participants: BooleanValue = False,
@@ -122,7 +123,7 @@ def train_ordinary_fedavg_delta(
     )
     participants = fedavg_reference_post_reference_participants(
         NBAIOT_DOMAIN_ORDER,
-        non_source_domains(source_domain),
+        non_source_domains(nbaiot_adapter(prepared_root), source_domain),
         source_domain,
         source_rows_available,
     )
@@ -151,7 +152,7 @@ def train_ordinary_fedavg_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         algorithm_token,
-                        nbaiot_domain_hash_token(domain),
+                        domain,
                         round_index,
                     ),
                 )
@@ -180,7 +181,7 @@ def train_fedavg_reference_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     return train_ordinary_fedavg_delta(
         prepared_root,
@@ -196,7 +197,7 @@ def train_secure_continual_assessment_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     return train_ordinary_fedavg_delta(
         prepared_root,
@@ -212,7 +213,7 @@ def train_recovery_after_source_admission_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     return train_ordinary_fedavg_delta(
         prepared_root,
@@ -238,7 +239,7 @@ def train_krum_reference_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
     heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
@@ -249,7 +250,9 @@ def train_krum_reference_delta(
     for round_index in range(krum_reference_post_reference_rounds()):
         participants = krum_reference_round_participants(
             client_sampling_round_order(
-                non_source_domains(source_domain), master_seed, round_index
+                non_source_domains(nbaiot_adapter(prepared_root), source_domain),
+                master_seed,
+                round_index,
             ),
             None,
             participant_count,
@@ -283,7 +286,7 @@ def train_krum_reference_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         "KRUM_REFERENCE",
-                        nbaiot_domain_hash_token(domain),
+                        domain,
                         round_index,
                     ),
                 ),
@@ -312,7 +315,7 @@ def train_density_cluster_trimmed_mean_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     source_rows_available = (
@@ -324,7 +327,7 @@ def train_density_cluster_trimmed_mean_delta(
     )
     participants = fedavg_reference_post_reference_participants(
         NBAIOT_DOMAIN_ORDER,
-        non_source_domains(source_domain),
+        non_source_domains(nbaiot_adapter(prepared_root), source_domain),
         source_domain,
         source_rows_available,
     )
@@ -336,7 +339,7 @@ def train_density_cluster_trimmed_mean_delta(
     any_round_trained = False
     for round_index in range(post_reference_retrain_maximum_local_epochs()):
         current_flat = _flatten_model_state(anchor, state)
-        contributing_domains: list[NBaiotDomain] = []
+        contributing_domains: list[DomainId] = []
         raw_updates: list[torch.Tensor] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
@@ -361,7 +364,7 @@ def train_density_cluster_trimmed_mean_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
-                        nbaiot_domain_hash_token(domain),
+                        domain,
                         round_index,
                     ),
                 ),
@@ -408,7 +411,7 @@ def _client_delta_from_role(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    domain: NBaiotDomain,
+    domain: DomainId,
     round_index: RoundIndex,
     round_start_flat: torch.Tensor,
     role: Role,
@@ -440,7 +443,7 @@ def _client_delta_from_role(
         anchor.dataset_manifest_hash,
         flat_parameters_identity(round_start_flat),
         algorithm_token,
-        nbaiot_domain_hash_token(domain),
+        domain,
         round_index,
     )
     model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
@@ -541,7 +544,7 @@ def train_update_reconstruction_filter_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     calibration_errors = anchor_round_reconstruction_calibration_errors(
@@ -561,7 +564,7 @@ def train_update_reconstruction_filter_delta(
     )
     participants = fedavg_reference_post_reference_participants(
         NBAIOT_DOMAIN_ORDER,
-        non_source_domains(source_domain),
+        non_source_domains(nbaiot_adapter(prepared_root), source_domain),
         source_domain,
         source_rows_available,
     )
@@ -597,7 +600,7 @@ def train_update_reconstruction_filter_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN,
-                        nbaiot_domain_hash_token(domain),
+                        domain,
                         round_index,
                     ),
                 ),
@@ -636,7 +639,7 @@ def train_source_update_sanitization_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor,
-    source_domain: NBaiotDomain | None,
+    source_domain: DomainId | None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     if source_domain is None:
