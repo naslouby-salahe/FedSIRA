@@ -126,14 +126,14 @@ TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
 SIGN_FLIP_CHECK_SAMPLE_COUNT = 10
 SIGN_FLIP_CHECK_EXPECTED_P_VALUE: PValue = 0.001953125
 HOLM_CHECK_RAW_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
-    ("c", 0.012),
-    ("a", 0.043),
-    ("b", 0.031),
+    ("c", 0.125),
+    ("a", 0.375),
+    ("b", 0.25),
 )
 HOLM_CHECK_ADJUSTED_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
-    ("c", 0.036),
-    ("b", 0.062),
-    ("a", 0.062),
+    ("c", 0.375),
+    ("b", 0.5),
+    ("a", 0.5),
 )
 SMOKE_MODEL_INPUT_WIDTH: ModelInputWidth = 4
 SMOKE_MODEL_OUTPUT_WIDTH: ModelOutputWidth = 2
