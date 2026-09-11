@@ -403,6 +403,11 @@ def export_experiment_report(
     metrics_root.mkdir(parents=True, exist_ok=True)
     telemetry_root.mkdir(parents=True, exist_ok=True)
 
+    log_structured_event(
+        REPORT_LOGGER,
+        "report.table.started",
+        ReportLogFields(report_scope=result.experiment),
+    )
     exported: list[Path] = [
         _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
         *render_experiment_figures(
@@ -568,16 +573,38 @@ def export_project_summary(
     ):
         exported.append(_write_table(tables_root, table))
         materialized_tables.append(table.name)
-
-    exported.extend(
-        render_mandatory_figures(
-            comparison_results,
-            figures_root,
-            evidence_trajectory=evidence_trajectory,
-            telemetry=telemetry,
-            outcomes=outcomes,
+        log_structured_event(
+            REPORT_LOGGER,
+            "report.table.generated",
+            ReportLogFields(report_scope=table.name),
         )
+    log_structured_event(
+        REPORT_LOGGER,
+        "report.tables.completed",
+        ReportLogFields(
+            report_scope=PROJECT_SUMMARY_EXPORT_NAME, artifact_count=len(materialized_tables)
+        ),
     )
+
+    log_structured_event(
+        REPORT_LOGGER,
+        "report.figure.started",
+        ReportLogFields(report_scope=PROJECT_SUMMARY_EXPORT_NAME),
+    )
+    mandatory_figures = render_mandatory_figures(
+        comparison_results,
+        figures_root,
+        evidence_trajectory=evidence_trajectory,
+        telemetry=telemetry,
+        outcomes=outcomes,
+    )
+    exported.extend(mandatory_figures)
+    for figure_path in mandatory_figures:
+        log_structured_event(
+            REPORT_LOGGER,
+            "report.figure.generated",
+            ReportLogFields(report_scope=Path(figure_path).name),
+        )
 
     pending_tables = tuple(
         name for name in MANUSCRIPT_TABLE_NAMES if name not in materialized_tables

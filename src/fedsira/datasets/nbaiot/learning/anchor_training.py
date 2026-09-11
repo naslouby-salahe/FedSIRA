@@ -35,7 +35,9 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.training import ModelState, load_model_state, model_state_from_classifier
 from fedsira.runtime import (
+    ElapsedTimer,
     current_application_context,
+    get_structured_logger,
     local_training_seed,
     namespace_seed,
     seed_job_local_rng_streams,
@@ -43,6 +45,8 @@ from fedsira.runtime import (
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
 ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
+
+ANCHOR_LOGGER = get_structured_logger("anchor_training")
 
 
 def training_seed(
@@ -73,6 +77,11 @@ def _flatten_model_state(
 
 
 def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | None:
+    timer = ElapsedTimer()
+    ANCHOR_LOGGER.info(
+        "anchor.training.started",
+        extra={"master_seed": master_seed, "prepared_root": prepared_root.as_posix()},
+    )
     config = current_application_context().scientific_config
     first_rows = load_prepared_rows(
         prepared_root, NBAIOT_DOMAIN_ORDER[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
@@ -135,6 +144,14 @@ def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | N
     )
     model = FedSIRAClassifier(input_width, output_width)
     load_model_state(model, final_state)
+    ANCHOR_LOGGER.info(
+        "anchor.training.completed",
+        extra={
+            "master_seed": master_seed,
+            "round_count": config.model.anchor_fedavg.rounds,
+            "elapsed_seconds": timer.elapsed_seconds(),
+        },
+    )
     return RealAnchor(
         input_width=input_width,
         output_width=output_width,

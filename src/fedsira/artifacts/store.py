@@ -10,9 +10,13 @@ from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactReuseDecision,
     FrozenDomainModel,
+    LogRecordText,
 )
+from fedsira.runtime import get_structured_logger
 
 ArtifactPayloadBytes: TypeAlias = bytes
+
+ARTIFACT_LOGGER = get_structured_logger("artifacts")
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
@@ -128,6 +132,14 @@ def is_artifact_complete_and_valid(
     return True
 
 
+def _log_artifact_event(
+    event: LogRecordText, family: ArtifactFamily, identity: ArtifactDigest
+) -> None:
+    ARTIFACT_LOGGER.info(
+        event, extra={"artifact_family": family.value, "artifact_identity": identity}
+    )
+
+
 def publish_or_reuse_artifact_payload(
     *,
     family: ArtifactFamily,
@@ -140,6 +152,7 @@ def publish_or_reuse_artifact_payload(
     if is_artifact_complete_and_valid(published_directory, identity):
         existing = read_published_manifest(published_directory, identity)
         if existing is not None:
+            _log_artifact_event("artifact.reused", family, identity)
             return existing, True
 
     staged_manifest = ArtifactManifest(
@@ -150,12 +163,11 @@ def publish_or_reuse_artifact_payload(
         upstream_identities=upstream_identities,
     )
     staged_path = stage_payload(staging_root, payload)
-    return (
-        publish_artifact_to_disk(
-            staged_path,
-            published_directory,
-            staged_manifest,
-            payload,
-        ),
-        False,
+    published = publish_artifact_to_disk(
+        staged_path,
+        published_directory,
+        staged_manifest,
+        payload,
     )
+    _log_artifact_event("artifact.published", family, identity)
+    return (published, False)
