@@ -9,8 +9,11 @@ import torch
 
 from fedsira.datasets.common import (
     Role,
+    apply_trigger_transform,
     open_tabular_engine,
+    relabel_triggered_rows_as_benign,
     role_hash_token,
+    select_source_backdoor_poison_rows,
     sql_string,
     view_parquet_path,
 )
@@ -51,11 +54,6 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.protocol.attacks import (
-    apply_trigger_transform,
-    relabel_triggered_rows_as_benign,
-    select_source_backdoor_poison_rows,
-)
 from fedsira.runtime import framed_bytes
 
 

@@ -7,6 +7,10 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
+from fedsira.datasets.common import (
+    apply_trigger_transform,
+    select_fractional_attack_rows,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
@@ -47,7 +51,6 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.evaluation.statistics import match_nearest_within_decile
-from fedsira.protocol.attacks import apply_trigger_transform, select_fractional_attack_rows
 from fedsira.protocol.rules import (
     EvidenceArrivalSchedule,
     first_cycle_with_minimum_eligible_evidence_holders,

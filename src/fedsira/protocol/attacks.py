@@ -1,30 +1,25 @@
-import math
-from collections import OrderedDict
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 
 import torch
 from torch import nn, optim
 
 from fedsira.config import PostReferenceConfig, TrainingConfig
-from fedsira.domain.enums import ByzantineVerifierBehavior, SeedNamespace, TernaryOutcome
+from fedsira.datasets.common import (
+    select_fractional_attack_rows,
+)
+from fedsira.domain.enums import ByzantineVerifierBehavior, TernaryOutcome
 from fedsira.domain.types import (
     ArtifactDigest,
-    AttackCount,
-    DatasetClassToken,
     DeltaScale,
-    ExampleCount,
-    FeatureIndex,
     LossWeight,
     NamespaceSeed,
     Probability,
     TrainableParameterCount,
     TrainingLoss,
-    TriggerFeatureValue,
 )
 from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
 from fedsira.learning.training import clip_gradients, step_optimizer
-from fedsira.runtime import deterministic_order
 
 
 def verifier_aware_training_step(
@@ -90,66 +85,6 @@ def resolve_byzantine_verifier_vote(behavior: ByzantineVerifierBehavior) -> Tern
     if behavior is ByzantineVerifierBehavior.FALSE_POSITIVE:
         return TernaryOutcome.POSITIVE
     return TernaryOutcome.NEGATIVE
-
-
-ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
-
-
-def fraction_to_attack_count(
-    fraction: Probability, eligible_population_size: ExampleCount
-) -> AttackCount:
-    return math.floor(fraction * eligible_population_size)
-
-
-def attack_row_order(
-    eligible_row_ids: Sequence[ArtifactDigest], attack_generation_namespace_seed: NamespaceSeed
-) -> tuple[ArtifactDigest, ...]:
-    return deterministic_order(
-        tuple(eligible_row_ids), ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
-    )
-
-
-def select_fractional_attack_rows(
-    eligible_row_ids: Sequence[ArtifactDigest],
-    fraction: Probability,
-    attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[ArtifactDigest, ...] | None:
-    count = fraction_to_attack_count(fraction, len(eligible_row_ids))
-    if fraction > 0.0 and count == 0:
-        return None
-    return attack_row_order(eligible_row_ids, attack_generation_namespace_seed)[:count]
-
-
-def apply_trigger_transform(
-    standardized_features: torch.Tensor,
-    trigger_feature_indices: Sequence[FeatureIndex],
-    trigger_value: TriggerFeatureValue,
-) -> torch.Tensor:
-    triggered = standardized_features.clone()
-    for feature_index in trigger_feature_indices:
-        triggered[..., feature_index] = trigger_value
-    return triggered
-
-
-def select_source_backdoor_poison_rows(
-    eligible_gafgyt_udp_row_ids: Sequence[ArtifactDigest],
-    poison_fraction: Probability,
-    attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[ArtifactDigest, ...] | None:
-    return select_fractional_attack_rows(
-        eligible_gafgyt_udp_row_ids, poison_fraction, attack_generation_namespace_seed
-    )
-
-
-def relabel_triggered_rows_as_benign(
-    labels_by_row_id: Mapping[ArtifactDigest, DatasetClassToken],
-    poisoned_row_ids: Sequence[ArtifactDigest],
-    benign_class: DatasetClassToken,
-) -> Mapping[ArtifactDigest, DatasetClassToken]:
-    relabeled: OrderedDict[ArtifactDigest, DatasetClassToken] = OrderedDict(labels_by_row_id)
-    for row_id in poisoned_row_ids:
-        relabeled[row_id] = benign_class
-    return relabeled
 
 
 def source_copy_update(

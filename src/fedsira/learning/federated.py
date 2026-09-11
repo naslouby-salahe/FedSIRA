@@ -1,18 +1,39 @@
 import torch
 
 from fedsira.config import AnchorFedAvgConfig, OptimizerConfig, TrainingConfig
+from fedsira.datasets.common import (
+    DatasetAdapter,
+    RealAnchor,
+    Role,
+)
+from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import (
+    AlgorithmName,
+    ArtifactDigest,
     DerivedSeed,
+    DomainId,
     ExampleCount,
+    FeatureCount,
+    FederatedRoundCount,
+    FrozenDomainModel,
     LearningRate,
     LocalEpochCount,
+    MasterSeed,
     ModelInputWidth,
     ModelOutputWidth,
+    RepositoryPath,
+    RoundIndex,
     SampleId,
     TensorDomainModel,
     TrainableParameterCount,
+    WallClockSeconds,
 )
-from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
+from fedsira.experiments.definitions import ReproducerCondition
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    trainable_parameter_count,
+)
 from fedsira.learning.training import (
     ModelState,
     WeightedModelState,
@@ -22,6 +43,14 @@ from fedsira.learning.training import (
     load_model_state,
     model_state_from_classifier,
     train_epochs_with_deterministic_batch_order,
+)
+from fedsira.runtime import (
+    ElapsedTimer,
+    current_application_context,
+    get_structured_logger,
+    local_training_seed,
+    namespace_seed,
+    seed_job_local_rng_streams,
 )
 
 
@@ -150,3 +179,121 @@ def run_anchor_fedavg_training(
         )
         round_checkpoints.append(state)
     return round_checkpoints[-1], tuple(round_checkpoints)
+
+
+ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
+ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
+ANCHOR_LOGGER = get_structured_logger("anchor_training")
+
+
+class AnchorTrainingLogFields(FrozenDomainModel):
+    master_seed: MasterSeed
+    prepared_root: RepositoryPath
+    round_count: FederatedRoundCount | None = None
+    elapsed_seconds: WallClockSeconds | None = None
+
+
+def training_seed(
+    master_seed: MasterSeed,
+    manifest_hash: ArtifactDigest,
+    start_checkpoint_identity: ArtifactDigest,
+    algorithm_token: AlgorithmName,
+    domain_token: DomainId,
+    round_index: RoundIndex,
+) -> DerivedSeed:
+    return local_training_seed(
+        namespace_seed(master_seed, SeedNamespace.LOCAL_TRAINING),
+        manifest_hash,
+        start_checkpoint_identity,
+        algorithm_token,
+        domain_token,
+        ANCHOR_TRAINING_CONDITION_TOKEN,
+        round_index,
+    )
+
+
+def _flatten_model_state(
+    state: ModelState, input_width: FeatureCount, output_width: FeatureCount
+) -> torch.Tensor:
+    model = FedSIRAClassifier(input_width, output_width)
+    load_model_state(model, state)
+    return flatten_trainable_parameters(model)
+
+
+def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor | None:
+    timer = ElapsedTimer()
+    ANCHOR_LOGGER.info(
+        "anchor.training.started",
+        extra=AnchorTrainingLogFields(
+            master_seed=master_seed, prepared_root=adapter.prepared_root.as_posix()
+        ).model_dump(),
+    )
+    config = current_application_context().scientific_config
+    first_rows = adapter.load_rows(
+        adapter.domain_ids[0], adapter.benign_class_token, Role.ANCHOR_TRAIN
+    )
+    if first_rows is None:
+        return None
+    input_width = len(first_rows.features[0])
+    output_width = len(adapter.class_tokens)
+    manifest_hash = adapter.manifest_hash()
+    seed_job_local_rng_streams(namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION))
+    initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
+    clients_per_round: list[tuple[LocalTrainingClient, ...]] = []
+    for round_index in range(config.model.anchor_fedavg.rounds):
+        round_clients: list[LocalTrainingClient] = []
+        for domain_id in adapter.domain_ids:
+            rows = adapter.supported_rows_for_role(domain_id, Role.ANCHOR_TRAIN)
+            tensors = adapter.tensor_view(rows)
+            if tensors is None:
+                continue
+            features, labels, sample_ids = tensors
+            round_clients.append(
+                LocalTrainingClient(
+                    features=features,
+                    labels=labels,
+                    sample_ids=sample_ids,
+                    training_seed=training_seed(
+                        master_seed,
+                        manifest_hash,
+                        "anchor-start",
+                        ANCHOR_TRAINING_ALGORITHM_TOKEN,
+                        adapter.domain_token(domain_id),
+                        round_index,
+                    ),
+                )
+            )
+        if not round_clients:
+            return None
+        clients_per_round.append(tuple(round_clients))
+    final_state, round_checkpoints = run_anchor_fedavg_training(
+        input_width,
+        output_width,
+        initial_state,
+        config.model.optimizer.anchor_and_standard_fl_learning_rate,
+        config.model.optimizer,
+        config.model.training,
+        config.model.anchor_fedavg,
+        tuple(clients_per_round),
+    )
+    model = FedSIRAClassifier(input_width, output_width)
+    load_model_state(model, final_state)
+    ANCHOR_LOGGER.info(
+        "anchor.training.completed",
+        extra=AnchorTrainingLogFields(
+            master_seed=master_seed,
+            prepared_root=adapter.prepared_root.as_posix(),
+            round_count=config.model.anchor_fedavg.rounds,
+            elapsed_seconds=timer.elapsed_seconds(),
+        ).model_dump(),
+    )
+    return RealAnchor(
+        input_width=input_width,
+        output_width=output_width,
+        flat_parameters=flatten_trainable_parameters(model),
+        dataset_manifest_hash=manifest_hash,
+        round_start_flat_parameters=tuple(
+            _flatten_model_state(state, input_width, output_width)
+            for state in (initial_state, *round_checkpoints[:-1])
+        ),
+    )

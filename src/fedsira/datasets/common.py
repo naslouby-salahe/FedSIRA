@@ -3,20 +3,25 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Self
 
 import duckdb
+import torch
 from pydantic import model_validator
 
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain, ScalingConfig
-from fedsira.domain.enums import DatasetId, Role
+from fedsira.domain.enums import DatasetId, Role, SeedNamespace
+from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     UINT32_MODULUS,
     ArtifactDigest,
     ArtifactReuseDecision,
+    AttackCount,
     BooleanValue,
     ClassCount,
     ClassLabel,
@@ -26,12 +31,18 @@ from fedsira.domain.types import (
     DatasetManifestDigest,
     DerivedSeed,
     DomainId,
+    ExampleCount,
     FeatureAccumulator,
+    FeatureCount,
+    FeatureIndex,
     FeatureMoment,
     FeatureName,
+    FeatureVector,
     FrozenDomainModel,
+    NamespaceSeed,
     OverwriteExisting,
     PredictorCount,
+    PreparedEvidencePresent,
     PreparedViewKey,
     Probability,
     RelativePathText,
@@ -48,8 +59,9 @@ from fedsira.domain.types import (
     SourceRowIndex,
     SquaredFeatureAccumulator,
     TextValue,
+    TriggerFeatureValue,
 )
-from fedsira.runtime import framed_bytes
+from fedsira.runtime import deterministic_order, framed_bytes
 
 SUPPORTED_ROLE_ORDER: tuple[Role, ...] = (
     Role.ANCHOR_TRAIN,
@@ -566,3 +578,252 @@ def prepared_view_digest(prepared_root: Path) -> ArtifactDigest:
         digest.update(sidecar.name.encode("utf-8"))
         digest.update(sidecar.read_bytes())
     return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class PreparedRows:
+    sample_ids: tuple[ArtifactDigest, ...]
+    features: tuple[FeatureVector, ...]
+    labels: tuple[ClassLabel, ...]
+
+    @property
+    def row_count(self) -> ExampleCount:
+        return len(self.sample_ids)
+
+
+@dataclass(frozen=True)
+class RealAnchor:
+    input_width: FeatureCount
+    output_width: FeatureCount
+    flat_parameters: torch.Tensor
+    dataset_manifest_hash: ArtifactDigest
+    round_start_flat_parameters: tuple[torch.Tensor, ...]
+
+
+@dataclass(frozen=True)
+class DomainTargetMetrics:
+    target_f1: MetricResult
+    supported_macro_f1: MetricResult
+    benign_far: MetricResult
+
+
+def real_evidence_available(prepared_root: Path) -> PreparedEvidencePresent:
+    return prepared_root.exists() and any(prepared_root.glob("*.parquet"))
+
+
+def prepared_feature_names(prepared_root: Path) -> tuple[FeatureName, ...] | None:
+    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
+    if not parquet_files:
+        return None
+    connection = open_tabular_engine()
+    cursor = connection.execute(
+        f"DESCRIBE SELECT * FROM read_parquet({sql_string(parquet_files[0].as_posix())})"
+    )
+    columns = tuple(str(row[0]) for row in cursor.fetchall())
+    return tuple(column for column in columns if column not in ("sample_id", "label"))
+
+
+def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
+    parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
+    if not parquet_files:
+        return "0" * 64
+    hasher = hashlib.sha256()
+    for path in parquet_files:
+        hasher.update(framed_bytes(path.name, path.stat().st_size))
+    return hasher.hexdigest()
+
+
+def flat_parameters_identity(flat_parameters: torch.Tensor) -> ArtifactDigest:
+    values = flat_parameters.detach().cpu()
+    joined = "|".join(repr(values[index].item()) for index in range(values.numel()))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class DatasetAdapter:
+    specification: DatasetSpecification
+    prepared_root: Path
+
+    @property
+    def dataset(self) -> DatasetId:
+        return self.specification.dataset
+
+    @property
+    def domain_ids(self) -> tuple[DomainId, ...]:
+        return self.specification.domain_ids
+
+    @property
+    def class_tokens(self) -> tuple[DatasetClassToken, ...]:
+        return self.specification.class_tokens
+
+    @property
+    def supported_class_tokens(self) -> tuple[DatasetClassToken, ...]:
+        return self.specification.supported_class_tokens
+
+    @property
+    def target_class_token(self) -> DatasetClassToken:
+        return self.specification.target_class
+
+    @property
+    def benign_class_token(self) -> DatasetClassToken:
+        return self.specification.benign_class
+
+    @property
+    def trigger_feature_names(self) -> tuple[FeatureName, ...]:
+        return self.specification.trigger_feature_names
+
+    def domain_token(self, domain_id: DomainId) -> DomainId:
+        try:
+            index = self.specification.domain_ids.index(domain_id)
+        except ValueError as error:
+            raise ValueError(
+                f"unknown domain identity for {self.dataset.value}: {domain_id}"
+            ) from error
+        return self.specification.domain_hash_tokens[index]
+
+    def attack_carrier_class_token(self) -> DatasetClassToken:
+        carrier = self.specification.attack_carrier_class
+        if carrier is None:
+            raise ValueError(f"{self.dataset.value} declares no attack carrier class")
+        return carrier
+
+    def view_key(
+        self, domain_id: DomainId, class_token: DatasetClassToken, role: Role
+    ) -> PreparedViewKey:
+        return f"{self.domain_token(domain_id)}_{class_token}_{role_hash_token(role)}"
+
+    def load_rows(
+        self, domain_id: DomainId, class_token: DatasetClassToken, role: Role
+    ) -> PreparedRows | None:
+        path = view_parquet_path(self.prepared_root, self.view_key(domain_id, class_token, role))
+        if not path.exists():
+            return None
+        connection = open_tabular_engine()
+        cursor = connection.execute(f"SELECT * FROM read_parquet({sql_string(path.as_posix())})")
+        columns = tuple(item[0] for item in cursor.description)
+        rows = cursor.fetchall()
+        if not rows:
+            return None
+        feature_indices = tuple(
+            index for index, column in enumerate(columns) if column not in ("sample_id", "label")
+        )
+        sample_id_index = columns.index("sample_id")
+        label_index = columns.index("label")
+        return PreparedRows(
+            sample_ids=tuple(str(row[sample_id_index]) for row in rows),
+            features=tuple(tuple(float(row[index]) for index in feature_indices) for row in rows),
+            labels=tuple(str(row[label_index]) for row in rows),
+        )
+
+    def tensor_view(
+        self, rows: PreparedRows | None
+    ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...]] | None:
+        if rows is None:
+            return None
+        features = torch.tensor(rows.features, dtype=torch.float32)
+        label_to_index = OrderedDict(
+            (class_token, index) for index, class_token in enumerate(self.class_tokens)
+        )
+        labels = torch.tensor([label_to_index[label] for label in rows.labels], dtype=torch.long)
+        return (features, labels, rows.sample_ids)
+
+    def manifest_hash(self) -> ArtifactDigest:
+        return dataset_manifest_hash(self.prepared_root)
+
+    def evidence_available(self) -> PreparedEvidencePresent:
+        return real_evidence_available(self.prepared_root)
+
+    def feature_names(self) -> tuple[FeatureName, ...] | None:
+        return prepared_feature_names(self.prepared_root)
+
+    def supported_rows_for_role(self, domain_id: DomainId, role: Role) -> PreparedRows | None:
+        combined_features: list[tuple[float, ...]] = []
+        combined_labels: list[ClassLabel] = []
+        combined_sample_ids: list[ArtifactDigest] = []
+        for class_token in self.class_tokens:
+            if class_token == self.target_class_token:
+                continue
+            rows = self.load_rows(domain_id, class_token, role)
+            if rows is None:
+                continue
+            combined_features.extend(rows.features)
+            combined_labels.extend(rows.labels)
+            combined_sample_ids.extend(rows.sample_ids)
+        if not combined_sample_ids:
+            return None
+        return PreparedRows(
+            sample_ids=tuple(combined_sample_ids),
+            features=tuple(combined_features),
+            labels=tuple(combined_labels),
+        )
+
+    def anchor_train_feature_mean(self, domain_id: DomainId) -> torch.Tensor | None:
+        combined_features: list[torch.Tensor] = []
+        for class_token in self.class_tokens:
+            if class_token == self.target_class_token:
+                continue
+            rows = self.tensor_view(self.load_rows(domain_id, class_token, Role.ANCHOR_TRAIN))
+            if rows is not None:
+                features, _labels, _sample_ids = rows
+                combined_features.append(features)
+        return None if not combined_features else torch.cat(combined_features, dim=0).mean(dim=0)
+
+
+ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
+
+
+def fraction_to_attack_count(
+    fraction: Probability, eligible_population_size: ExampleCount
+) -> AttackCount:
+    return math.floor(fraction * eligible_population_size)
+
+
+def attack_row_order(
+    eligible_row_ids: Sequence[ArtifactDigest], attack_generation_namespace_seed: NamespaceSeed
+) -> tuple[ArtifactDigest, ...]:
+    return deterministic_order(
+        tuple(eligible_row_ids), ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
+    )
+
+
+def select_fractional_attack_rows(
+    eligible_row_ids: Sequence[ArtifactDigest],
+    fraction: Probability,
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[ArtifactDigest, ...] | None:
+    count = fraction_to_attack_count(fraction, len(eligible_row_ids))
+    if fraction > 0.0 and count == 0:
+        return None
+    return attack_row_order(eligible_row_ids, attack_generation_namespace_seed)[:count]
+
+
+def apply_trigger_transform(
+    standardized_features: torch.Tensor,
+    trigger_feature_indices: Sequence[FeatureIndex],
+    trigger_value: TriggerFeatureValue,
+) -> torch.Tensor:
+    triggered = standardized_features.clone()
+    for feature_index in trigger_feature_indices:
+        triggered[..., feature_index] = trigger_value
+    return triggered
+
+
+def select_source_backdoor_poison_rows(
+    eligible_gafgyt_udp_row_ids: Sequence[ArtifactDigest],
+    poison_fraction: Probability,
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
+        eligible_gafgyt_udp_row_ids, poison_fraction, attack_generation_namespace_seed
+    )
+
+
+def relabel_triggered_rows_as_benign(
+    labels_by_row_id: Mapping[ArtifactDigest, DatasetClassToken],
+    poisoned_row_ids: Sequence[ArtifactDigest],
+    benign_class: DatasetClassToken,
+) -> Mapping[ArtifactDigest, DatasetClassToken]:
+    relabeled: OrderedDict[ArtifactDigest, DatasetClassToken] = OrderedDict(labels_by_row_id)
+    for row_id in poisoned_row_ids:
+        relabeled[row_id] = benign_class
+    return relabeled
