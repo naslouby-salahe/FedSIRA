@@ -15,6 +15,7 @@ JUSTIFIED_LINE_BUDGETS = {
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 1300,
     "evaluation/service.py": 700,
+    "experiments/execution.py": 1050,
     "reporting/tables.py": 1600,
     "reporting/figures.py": 1550,
     "reporting/export.py": 1300,

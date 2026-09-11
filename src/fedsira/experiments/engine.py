@@ -57,7 +57,7 @@ from fedsira.runtime import (
 )
 
 if TYPE_CHECKING:
-    from fedsira.datasets.nbaiot.validation import ExperimentPrerequisiteState
+    from fedsira.experiments.execution import ExperimentPrerequisiteState
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
@@ -221,7 +221,7 @@ def execution_digest(
 
 
 def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> CellExecutionOutcome:
-    from fedsira.datasets.nbaiot.validation import validate_cell_terminal_record
+    from fedsira.experiments.execution import validate_cell_terminal_record
 
     config = current_application_context().scientific_config
     attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
@@ -286,7 +286,7 @@ class ComparisonResultBuilder(Protocol):
 def prerequisite_states_from_store(
     plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
 ) -> tuple[ExperimentPrerequisiteState, ...]:
-    from fedsira.datasets.nbaiot.validation import ExperimentPrerequisiteState
+    from fedsira.experiments.execution import ExperimentPrerequisiteState
 
     definition = experiment_by_name(experiment)
     return tuple(

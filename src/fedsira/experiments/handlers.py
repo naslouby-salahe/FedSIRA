@@ -37,10 +37,6 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_adapter,
 )
-from fedsira.datasets.nbaiot.validation import (
-    run_data_and_domain_evidence_validation,
-    run_protocol_invariant_validation,
-)
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
     AdmissionState,
@@ -158,6 +154,10 @@ from fedsira.experiments.engine import (
     PreparedEvidenceCounts,
     ProtocolPhaseDurations,
     load_prepared_evidence_counts,
+)
+from fedsira.experiments.execution import (
+    run_data_and_domain_evidence_validation,
+    run_protocol_invariant_validation,
 )
 from fedsira.experiments.planning import (
     ScientificCell,

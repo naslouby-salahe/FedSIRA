@@ -1,4 +1,6 @@
-from fedsira.datasets.nbaiot.validation import run_smoke_suite
+from fedsira.experiments.execution import (
+    run_smoke_suite,
+)
 
 
 def test_smoke_suite_includes_passing_data_invariants() -> None:

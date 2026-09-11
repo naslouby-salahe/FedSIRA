@@ -12,7 +12,6 @@ from fedsira.artifacts.paths import (
     workspace_root_for_family,
 )
 from fedsira.datasets.common import dataset_specification
-from fedsira.datasets.nbaiot.validation import PersistedSmokeRecord
 from fedsira.datasets.preprocess import execute_preprocess
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
 from fedsira.domain.models import (
@@ -68,6 +67,7 @@ from fedsira.experiments.engine import (
     derive_experiment_lifecycle,
 )
 from fedsira.experiments.execution import (
+    PersistedSmokeRecord,
     execute_experiment,
     execute_smoke,
     execute_status,

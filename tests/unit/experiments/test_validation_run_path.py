@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.nbaiot.validation import run_data_and_domain_evidence_validation
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.models import (
     PreparedEvidenceCounts,
@@ -13,6 +12,9 @@ from fedsira.experiments.definitions import (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
+from fedsira.experiments.execution import (
+    run_data_and_domain_evidence_validation,
+)
 from fedsira.experiments.handlers import ProtocolCellExecutor
 
 
@@ -20,7 +22,7 @@ def test_protocol_invariant_validation_cell_executes_smoke_invariants(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "fedsira.datasets.nbaiot.validation.smoke_record_path", lambda: tmp_path / "smoke.json"
+        "fedsira.experiments.execution.smoke_record_path", lambda: tmp_path / "smoke.json"
     )
     executor = ProtocolCellExecutor()
     cell = ScientificCell(

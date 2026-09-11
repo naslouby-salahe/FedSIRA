@@ -1,4 +1,4 @@
-from fedsira.datasets.nbaiot.validation import (
+from fedsira.experiments.execution import (
     validate_condition_vocabulary,
     validate_no_duplicate_semantic_cells,
 )

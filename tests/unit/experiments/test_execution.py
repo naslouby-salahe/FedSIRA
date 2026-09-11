@@ -3,13 +3,6 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from fedsira.datasets.nbaiot.validation import (
-    ExperimentPrerequisiteState,
-    validate_cell_phase_sequence,
-    validate_cell_terminal_record,
-    validate_experiment_prerequisites_met,
-    validate_no_duplicate_semantic_cells,
-)
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.domain.models import (
     ScientificCell,
@@ -21,7 +14,14 @@ from fedsira.experiments.engine import (
     PersistedExecutionRecord,
     derive_experiment_lifecycle,
 )
-from fedsira.experiments.execution import execute_experiment
+from fedsira.experiments.execution import (
+    ExperimentPrerequisiteState,
+    execute_experiment,
+    validate_cell_phase_sequence,
+    validate_cell_terminal_record,
+    validate_experiment_prerequisites_met,
+    validate_no_duplicate_semantic_cells,
+)
 from fedsira.experiments.planning import (
     build_plan,
 )
