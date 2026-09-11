@@ -9,10 +9,6 @@ import torch
 
 from fedsira.artifacts.paths import smoke_record_path
 from fedsira.artifacts.store import ArtifactManifest, validate_artifact_lifecycle_readable
-from fedsira.config import (
-    TEST_FIXTURE_CONFIG_PATH,
-    load_test_fixture_config,
-)
 from fedsira.datasets.common import SUPPORTED_ROLE_ORDER, Role
 from fedsira.datasets.nbaiot.prepare import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
@@ -27,16 +23,26 @@ from fedsira.domain.enums import (
 from fedsira.domain.models import AdmissionDelayDecomposition
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
+    ComparisonName,
+    DatasetClassToken,
+    ExampleCount,
     ExperimentName,
     FrozenDomainModel,
     InvariantChecksPassed,
+    MetricValue,
+    ModelInputWidth,
+    ModelOutputWidth,
     OverwriteExisting,
     PreparedReproductionTargetCount,
     PreparedSupportedReplayCount,
+    Probability,
+    ProductionWeight,
+    PValue,
     ScenarioName,
     SchemaVersion,
     ScientificCellSemanticKey,
     TextValue,
+    WallClockSeconds,
 )
 from fedsira.evaluation.metrics import accuracy, compute_confusion_counts
 from fedsira.evaluation.statistics import (
@@ -115,6 +121,43 @@ TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
         ExperimentLifecycleState.INVALID,
     )
 )
+
+
+SIGN_FLIP_CHECK_SAMPLE_COUNT = 10
+SIGN_FLIP_CHECK_EXPECTED_P_VALUE: PValue = 0.001953125
+HOLM_CHECK_RAW_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
+    ("c", 0.01),
+    ("a", 0.04),
+    ("b", 0.03),
+)
+HOLM_CHECK_ADJUSTED_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
+    ("c", 0.03),
+    ("b", 0.06),
+    ("a", 0.06),
+)
+SMOKE_MODEL_INPUT_WIDTH: ModelInputWidth = 4
+SMOKE_MODEL_OUTPUT_WIDTH: ModelOutputWidth = 2
+SMOKE_BATCH_ROW_COUNT: ExampleCount = 2
+SMOKE_FEDAVG_CLIENT_A_EXAMPLE_COUNT: ExampleCount = 1
+SMOKE_FEDAVG_CLIENT_B_EXAMPLE_COUNT: ExampleCount = 3
+SMOKE_FEDAVG_CLIENT_A_WEIGHTS: tuple[MetricValue, ...] = (0.0, 1.0)
+SMOKE_FEDAVG_CLIENT_B_WEIGHTS: tuple[MetricValue, ...] = (4.0, 5.0)
+SMOKE_QUANTILE_VALUES: tuple[MetricValue, ...] = (0.0, 1.0, 2.0, 3.0)
+SMOKE_QUANTILE_PROBABILITY: Probability = 0.5
+SMOKE_SAMPLE_SD_VALUES: tuple[MetricValue, ...] = (1.0, 2.0, 3.0)
+SMOKE_DELAY_ASSIGNMENT_SECONDS: WallClockSeconds = 1.0
+SMOKE_DELAY_REPRODUCE_SECONDS: WallClockSeconds = 2.0
+SMOKE_DELAY_VERIFY_SECONDS: WallClockSeconds = 3.0
+SMOKE_DELAY_SYNTHESIZE_SECONDS: WallClockSeconds = 4.0
+SMOKE_BOOTSTRAP_VALUES: tuple[MetricValue, ...] = (1.0, 2.0, 3.0)
+SMOKE_CONFUSION_TRUE_LABELS: tuple[DatasetClassToken, ...] = ("a", "b", "a", "a")
+SMOKE_CONFUSION_PREDICTED_LABELS: tuple[DatasetClassToken, ...] = ("a", "a", "a", "b")
+SMOKE_CONFUSION_CLASS_TOKEN: DatasetClassToken = "a"
+SMOKE_CONFUSION_TRUE_POSITIVE = 2
+SMOKE_CONFUSION_FALSE_POSITIVE = 1
+SMOKE_CONFUSION_FALSE_NEGATIVE = 1
+SMOKE_CONFUSION_TRUE_NEGATIVE = 0
+SMOKE_NONZERO_PRODUCTION_WEIGHT: ProductionWeight = 1.0
 
 
 class SmokeCheckResult(FrozenDomainModel):
@@ -344,12 +387,11 @@ def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
 
 
 def _mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
-    fixture_config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
-    sample_count = fixture_config.sign_flip_sample_count
+    sample_count = SIGN_FLIP_CHECK_SAMPLE_COUNT
     sign_flip = exact_sign_flip_two_sided_p_value((1.0,) * sample_count)
-    sign_flip_matches = sign_flip == fixture_config.sign_flip_expected_p_value
-    holm = holm_adjusted_p_values(fixture_config.holm_fixture_raw_p_values)
-    holm_matches = holm == fixture_config.holm_fixture_adjusted_p_values
+    sign_flip_matches = sign_flip == SIGN_FLIP_CHECK_EXPECTED_P_VALUE
+    holm = holm_adjusted_p_values(HOLM_CHECK_RAW_P_VALUES)
+    holm_matches = holm == HOLM_CHECK_ADJUSTED_P_VALUES
     return (
         SmokeCheckResult(
             name="exact sign-flip test enumerates all assignments",
@@ -362,10 +404,9 @@ def _mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
 
 def _model_invariants() -> tuple[SmokeCheckResult, ...]:
     config = current_application_context().scientific_config
-    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
-    input_width = fixture.smoke_model_input_width
-    output_width = fixture.smoke_model_output_width
-    batch_rows = fixture.smoke_batch_row_count
+    input_width = SMOKE_MODEL_INPUT_WIDTH
+    output_width = SMOKE_MODEL_OUTPUT_WIDTH
+    batch_rows = SMOKE_BATCH_ROW_COUNT
     model = FedSIRAClassifier(input_width, output_width)
     features = torch.ones((batch_rows, input_width))
     labels = torch.zeros((batch_rows,), dtype=torch.long)
@@ -377,7 +418,7 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
         parameters=(
             ModelParameter(
                 name="w",
-                value=torch.tensor(fixture.smoke_fedavg_client_a_weights),
+                value=torch.tensor(SMOKE_FEDAVG_CLIENT_A_WEIGHTS),
             ),
         )
     )
@@ -385,12 +426,12 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
         parameters=(
             ModelParameter(
                 name="w",
-                value=torch.tensor(fixture.smoke_fedavg_client_b_weights),
+                value=torch.tensor(SMOKE_FEDAVG_CLIENT_B_WEIGHTS),
             ),
         )
     )
-    count_a = fixture.smoke_fedavg_client_a_example_count
-    count_b = fixture.smoke_fedavg_client_b_example_count
+    count_a = SMOKE_FEDAVG_CLIENT_A_EXAMPLE_COUNT
+    count_b = SMOKE_FEDAVG_CLIENT_B_EXAMPLE_COUNT
     averaged = federated_averaging(
         (
             WeightedModelState(state=first, example_count=count_a),
@@ -402,8 +443,8 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
         tuple(
             (left * count_a + right * count_b) / total
             for left, right in zip(
-                fixture.smoke_fedavg_client_a_weights,
-                fixture.smoke_fedavg_client_b_weights,
+                SMOKE_FEDAVG_CLIENT_A_WEIGHTS,
+                SMOKE_FEDAVG_CLIENT_B_WEIGHTS,
                 strict=True,
             )
         )
@@ -473,11 +514,10 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
 
 def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
     config = current_application_context().scientific_config
-    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     source_weight_zero = True
     try:
         validate_source_excluded_production_weight(SOURCE_DIRECT_PRODUCTION_WEIGHT)
-        validate_source_excluded_production_weight(fixture.smoke_nonzero_production_weight)
+        validate_source_excluded_production_weight(SMOKE_NONZERO_PRODUCTION_WEIGHT)
         source_weight_zero = False
     except ValueError:
         source_weight_zero = True
@@ -534,7 +574,6 @@ def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
 
 def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     config = current_application_context().scientific_config
-    fixture = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
     diagnostic = config.protocol.diagnostic_random_verifier_profile
     pool = len(NBaiotDomain) - len((_DANMINI, _ENNIO))
     zero = diagnostic_at_least_two_byzantine_probability(pool, 0, diagnostic.panel_size)
@@ -542,10 +581,10 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     tolerance = config.validation_tolerances.random_committee_probability_absolute
     delay = AdmissionDelayDecomposition(
         logical_information_arrival_cycles=1,
-        assignment_seconds=fixture.smoke_delay_assignment_seconds,
-        reproduce_seconds=fixture.smoke_delay_reproduce_seconds,
-        verify_seconds=fixture.smoke_delay_verify_seconds,
-        synthesize_seconds=fixture.smoke_delay_synthesize_seconds,
+        assignment_seconds=SMOKE_DELAY_ASSIGNMENT_SECONDS,
+        reproduce_seconds=SMOKE_DELAY_REPRODUCE_SECONDS,
+        verify_seconds=SMOKE_DELAY_VERIFY_SECONDS,
+        synthesize_seconds=SMOKE_DELAY_SYNTHESIZE_SECONDS,
     )
     delay_matches = (
         abs(
@@ -559,34 +598,34 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
         )
         < config.validation_tolerances.delay_component_sum_seconds_absolute
     )
-    quantiles = quantile_type7(fixture.smoke_quantile_values, fixture.smoke_quantile_probability)
+    quantiles = quantile_type7(SMOKE_QUANTILE_VALUES, SMOKE_QUANTILE_PROBABILITY)
     numpy_matches = quantiles == float(
         numpy.quantile(
-            fixture.smoke_quantile_values, fixture.smoke_quantile_probability, method="linear"
+            SMOKE_QUANTILE_VALUES, SMOKE_QUANTILE_PROBABILITY, method="linear"
         )
     )
-    sample = numpy.array(fixture.smoke_sample_sd_values)
+    sample = numpy.array(SMOKE_SAMPLE_SD_VALUES)
     sd_matches = float(sample.std(ddof=1)) == float(numpy.std(sample, ddof=1))
     confusion = compute_confusion_counts(
-        fixture.smoke_confusion_true_labels,
-        fixture.smoke_confusion_predicted_labels,
-        fixture.smoke_confusion_class_token,
+        SMOKE_CONFUSION_TRUE_LABELS,
+        SMOKE_CONFUSION_PREDICTED_LABELS,
+        SMOKE_CONFUSION_CLASS_TOKEN,
     )
     confusion_matches = (
-        confusion.true_positive == fixture.smoke_confusion_true_positive
-        and confusion.false_positive == fixture.smoke_confusion_false_positive
-        and confusion.false_negative == fixture.smoke_confusion_false_negative
-        and confusion.true_negative == fixture.smoke_confusion_true_negative
+        confusion.true_positive == SMOKE_CONFUSION_TRUE_POSITIVE
+        and confusion.false_positive == SMOKE_CONFUSION_FALSE_POSITIVE
+        and confusion.false_negative == SMOKE_CONFUSION_FALSE_NEGATIVE
+        and confusion.true_negative == SMOKE_CONFUSION_TRUE_NEGATIVE
     )
     zero_den = accuracy(OrderedDict(), 0)
     zero_is_na = zero_den.value is None and zero_den.denominator == 0
     bootstrap_config = config.metrics_and_statistics.bootstrap
     analysis_seed = config.seeds_and_determinism.analysis_seed
     first_interval = bootstrap_percentile_confidence_interval(
-        fixture.smoke_bootstrap_values, bootstrap_config, analysis_seed
+        SMOKE_BOOTSTRAP_VALUES, bootstrap_config, analysis_seed
     )
     second_interval = bootstrap_percentile_confidence_interval(
-        fixture.smoke_bootstrap_values, bootstrap_config, analysis_seed
+        SMOKE_BOOTSTRAP_VALUES, bootstrap_config, analysis_seed
     )
     bootstrap_deterministic = first_interval == second_interval
     return (
