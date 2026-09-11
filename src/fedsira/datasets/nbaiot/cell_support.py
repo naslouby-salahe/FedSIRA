@@ -19,11 +19,6 @@ from fedsira.datasets.nbaiot.evaluation.report_summary import (
     RealReportSummary,
     compute_real_report_summary,
 )
-from fedsira.datasets.nbaiot.learning.post_reference_training import (
-    certified_domain_delta_committee,
-    train_domain_reproduction_delta,
-    train_source_candidate_delta,
-)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -78,6 +73,11 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.engine import PreparedEvidenceCounts
 from fedsira.experiments.planning import ScientificCell
+from fedsira.learning.post_reference import (
+    certified_domain_delta_committee,
+    train_domain_reproduction_delta,
+    train_source_candidate_delta,
+)
 from fedsira.protocol.admission import (
     apply_production_update,
     final_gate_predicates_pass,
@@ -402,7 +402,7 @@ def _train_reproduction_update(
     validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
     if domain not in compromised_reproducers:
         return train_domain_reproduction_delta(
-            prepared_root,
+            nbaiot_adapter(prepared_root),
             cell.master_seed,
             anchor,
             domain,
@@ -422,7 +422,7 @@ def _train_reproduction_update(
             anchor.flat_parameters, anchor.flat_parameters + source_delta
         )
     trained = train_domain_reproduction_delta(
-        prepared_root,
+        nbaiot_adapter(prepared_root),
         cell.master_seed,
         anchor,
         domain,
@@ -579,7 +579,7 @@ def single_verifier_progression(
         next_domain = NBaiotDomain(candidate)
         consumed.add(next_domain)
         update = train_domain_reproduction_delta(
-            prepared_root,
+            nbaiot_adapter(prepared_root),
             cell.master_seed,
             anchor,
             next_domain,
@@ -725,7 +725,7 @@ def final_gate_decision(
         OrderedDict(precomputed_updates)
         if precomputed_updates is not None
         else certified_domain_delta_committee(
-            prepared_root,
+            nbaiot_adapter(prepared_root),
             master_seed,
             anchor,
             reproducer_order,
@@ -734,13 +734,13 @@ def final_gate_decision(
     )
     if use_source_delta_for_source_domain and source_domain is not None:
         source_delta = train_source_candidate_delta(
-            prepared_root, master_seed, anchor, source_domain
+            nbaiot_adapter(prepared_root), master_seed, anchor, source_domain
         )
         if source_delta is not None:
             committee_deltas[source_domain] = source_delta
     if force_first_row_to_source_delta and source_domain is not None and reproducer_order:
         source_delta = train_source_candidate_delta(
-            prepared_root, master_seed, anchor, source_domain
+            nbaiot_adapter(prepared_root), master_seed, anchor, source_domain
         )
         if source_delta is not None:
             committee_deltas[reproducer_order[0]] = source_delta

@@ -19,7 +19,6 @@ from fedsira.datasets.common import (
     Role,
     dataset_manifest_hash,
 )
-from fedsira.datasets.nbaiot.learning.post_reference_training import combined_post_reference_rows
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -99,6 +98,9 @@ from fedsira.learning.model import (
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
     logits_for_samples,
+)
+from fedsira.learning.post_reference import (
+    combined_post_reference_rows,
 )
 from fedsira.learning.training import (
     ModelState,
@@ -428,7 +430,9 @@ def _group_post_reference_round_clients(
         if target_rows is not None:
             has_target_bearing_member = True
             group_target_row_count += target_rows.row_count
-        combined = combined_post_reference_rows(prepared_root, domain, Role.REPRODUCTION)
+        combined = combined_post_reference_rows(
+            nbaiot_adapter(prepared_root), domain, Role.REPRODUCTION
+        )
         if combined is not None:
             features, labels, sample_ids, _is_supported = combined
         else:

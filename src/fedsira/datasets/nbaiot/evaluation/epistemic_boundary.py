@@ -15,7 +15,6 @@ from fedsira.datasets.common import (
     select_spurious_feature_rows,
 )
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBaiotClass,
@@ -37,6 +36,9 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
     logits_for_samples,
     per_sample_cross_entropy,
+)
+from fedsira.learning.post_reference import (
+    train_domain_reproduction_delta,
 )
 
 
@@ -159,7 +161,7 @@ def compute_shared_epistemic_failure_summary(
     )
     for domain in non_source_domains(source_domain):
         delta = train_domain_reproduction_delta(
-            prepared_root,
+            nbaiot_adapter(prepared_root),
             master_seed,
             anchor,
             domain,

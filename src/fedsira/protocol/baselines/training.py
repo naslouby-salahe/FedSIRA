@@ -13,10 +13,6 @@ from fedsira.datasets.common import (
     flat_parameters_identity,
 )
 from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
-from fedsira.datasets.nbaiot.learning.post_reference_training import (
-    combined_post_reference_rows,
-    train_source_candidate_delta,
-)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -48,6 +44,10 @@ from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
+)
+from fedsira.learning.post_reference import (
+    combined_post_reference_rows,
+    train_source_candidate_delta,
 )
 from fedsira.learning.training import (
     ModelState,
@@ -137,7 +137,7 @@ def train_ordinary_fedavg_delta(
         round_clients: list[LocalTrainingClient] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, role)
+            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -261,7 +261,7 @@ def train_krum_reference_delta(
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
             combined = combined_post_reference_rows(
-                prepared_root, domain, role, heterogeneity_scope=heterogeneity_scope
+                nbaiot_adapter(prepared_root), domain, role, heterogeneity_scope=heterogeneity_scope
             )
             if combined is None:
                 continue
@@ -340,7 +340,7 @@ def train_density_cluster_trimmed_mean_delta(
         raw_updates: list[torch.Tensor] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, role)
+            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -576,7 +576,7 @@ def train_update_reconstruction_filter_delta(
         accepted_states: list[WeightedModelState] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(prepared_root, domain, role)
+            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
             if combined is None:
                 continue
             features, labels, sample_ids, _is_supported = combined
@@ -641,7 +641,9 @@ def train_source_update_sanitization_delta(
     config = current_application_context().scientific_config
     if source_domain is None:
         return None
-    source_delta = train_source_candidate_delta(prepared_root, master_seed, anchor, source_domain)
+    source_delta = train_source_candidate_delta(
+        nbaiot_adapter(prepared_root), master_seed, anchor, source_domain
+    )
     if source_delta is None:
         return None
     calibration_updates = anchor_round_calibration_updates(prepared_root, master_seed, anchor)

@@ -9,13 +9,15 @@ from fedsira.datasets.common import (
     RootCauseScope,
 )
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
-from fedsira.datasets.nbaiot.schema import NBaiotDomain
+from fedsira.datasets.nbaiot.schema import NBaiotDomain, nbaiot_adapter
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import DomainCount, MasterSeed
 from fedsira.evaluation.metrics import supported_macro_f1_harm
 from fedsira.evaluation.statistics import equal_weight_domain_mean
+from fedsira.learning.post_reference import (
+    train_domain_reproduction_delta,
+)
 
 
 @dataclass(frozen=True)
@@ -57,7 +59,7 @@ def compute_capability_under_specification_summary(
     )
     for domain in non_source_domains(source_domain):
         delta = train_domain_reproduction_delta(
-            prepared_root, master_seed, anchor, domain, root_cause_scope
+            nbaiot_adapter(prepared_root), master_seed, anchor, domain, root_cause_scope
         )
         if delta is None:
             continue

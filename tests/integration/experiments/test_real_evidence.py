@@ -29,15 +29,6 @@ from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_sourc
 from fedsira.datasets.nbaiot.evaluation.epistemic_boundary import (
     compute_shared_epistemic_failure_summary,
 )
-from fedsira.datasets.nbaiot.learning.post_reference_training import (
-    train_domain_reproduction_delta,
-    train_generic_hard_supported_examples_delta,
-    train_source_candidate_delta,
-)
-from fedsira.datasets.nbaiot.learning.reference import (
-    train_centralized_reference_checkpoint,
-    train_local_only_reference_checkpoint,
-)
 from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     DiscoveredCsvFile,
@@ -49,6 +40,13 @@ from fedsira.domain.types import FeatureName
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.federated import train_anchor
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
+from fedsira.learning.post_reference import (
+    train_centralized_reference_checkpoint,
+    train_domain_reproduction_delta,
+    train_generic_hard_supported_examples_delta,
+    train_local_only_reference_checkpoint,
+    train_source_candidate_delta,
+)
 from fedsira.protocol.baselines.defenses import (
     train_certified_ensemble_group_checkpoints,
 )
@@ -200,7 +198,7 @@ def test_train_domain_reproduction_delta_is_nonzero_and_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_domain_reproduction_delta(
-        prepared_root, master_seed=1, anchor=anchor, domain=DOMAINS[0]
+        real_evidence_adapter(prepared_root), master_seed=1, anchor=anchor, domain=DOMAINS[0]
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -212,7 +210,10 @@ def test_train_domain_reproduction_delta_is_none_without_target_rows(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_domain_reproduction_delta(
-        prepared_root, master_seed=1, anchor=anchor, domain=NBaiotDomain.SAMSUNG_WEBCAM
+        real_evidence_adapter(prepared_root),
+        master_seed=1,
+        anchor=anchor,
+        domain=NBaiotDomain.SAMSUNG_WEBCAM,
     )
     assert delta is None
 
@@ -221,7 +222,7 @@ def test_train_generic_hard_supported_examples_delta_is_nonzero_and_finite(
     prepared_root: Path, anchor: RealAnchor
 ) -> None:
     delta = train_generic_hard_supported_examples_delta(
-        prepared_root, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        real_evidence_adapter(prepared_root), master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
     )
     assert delta is not None
     assert delta.shape == anchor.flat_parameters.shape
@@ -233,7 +234,10 @@ def test_train_generic_hard_supported_examples_delta_returns_none_without_prepar
     tmp_path: Path, anchor: RealAnchor
 ) -> None:
     delta = train_generic_hard_supported_examples_delta(
-        tmp_path, master_seed=1, anchor=anchor, source_domain=DOMAINS[0]
+        real_evidence_adapter(tmp_path),
+        master_seed=1,
+        anchor=anchor,
+        source_domain=DOMAINS[0],
     )
     assert delta is None
 
@@ -255,13 +259,13 @@ def test_train_source_candidate_delta_with_backdoor_scope_is_finite_and_differs_
 ) -> None:
     scope = _backdoor_scope(prepared_root_with_udp)
     clean_delta = train_source_candidate_delta(
-        prepared_root_with_udp,
+        real_evidence_adapter(prepared_root_with_udp),
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
     )
     poisoned_delta = train_source_candidate_delta(
-        prepared_root_with_udp,
+        real_evidence_adapter(prepared_root_with_udp),
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
@@ -278,7 +282,7 @@ def test_compute_source_backdoor_asr_is_a_defined_rate(
 ) -> None:
     scope = _backdoor_scope(prepared_root_with_udp)
     delta = train_source_candidate_delta(
-        prepared_root_with_udp,
+        real_evidence_adapter(prepared_root_with_udp),
         master_seed=1,
         anchor=anchor_with_udp,
         source_domain=DOMAINS[0],
@@ -351,10 +355,10 @@ def test_train_domain_reproduction_delta_with_heterogeneity_scope_differs_from_n
 ) -> None:
     scope = _heterogeneity_scope(prepared_root, shift_magnitude=1.0)
     natural_delta = train_domain_reproduction_delta(
-        prepared_root, master_seed=1, anchor=anchor, domain=DOMAINS[0]
+        real_evidence_adapter(prepared_root), master_seed=1, anchor=anchor, domain=DOMAINS[0]
     )
     shifted_delta = train_domain_reproduction_delta(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -436,7 +440,7 @@ def test_train_domain_reproduction_delta_with_balanced_selection_seed_is_finite(
         balanced_selection_seed=1,
     )
     delta = train_domain_reproduction_delta(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -453,7 +457,7 @@ def test_train_domain_reproduction_delta_with_root_cause_scope_is_finite(
     assert feature_names is not None
     scope = _root_cause_scope(feature_names, CapabilityContractScope.BROAD_TARGET_ONLY)
     delta = train_domain_reproduction_delta(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -520,7 +524,7 @@ def test_train_domain_reproduction_delta_with_shared_label_error_scope_is_finite
     assert feature_names is not None
     scope = _epistemic_failure_scope(feature_names, EpistemicFailureType.SHARED_LABEL_ERROR)
     delta = train_domain_reproduction_delta(
-        prepared_root,
+        real_evidence_adapter(prepared_root),
         master_seed=1,
         anchor=anchor,
         domain=DOMAINS[0],
@@ -789,8 +793,12 @@ def test_train_secure_continual_assessment_delta_returns_none_without_prepared_d
 def test_train_local_only_reference_checkpoint_is_finite_and_distinct_per_domain(
     prepared_root: Path,
 ) -> None:
-    first = train_local_only_reference_checkpoint(prepared_root, master_seed=1, domain=DOMAINS[0])
-    second = train_local_only_reference_checkpoint(prepared_root, master_seed=1, domain=DOMAINS[1])
+    first = train_local_only_reference_checkpoint(
+        real_evidence_adapter(prepared_root), master_seed=1, domain=DOMAINS[0]
+    )
+    second = train_local_only_reference_checkpoint(
+        real_evidence_adapter(prepared_root), master_seed=1, domain=DOMAINS[1]
+    )
     assert first is not None
     assert second is not None
     assert torch.isfinite(first).all()
@@ -801,11 +809,18 @@ def test_train_local_only_reference_checkpoint_is_finite_and_distinct_per_domain
 def test_train_local_only_reference_checkpoint_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert train_local_only_reference_checkpoint(tmp_path, master_seed=1, domain=DOMAINS[0]) is None
+    assert (
+        train_local_only_reference_checkpoint(
+            real_evidence_adapter(tmp_path), master_seed=1, domain=DOMAINS[0]
+        )
+        is None
+    )
 
 
 def test_train_centralized_reference_checkpoint_is_finite(prepared_root: Path) -> None:
-    checkpoint = train_centralized_reference_checkpoint(prepared_root, master_seed=1)
+    checkpoint = train_centralized_reference_checkpoint(
+        real_evidence_adapter(prepared_root), master_seed=1
+    )
     assert checkpoint is not None
     assert torch.isfinite(checkpoint).all()
 
@@ -813,4 +828,7 @@ def test_train_centralized_reference_checkpoint_is_finite(prepared_root: Path) -
 def test_train_centralized_reference_checkpoint_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert train_centralized_reference_checkpoint(tmp_path, master_seed=1) is None
+    assert (
+        train_centralized_reference_checkpoint(real_evidence_adapter(tmp_path), master_seed=1)
+        is None
+    )

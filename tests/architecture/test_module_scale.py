@@ -9,6 +9,7 @@ JUSTIFIED_LINE_BUDGETS = {
     "datasets/nbaiot/validation.py": 800,
     "experiments/collapse.py": 700,
     "experiments/handlers.py": 2250,
+    "learning/post_reference.py": 700,
     "datasets/common.py": 1300,
     "datasets/nbaiot/cell_support.py": 950,
     "evaluation/comparisons.py": 1200,

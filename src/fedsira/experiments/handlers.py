@@ -69,11 +69,6 @@ from fedsira.datasets.nbaiot.evaluation.screening import (
     compute_screen_differential,
     evaluate_screen_domain,
 )
-from fedsira.datasets.nbaiot.learning.post_reference_training import (
-    certified_domain_delta_committee,
-    train_generic_hard_supported_examples_delta,
-    train_source_candidate_delta,
-)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -190,6 +185,11 @@ from fedsira.experiments.planning import (
     ScientificCell,
 )
 from fedsira.learning.federated import train_anchor
+from fedsira.learning.post_reference import (
+    certified_domain_delta_committee,
+    train_generic_hard_supported_examples_delta,
+    train_source_candidate_delta,
+)
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
     select_model_replacement_carrier_rows,
@@ -394,7 +394,10 @@ class ProtocolCellDispatch:
                     source_domain_for_cell(cell, self._prepared_root)
                 )[: config.baselines.parameter_similarity.required_committed_rows]
                 committee_deltas = certified_domain_delta_committee(
-                    self._prepared_root, cell.master_seed, real_anchor, candidate_domains
+                    nbaiot_adapter(self._prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    candidate_domains,
                 )
                 committed_rows = tuple(
                     (
@@ -438,7 +441,10 @@ class ProtocolCellDispatch:
                     : config.protocol.synthesis.committee_size
                 ]
                 committee_deltas = certified_domain_delta_committee(
-                    self._prepared_root, cell.master_seed, real_anchor, candidate_domains
+                    nbaiot_adapter(self._prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    candidate_domains,
                 )
                 balanced_selection_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
                 broad_certified_count = 0
@@ -739,11 +745,14 @@ class ProtocolCellDispatch:
         ):
             if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES:
                 real_source_delta = train_generic_hard_supported_examples_delta(
-                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                    nbaiot_adapter(self._prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
                 )
             else:
                 real_source_delta = train_source_candidate_delta(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -961,7 +970,7 @@ class ProtocolCellDispatch:
         required_row_count = row_requirement(cell, self._resolved_core)
         source_delta = (
             train_source_candidate_delta(
-                self._prepared_root,
+                nbaiot_adapter(self._prepared_root),
                 cell.master_seed,
                 real_anchor,
                 source_domain,
@@ -1173,7 +1182,7 @@ class ProtocolCellDispatch:
                 and (backdoor_scope is not None)
             ):
                 source_delta = train_source_candidate_delta(
-                    self._prepared_root,
+                    nbaiot_adapter(self._prepared_root),
                     cell.master_seed,
                     real_anchor,
                     source_domain,
@@ -1256,7 +1265,10 @@ class ProtocolCellDispatch:
             source_domain = source_domain_for_cell(cell, self._prepared_root)
             source_delta = (
                 train_source_candidate_delta(
-                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                    nbaiot_adapter(self._prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
                 )
                 if real_anchor is not None and source_domain is not None
                 else None
@@ -1328,7 +1340,10 @@ class ProtocolCellDispatch:
         ):
             source_delta = (
                 train_source_candidate_delta(
-                    self._prepared_root, cell.master_seed, real_anchor, source_domain
+                    nbaiot_adapter(self._prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
                 )
                 if real_anchor is not None and source_domain is not None
                 else None

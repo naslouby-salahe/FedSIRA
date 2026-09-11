@@ -29,19 +29,13 @@ from fedsira.datasets.nbaiot.evaluation.domain import (
     non_source_domains,
 )
 from fedsira.datasets.nbaiot.evaluation.report_summary import RealReportSummary
-from fedsira.datasets.nbaiot.learning.post_reference_training import (
-    train_source_candidate_delta,
-)
-from fedsira.datasets.nbaiot.learning.reference import (
-    train_centralized_reference_checkpoint,
-    train_local_only_reference_checkpoint,
-)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
+    nbaiot_adapter,
 )
 from fedsira.domain.enums import (
     AdmissionState,
@@ -67,6 +61,11 @@ from fedsira.experiments.engine import (
 )
 from fedsira.experiments.planning import (
     ScientificCell,
+)
+from fedsira.learning.post_reference import (
+    train_centralized_reference_checkpoint,
+    train_local_only_reference_checkpoint,
+    train_source_candidate_delta,
 )
 from fedsira.protocol.admission import (
     final_gate_predicates_pass,
@@ -156,7 +155,7 @@ class ProtocolBaselineOutcomes:
         if real_anchor is not None and source_domain is not None:
             backdoor_scope = self.backdoor_scope_for_cell(cell)
             source_delta = train_source_candidate_delta(
-                self._prepared_root,
+                nbaiot_adapter(self._prepared_root),
                 cell.master_seed,
                 real_anchor,
                 source_domain,
@@ -213,7 +212,7 @@ class ProtocolBaselineOutcomes:
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
         source_delta = train_source_candidate_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            nbaiot_adapter(self._prepared_root), cell.master_seed, real_anchor, source_domain
         )
         if source_delta is None:
             return AdmissionState.DORMANT
@@ -262,7 +261,7 @@ class ProtocolBaselineOutcomes:
         if review_state is not AdmissionState.ADMITTED:
             return review_state
         source_delta = train_source_candidate_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            nbaiot_adapter(self._prepared_root), cell.master_seed, real_anchor, source_domain
         )
         if source_delta is None:
             return AdmissionState.DORMANT
@@ -391,7 +390,7 @@ class ProtocolBaselineOutcomes:
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
         source_delta = train_source_candidate_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            nbaiot_adapter(self._prepared_root), cell.master_seed, real_anchor, source_domain
         )
         if source_delta is None:
             return AdmissionState.DORMANT
@@ -431,7 +430,7 @@ class ProtocolBaselineOutcomes:
             if not local_only_reference_evaluation_is_domain_local(domain, domain):
                 continue
             local_checkpoint = train_local_only_reference_checkpoint(
-                self._prepared_root, cell.master_seed, domain
+                nbaiot_adapter(self._prepared_root), cell.master_seed, domain
             )
             if local_checkpoint is None:
                 continue
@@ -546,7 +545,7 @@ class ProtocolBaselineOutcomes:
         if real_anchor is None:
             return AdmissionState.DORMANT
         production_checkpoint = train_centralized_reference_checkpoint(
-            self._prepared_root, cell.master_seed
+            nbaiot_adapter(self._prepared_root), cell.master_seed
         )
         if production_checkpoint is None:
             return AdmissionState.DORMANT
@@ -559,7 +558,7 @@ class ProtocolBaselineOutcomes:
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
         source_delta = train_source_candidate_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            nbaiot_adapter(self._prepared_root), cell.master_seed, real_anchor, source_domain
         )
         if source_delta is None:
             return AdmissionState.DORMANT
@@ -629,7 +628,7 @@ class ProtocolBaselineOutcomes:
         positive_report_count = 0
         for reviewer_domain in reviewer_domains:
             local_checkpoint = train_local_only_reference_checkpoint(
-                self._prepared_root, cell.master_seed, reviewer_domain
+                nbaiot_adapter(self._prepared_root), cell.master_seed, reviewer_domain
             )
             if local_checkpoint is None:
                 continue
