@@ -5,9 +5,7 @@ from pydantic import ValidationError
 
 from fedsira.config import (
     PRODUCTION_CONFIG_PATH,
-    TEST_FIXTURE_CONFIG_PATH,
     load_scientific_config,
-    load_test_fixture_config,
 )
 
 
@@ -15,11 +13,6 @@ def test_production_config_loads_and_validates() -> None:
     config = load_scientific_config(PRODUCTION_CONFIG_PATH)
     assert config.datasets.primary.name.value == "N-BaIoT"
     assert config.seeds_and_determinism.master_seeds[0] == 1103
-
-
-def test_test_fixture_config_loads() -> None:
-    config = load_test_fixture_config(TEST_FIXTURE_CONFIG_PATH)
-    assert config.fixture_format_version == 1
 
 
 def test_missing_file_raises_value_error(tmp_path: Path) -> None:

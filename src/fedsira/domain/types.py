@@ -382,4 +382,5 @@ class SeedBundle(FrozenDomainModel):
     def confirmatory_seed_count(self) -> SeedCount:
         return len(self.master_seeds)
 
+
 CellHandlerName = TextValue

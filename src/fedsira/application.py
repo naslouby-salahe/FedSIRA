@@ -448,9 +448,7 @@ def render(report: DoctorReport, console: Console) -> None:
     else:
         console.print("environment: no blocking mismatches")
     advisories = tuple(
-        mismatch
-        for mismatch in report.environment_mismatches
-        if mismatch not in blocking
+        mismatch for mismatch in report.environment_mismatches if mismatch not in blocking
     )
     for mismatch in advisories:
         console.print(

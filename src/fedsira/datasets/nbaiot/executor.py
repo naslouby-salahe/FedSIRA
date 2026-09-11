@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Mapping
 from pathlib import Path
-from types import MappingProxyType
 from typing import Protocol, cast
 
 import torch
@@ -54,6 +52,7 @@ from fedsira.domain.types import (
     BooleanValue,
     CellHandlerName,
     ExperimentName,
+    FrozenDomainModel,
     MasterSeed,
     MetricObservation,
 )
@@ -125,34 +124,85 @@ class CellHandler(Protocol):
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]: ...
 
 
-CELL_HANDLER_BY_EXPERIMENT: Mapping[ExperimentName, CellHandlerName] = MappingProxyType(
-    {
-        DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: "_execute_data_and_domain_validation_cell",
-        PROTOCOL_INVARIANT_VALIDATION_NAME: "_execute_protocol_invariant_validation_cell",
-        BASELINE_IMPLEMENTATION_VALIDATION_NAME: "_execute_baseline_cell",
-        PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: "_execute_opening_cell",
-        SINGLE_REPRODUCTION_NECESSITY_NAME: "_execute_plurality_cell",
-        SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: "_execute_source_exclusion_cell",
-        EXTERNAL_VERIFICATION_NECESSITY_NAME: "_execute_external_verification_cell",
-        PRIMARY_CONFIRMATORY_EVALUATION_NAME: "_execute_primary_cell",
-        MECHANISM_ABLATION_NAME: "_execute_ablation_cell",
-        COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: "_execute_reproducer_robustness_cell",
-        COMPROMISED_VERIFIER_ROBUSTNESS_NAME: "_execute_verifier_robustness_cell",
-        BYZANTINE_BOUND_VIOLATION_NAME: "_execute_byzantine_bound_cell",
-        EVIDENCE_SCARCITY_AND_DORMANCY_NAME: "_execute_evidence_scarcity_cell",
-        SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: "_execute_boundary_cell",
-        CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: "_execute_boundary_cell",
-        HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: "_execute_boundary_cell",
-        ADMISSION_DELAY_DECOMPOSITION_NAME: "_execute_admission_delay_cell",
-        EFFICIENCY_MEASUREMENT_NAME: "_execute_efficiency_cell",
-        SECONDARY_DATASET_GENERALIZATION_NAME: "_execute_secondary_cell",
-    }
+class CellHandlerRegistration(FrozenDomainModel):
+    experiment: ExperimentName
+    handler: CellHandlerName
+
+
+CELL_HANDLER_REGISTRATIONS: tuple[CellHandlerRegistration, ...] = (
+    CellHandlerRegistration(
+        experiment=DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+        handler="_execute_data_and_domain_validation_cell",
+    ),
+    CellHandlerRegistration(
+        experiment=PROTOCOL_INVARIANT_VALIDATION_NAME,
+        handler="_execute_protocol_invariant_validation_cell",
+    ),
+    CellHandlerRegistration(
+        experiment=BASELINE_IMPLEMENTATION_VALIDATION_NAME, handler="_execute_baseline_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME, handler="_execute_opening_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=SINGLE_REPRODUCTION_NECESSITY_NAME, handler="_execute_plurality_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+        handler="_execute_source_exclusion_cell",
+    ),
+    CellHandlerRegistration(
+        experiment=EXTERNAL_VERIFICATION_NECESSITY_NAME,
+        handler="_execute_external_verification_cell",
+    ),
+    CellHandlerRegistration(
+        experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME, handler="_execute_primary_cell"
+    ),
+    CellHandlerRegistration(experiment=MECHANISM_ABLATION_NAME, handler="_execute_ablation_cell"),
+    CellHandlerRegistration(
+        experiment=COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+        handler="_execute_reproducer_robustness_cell",
+    ),
+    CellHandlerRegistration(
+        experiment=COMPROMISED_VERIFIER_ROBUSTNESS_NAME, handler="_execute_verifier_robustness_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=BYZANTINE_BOUND_VIOLATION_NAME, handler="_execute_byzantine_bound_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=EVIDENCE_SCARCITY_AND_DORMANCY_NAME, handler="_execute_evidence_scarcity_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME, handler="_execute_boundary_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME, handler="_execute_boundary_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME, handler="_execute_boundary_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=ADMISSION_DELAY_DECOMPOSITION_NAME, handler="_execute_admission_delay_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=EFFICIENCY_MEASUREMENT_NAME, handler="_execute_efficiency_cell"
+    ),
+    CellHandlerRegistration(
+        experiment=SECONDARY_DATASET_GENERALIZATION_NAME, handler="_execute_secondary_cell"
+    ),
 )
+
+
+def cell_handler_registration(experiment: ExperimentName) -> CellHandlerName | None:
+    for registration in CELL_HANDLER_REGISTRATIONS:
+        if registration.experiment == experiment:
+            return registration.handler
+    return None
 
 
 def validate_cell_handler_registration() -> None:
     registered = set(REGISTERED_EXPERIMENT_NAMES)
-    mapped = set(CELL_HANDLER_BY_EXPERIMENT)
+    mapped = {registration.experiment for registration in CELL_HANDLER_REGISTRATIONS}
     missing = registered - mapped
     if missing:
         raise ValueError(f"registered experiments without a cell handler: {sorted(missing)}")
@@ -173,18 +223,18 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             DatasetId.CICIOT2023
         )
         self._resolved_core = resolved_core
-        self._real_anchor_cache: OrderedDict[MasterSeed, RealAnchor | None] = OrderedDict()
+        self.real_anchor_cache: OrderedDict[MasterSeed, RealAnchor | None] = OrderedDict()
         self._pending_real_report: RealReportSummary | None = None
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
 
-    def _real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
-        if master_seed not in self._real_anchor_cache:
-            self._real_anchor_cache[master_seed] = (
+    def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
+        if master_seed not in self.real_anchor_cache:
+            self.real_anchor_cache[master_seed] = (
                 train_anchor(self._prepared_root, master_seed)
                 if real_evidence_available(self._prepared_root)
                 else None
             )
-        return self._real_anchor_cache[master_seed]
+        return self.real_anchor_cache[master_seed]
 
     def _same_context_verifier_panel(
         self,
@@ -221,7 +271,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             config.protocol.verification.panel_size,
         )
 
-    def _candidate_capability_contract_passes(
+    def candidate_capability_contract_passes(
         self,
         real_anchor: RealAnchor,
         source_domain: NBaiotDomain,
@@ -336,7 +386,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             benign_far_increase,
         )
 
-    def _backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
+    def backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
         config = current_application_context().scientific_config
         if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             return None
@@ -351,7 +401,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
         )
 
-    def _heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None:
+    def heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None:
         config = current_application_context().scientific_config
         if cell.experiment != HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             return None
@@ -478,7 +528,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     def _execute_cell_protocol(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        handler_name = CELL_HANDLER_BY_EXPERIMENT.get(cell.experiment)
+        handler_name = cell_handler_registration(cell.experiment)
         if handler_name is None:
             raise ValueError(f"no registered cell handler for experiment {cell.experiment}")
         handler = cast(CellHandler, getattr(self, handler_name))

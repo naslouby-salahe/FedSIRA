@@ -1379,8 +1379,6 @@ def render_generalization_results_table(
     )
 
 
-
-
 class RenderedTable(FrozenDomainModel):
     name: TableName
     csv_text: TableCsvText

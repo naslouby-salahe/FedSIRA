@@ -6,24 +6,6 @@ import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
-from fedsira.protocol.baselines.defenses import (
-    train_certified_ensemble_group_checkpoints,
-)
-from fedsira.protocol.baselines.training import (
-    train_fedavg_reference_delta,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-)
-from fedsira.protocol.baselines.training import (
-    anchor_round_calibration_updates,
-    anchor_round_reconstruction_calibration_errors,
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
-)
-from fedsira.protocol.baselines.training import (
-    train_density_cluster_trimmed_mean_delta,
-    train_krum_reference_delta,
-)
 from fedsira.datasets.nbaiot.evaluation.backdoor import (
     compute_source_backdoor_asr,
     recovery_backdoor_alarm_threshold,
@@ -66,6 +48,20 @@ from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.types import FeatureName
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
+from fedsira.protocol.baselines.defenses import (
+    train_certified_ensemble_group_checkpoints,
+)
+from fedsira.protocol.baselines.training import (
+    anchor_round_calibration_updates,
+    anchor_round_reconstruction_calibration_errors,
+    train_density_cluster_trimmed_mean_delta,
+    train_fedavg_reference_delta,
+    train_krum_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
+)
 
 pytestmark = pytest.mark.slow
 

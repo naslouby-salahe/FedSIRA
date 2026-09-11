@@ -1,7 +1,10 @@
 import pytest
 
-from fedsira.artifacts.store import ArtifactManifest, validate_artifact_lifecycle_readable
-from fedsira.artifacts.store import compute_checksum
+from fedsira.artifacts.store import (
+    ArtifactManifest,
+    compute_checksum,
+    validate_artifact_lifecycle_readable,
+)
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 

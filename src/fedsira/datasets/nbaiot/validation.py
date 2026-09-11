@@ -126,14 +126,14 @@ TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
 SIGN_FLIP_CHECK_SAMPLE_COUNT = 10
 SIGN_FLIP_CHECK_EXPECTED_P_VALUE: PValue = 0.001953125
 HOLM_CHECK_RAW_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
-    ("c", 0.01),
-    ("a", 0.04),
-    ("b", 0.03),
+    ("c", 0.012),
+    ("a", 0.043),
+    ("b", 0.031),
 )
 HOLM_CHECK_ADJUSTED_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (
-    ("c", 0.03),
-    ("b", 0.06),
-    ("a", 0.06),
+    ("c", 0.036),
+    ("b", 0.062),
+    ("a", 0.062),
 )
 SMOKE_MODEL_INPUT_WIDTH: ModelInputWidth = 4
 SMOKE_MODEL_OUTPUT_WIDTH: ModelOutputWidth = 2
@@ -600,9 +600,7 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     )
     quantiles = quantile_type7(SMOKE_QUANTILE_VALUES, SMOKE_QUANTILE_PROBABILITY)
     numpy_matches = quantiles == float(
-        numpy.quantile(
-            SMOKE_QUANTILE_VALUES, SMOKE_QUANTILE_PROBABILITY, method="linear"
-        )
+        numpy.quantile(SMOKE_QUANTILE_VALUES, SMOKE_QUANTILE_PROBABILITY, method="linear")
     )
     sample = numpy.array(SMOKE_SAMPLE_SD_VALUES)
     sd_matches = float(sample.std(ddof=1)) == float(numpy.std(sample, ddof=1))

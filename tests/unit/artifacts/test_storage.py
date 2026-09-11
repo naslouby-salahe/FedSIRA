@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.artifacts.store import ArtifactManifest
 from fedsira.artifacts.store import (
+    ArtifactManifest,
     compute_checksum,
     is_artifact_complete_and_valid,
     publish_artifact_to_disk,

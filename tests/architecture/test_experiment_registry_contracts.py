@@ -1,9 +1,9 @@
 import ast
 
 import pytest
-from _repo import SRC_ROOT, iter_python_files, parse
 from pydantic import ValidationError
 
+from _repo import SRC_ROOT, iter_python_files, parse
 from fedsira.domain.enums import DatasetId
 from fedsira.experiments.definitions import (
     ExperimentDefinition,

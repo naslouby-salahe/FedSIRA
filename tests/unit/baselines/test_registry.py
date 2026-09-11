@@ -3,19 +3,17 @@ import pytest
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import AdmissionState, TernaryOutcome
-from fedsira.protocol.baselines.training import (
-    fedavg_reference_post_reference_local_epochs,
-    post_reference_retrain_maximum_local_epochs,
-    standard_fl_anchor_rounds,
-)
 from fedsira.protocol.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
     domain_target_view,
     domain_without_target_view_may_participate,
+    fedavg_reference_post_reference_local_epochs,
     first_eligible_non_source_reproducer,
+    post_reference_retrain_maximum_local_epochs,
     review_style_baseline_outcome,
     single_fresh_verifier_domain,
     single_fresh_verifier_outcome,
+    standard_fl_anchor_rounds,
     validate_role_not_used_for_tuning,
 )
 

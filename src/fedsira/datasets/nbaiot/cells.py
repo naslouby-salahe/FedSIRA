@@ -8,21 +8,21 @@ from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.cell_support import (
     BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
     RESOLVED_FEDSIRA_CORE_METHOD,
-    _capability_contract_for_digest,
-    _honest_verifier_report,
-    _reproducer_order,
-    _source_domain_for_cell,
-    _verifier_panel,
+    capability_contract_for_digest,
     compromised_reproducer_count,
     compromised_verifier_count,
     efficiency_message_counts,
     final_gate_decision,
     first_target_sample_id,
+    honest_verifier_report,
     opening_identity,
     opening_mode_for_cell,
+    reproducer_order_for_cell,
     reproduction_progression,
     row_requirement,
     single_verifier_progression,
+    source_domain_for_cell,
+    verifier_panel,
 )
 from fedsira.datasets.nbaiot.evaluation.backdoor import (
     compute_source_backdoor_asr,
@@ -240,7 +240,7 @@ class ProtocolCellDispatch:
             )
             return self._execute_verifier_robustness_cell(verifier_cell, evidence)
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW:
-            state = self._client_review_outcome(cell)
+            state = self.client_review_outcome(cell)
             return (state, metrics_from_state(state, self._pending_real_report))
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK:
             state = self._source_release_after_full_external_check_outcome(cell, evidence)
@@ -262,10 +262,10 @@ class ProtocolCellDispatch:
         extra: list[MetricObservation] = []
         if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION:
             domain_without_target_view_may_participate(True)
-            real_anchor = self._real_anchor(cell.master_seed)
+            real_anchor = self.real_anchor(cell.master_seed)
             if real_anchor is not None:
                 candidate_domains = non_source_domains(
-                    _source_domain_for_cell(cell, self._prepared_root)
+                    source_domain_for_cell(cell, self._prepared_root)
                 )[: config.baselines.parameter_similarity.required_committed_rows]
                 committee_deltas = certified_domain_delta_committee(
                     self._prepared_root, cell.master_seed, real_anchor, candidate_domains
@@ -298,8 +298,8 @@ class ProtocolCellDispatch:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
             )
-            real_anchor = self._real_anchor(cell.master_seed)
-            source_domain = _source_domain_for_cell(cell, self._prepared_root)
+            real_anchor = self.real_anchor(cell.master_seed)
+            source_domain = source_domain_for_cell(cell, self._prepared_root)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -401,7 +401,7 @@ class ProtocolCellDispatch:
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
             scope = CapabilityContractScope(cell.method)
-            real_anchor = self._real_anchor(cell.master_seed)
+            real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -417,7 +417,7 @@ class ProtocolCellDispatch:
                     self._prepared_root,
                     cell.master_seed,
                     real_anchor,
-                    _source_domain_for_cell(cell, self._prepared_root),
+                    source_domain_for_cell(cell, self._prepared_root),
                     root_cause_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -460,7 +460,7 @@ class ProtocolCellDispatch:
             if real_anchor is not None:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = root_cause_partitioned_row_ids(
                     self._prepared_root,
-                    non_source_domains(_source_domain_for_cell(cell, self._prepared_root)),
+                    non_source_domains(source_domain_for_cell(cell, self._prepared_root)),
                 )
             else:
                 root_cause_a_ids, root_cause_b_ids, supported_ids = (
@@ -478,7 +478,7 @@ class ProtocolCellDispatch:
             failure_type = EpistemicFailureType(failure_type_token)
             strength = float(strength_token)
             attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-            real_anchor = self._real_anchor(cell.master_seed)
+            real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._prepared_root) if real_anchor is not None else None
             )
@@ -497,7 +497,7 @@ class ProtocolCellDispatch:
                     self._prepared_root,
                     cell.master_seed,
                     real_anchor,
-                    _source_domain_for_cell(cell, self._prepared_root),
+                    source_domain_for_cell(cell, self._prepared_root),
                     epistemic_failure_scope,
                 )
                 oracle_label = clean_proposal_oracle_label(
@@ -552,7 +552,7 @@ class ProtocolCellDispatch:
                     heterogeneity_seed,
                     config.attacks_and_boundaries.heterogeneity.quantity_skew_multipliers,
                 )
-                source_domain = _source_domain_for_cell(cell, self._prepared_root)
+                source_domain = source_domain_for_cell(cell, self._prepared_root)
                 if source_domain is not None:
                     excluded = exclude_source_from_quantity_skew(
                         multiplier_by_domain, source_domain
@@ -600,8 +600,8 @@ class ProtocolCellDispatch:
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
         )
-        source_domain = _source_domain_for_cell(cell, self._prepared_root)
-        real_anchor = self._real_anchor(cell.master_seed)
+        source_domain = source_domain_for_cell(cell, self._prepared_root)
+        real_anchor = self.real_anchor(cell.master_seed)
         resolved_opening_identity = (
             opening_identity(real_anchor.dataset_manifest_hash) if real_anchor is not None else None
         )
@@ -620,7 +620,7 @@ class ProtocolCellDispatch:
                     cell.master_seed,
                     real_anchor,
                     source_domain,
-                    backdoor_scope=self._backdoor_scope_for_cell(cell),
+                    backdoor_scope=self.backdoor_scope_for_cell(cell),
                 )
         else:
             real_source_delta = None
@@ -747,10 +747,10 @@ class ProtocolCellDispatch:
             evidence_minima,
         ):
             return AdmissionState.DORMANT
-        real_anchor = self._real_anchor(cell.master_seed)
+        real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
-        source_domain = _source_domain_for_cell(cell, self._prepared_root)
+        source_domain = source_domain_for_cell(cell, self._prepared_root)
         direct_krum_active = cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM
         coordinate_median_active = (
             cell.method == BaselineIdentity.THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE
@@ -838,18 +838,18 @@ class ProtocolCellDispatch:
                 cell.master_seed,
                 real_anchor,
                 source_domain,
-                backdoor_scope=self._backdoor_scope_for_cell(cell),
+                backdoor_scope=self.backdoor_scope_for_cell(cell),
             )
             if source_domain is not None
             and (
                 no_origin_exclusion_active
                 or byzantine_reproducer_copies_source_active
-                or self._backdoor_scope_for_cell(cell) is not None
+                or self.backdoor_scope_for_cell(cell) is not None
             )
             else None
         )
         heterogeneity_scope = self._heterogeneity_scope_for_cell(cell)
-        backdoor_scope = self._backdoor_scope_for_cell(cell)
+        backdoor_scope = self.backdoor_scope_for_cell(cell)
         if single_verifier_active:
             reproduction_timer = ElapsedTimer()
             progression_state, attempts, commitment_hashes, updates = single_verifier_progression(
@@ -894,7 +894,7 @@ class ProtocolCellDispatch:
                     if same_context_verification_active:
                         panel = self._same_context_verifier_panel(source_domain, attempt_domain)
                     else:
-                        panel = _verifier_panel(
+                        panel = verifier_panel(
                             source_domain,
                             attempt_domain,
                             cell.master_seed,
@@ -905,7 +905,7 @@ class ProtocolCellDispatch:
                     if not panel_votes_are_one_per_domain(panel):
                         return AdmissionState.DORMANT
                     reports = tuple(
-                        _honest_verifier_report(
+                        honest_verifier_report(
                             self._prepared_root,
                             real_anchor,
                             candidate_flat,
@@ -1025,10 +1025,10 @@ class ProtocolCellDispatch:
                 source_row_id=None,
             )
         elif method == SourceExclusionMethod.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
-            state = self._client_review_outcome(cell)
+            state = self.client_review_outcome(cell)
         elif method == SourceExclusionMethod.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN:
             discard_source = client_review_then_retrain_should_discard_source_weights(
-                self._client_review_outcome(cell)
+                self.client_review_outcome(cell)
             )
             state = (
                 self._advance_protocol(cell, evidence) if discard_source else AdmissionState.DORMANT
@@ -1037,9 +1037,9 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         extra: list[MetricObservation] = []
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
-            real_anchor = self._real_anchor(cell.master_seed)
-            source_domain = _source_domain_for_cell(cell, self._prepared_root)
-            backdoor_scope = self._backdoor_scope_for_cell(cell)
+            real_anchor = self.real_anchor(cell.master_seed)
+            source_domain = source_domain_for_cell(cell, self._prepared_root)
+            backdoor_scope = self.backdoor_scope_for_cell(cell)
             if (
                 real_anchor is not None
                 and source_domain is not None
@@ -1107,7 +1107,7 @@ class ProtocolCellDispatch:
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(
             NBAIOT_DOMAIN_ORDER[0],
-            _source_domain_for_cell(cell, self._prepared_root),
+            source_domain_for_cell(cell, self._prepared_root),
             ORDINARY_POST_REFERENCE_DATA_ACCESS,
         )
         state: AdmissionState
@@ -1125,8 +1125,8 @@ class ProtocolCellDispatch:
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
-            real_anchor = self._real_anchor(cell.master_seed)
-            source_domain = _source_domain_for_cell(cell, self._prepared_root)
+            real_anchor = self.real_anchor(cell.master_seed)
+            source_domain = source_domain_for_cell(cell, self._prepared_root)
             source_delta = (
                 train_source_candidate_delta(
                     self._prepared_root, cell.master_seed, real_anchor, source_domain
@@ -1136,12 +1136,12 @@ class ProtocolCellDispatch:
             )
             if real_anchor is not None and source_delta is not None:
                 client_review_direct_admission_production_is_source(source_delta, source_delta)
-            state = self._client_review_outcome(cell)
+            state = self.client_review_outcome(cell)
         elif method == BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
             client_review_then_retrain_local_epochs()
             discard_source = client_review_then_retrain_should_discard_source_weights(
-                self._client_review_outcome(cell)
+                self.client_review_outcome(cell)
             )
             state = (
                 self._advance_protocol(cell, evidence) if discard_source else AdmissionState.DORMANT
@@ -1183,8 +1183,8 @@ class ProtocolCellDispatch:
         condition = cell.condition
         compromised_count = compromised_reproducer_count(condition)
         attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
-        real_anchor = self._real_anchor(cell.master_seed)
-        source_domain = _source_domain_for_cell(cell, self._prepared_root)
+        real_anchor = self.real_anchor(cell.master_seed)
+        source_domain = source_domain_for_cell(cell, self._prepared_root)
         carrier_rows = (
             load_prepared_rows(
                 self._prepared_root,
@@ -1226,7 +1226,7 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         else:
             selected = select_compromised_reproducers(
-                _reproducer_order(cell), frozenset(NBAIOT_DOMAIN_ORDER), compromised_count
+                reproducer_order_for_cell(cell), frozenset(NBAIOT_DOMAIN_ORDER), compromised_count
             )
             compromised_reproducers: frozenset[NBaiotDomain] = (
                 frozenset(NBaiotDomain(domain) for domain in selected)
@@ -1242,7 +1242,7 @@ class ProtocolCellDispatch:
                 compromised_reproducers,
                 self._prepared_root,
                 real_anchor,
-                backdoor_scope=self._backdoor_scope_for_cell(cell),
+                backdoor_scope=self.backdoor_scope_for_cell(cell),
             )
             if (
                 progression_state is AdmissionState.SYNTHESIS_PENDING
@@ -1284,8 +1284,8 @@ class ProtocolCellDispatch:
         ):
             state = AdmissionState.DORMANT
         else:
-            source_domain = _source_domain_for_cell(cell, self._prepared_root)
-            reproducer_domain = _reproducer_order(cell)[0]
+            source_domain = source_domain_for_cell(cell, self._prepared_root)
+            reproducer_domain = reproducer_order_for_cell(cell)[0]
             eligible_verifiers = tuple(
                 domain
                 for domain in NBAIOT_DOMAIN_ORDER
@@ -1539,7 +1539,7 @@ class ProtocolCellDispatch:
     def _execute_efficiency_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        real_anchor = self._real_anchor(cell.master_seed)
+        real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             tensor_payload = b""
             parameter_shape: tuple[int, ...] = (0,)
@@ -1551,7 +1551,7 @@ class ProtocolCellDispatch:
             parameter_shape = (int(flat_parameters.numel()),)
             manifest_hash = real_anchor.dataset_manifest_hash
             capability_hash = compute_capability_identity(
-                _capability_contract_for_digest(manifest_hash)
+                capability_contract_for_digest(manifest_hash)
             )
         model_size_bytes = len(tensor_payload)
         semantic_cell_key_hash = hashlib.sha256(cell.semantic_key.encode("utf-8")).hexdigest()

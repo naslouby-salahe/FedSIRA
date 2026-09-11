@@ -162,7 +162,7 @@ def opening_mode_for_cell(
     return AdmissionOpeningMode.CANDIDATE_FREE
 
 
-def _target_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
+def target_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
     rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
     return 0 if rows is None else rows.row_count
 
@@ -176,7 +176,7 @@ def first_target_sample_id(
     return rows.sample_ids[0]
 
 
-def _supported_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
+def supported_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
     total: ExampleCount = 0
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
@@ -187,7 +187,7 @@ def _supported_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role)
     return total
 
 
-def _domains_with_class(
+def domains_with_class(
     prepared_root: Path, class_id: NBaiotClass, role: Role
 ) -> frozenset[NBaiotDomain]:
     return frozenset(
@@ -197,7 +197,7 @@ def _domains_with_class(
     )
 
 
-def _capability_contract_for_digest(dataset_manifest_hash: ArtifactDigest) -> CapabilityContract:
+def capability_contract_for_digest(dataset_manifest_hash: ArtifactDigest) -> CapabilityContract:
     config = current_application_context().scientific_config
     return build_capability_contract(
         dataset_manifest_hash,
@@ -212,7 +212,7 @@ def _capability_contract_for_digest(dataset_manifest_hash: ArtifactDigest) -> Ca
 
 
 def opening_identity(dataset_manifest_hash: ArtifactDigest) -> OpeningIdentity:
-    contract = _capability_contract_for_digest(dataset_manifest_hash)
+    contract = capability_contract_for_digest(dataset_manifest_hash)
     return OpeningIdentity(
         capability_identity=compute_capability_identity(contract),
         contract_passes=False,
@@ -223,7 +223,7 @@ def _source_requires_attack_carrier(cell: ScientificCell) -> BooleanValue:
     return cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
 
 
-def _source_domain_for_cell(
+def source_domain_for_cell(
     cell: ScientificCell, prepared_root: Path | None = None
 ) -> NBaiotDomain | None:
     source_order = source_selection_order(
@@ -235,10 +235,10 @@ def _source_domain_for_cell(
         domains_with_carrier: frozenset[NBaiotDomain] = frozenset()
         requires_carrier = False
     else:
-        domains_with_target = _domains_with_class(
+        domains_with_target = domains_with_class(
             prepared_root, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
-        ) | _domains_with_class(prepared_root, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION)
-        domains_with_carrier = _domains_with_class(
+        ) | domains_with_class(prepared_root, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION)
+        domains_with_carrier = domains_with_class(
             prepared_root, NBaiotClass.GAFGYT_UDP, Role.POST_REFERENCE_REPLAY
         )
         requires_carrier = _source_requires_attack_carrier(cell)
@@ -251,7 +251,7 @@ def _source_domain_for_cell(
     return NBaiotDomain(selected) if selected is not None else None
 
 
-def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
+def reproducer_order_for_cell(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
     return reproducer_order(
         NBAIOT_DOMAIN_ORDER, derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed)
     )
@@ -279,7 +279,7 @@ def row_requirement(
     return config.protocol.synthesis.committee_size
 
 
-def _commitment_digest(
+def commitment_digest(
     reproducer_domain: NBaiotDomain,
     master_seed: MasterSeed,
     capability_identity: ArtifactDigest,
@@ -293,7 +293,7 @@ def _commitment_digest(
     )
 
 
-def _verifier_panel(
+def verifier_panel(
     source_domain: NBaiotDomain | None,
     reproducer_domain: NBaiotDomain,
     master_seed: MasterSeed,
@@ -321,8 +321,8 @@ def _verifier_panel(
 def _domain_is_reproduction_adequate(prepared_root: Path, domain: NBaiotDomain) -> BooleanValue:
     config = current_application_context().scientific_config
     return reproduction_evidence_is_adequate(
-        _target_role_count(prepared_root, domain, Role.REPRODUCTION),
-        _supported_role_count(prepared_root, domain, Role.POST_REFERENCE_REPLAY),
+        target_role_count(prepared_root, domain, Role.REPRODUCTION),
+        supported_role_count(prepared_root, domain, Role.POST_REFERENCE_REPLAY),
         config.capability_contract.evidence_minima,
     )
 
@@ -335,7 +335,7 @@ def _benign_far_increase(
     return MetricResult(value=candidate_metrics.value - anchor_metrics.value, denominator=1)
 
 
-def _honest_verifier_report(
+def honest_verifier_report(
     prepared_root: Path,
     anchor: RealAnchor,
     candidate_flat_parameters: torch.Tensor,
@@ -344,8 +344,8 @@ def _honest_verifier_report(
 ) -> TernaryOutcome:
     config = current_application_context().scientific_config
     if not verification_evidence_is_adequate(
-        _target_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
-        _supported_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
+        target_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
+        supported_role_count(prepared_root, verifier_domain, Role.ROW_VERIFICATION),
         config.capability_contract.evidence_minima,
     ):
         return resolve_ternary_outcome(False, False)
@@ -367,7 +367,7 @@ def _honest_verifier_report(
     )
     if anchor_metrics is None or candidate_metrics is None:
         return resolve_ternary_outcome(False, False)
-    contract = _capability_contract_for_digest(anchor.dataset_manifest_hash)
+    contract = capability_contract_for_digest(anchor.dataset_manifest_hash)
     passes = capability_contract_passes(
         contract,
         candidate_metrics.target_f1,
@@ -455,14 +455,14 @@ def reproduction_progression(
     del evidence
     if anchor is None:
         return (AdmissionState.DORMANT, (), (), OrderedDict())
-    reproducer_order = _reproducer_order(cell)
-    source_domain = _source_domain_for_cell(cell, prepared_root)
+    reproducer_order = reproducer_order_for_cell(cell)
+    source_domain = source_domain_for_cell(cell, prepared_root)
     validate_reproduction_start_checkpoint(
         ANCHOR_CHECKPOINT_IDENTITY, frozenset({SOURCE_CHECKPOINT_IDENTITY})
     )
     validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
     capability_identity = compute_capability_identity(
-        _capability_contract_for_digest(anchor.dataset_manifest_hash)
+        capability_contract_for_digest(anchor.dataset_manifest_hash)
     )
     adequate_domains = frozenset(
         domain
@@ -480,7 +480,7 @@ def reproduction_progression(
         and source_delta is not None
     ):
         reproduced = anchor.flat_parameters + source_delta
-        commitment_hash = _commitment_digest(
+        commitment_hash = commitment_digest(
             source_domain, cell.master_seed, capability_identity, reproduced
         )
         commitment_hashes.append(commitment_hash)
@@ -517,7 +517,7 @@ def reproduction_progression(
             state = handle_inadequate_domain()
             continue
         reproduced = anchor.flat_parameters + update
-        commitment_hash = _commitment_digest(
+        commitment_hash = commitment_digest(
             domain, cell.master_seed, capability_identity, reproduced
         )
         commitment_hashes.append(commitment_hash)
@@ -552,14 +552,14 @@ def single_verifier_progression(
     if anchor is None:
         return (AdmissionState.DORMANT, (), (), OrderedDict())
     config = current_application_context().scientific_config
-    reproducer_order = _reproducer_order(cell)
+    reproducer_order = reproducer_order_for_cell(cell)
     adequate_domains = frozenset(
         domain
         for domain in NBAIOT_DOMAIN_ORDER
         if domain != source_domain and _domain_is_reproduction_adequate(prepared_root, domain)
     )
     capability_identity = compute_capability_identity(
-        _capability_contract_for_digest(anchor.dataset_manifest_hash)
+        capability_contract_for_digest(anchor.dataset_manifest_hash)
     )
     consumed: set[NBaiotDomain] = set()
     while True:
@@ -580,11 +580,11 @@ def single_verifier_progression(
         if update is None:
             continue
         reproduced = anchor.flat_parameters + update
-        commitment_hash = _commitment_digest(
+        commitment_hash = commitment_digest(
             next_domain, cell.master_seed, capability_identity, reproduced
         )
         validate_commitment_exists_before_verifier_assignment(commitment_hash)
-        panel_order = _verifier_panel(
+        panel_order = verifier_panel(
             source_domain,
             next_domain,
             cell.master_seed,
@@ -596,7 +596,7 @@ def single_verifier_progression(
         )
         if verifier_domain is None:
             continue
-        report = _honest_verifier_report(
+        report = honest_verifier_report(
             prepared_root,
             anchor,
             reproduced,
@@ -616,7 +616,7 @@ def single_verifier_progression(
             continue
 
 
-def _real_final_gate_metrics(
+def real_final_gate_metrics(
     prepared_root: Path,
     anchor: RealAnchor,
     source_domain: NBaiotDomain | None,
@@ -744,7 +744,7 @@ def final_gate_decision(
             return (AdmissionState.DORMANT, None)
         production_update = coordinate_wise_median_synthesis(available_updates)
         production_checkpoint = apply_production_update(base_flat_parameters, production_update)
-        return _final_gate_decision_from_production_checkpoint(
+        return final_gate_decision_from_production_checkpoint(
             evidence,
             source_domain,
             prepared_root,
@@ -778,7 +778,7 @@ def final_gate_decision(
         is_plurality_active, krum_selected_update, single_reproduction_update
     )
     production_checkpoint = apply_production_update(base_flat_parameters, production_update)
-    return _final_gate_decision_from_production_checkpoint(
+    return final_gate_decision_from_production_checkpoint(
         evidence,
         source_domain,
         prepared_root,
@@ -789,7 +789,7 @@ def final_gate_decision(
     )
 
 
-def _final_gate_decision_from_production_checkpoint(
+def final_gate_decision_from_production_checkpoint(
     evidence: PreparedEvidenceCounts,
     source_domain: NBaiotDomain | None,
     prepared_root: Path,
@@ -805,7 +805,7 @@ def _final_gate_decision_from_production_checkpoint(
         minimum_target_f1,
         pooled_supported_macro_f1_drop,
         pooled_benign_far_increase,
-    ) = _real_final_gate_metrics(
+    ) = real_final_gate_metrics(
         prepared_root,
         anchor,
         source_domain,

@@ -2,10 +2,9 @@ import pytest
 import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.learning.training import model_state_from_classifier
-from fedsira.learning.federated import run_anchor_fedavg_training
-from fedsira.learning.federated import LocalTrainingClient
+from fedsira.learning.federated import LocalTrainingClient, run_anchor_fedavg_training
 from fedsira.learning.model import FedSIRAClassifier
+from fedsira.learning.training import model_state_from_classifier
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 OPTIMIZER_CONFIG = CONFIG.model.optimizer

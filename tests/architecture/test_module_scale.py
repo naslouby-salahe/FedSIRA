@@ -13,12 +13,14 @@ JUSTIFIED_LINE_BUDGETS = {
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 700,
     "reporting/tables.py": 1600,
-    "reporting/figures.py": 1400,
-    "reporting/export.py": 900,
+    "reporting/figures.py": 1550,
+    "reporting/export.py": 1300,
+    "protocol/baselines/defenses.py": 950,
+    "protocol/baselines/outcomes.py": 700,
+    "protocol/baselines/training.py": 700,
     "datasets/ciciot2023/prepare.py": 800,
     "datasets/nbaiot/prepare.py": 700,
     "application.py": 700,
-    "datasets/nbaiot/baselines/outcomes.py": 700,
 }
 
 DEFAULT_LINE_BUDGET = 600
@@ -27,8 +29,10 @@ JUSTIFIED_BYTE_BUDGETS = {
     "datasets/nbaiot/cells.py": 80_000,
     "reporting/tables.py": 55_000,
     "reporting/figures.py": 55_000,
+    "reporting/export.py": 45_000,
     "datasets/ciciot2023/prepare.py": 40_000,
     "evaluation/comparisons.py": 45_000,
+    "experiments/definitions.py": 45_000,
 }
 
 

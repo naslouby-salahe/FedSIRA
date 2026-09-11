@@ -42,6 +42,7 @@ from fedsira.experiments.execution import (
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
 from fedsira.reporting.export import (
+    CELL_METRICS_PARQUET_NAME,
     ExperimentReportSummary,
     ReportExportResult,
     export_experiment_report,
@@ -59,14 +60,11 @@ from fedsira.reporting.figures import (
     render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.export import (
-    CELL_METRICS_PARQUET_NAME,
-)
+from fedsira.reporting.protocol_tables import render_experiment_plan_table
 from fedsira.reporting.tables import (
     format_metric_value,
     format_p_value,
     render_delay_and_efficiency_table,
-    render_experiment_plan_table,
     render_primary_results_table,
 )
 from fedsira.reporting.verification import (
