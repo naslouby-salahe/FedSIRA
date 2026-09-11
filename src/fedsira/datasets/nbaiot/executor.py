@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
+from typing import Protocol, cast
 
 import torch
 
@@ -49,6 +52,8 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     BooleanValue,
+    CellHandlerName,
+    ExperimentName,
     MasterSeed,
     MetricObservation,
 )
@@ -80,6 +85,7 @@ from fedsira.experiments.definitions import (
     HeterogeneityRegime,
     ProposalEpisode,
     experiment_by_name,
+    experiment_registry,
 )
 from fedsira.experiments.execution import (
     AdmissionStateObservation,
@@ -111,6 +117,48 @@ from fedsira.runtime import (
     current_application_context,
     derive_uint32,
 )
+
+
+class CellHandler(Protocol):
+    def __call__(
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]: ...
+
+
+CELL_HANDLER_BY_EXPERIMENT: Mapping[ExperimentName, CellHandlerName] = MappingProxyType(
+    {
+        DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: "_execute_data_and_domain_validation_cell",
+        PROTOCOL_INVARIANT_VALIDATION_NAME: "_execute_protocol_invariant_validation_cell",
+        BASELINE_IMPLEMENTATION_VALIDATION_NAME: "_execute_baseline_cell",
+        PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: "_execute_opening_cell",
+        SINGLE_REPRODUCTION_NECESSITY_NAME: "_execute_plurality_cell",
+        SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: "_execute_source_exclusion_cell",
+        EXTERNAL_VERIFICATION_NECESSITY_NAME: "_execute_external_verification_cell",
+        PRIMARY_CONFIRMATORY_EVALUATION_NAME: "_execute_primary_cell",
+        MECHANISM_ABLATION_NAME: "_execute_ablation_cell",
+        COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: "_execute_reproducer_robustness_cell",
+        COMPROMISED_VERIFIER_ROBUSTNESS_NAME: "_execute_verifier_robustness_cell",
+        BYZANTINE_BOUND_VIOLATION_NAME: "_execute_byzantine_bound_cell",
+        EVIDENCE_SCARCITY_AND_DORMANCY_NAME: "_execute_evidence_scarcity_cell",
+        SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: "_execute_boundary_cell",
+        CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: "_execute_boundary_cell",
+        HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: "_execute_boundary_cell",
+        ADMISSION_DELAY_DECOMPOSITION_NAME: "_execute_admission_delay_cell",
+        EFFICIENCY_MEASUREMENT_NAME: "_execute_efficiency_cell",
+        SECONDARY_DATASET_GENERALIZATION_NAME: "_execute_secondary_cell",
+    }
+)
+
+
+def validate_cell_handler_registration() -> None:
+    registered = {definition.name for definition in experiment_registry()}
+    mapped = set(CELL_HANDLER_BY_EXPERIMENT)
+    missing = registered - mapped
+    if missing:
+        raise ValueError(f"registered experiments without a cell handler: {sorted(missing)}")
+    unknown = mapped - registered
+    if unknown:
+        raise ValueError(f"cell handlers for unregistered experiments: {sorted(unknown)}")
 
 
 class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellDispatch):
@@ -411,51 +459,27 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             for cycle in range(horizon + 1)
         )
 
+    def _execute_data_and_domain_validation_cell(
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+        run_data_and_domain_evidence_validation(
+            evidence.reproduction_target_count,
+            evidence.reproduction_supported_count,
+            evidence.final_gate_adequate_domain_count,
+        )
+        return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
+
+    def _execute_protocol_invariant_validation_cell(
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+        run_protocol_invariant_validation()
+        return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
+
     def _execute_cell_protocol(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        if cell.experiment == PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME:
-            return self._execute_opening_cell(cell, evidence)
-        if cell.experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
-            return self._execute_plurality_cell(cell, evidence)
-        if cell.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
-            return self._execute_source_exclusion_cell(cell, evidence)
-        if cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME:
-            return self._execute_external_verification_cell(cell, evidence)
-        if cell.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME:
-            return self._execute_primary_cell(cell, evidence)
-        if cell.experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
-            return self._execute_reproducer_robustness_cell(cell, evidence)
-        if cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-            return self._execute_verifier_robustness_cell(cell, evidence)
-        if cell.experiment == BYZANTINE_BOUND_VIOLATION_NAME:
-            return self._execute_byzantine_bound_cell(cell, evidence)
-        if cell.experiment == EFFICIENCY_MEASUREMENT_NAME:
-            return self._execute_efficiency_cell(cell, evidence)
-        if cell.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
-            return self._execute_secondary_cell(cell, evidence)
-        if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
-            return self._execute_evidence_scarcity_cell(cell, evidence)
-        if cell.experiment == ADMISSION_DELAY_DECOMPOSITION_NAME:
-            return self._execute_admission_delay_cell(cell, evidence)
-        if cell.experiment in (
-            SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-            CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-            HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-        ):
-            return self._execute_boundary_cell(cell, evidence)
-        if cell.experiment == MECHANISM_ABLATION_NAME:
-            return self._execute_ablation_cell(cell, evidence)
-        if cell.experiment == DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME:
-            run_data_and_domain_evidence_validation(
-                evidence.reproduction_target_count,
-                evidence.reproduction_supported_count,
-                evidence.final_gate_adequate_domain_count,
-            )
-            return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
-        if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
-            run_protocol_invariant_validation()
-            return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
-        if cell.experiment == BASELINE_IMPLEMENTATION_VALIDATION_NAME:
-            return self._execute_baseline_cell(cell, evidence)
-        raise ValueError(f"no protocol executor is defined for experiment {cell.experiment}")
+        handler_name = CELL_HANDLER_BY_EXPERIMENT.get(cell.experiment)
+        if handler_name is None:
+            raise ValueError(f"no registered cell handler for experiment {cell.experiment}")
+        handler = cast(CellHandler, getattr(self, handler_name))
+        return handler(cell, evidence)

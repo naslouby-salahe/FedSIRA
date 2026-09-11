@@ -4,7 +4,7 @@ from typing import Union
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src" / "fedsira"
 TESTS_ROOT = REPO_ROOT / "tests"
 CONFIG_PATH = REPO_ROOT / "configs" / "fedsira.yaml"
