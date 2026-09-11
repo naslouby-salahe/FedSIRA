@@ -43,6 +43,7 @@ from fedsira.runtime import (
     get_structured_logger,
     log_structured_event,
     mirror_structured_logging_to_console,
+    run_bounded,
 )
 
 PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
@@ -180,7 +181,8 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
 def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
-        _execute_bound(dataset, overwrite)
+        timeout = context.scientific_config.execution.timeouts_seconds.dataset_preprocessing
+        run_bounded("preprocessing", timeout, lambda: _execute_bound(dataset, overwrite))
 
 
 def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:

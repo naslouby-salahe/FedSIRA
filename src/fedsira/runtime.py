@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import json
 import logging
@@ -8,7 +9,9 @@ import random
 import resource
 import subprocess
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import timedelta
@@ -52,6 +55,7 @@ from fedsira.domain.types import (
     SampleId,
     SeedDerivationLabel,
     TextValue,
+    TimeoutSeconds,
     TrainingConditionId,
     WallClockSeconds,
 )
@@ -125,6 +129,7 @@ LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATC
 FramedBytes = Annotated[bytes, Field()]
 DigestBytes = Annotated[bytes, Field(min_length=32, max_length=32)]
 OrderItem = TypeVar("OrderItem")
+OperationResult = TypeVar("OperationResult")
 
 
 class _TorchSeedFunction(Protocol):
@@ -397,3 +402,25 @@ def peak_gpu_memory_bytes() -> PeakMemoryBytes:
 
 def peak_host_resident_set_bytes() -> PeakMemoryBytes:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * BYTES_PER_KIBIBYTE
+
+
+class OperationTimeoutError(RuntimeError):
+    def __init__(self, operation: RuntimeComponentName, timeout_seconds: TimeoutSeconds) -> None:
+        super().__init__(f"{operation} exceeded the configured timeout of {timeout_seconds}s")
+        self.operation = operation
+        self.timeout_seconds = timeout_seconds
+
+
+def run_bounded(
+    operation: RuntimeComponentName,
+    timeout_seconds: TimeoutSeconds,
+    action: Callable[[], OperationResult],
+) -> OperationResult:
+    bound_context = contextvars.copy_context()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(bound_context.run, action)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except FuturesTimeoutError as error:
+            future.cancel()
+            raise OperationTimeoutError(operation, timeout_seconds) from error

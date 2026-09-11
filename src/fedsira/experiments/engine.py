@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -53,10 +51,12 @@ from fedsira.experiments.planning import (
 )
 from fedsira.runtime import (
     FailureDetail,
+    OperationTimeoutError,
     automatic_recovery_permitted,
     current_application_context,
     framed_bytes,
     get_structured_logger,
+    run_bounded,
 )
 
 if TYPE_CHECKING:
@@ -263,30 +263,29 @@ def _execute_cell_phase_with_timeout(
             cell=cell.semantic_key, timeout_seconds=timeout_seconds
         ).model_dump(),
     )
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(executor.execute_cell, cell)
-        try:
-            outcome = future.result(timeout=timeout_seconds)
-        except FuturesTimeoutError:
-            future.cancel()
-            EXECUTION_LOGGER.info(
-                "cell.phase.timeout",
-                extra=CellPhaseLogFields(
-                    cell=cell.semantic_key, timeout_seconds=timeout_seconds
-                ).model_dump(),
-            )
-            return CellExecutionOutcome(
-                cell=cell,
-                terminal_state=ExperimentLifecycleState.FAILED,
-                failure=FailureDetail(
-                    failure_class=FailureClass.TIMEOUT,
-                    message=(
-                        "scientific cell phase exceeded "
-                        f"execution.timeouts_seconds.scientific_cell_phase={timeout_seconds}"
-                    ),
-                    cell_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
+    try:
+        outcome = run_bounded(
+            "scientific_cell_phase", timeout_seconds, lambda: executor.execute_cell(cell)
+        )
+    except OperationTimeoutError:
+        EXECUTION_LOGGER.info(
+            "cell.phase.timeout",
+            extra=CellPhaseLogFields(
+                cell=cell.semantic_key, timeout_seconds=timeout_seconds
+            ).model_dump(),
+        )
+        return CellExecutionOutcome(
+            cell=cell,
+            terminal_state=ExperimentLifecycleState.FAILED,
+            failure=FailureDetail(
+                failure_class=FailureClass.TIMEOUT,
+                message=(
+                    "scientific cell phase exceeded "
+                    f"execution.timeouts_seconds.scientific_cell_phase={timeout_seconds}"
                 ),
-            )
+                cell_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
+            ),
+        )
     EXECUTION_LOGGER.info(
         "cell.phase.completed", extra=CellPhaseLogFields(cell=cell.semantic_key).model_dump()
     )

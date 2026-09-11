@@ -208,6 +208,7 @@ from fedsira.protocol.baselines.registry import (
 from fedsira.protocol.baselines.training import (
     candidate_free_full_path_opening_mode,
     one_independent_retrain_local_epochs,
+    validate_candidate_free_full_path_opening_mode,
 )
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
@@ -1276,9 +1277,12 @@ class ProtocolCellDispatch:
         elif method == BaselineIdentity.FEDAVG_REFERENCE:
             standard_fl_anchor_rounds()
             state = self._fedavg_reference_outcome(cell, evidence)
+        elif method == BaselineIdentity.CANDIDATE_FREE_FULL_PATH:
+            validate_candidate_free_full_path_opening_mode(candidate_free_full_path_opening_mode())
+            state = self._advance_protocol(cell, evidence)
         elif method == BaselineIdentity.ONE_INDEPENDENT_RETRAIN:
             one_independent_retrain_local_epochs()
-            candidate_free_full_path_opening_mode()
+            validate_candidate_free_full_path_opening_mode(candidate_free_full_path_opening_mode())
             state = self._advance_protocol(cell, evidence)
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)

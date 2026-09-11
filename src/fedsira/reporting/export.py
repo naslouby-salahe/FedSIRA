@@ -152,6 +152,7 @@ from fedsira.runtime import (
     current_application_context,
     get_structured_logger,
     log_structured_event,
+    run_bounded,
 )
 
 EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
@@ -653,7 +654,8 @@ def execute_report(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         scope = name if name is not None else PROJECT_SUMMARY_EXPORT_NAME
         fields = ReportLogFields(report_scope=scope)
         log_structured_event(REPORT_LOGGER, "report.started", fields)
-        _execute_bound(name, overwrite)
+        timeout = context.scientific_config.execution.timeouts_seconds.experiment_analysis_or_report
+        run_bounded("report", timeout, lambda: _execute_bound(name, overwrite))
         log_structured_event(REPORT_LOGGER, "report.completed", fields)
 
 
@@ -697,19 +699,30 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     terminal_count_records = tuple(terminal_counts)
     lifecycle_records = tuple(lifecycle_states)
     experiment_names = tuple(planned.definition.name for planned in plan.experiments)
-    count_verification = verify_planned_cell_count_satisfied(plan, terminal_count_records)
-    completion_verification = verify_experiments_completed(lifecycle_records, experiment_names)
-    terminal_verification = verify_experiments_reached_terminal_state(
-        lifecycle_records, experiment_names
-    )
+    execution_config = current_application_context().scientific_config.execution
+    verification_timeout = execution_config.timeouts_seconds.final_export_verification
     artifact_roots = (
         REPOSITORY_ROOT / preprocessing_root(),
         REPOSITORY_ROOT / artifact_publication_root(),
         REPOSITORY_ROOT / execution_outputs_root(),
         REPOSITORY_ROOT / manuscript_results_root(),
     )
-    manifest_dependency_verification = verify_artifact_manifest_dependencies(
-        artifact_manifest_dependency_failures(load_published_manifests(artifact_roots))
+    (
+        count_verification,
+        completion_verification,
+        terminal_verification,
+        manifest_dependency_verification,
+    ) = run_bounded(
+        "final_export_verification",
+        verification_timeout,
+        lambda: (
+            verify_planned_cell_count_satisfied(plan, terminal_count_records),
+            verify_experiments_completed(lifecycle_records, experiment_names),
+            verify_experiments_reached_terminal_state(lifecycle_records, experiment_names),
+            verify_artifact_manifest_dependencies(
+                artifact_manifest_dependency_failures(load_published_manifests(artifact_roots))
+            ),
+        ),
     )
     failures = (
         *count_verification.failures,

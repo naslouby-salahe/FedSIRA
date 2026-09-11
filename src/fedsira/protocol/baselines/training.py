@@ -92,6 +92,13 @@ def candidate_free_full_path_opening_mode() -> AdmissionOpeningMode:
     return AdmissionOpeningMode.CANDIDATE_FREE
 
 
+def validate_candidate_free_full_path_opening_mode(mode: AdmissionOpeningMode) -> None:
+    if mode is not AdmissionOpeningMode.CANDIDATE_FREE:
+        raise ValueError(
+            "Candidate-Free Full Path must open the claim from confirmed anchor failure"
+        )
+
+
 Domain = TypeVar("Domain", bound=Hashable)
 
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"
