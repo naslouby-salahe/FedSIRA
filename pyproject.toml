@@ -68,7 +68,6 @@ max-statements = 80
 "src/fedsira/cli.py" = ["B008"]
 "src/fedsira/datasets/nbaiot/cells.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 "src/fedsira/datasets/nbaiot/cell_support.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"src/fedsira/datasets/nbaiot/baselines/outcomes.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 "src/fedsira/application.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/datasets/nbaiot/executor.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 "src/fedsira/reporting/export.py" = ["C901", "PLR0912", "PLR0915"]
@@ -125,12 +124,6 @@ reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/evaluation/standard.py"
-reportMissingTypeStubs = "none"
-reportUnknownVariableType = "none"
-reportUnknownArgumentType = "none"
-
-[[tool.pyright.executionEnvironments]]
 root = "src/fedsira/evaluation/metrics.py"
 reportMissingTypeStubs = "none"
 reportUnknownVariableType = "none"
@@ -150,14 +143,6 @@ reportUnknownArgumentType = "none"
 [[tool.pyright.executionEnvironments]]
 root = "tests/unit/datasets/nbaiot/test_preprocessing.py"
 reportUnknownMemberType = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/baselines/outcomes.py"
-reportUnknownMemberType = "none"
-reportAttributeAccessIssue = "none"
-reportPrivateUsage = "none"
-reportUnknownVariableType = "none"
-reportUnknownArgumentType = "none"
 
 [tool.deptry]
 known_first_party = ["fedsira"]

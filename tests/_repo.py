@@ -39,6 +39,19 @@ def iter_python_files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
 
 
+def _require_scan_roots() -> None:
+    for root in (SRC_ROOT, TESTS_ROOT):
+        if not root.is_dir():
+            raise RuntimeError(f"architecture scan root does not exist: {root}")
+    if not iter_python_files(SRC_ROOT):
+        raise RuntimeError(f"architecture scan root contains no Python modules: {SRC_ROOT}")
+    if not CONFIG_PATH.is_file():
+        raise RuntimeError(f"authoritative configuration file is missing: {CONFIG_PATH}")
+
+
+_require_scan_roots()
+
+
 def module_name(path: Path) -> str:
     relative = path.relative_to(REPO_ROOT / "src")
     parts = list(relative.with_suffix("").parts)
