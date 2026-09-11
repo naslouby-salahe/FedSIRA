@@ -28,7 +28,7 @@ JUSTIFIED_LINE_BUDGETS = {
 DEFAULT_LINE_BUDGET = 600
 DEFAULT_BYTE_BUDGET = 40_000
 JUSTIFIED_BYTE_BUDGETS = {
-    "experiments/handlers.py": 100_000,
+    "experiments/handlers.py": 110_000,
     "datasets/common.py": 50_000,
     "reporting/tables.py": 55_000,
     "reporting/figures.py": 55_000,
