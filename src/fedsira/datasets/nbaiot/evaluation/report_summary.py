@@ -18,7 +18,7 @@ from fedsira.evaluation.metrics import (
     legitimate_admission_rate,
     supported_macro_f1_harm,
 )
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     coefficient_of_variation,
     domain_disparity,
     equal_weight_domain_mean,

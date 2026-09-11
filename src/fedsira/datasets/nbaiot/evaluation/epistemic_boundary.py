@@ -26,10 +26,14 @@ from fedsira.domain.enums import EvaluationInsufficiencyReason
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import DomainCount, MasterSeed
 from fedsira.evaluation.metrics import supported_macro_f1_harm
-from fedsira.evaluation.summaries import equal_weight_domain_mean
+from fedsira.evaluation.statistics import equal_weight_domain_mean
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.learning.model import FedSIRAClassifier, load_flat_trainable_parameters
-from fedsira.learning.scoring import logits_for_samples, per_sample_cross_entropy
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    load_flat_trainable_parameters,
+    logits_for_samples,
+    per_sample_cross_entropy,
+)
 
 
 def _diagnostic_marker_for_domain(

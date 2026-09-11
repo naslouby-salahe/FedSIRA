@@ -12,7 +12,7 @@ from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import DomainCount, MasterSeed
 from fedsira.evaluation.metrics import supported_macro_f1_harm
-from fedsira.evaluation.summaries import equal_weight_domain_mean
+from fedsira.evaluation.statistics import equal_weight_domain_mean
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,5 @@
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.protocol.baselines.source_model import (
+from fedsira.protocol.baselines.defenses import (
     independent_local_reference_reviewer_is_positive,
     secure_continual_assessment_post_reference_rounds,
 )

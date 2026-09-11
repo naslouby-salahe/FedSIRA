@@ -59,7 +59,7 @@ from fedsira.reporting.figures import (
     render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.materialization import (
+from fedsira.reporting.export import (
     CELL_METRICS_PARQUET_NAME,
 )
 from fedsira.reporting.tables import (

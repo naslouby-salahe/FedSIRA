@@ -5,12 +5,6 @@ from dataclasses import replace
 
 from fedsira.artifacts.paths import experiment_repetition_telemetry_root
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.baselines.calibration import (
-    parameter_similarity_certification_row_results,
-)
-from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
-    validate_group_without_target_member_uses_supported_only,
-)
 from fedsira.datasets.nbaiot.cell_support import (
     BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
     RESOLVED_FEDSIRA_CORE_METHOD,
@@ -152,39 +146,35 @@ from fedsira.experiments.planning import (
 from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
 )
-from fedsira.protocol.attacks.byzantine import (
+from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
-)
-from fedsira.protocol.attacks.source import (
     select_model_replacement_carrier_rows,
     source_copy_update,
 )
-from fedsira.protocol.baselines.independent_retraining import (
-    candidate_free_full_path_opening_mode,
-    one_independent_retrain_local_epochs,
-)
-from fedsira.protocol.baselines.references import (
-    standard_fl_anchor_rounds,
+from fedsira.protocol.baselines.defenses import (
+    CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
+    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+    client_review_direct_admission_production_is_source,
+    client_review_then_retrain_local_epochs,
+    client_review_then_retrain_should_discard_source_weights,
+    direct_krum_committee_rows,
+    parameter_similarity_certification_row_results,
+    validate_client_review_composite_screen,
+    validate_client_review_reviewer_count,
+    validate_group_without_target_member_uses_supported_only,
+    validate_three_row_coordinate_median_committee_size,
 )
 from fedsira.protocol.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
     BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
+    standard_fl_anchor_rounds,
     validate_role_not_used_for_tuning,
 )
-from fedsira.protocol.baselines.robust_aggregation import (
-    direct_krum_committee_rows,
-    validate_three_row_coordinate_median_committee_size,
-)
-from fedsira.protocol.baselines.source_model import (
-    CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
-    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
-    client_review_direct_admission_production_is_source,
-    client_review_then_retrain_local_epochs,
-    client_review_then_retrain_should_discard_source_weights,
-    validate_client_review_composite_screen,
-    validate_client_review_reviewer_count,
+from fedsira.protocol.baselines.training import (
+    candidate_free_full_path_opening_mode,
+    one_independent_retrain_local_epochs,
 )
 from fedsira.protocol.capability_contract import (
     compute_capability_identity,
@@ -202,19 +192,17 @@ from fedsira.protocol.proposal import (
 from fedsira.protocol.reproduction import (
     select_compromised_reproducers,
 )
-from fedsira.protocol.specification import (
+from fedsira.protocol.rules import (
+    apply_logical_cycle_expiry,
     deduplicate_reports_by_proxy,
     diagnostic_at_least_two_byzantine_probability,
     first_cycle_with_minimum_eligible_evidence_holders,
     krum_committee_is_admissible,
     minimum_honest_positive_count,
     report_for_domain,
-    validate_no_safety_completion_before_tau_k,
-)
-from fedsira.protocol.state_machine import (
-    apply_logical_cycle_expiry,
     resolve_ternary_outcome,
     resume_dormant_admission,
+    validate_no_safety_completion_before_tau_k,
 )
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,

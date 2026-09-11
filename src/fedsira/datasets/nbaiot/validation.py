@@ -8,7 +8,7 @@ import numpy
 import torch
 
 from fedsira.artifacts.paths import smoke_record_path
-from fedsira.artifacts.provenance import ArtifactManifest, validate_artifact_lifecycle_readable
+from fedsira.artifacts.store import ArtifactManifest, validate_artifact_lifecycle_readable
 from fedsira.config import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
@@ -39,9 +39,10 @@ from fedsira.domain.types import (
     TextValue,
 )
 from fedsira.evaluation.metrics import accuracy, compute_confusion_counts
-from fedsira.evaluation.statistics import exact_sign_flip_two_sided_p_value, holm_adjusted_p_values
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     bootstrap_percentile_confidence_interval,
+    exact_sign_flip_two_sided_p_value,
+    holm_adjusted_p_values,
     quantile_type7,
 )
 from fedsira.experiments.collapse import resolve_all_eight_cases
@@ -55,12 +56,6 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell
-from fedsira.learning.aggregation import (
-    ModelParameter,
-    ModelState,
-    WeightedModelState,
-    federated_averaging,
-)
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
@@ -71,7 +66,14 @@ from fedsira.learning.post_reference import (
     post_reference_training_step,
     run_post_reference_training,
 )
-from fedsira.learning.training import build_loss_function, build_optimizer
+from fedsira.learning.training import (
+    ModelParameter,
+    ModelState,
+    WeightedModelState,
+    build_loss_function,
+    build_optimizer,
+    federated_averaging,
+)
 from fedsira.protocol.admission import validate_admission_requires_final_gate
 from fedsira.protocol.baselines.registry import validate_role_not_used_for_tuning
 from fedsira.protocol.capability_contract import (
@@ -79,7 +81,7 @@ from fedsira.protocol.capability_contract import (
     validate_source_excluded_production_weight,
 )
 from fedsira.protocol.reproduction import validate_commitment_exists_before_verifier_assignment
-from fedsira.protocol.specification import (
+from fedsira.protocol.rules import (
     diagnostic_at_least_two_byzantine_probability,
     krum_committee_is_admissible,
     minimum_honest_positive_count,

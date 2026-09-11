@@ -16,7 +16,7 @@ from fedsira.domain.types import (
     SourceExcludedFromKrum,
     TensorDomainModel,
 )
-from fedsira.protocol.specification import krum_committee_is_admissible
+from fedsira.protocol.rules import krum_committee_is_admissible
 
 
 def synthesis_pending_transition(

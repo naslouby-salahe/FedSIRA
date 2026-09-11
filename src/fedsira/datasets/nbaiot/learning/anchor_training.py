@@ -28,13 +28,12 @@ from fedsira.domain.types import (
     RoundIndex,
 )
 from fedsira.experiments.definitions import ReproducerCondition
-from fedsira.learning.aggregation import ModelState, load_model_state, model_state_from_classifier
-from fedsira.learning.anchor import run_anchor_fedavg_training
-from fedsira.learning.federated import LocalTrainingClient
+from fedsira.learning.federated import LocalTrainingClient, run_anchor_fedavg_training
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
 )
+from fedsira.learning.training import ModelState, load_model_state, model_state_from_classifier
 from fedsira.runtime import (
     current_application_context,
     local_training_seed,

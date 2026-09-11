@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from fedsira.learning.aggregation import (
+from fedsira.learning.training import (
     ModelParameter,
     ModelState,
     WeightedModelState,

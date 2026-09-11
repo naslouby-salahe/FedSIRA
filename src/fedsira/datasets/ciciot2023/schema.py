@@ -5,11 +5,16 @@ from enum import IntEnum, StrEnum
 
 from fedsira.domain.types import (
     ClassLabel,
+    DatasetClassToken,
     DatasetManifestDigest,
     DomainCount,
     DomainId,
+    FileCount,
+    FrozenDomainModel,
     PartitionSalt,
     PredictorCount,
+    PredictorCountMatchesOfficial,
+    RowCount,
     SampleId,
     SeedDerivationLabel,
 )
@@ -94,3 +99,16 @@ def hash_to_pseudo_domain(
     ).digest()
     index = int.from_bytes(digest[0:8], byteorder="big") % PSEUDO_DOMAIN_COUNT
     return CICIoT2023PseudoDomain(index)
+
+
+class CICIoT2023DatasetManifestPayload(FrozenDomainModel):
+    dataset_file_manifest_hash: DatasetManifestDigest
+    file_count: FileCount
+    raw_row_count: RowCount
+    retained_row_count: RowCount
+    excluded_row_count: RowCount
+    predictor_count: PredictorCount
+    official_expected_predictor_count: PredictorCount
+    predictor_count_matches_official: PredictorCountMatchesOfficial
+    class_registry: tuple[DatasetClassToken, ...]
+    pseudo_domain_count: DomainCount

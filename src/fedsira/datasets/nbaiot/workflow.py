@@ -51,7 +51,7 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.protocol.attacks.source import (
+from fedsira.protocol.attacks import (
     apply_trigger_transform,
     relabel_triggered_rows_as_benign,
     select_source_backdoor_poison_rows,

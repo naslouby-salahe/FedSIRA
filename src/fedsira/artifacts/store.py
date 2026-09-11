@@ -2,13 +2,58 @@ import hashlib
 import os
 import uuid
 from pathlib import Path
+from typing import TypeAlias
 
-from fedsira.artifacts.provenance import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
-from fedsira.domain.types import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
+from fedsira.domain.types import (
+    ArtifactComplete,
+    ArtifactDigest,
+    ArtifactReuseDecision,
+    FrozenDomainModel,
+)
+
+ArtifactPayloadBytes: TypeAlias = bytes
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
+
+
+class ArtifactManifest(FrozenDomainModel):
+    family: ArtifactFamily
+    identity: ArtifactDigest
+    checksum: ArtifactDigest
+    lifecycle_state: ArtifactLifecycleState
+    upstream_identities: tuple[ArtifactDigest, ...]
+
+    def with_lifecycle_state(
+        self,
+        lifecycle_state: ArtifactLifecycleState,
+    ) -> "ArtifactManifest":
+        return ArtifactManifest(
+            family=self.family,
+            identity=self.identity,
+            checksum=self.checksum,
+            lifecycle_state=lifecycle_state,
+            upstream_identities=self.upstream_identities,
+        )
+
+
+def load_published_manifests(roots: tuple[Path, ...]) -> tuple[ArtifactManifest, ...]:
+    manifests: list[ArtifactManifest] = []
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob(f"*{ARTIFACT_MANIFEST_SUFFIX}")):
+            manifests.append(ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8")))
+    return tuple(manifests)
+
+
+def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:
+    if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
+        raise ValueError(
+            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state.value}); "
+            "it is never a valid input to downstream science"
+        )
 
 
 def compute_checksum(payload: ArtifactPayloadBytes) -> ArtifactDigest:

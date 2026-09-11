@@ -2,7 +2,7 @@ import numpy
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.models import MetricResult
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     bootstrap_percentile_confidence_interval,
     coefficient_of_variation,
     decile_bin,

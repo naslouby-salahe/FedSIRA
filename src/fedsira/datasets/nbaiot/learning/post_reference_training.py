@@ -25,15 +25,15 @@ from fedsira.datasets.nbaiot.workflow import (
     tensor_view,
 )
 from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
-from fedsira.evaluation.summaries import decile_bin, decile_boundaries
+from fedsira.evaluation.statistics import decile_bin, decile_boundaries
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
+    per_sample_cross_entropy,
 )
 from fedsira.learning.post_reference import run_post_reference_training
-from fedsira.learning.scoring import per_sample_cross_entropy
 from fedsira.runtime import current_application_context, seed_job_local_rng_streams
 
 SOURCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SOURCE_CANDIDATE"

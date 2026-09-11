@@ -23,11 +23,11 @@ from fedsira.domain.types import (
     ScenarioName,
 )
 from fedsira.evaluation.statistics import (
+    bootstrap_percentile_confidence_interval,
     exact_sign_flip_non_inferiority_p_value,
     exact_sign_flip_two_sided_p_value,
     holm_adjusted_p_values,
 )
-from fedsira.evaluation.summaries import bootstrap_percentile_confidence_interval
 from fedsira.experiments.definitions import (
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,

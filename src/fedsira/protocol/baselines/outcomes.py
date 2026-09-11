@@ -3,26 +3,6 @@ from __future__ import annotations
 import torch
 
 from fedsira.datasets.common import Role, role_hash_token
-from fedsira.datasets.nbaiot.baselines.calibration import (
-    recovery_rollback_is_triggered,
-)
-from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
-    evaluate_certified_ensemble,
-    train_certified_ensemble_group_checkpoints,
-)
-from fedsira.datasets.nbaiot.baselines.fedavg_training import (
-    train_fedavg_reference_delta,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-)
-from fedsira.datasets.nbaiot.baselines.reconstruction_training import (
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
-)
-from fedsira.datasets.nbaiot.baselines.robust_training import (
-    train_density_cluster_trimmed_mean_delta,
-    train_krum_reference_delta,
-)
 from fedsira.datasets.nbaiot.cell_support import (
     VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
     _capability_contract_for_digest,
@@ -69,7 +49,7 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
     worst_domain_target_f1,
 )
@@ -83,19 +63,29 @@ from fedsira.protocol.admission import (
     final_gate_predicates_pass,
     median_domain_target_f1,
 )
-from fedsira.protocol.baselines.references import (
-    local_only_reference_evaluation_is_domain_local,
-)
-from fedsira.protocol.baselines.registry import (
-    review_style_baseline_outcome,
-)
-from fedsira.protocol.baselines.source_model import (
+from fedsira.protocol.baselines.defenses import (
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
     INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
     INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
     SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
     SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
+    evaluate_certified_ensemble,
     independent_local_reference_reviewer_is_positive,
+    recovery_rollback_is_triggered,
+    train_certified_ensemble_group_checkpoints,
+)
+from fedsira.protocol.baselines.registry import (
+    local_only_reference_evaluation_is_domain_local,
+    review_style_baseline_outcome,
+)
+from fedsira.protocol.baselines.training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_fedavg_reference_delta,
+    train_krum_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
 )
 from fedsira.protocol.capability_contract import (
     build_capability_contract,

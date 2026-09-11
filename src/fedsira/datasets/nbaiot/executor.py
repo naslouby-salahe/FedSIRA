@@ -8,11 +8,6 @@ import torch
 from fedsira.artifacts.paths import prepared_evidence_root
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
-from fedsira.datasets.nbaiot.baselines.calibration import (
-    DomainFeatureMean,
-    same_context_verifier_panel,
-)
-from fedsira.datasets.nbaiot.baselines.outcomes import ProtocolBaselineOutcomes
 from fedsira.datasets.nbaiot.cells import ProtocolCellDispatch
 from fedsira.datasets.nbaiot.evaluation.domain import (
     evaluate_domain,
@@ -99,6 +94,11 @@ from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
     load_prepared_evidence_counts,
 )
+from fedsira.protocol.baselines.defenses import (
+    DomainFeatureMean,
+    same_context_verifier_panel,
+)
+from fedsira.protocol.baselines.outcomes import ProtocolBaselineOutcomes
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
     capability_contract_passes,

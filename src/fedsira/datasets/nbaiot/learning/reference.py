@@ -17,10 +17,10 @@ from fedsira.datasets.nbaiot.schema import (
 from fedsira.datasets.nbaiot.workflow import dataset_manifest_hash, load_prepared_rows, tensor_view
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
-from fedsira.learning.aggregation import load_model_state, model_state_from_classifier
 from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
 from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
-from fedsira.protocol.baselines.references import (
+from fedsira.learning.training import load_model_state, model_state_from_classifier
+from fedsira.protocol.baselines.registry import (
     centralized_reference_local_epochs,
     centralized_reference_pooled_rows,
     local_only_reference_local_epochs,

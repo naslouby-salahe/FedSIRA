@@ -11,7 +11,7 @@ from fedsira.domain.types import (
     InvariantChecksPassed,
     PluralityActive,
 )
-from fedsira.evaluation.summaries import quantile_type7
+from fedsira.evaluation.statistics import quantile_type7
 
 
 def validate_admission_requires_final_gate(

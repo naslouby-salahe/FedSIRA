@@ -1,7 +1,7 @@
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
+from fedsira.protocol.baselines.defenses import (
     certified_ensemble_domain_groups,
     certified_ensemble_post_reference_rounds,
     ensemble_predicted_label,

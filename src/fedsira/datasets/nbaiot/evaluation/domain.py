@@ -35,8 +35,11 @@ from fedsira.evaluation.metrics import (
     metric_value,
     report_metric_set,
 )
-from fedsira.learning.model import FedSIRAClassifier, load_flat_trainable_parameters
-from fedsira.learning.scoring import logits_for_samples
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    load_flat_trainable_parameters,
+    logits_for_samples,
+)
 
 
 def evaluate_domain(

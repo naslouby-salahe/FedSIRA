@@ -7,12 +7,7 @@ from fedsira.artifacts.paths import (
     preprocessing_metadata_root,
     workspace_root_for_family,
 )
-from fedsira.artifacts.provenance import (
-    CICIoT2023DatasetManifestPayload,
-    DatasetManifestPayload,
-    NBaiotDatasetManifestPayload,
-)
-from fedsira.artifacts.storage import compute_checksum, publish_or_reuse_artifact_payload
+from fedsira.artifacts.store import compute_checksum, publish_or_reuse_artifact_payload
 from fedsira.datasets.ciciot2023.prepare import (
     discover_secondary_csv_files,
     materialize_ciciot2023_prepared_views,
@@ -20,6 +15,7 @@ from fedsira.datasets.ciciot2023.prepare import (
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
+    CICIoT2023DatasetManifestPayload,
 )
 from fedsira.datasets.common import DatasetPreparationLogFields
 from fedsira.datasets.nbaiot.prepare import (
@@ -29,6 +25,7 @@ from fedsira.datasets.nbaiot.prepare import (
     materialize_nbaiot_prepared_views,
     validate_target_holder_feasibility,
 )
+from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
 from fedsira.datasets.specification import dataset_specification
 from fedsira.domain.enums import ArtifactFamily, DatasetId
 from fedsira.domain.types import (
@@ -50,6 +47,8 @@ from fedsira.runtime import (
 )
 
 PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
+
+DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
 
 def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseDecision:

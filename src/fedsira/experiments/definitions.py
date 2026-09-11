@@ -27,7 +27,7 @@ from fedsira.protocol.baselines.registry import (
     BaselineIdentity,
     BaselineValidationFixture,
 )
-from fedsira.protocol.specification import EvidenceArrivalSchedule
+from fedsira.protocol.rules import EvidenceArrivalSchedule
 from fedsira.runtime import current_application_context
 
 

@@ -27,8 +27,8 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.protocol.baselines.registry import BASELINE_CONTRACTS
-from fedsira.reporting.rendering import RenderedTable
-from fedsira.reporting.rendering import csv_text as _csv_text
+from fedsira.reporting.tables import RenderedTable
+from fedsira.reporting.tables import csv_text as _csv_text
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
 

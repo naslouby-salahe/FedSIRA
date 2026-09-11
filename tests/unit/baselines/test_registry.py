@@ -3,7 +3,7 @@ import pytest
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import AdmissionState, TernaryOutcome
-from fedsira.protocol.baselines.references import (
+from fedsira.protocol.baselines.training import (
     fedavg_reference_post_reference_local_epochs,
     post_reference_retrain_maximum_local_epochs,
     standard_fl_anchor_rounds,

@@ -1,5 +1,5 @@
 from fedsira.domain.enums import AdmissionOpeningMode
-from fedsira.protocol.baselines.independent_retraining import (
+from fedsira.protocol.baselines.training import (
     candidate_free_full_path_opening_mode,
     one_independent_retrain_local_epochs,
 )

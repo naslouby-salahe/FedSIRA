@@ -3,7 +3,7 @@ import torch
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.protocol.baselines.references import (
+from fedsira.protocol.baselines.training import (
     centralized_reference_local_epochs,
     centralized_reference_pooled_rows,
     fedavg_reference_post_reference_local_epochs,

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from fedsira.artifacts.provenance import ArtifactManifest
+from fedsira.artifacts.store import ArtifactManifest
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 
 

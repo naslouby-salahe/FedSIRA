@@ -4,8 +4,11 @@ from enum import StrEnum
 from fedsira.domain.types import (
     AttackBasename,
     AttackFamilyName,
+    DatasetClassToken,
+    DatasetManifestDigest,
     DomainId,
     FeatureName,
+    FrozenDomainModel,
     NamespaceSeed,
     PathToken,
     PredictorCount,
@@ -116,3 +119,8 @@ def deterministic_domain_order(
     tokens = tuple(nbaiot_domain_hash_token(domain) for domain in domains)
     ordered_tokens = deterministic_order(tokens, domain_separator, order_namespace_seed)
     return tuple(nbaiot_domain_from_hash_token(token) for token in ordered_tokens)
+
+
+class NBaiotDatasetManifestPayload(FrozenDomainModel):
+    dataset_file_manifest_hash: DatasetManifestDigest
+    structurally_unavailable_classes: tuple[DatasetClassToken, ...]

@@ -4,7 +4,7 @@ import csv
 from io import StringIO
 from pathlib import Path
 
-from fedsira.artifacts.provenance import ArtifactManifest
+from fedsira.artifacts.store import ArtifactManifest
 from fedsira.domain.enums import (
     AdmissionState,
     ArtifactLifecycleState,

@@ -1,7 +1,7 @@
 import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.learning.aggregation import model_parameter, model_state_from_classifier
+from fedsira.learning.training import model_parameter, model_state_from_classifier
 from fedsira.learning.federated import (
     LocalTrainingClient,
     run_fedavg_round,

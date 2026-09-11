@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import csv
 import math
+from collections.abc import Callable
+from io import StringIO
 
 from fedsira.config import PublicationRoundingConfig
 from fedsira.domain.enums import CoreMethodIdentity
@@ -14,6 +17,7 @@ from fedsira.domain.types import (
     PValue,
     RowCount,
     ScenarioName,
+    TableCsvText,
     TableName,
     TextValue,
 )
@@ -28,7 +32,7 @@ from fedsira.evaluation.comparisons import (
     MaterialityDirection,
     ablation_metric,
 )
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     bootstrap_percentile_confidence_interval,
     quantile_type7,
 )
@@ -62,18 +66,6 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.execution import CellExecutionOutcome
-from fedsira.experiments.planning import ExperimentPlan
-from fedsira.reporting.protocol_tables import (
-    render_baseline_protocol_table,
-    render_dataset_and_domain_protocol_table,
-    render_experiment_plan_table,
-    render_metric_and_statistics_protocol_table,
-    render_model_and_training_protocol_table,
-    render_primary_domain_statistics_table,
-    render_security_and_capability_contract_protocol_table,
-)
-from fedsira.reporting.rendering import RenderedTable, render_cell_metrics
-from fedsira.reporting.rendering import csv_text as _csv_text
 from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
@@ -200,7 +192,7 @@ def render_statistical_summary_table(
     )
     return RenderedTable(
         name="Statistical Summary",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "comparison_family",
                 "comparison",
@@ -308,7 +300,7 @@ def render_collapse_decisions_table(
     )
     return RenderedTable(
         name="Collapse Decisions",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "mechanism",
                 "comparator",
@@ -610,7 +602,7 @@ def render_primary_results_table(
     )
     return RenderedTable(
         name="Primary Results",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "method",
                 "scenario",
@@ -758,7 +750,7 @@ def render_source_exclusion_results_table(
     )
     return RenderedTable(
         name="Source-Exclusion Results",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "method",
                 "post_production_asr",
@@ -849,7 +841,7 @@ def render_ablation_results_table(
         )
     return RenderedTable(
         name="Ablation Results",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "variant",
                 "targeted_mechanism",
@@ -994,7 +986,7 @@ def render_byzantine_robustness_table(
     rows.sort(key=lambda row: (row[0], row[3] != "Within Bound", int(row[4]), row[1], row[2]))
     return RenderedTable(
         name="Byzantine Robustness",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "bound_family",
                 "method",
@@ -1105,7 +1097,7 @@ def render_failure_boundaries_table(
                 )
     return RenderedTable(
         name="Failure Boundaries",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "boundary_family",
                 "condition",
@@ -1227,7 +1219,7 @@ def render_delay_and_efficiency_table(
     )
     return RenderedTable(
         name="Delay and Efficiency",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "experiment",
                 "method",
@@ -1367,7 +1359,7 @@ def render_generalization_results_table(
             )
     return RenderedTable(
         name="Generalization Results",
-        csv_text=_csv_text(
+        csv_text=csv_text(
             (
                 "method",
                 "scenario",
@@ -1387,57 +1379,57 @@ def render_generalization_results_table(
     )
 
 
-def render_mandatory_tables(
-    plan: ExperimentPlan,
-    collapse_decisions: tuple[CollapseDecision, ...] | None,
-    resolved_core: ResolvedCore | None,
-    comparison_results: tuple[ComparisonFamilyResult, ...],
+
+
+class RenderedTable(FrozenDomainModel):
+    name: TableName
+    csv_text: TableCsvText
+
+
+def csv_text(
+    header: tuple[TextValue, ...],
+    rows: tuple[tuple[TextValue, ...], ...],
+) -> TableCsvText:
+    buffer = StringIO(newline="")
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(header)
+    writer.writerows(rows)
+    return buffer.getvalue().rstrip("\n")
+
+
+def render_cell_metrics(
     outcomes: tuple[CellExecutionOutcome, ...],
-) -> tuple[RenderedTable, ...]:
-    tables = [
-        render_dataset_and_domain_protocol_table(),
-        render_primary_domain_statistics_table(),
-        render_model_and_training_protocol_table(),
-        render_security_and_capability_contract_protocol_table(),
-        render_baseline_protocol_table(),
-        render_experiment_plan_table(plan),
-        render_metric_and_statistics_protocol_table(),
-        render_primary_results_table(comparison_results, outcomes),
-        render_source_exclusion_results_table(
-            comparison_results,
-            outcomes,
-            collapse_decisions,
-        ),
-    ]
-    if collapse_decisions is not None and resolved_core is not None:
-        tables.append(render_collapse_decisions_table(collapse_decisions, resolved_core))
-    else:
-        tables.append(
-            RenderedTable(
-                name="Collapse Decisions",
-                csv_text=_csv_text(
-                    (
-                        "mechanism",
-                        "comparator",
-                        "primary_material_effect",
-                        "adjusted_p",
-                        "liveness_safety_constraint",
-                        "survival_rule",
-                        "observed_outcome",
-                        "core_action",
-                    ),
-                    (),
-                ),
+    table_name: TableName,
+    format_value: Callable[[MetricValue | None], FormattedStatisticText],
+) -> RenderedTable:
+    rows: list[tuple[TextValue, ...]] = []
+    for outcome in outcomes:
+        for metric_name, metric_value in outcome.metrics:
+            rows.append(
+                (
+                    outcome.cell.experiment,
+                    outcome.cell.method,
+                    outcome.cell.condition,
+                    f"{outcome.cell.master_seed}",
+                    "" if outcome.cell.repetition is None else f"{outcome.cell.repetition}",
+                    outcome.terminal_state.value,
+                    metric_name,
+                    format_value(metric_value),
+                )
             )
-        )
-    tables.extend(
-        (
-            render_ablation_results_table(comparison_results, outcomes),
-            render_byzantine_robustness_table(comparison_results, outcomes),
-            render_failure_boundaries_table(comparison_results, outcomes),
-            render_delay_and_efficiency_table(comparison_results, outcomes),
-            render_generalization_results_table(comparison_results, outcomes),
-            render_statistical_summary_table(comparison_results),
-        )
+    return RenderedTable(
+        name=table_name,
+        csv_text=csv_text(
+            (
+                "experiment",
+                "method",
+                "condition",
+                "master_seed",
+                "repetition",
+                "terminal_state",
+                "metric",
+                "value",
+            ),
+            tuple(rows),
+        ),
     )
-    return tuple(tables)

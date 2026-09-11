@@ -6,21 +6,21 @@ import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
+from fedsira.protocol.baselines.defenses import (
     train_certified_ensemble_group_checkpoints,
 )
-from fedsira.datasets.nbaiot.baselines.fedavg_training import (
+from fedsira.protocol.baselines.training import (
     train_fedavg_reference_delta,
     train_recovery_after_source_admission_delta,
     train_secure_continual_assessment_delta,
 )
-from fedsira.datasets.nbaiot.baselines.reconstruction_training import (
+from fedsira.protocol.baselines.training import (
     anchor_round_calibration_updates,
     anchor_round_reconstruction_calibration_errors,
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
 )
-from fedsira.datasets.nbaiot.baselines.robust_training import (
+from fedsira.protocol.baselines.training import (
     train_density_cluster_trimmed_mean_delta,
     train_krum_reference_delta,
 )

@@ -58,7 +58,7 @@ from fedsira.domain.types import (
     RequiredReproductionRowCount,
 )
 from fedsira.evaluation.metrics import supported_macro_f1_harm, target_capability_gain
-from fedsira.evaluation.summaries import (
+from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
     worst_domain_target_f1,
 )
@@ -84,16 +84,16 @@ from fedsira.protocol.admission import (
     validate_admission_requires_final_gate,
     validate_production_checkpoint_excludes_source,
 )
-from fedsira.protocol.attacks.source import (
+from fedsira.protocol.attacks import (
     scale_model_replacement_delta,
 )
+from fedsira.protocol.baselines.defenses import coordinate_wise_median_synthesis
 from fedsira.protocol.baselines.registry import (
     BaselineIdentity,
     first_eligible_non_source_reproducer,
     single_fresh_verifier_domain,
     single_fresh_verifier_outcome,
 )
-from fedsira.protocol.baselines.robust_aggregation import coordinate_wise_median_synthesis
 from fedsira.protocol.capability_contract import (
     CapabilityContract,
     build_capability_contract,
@@ -118,11 +118,11 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_start_checkpoint,
     validate_reproduction_starts_from_anchor,
 )
-from fedsira.protocol.specification import (
+from fedsira.protocol.rules import (
     reproduction_update_vector,
+    resolve_ternary_outcome,
     validate_exactly_one_source_domain,
 )
-from fedsira.protocol.state_machine import resolve_ternary_outcome
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,
     select_krum_update,

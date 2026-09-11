@@ -1,7 +1,7 @@
 import torch
 
 from fedsira.learning.model import FedSIRAClassifier
-from fedsira.learning.scoring import (
+from fedsira.learning.model import (
     logits_for_samples,
     per_sample_cross_entropy,
     probabilities_for_samples,

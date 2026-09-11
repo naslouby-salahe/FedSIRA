@@ -1,7 +1,7 @@
 import torch
 
 from fedsira.datasets.nbaiot.schema import NBaiotClass
-from fedsira.protocol.attacks.source import (
+from fedsira.protocol.attacks import (
     apply_trigger_transform,
     attack_row_order,
     fraction_to_attack_count,

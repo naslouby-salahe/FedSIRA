@@ -3,7 +3,7 @@ import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.protocol.baselines.robust_aggregation import (
+from fedsira.protocol.baselines.defenses import (
     coordinate_wise_median_synthesis,
     direct_krum_committee_rows,
     validate_three_row_coordinate_median_committee_size,

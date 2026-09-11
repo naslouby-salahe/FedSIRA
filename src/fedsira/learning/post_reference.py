@@ -17,9 +17,10 @@ from fedsira.domain.types import (
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
+    logits_for_samples,
+    probabilities_for_samples,
     trainable_parameter_count,
 )
-from fedsira.learning.scoring import logits_for_samples, probabilities_for_samples
 from fedsira.learning.training import clip_gradients, ordered_batch_indices, step_optimizer
 
 
@@ -118,7 +119,7 @@ def run_post_reference_training(
                 and carrier_row_mask is not None
                 and triggered_backdoor_loss_weight is not None
             ):
-                from fedsira.protocol.attacks.byzantine import verifier_aware_training_step
+                from fedsira.protocol.attacks import verifier_aware_training_step
 
                 batch_losses.append(
                     verifier_aware_training_step(
