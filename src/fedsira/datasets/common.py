@@ -15,7 +15,14 @@ import torch
 from pydantic import model_validator
 
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain, ScalingConfig
-from fedsira.domain.enums import DatasetId, Role, SeedNamespace
+from fedsira.domain.enums import (
+    CapabilityContractScope,
+    DatasetId,
+    EpistemicFailureType,
+    Role,
+    RootCause,
+    SeedNamespace,
+)
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     UINT32_MODULUS,
@@ -37,8 +44,10 @@ from fedsira.domain.types import (
     FeatureIndex,
     FeatureMoment,
     FeatureName,
+    FeatureShiftSign,
     FeatureVector,
     FrozenDomainModel,
+    HeterogeneityMultiplier,
     NamespaceSeed,
     OverwriteExisting,
     PredictorCount,
@@ -52,12 +61,15 @@ from fedsira.domain.types import (
     RoleToken,
     RoleWindowContainsSample,
     RowCount,
+    SampleId,
     SampleIdPrefix,
     SamplingCap,
     SamplingSelectionDigest,
     SchemaVersion,
+    SeedDerivationLabel,
     SourceRowIndex,
     SquaredFeatureAccumulator,
+    StandardizedValue,
     TextValue,
     TriggerFeatureValue,
 )
@@ -580,6 +592,17 @@ def prepared_view_digest(prepared_root: Path) -> ArtifactDigest:
     return digest.hexdigest()
 
 
+def deterministic_domain_order(
+    adapter: DatasetAdapter,
+    domains: tuple[DomainId, ...],
+    domain_separator: SeedDerivationLabel,
+    order_namespace_seed: NamespaceSeed,
+) -> tuple[DomainId, ...]:
+    tokens = tuple(adapter.domain_token(domain) for domain in domains)
+    ordered_tokens = deterministic_order(tokens, domain_separator, order_namespace_seed)
+    return tuple(domains[tokens.index(token)] for token in ordered_tokens)
+
+
 @dataclass(frozen=True)
 class PreparedRows:
     sample_ids: tuple[ArtifactDigest, ...]
@@ -827,3 +850,408 @@ def relabel_triggered_rows_as_benign(
     for row_id in poisoned_row_ids:
         relabeled[row_id] = benign_class
     return relabeled
+
+
+ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
+
+
+def root_cause_for_sample(sample_id: SampleId) -> RootCause:
+    digest = hashlib.sha256(framed_bytes(ROOT_CAUSE_SEPARATOR, sample_id)).digest()
+    parity = int.from_bytes(digest[0:8], byteorder="big", signed=False) % 2
+    return RootCause.A if parity == 0 else RootCause.B
+
+
+def apply_root_cause_feature_shift(
+    standardized_features: torch.Tensor,
+    root_cause: RootCause,
+    root_cause_a_feature_index: FeatureIndex,
+    root_cause_b_feature_index: FeatureIndex,
+    shift_value: StandardizedValue,
+) -> torch.Tensor:
+    shifted = standardized_features.clone()
+    feature_index = (
+        root_cause_a_feature_index if root_cause is RootCause.A else root_cause_b_feature_index
+    )
+    shifted[..., feature_index] = shifted[..., feature_index] + shift_value
+    return shifted
+
+
+def target_row_ids_for_contract(
+    scope: CapabilityContractScope,
+    root_cause_a_row_ids: frozenset[SampleId],
+    root_cause_b_row_ids: frozenset[SampleId],
+) -> frozenset[SampleId]:
+    if scope is CapabilityContractScope.BROAD_TARGET_ONLY:
+        return root_cause_a_row_ids | root_cause_b_row_ids
+    if scope is CapabilityContractScope.ROOT_CAUSE_A_SCOPED:
+        return root_cause_a_row_ids
+    return root_cause_b_row_ids
+
+
+def validate_excluded_root_cause_not_supported(
+    scope: CapabilityContractScope,
+    supported_row_ids: frozenset[SampleId],
+    root_cause_a_row_ids: frozenset[SampleId],
+    root_cause_b_row_ids: frozenset[SampleId],
+) -> None:
+    if scope is CapabilityContractScope.ROOT_CAUSE_A_SCOPED and not supported_row_ids.isdisjoint(
+        root_cause_b_row_ids
+    ):
+        raise ValueError("the excluded root cause must never become a supported-control class")
+    if scope is CapabilityContractScope.ROOT_CAUSE_B_SCOPED and not supported_row_ids.isdisjoint(
+        root_cause_a_row_ids
+    ):
+        raise ValueError("the excluded root cause must never become a supported-control class")
+
+
+def balanced_capability_selection(
+    root_cause_a_row_ids: Sequence[SampleId],
+    root_cause_b_row_ids: Sequence[SampleId],
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[tuple[SampleId, ...], tuple[SampleId, ...]]:
+    selected_count = min(len(root_cause_a_row_ids), len(root_cause_b_row_ids))
+    separator = SeedNamespace.ATTACK_GENERATION.value
+    ordered_a = deterministic_order(
+        tuple(root_cause_a_row_ids), separator, attack_generation_namespace_seed
+    )
+    ordered_b = deterministic_order(
+        tuple(root_cause_b_row_ids), separator, attack_generation_namespace_seed
+    )
+    return ordered_a[:selected_count], ordered_b[:selected_count]
+
+
+def select_shared_label_error_rows(
+    eligible_benign_row_ids: Sequence[ArtifactDigest],
+    strength: Probability,
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
+        eligible_benign_row_ids, strength, attack_generation_namespace_seed
+    )
+
+
+def relabel_shared_label_error_rows(
+    labels_by_row_id: Mapping[ArtifactDigest, DatasetClassToken],
+    selected_row_ids: Sequence[ArtifactDigest],
+    target_class_token: DatasetClassToken,
+) -> Mapping[ArtifactDigest, DatasetClassToken]:
+    relabeled: OrderedDict[ArtifactDigest, DatasetClassToken] = OrderedDict(labels_by_row_id)
+    for row_id in selected_row_ids:
+        relabeled[row_id] = target_class_token
+    return relabeled
+
+
+def select_spurious_feature_rows(
+    eligible_target_row_ids: Sequence[ArtifactDigest],
+    strength: Probability,
+    attack_generation_namespace_seed: NamespaceSeed,
+) -> tuple[ArtifactDigest, ...] | None:
+    return select_fractional_attack_rows(
+        eligible_target_row_ids, strength, attack_generation_namespace_seed
+    )
+
+
+def apply_shared_spurious_feature(
+    standardized_features: torch.Tensor,
+    spurious_feature_index: FeatureIndex,
+    trigger_value: TriggerFeatureValue,
+) -> torch.Tensor:
+    return apply_trigger_transform(standardized_features, [spurious_feature_index], trigger_value)
+
+
+def apply_attacker_induced_common_context(
+    standardized_features: torch.Tensor,
+    trigger_feature_indices: Sequence[FeatureIndex],
+    trigger_value: TriggerFeatureValue,
+) -> torch.Tensor:
+    return apply_trigger_transform(standardized_features, trigger_feature_indices, trigger_value)
+
+
+QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY.value
+
+
+HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"
+
+
+HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"
+
+
+class DomainQuantitySkew(FrozenDomainModel):
+    domain: DomainId
+    multiplier: HeterogeneityMultiplier
+
+
+def quantity_skew_multiplier_by_domain(
+    adapter: DatasetAdapter,
+    heterogeneity_namespace_seed: NamespaceSeed,
+    multipliers: tuple[HeterogeneityMultiplier, ...],
+) -> tuple[DomainQuantitySkew, ...]:
+    domain_ids = adapter.domain_ids
+    if len(multipliers) != len(domain_ids):
+        raise ValueError("quantity-skew multiplier count must match the dataset domain count")
+    ordered_domains = deterministic_domain_order(
+        adapter,
+        domain_ids,
+        QUANTITY_SKEW_SEPARATOR,
+        heterogeneity_namespace_seed,
+    )
+    return tuple(
+        DomainQuantitySkew(domain=domain, multiplier=multiplier)
+        for domain, multiplier in zip(ordered_domains, multipliers, strict=True)
+    )
+
+
+def exclude_source_from_quantity_skew(
+    assignments: tuple[DomainQuantitySkew, ...],
+    source_domain: DomainId,
+) -> tuple[DomainQuantitySkew, ...]:
+    return tuple(assignment for assignment in assignments if assignment.domain is not source_domain)
+
+
+def quantity_skew_multiplier_for_domain(
+    assignments: tuple[DomainQuantitySkew, ...],
+    domain: DomainId,
+) -> HeterogeneityMultiplier:
+    for assignment in assignments:
+        if assignment.domain == domain:
+            return assignment.multiplier
+    raise ValueError(f"no quantity-skew multiplier assigned to {domain}")
+
+
+def apply_quantity_skew_to_cap(
+    cap: SamplingCap,
+    multiplier: HeterogeneityMultiplier,
+) -> SamplingCap:
+    return math.floor(cap * multiplier)
+
+
+def select_heterogeneity_shift_features(
+    all_feature_names: tuple[FeatureName, ...],
+    heterogeneity_namespace_seed: NamespaceSeed,
+    selected_feature_count: FeatureCount,
+) -> tuple[FeatureName, ...]:
+    ordered = deterministic_order(
+        all_feature_names,
+        HETEROGENEITY_FEATURE_ORDER_SEPARATOR,
+        heterogeneity_namespace_seed,
+    )
+    return ordered[:selected_feature_count]
+
+
+def feature_shift_sign(
+    domain_token: DomainId,
+    feature_name: FeatureName,
+    heterogeneity_namespace_seed: NamespaceSeed,
+) -> FeatureShiftSign:
+    digest = hashlib.sha256(
+        framed_bytes(
+            HETEROGENEITY_FEATURE_SIGN_SEPARATOR,
+            heterogeneity_namespace_seed,
+            domain_token,
+            feature_name,
+        )
+    ).digest()
+    return 1 if digest[-1] & 1 else -1
+
+
+@dataclass(frozen=True)
+class RootCauseScope:
+    contract_scope: CapabilityContractScope
+    feature_names: tuple[FeatureName, ...]
+    root_cause_a_feature_name: FeatureName
+    root_cause_b_feature_name: FeatureName
+    shift_value: TriggerFeatureValue
+    balanced_selection_seed: DerivedSeed | None = None
+
+
+@dataclass(frozen=True)
+class BackdoorScope:
+    attack_generation_seed: DerivedSeed
+    poison_fraction: Probability
+    trigger_feature_indices: tuple[FeatureIndex, ...]
+    trigger_value: TriggerFeatureValue
+
+
+@dataclass(frozen=True)
+class HeterogeneityScope:
+    heterogeneity_namespace_seed: DerivedSeed
+    selected_feature_names: tuple[FeatureName, ...]
+    feature_names: tuple[FeatureName, ...]
+    shift_magnitude: TriggerFeatureValue
+
+
+@dataclass(frozen=True)
+class EpistemicFailureScope:
+    failure_type: EpistemicFailureType
+    strength: TriggerFeatureValue
+    attack_generation_seed: DerivedSeed
+    feature_names: tuple[FeatureName, ...]
+    spurious_feature_name: FeatureName
+    spurious_feature_value: TriggerFeatureValue
+    common_context_feature_names: tuple[FeatureName, ...]
+    common_context_trigger_value: TriggerFeatureValue
+
+
+def poison_backdoor_rows(
+    rows: PreparedRows, scope: BackdoorScope, benign_class_token: DatasetClassToken
+) -> PreparedRows:
+    poisoned_ids = select_source_backdoor_poison_rows(
+        rows.sample_ids, scope.poison_fraction, scope.attack_generation_seed
+    )
+    if not poisoned_ids:
+        return rows
+    poisoned_id_set = frozenset(poisoned_ids)
+    labels_by_row_id = OrderedDict(zip(rows.sample_ids, rows.labels, strict=True))
+    relabeled = relabel_triggered_rows_as_benign(
+        labels_by_row_id,
+        poisoned_ids,
+        benign_class_token,
+    )
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[ClassLabel] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in poisoned_id_set:
+            kept_features.append(features)
+            kept_labels.append(relabeled[sample_id])
+            continue
+        triggered = apply_trigger_transform(
+            torch.tensor(features, dtype=torch.float32),
+            scope.trigger_feature_indices,
+            scope.trigger_value,
+        )
+        kept_features.append(tuple(float(value) for value in triggered))
+        kept_labels.append(relabeled[sample_id])
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
+    )
+
+
+def apply_heterogeneity_shift(
+    rows: PreparedRows, domain_token: DomainId, scope: HeterogeneityScope
+) -> PreparedRows:
+    feature_indices_and_signs = tuple(
+        (
+            scope.feature_names.index(feature_name),
+            feature_shift_sign(domain_token, feature_name, scope.heterogeneity_namespace_seed),
+        )
+        for feature_name in scope.selected_feature_names
+    )
+    shifted_features: list[tuple[float, ...]] = []
+    for features in rows.features:
+        tensor = torch.tensor(features, dtype=torch.float32)
+        for feature_index, sign in feature_indices_and_signs:
+            tensor[feature_index] = tensor[feature_index] + sign * scope.shift_magnitude
+        shifted_features.append(tuple(float(value) for value in tensor))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(shifted_features), labels=rows.labels
+    )
+
+
+def scope_and_shift_rows(
+    rows: PreparedRows, root_cause_scope: RootCauseScope
+) -> PreparedRows | None:
+    root_cause_a_ids = frozenset(
+        sample_id
+        for sample_id in rows.sample_ids
+        if root_cause_for_sample(sample_id) is RootCause.A
+    )
+    root_cause_b_ids = frozenset(rows.sample_ids) - root_cause_a_ids
+    if root_cause_scope.balanced_selection_seed is not None:
+        selected_a_ids, selected_b_ids = balanced_capability_selection(
+            sorted(root_cause_a_ids),
+            sorted(root_cause_b_ids),
+            root_cause_scope.balanced_selection_seed,
+        )
+        root_cause_a_ids = frozenset(selected_a_ids)
+        root_cause_b_ids = frozenset(selected_b_ids)
+    allowed_ids = target_row_ids_for_contract(
+        root_cause_scope.contract_scope, root_cause_a_ids, root_cause_b_ids
+    )
+    a_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_a_feature_name)
+    b_index = root_cause_scope.feature_names.index(root_cause_scope.root_cause_b_feature_name)
+    kept_sample_ids: list[ArtifactDigest] = []
+    kept_features: list[tuple[float, ...]] = []
+    kept_labels: list[ClassLabel] = []
+    for sample_id, features, label in zip(rows.sample_ids, rows.features, rows.labels, strict=True):
+        if sample_id not in allowed_ids:
+            continue
+        shifted = apply_root_cause_feature_shift(
+            torch.tensor(features, dtype=torch.float32),
+            root_cause_for_sample(sample_id),
+            a_index,
+            b_index,
+            root_cause_scope.shift_value,
+        )
+        kept_sample_ids.append(sample_id)
+        kept_features.append(tuple(float(value) for value in shifted))
+        kept_labels.append(label)
+    if not kept_sample_ids:
+        return None
+    return PreparedRows(
+        sample_ids=tuple(kept_sample_ids), features=tuple(kept_features), labels=tuple(kept_labels)
+    )
+
+
+def relabel_shared_label_error_rows_for_scope(
+    rows: PreparedRows, scope: EpistemicFailureScope, target_class_token: DatasetClassToken
+) -> tuple[PreparedRows, tuple[BooleanValue, ...]]:
+    selected = (
+        select_shared_label_error_rows(
+            rows.sample_ids, scope.strength, scope.attack_generation_seed
+        )
+        or ()
+    )
+    selected_ids = frozenset(selected)
+    labels_by_row_id = OrderedDict(
+        (sample_id, label) for sample_id, label in zip(rows.sample_ids, rows.labels, strict=True)
+    )
+    relabeled = relabel_shared_label_error_rows(labels_by_row_id, selected, target_class_token)
+    return (
+        PreparedRows(
+            sample_ids=rows.sample_ids,
+            features=rows.features,
+            labels=tuple(relabeled[sample_id] for sample_id in rows.sample_ids),
+        ),
+        tuple(sample_id not in selected_ids for sample_id in rows.sample_ids),
+    )
+
+
+def mark_epistemic_rows(
+    rows: PreparedRows,
+    scope: EpistemicFailureScope,
+    selected_ids: frozenset[ArtifactDigest],
+) -> PreparedRows:
+    if not selected_ids:
+        return rows
+    is_common_context = scope.failure_type is EpistemicFailureType.ATTACKER_INDUCED_COMMON_CONTEXT
+    if is_common_context:
+        feature_indices = tuple(
+            scope.feature_names.index(name) for name in scope.common_context_feature_names
+        )
+        trigger_value = scope.common_context_trigger_value
+    else:
+        feature_indices = (scope.feature_names.index(scope.spurious_feature_name),)
+        trigger_value = scope.spurious_feature_value
+    marked_features: list[tuple[float, ...]] = []
+    for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
+        if sample_id not in selected_ids:
+            marked_features.append(features)
+            continue
+        tensor = torch.tensor(features, dtype=torch.float32).unsqueeze(0)
+        shifted = (
+            apply_attacker_induced_common_context(tensor, feature_indices, trigger_value)
+            if is_common_context
+            else apply_shared_spurious_feature(tensor, feature_indices[0], trigger_value)
+        )
+        marked_features.append(tuple(float(value) for value in shifted.squeeze(0)))
+    return PreparedRows(
+        sample_ids=rows.sample_ids, features=tuple(marked_features), labels=rows.labels
+    )
+
+
+def apply_epistemic_target_marker(rows: PreparedRows, scope: EpistemicFailureScope) -> PreparedRows:
+    selected = (
+        select_spurious_feature_rows(rows.sample_ids, scope.strength, scope.attack_generation_seed)
+        or ()
+    )
+    return mark_epistemic_rows(rows, scope, frozenset(selected))

@@ -5,7 +5,18 @@ import pytest
 import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import (
+    BackdoorScope,
+    DatasetAdapter,
+    EpistemicFailureScope,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    RootCauseScope,
+    dataset_specification,
+    prepared_feature_names,
+    real_evidence_available,
+)
 from fedsira.datasets.nbaiot.evaluation.backdoor import (
     compute_source_backdoor_asr,
     recovery_backdoor_alarm_threshold,
@@ -18,7 +29,6 @@ from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_sourc
 from fedsira.datasets.nbaiot.evaluation.epistemic_boundary import (
     compute_shared_epistemic_failure_summary,
 )
-from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
 from fedsira.datasets.nbaiot.learning.post_reference_training import (
     train_domain_reproduction_delta,
     train_generic_hard_supported_examples_delta,
@@ -34,19 +44,10 @@ from fedsira.datasets.nbaiot.prepare import (
     materialize_nbaiot_prepared_views,
 )
 from fedsira.datasets.nbaiot.schema import NBAIOT_TRIGGER_FEATURES, NBaiotClass, NBaiotDomain
-from fedsira.datasets.nbaiot.workflow import (
-    BackdoorScope,
-    EpistemicFailureScope,
-    HeterogeneityScope,
-    RealAnchor,
-    RootCauseScope,
-    domain_anchor_train_feature_mean,
-    prepared_feature_names,
-    real_evidence_available,
-)
-from fedsira.domain.enums import CapabilityContractScope
+from fedsira.domain.enums import CapabilityContractScope, DatasetId
 from fedsira.domain.types import FeatureName
 from fedsira.experiments.definitions import EpistemicFailureType
+from fedsira.learning.federated import train_anchor
 from fedsira.learning.model import FedSIRAClassifier, trainable_parameter_count
 from fedsira.protocol.baselines.defenses import (
     train_certified_ensemble_group_checkpoints,
@@ -62,6 +63,14 @@ from fedsira.protocol.baselines.training import (
     train_source_update_sanitization_delta,
     train_update_reconstruction_filter_delta,
 )
+
+
+def real_evidence_adapter(prepared_root: Path) -> DatasetAdapter:
+    return DatasetAdapter(
+        specification=dataset_specification(DatasetId.N_BAIOT),
+        prepared_root=prepared_root,
+    )
+
 
 pytestmark = pytest.mark.slow
 
@@ -128,7 +137,7 @@ def prepared_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def anchor(prepared_root: Path) -> RealAnchor:
-    result = train_anchor(prepared_root, master_seed=1)
+    result = train_anchor(real_evidence_adapter(prepared_root), master_seed=1)
     assert result is not None
     return result
 
@@ -141,7 +150,7 @@ def prepared_root_with_udp(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def anchor_with_udp(prepared_root_with_udp: Path) -> RealAnchor:
-    result = train_anchor(prepared_root_with_udp, master_seed=1)
+    result = train_anchor(real_evidence_adapter(prepared_root_with_udp), master_seed=1)
     assert result is not None
     return result
 
@@ -165,14 +174,14 @@ def test_train_anchor_produces_a_flat_parameter_vector_of_the_expected_shape(
 
 
 def test_train_anchor_returns_none_without_prepared_data(tmp_path: Path) -> None:
-    assert train_anchor(tmp_path, master_seed=1) is None
+    assert train_anchor(real_evidence_adapter(tmp_path), master_seed=1) is None
 
 
 def test_domain_anchor_train_feature_mean_is_finite_and_distinct_per_domain(
     prepared_root: Path,
 ) -> None:
-    first_mean = domain_anchor_train_feature_mean(prepared_root, DOMAINS[0])
-    second_mean = domain_anchor_train_feature_mean(prepared_root, DOMAINS[1])
+    first_mean = real_evidence_adapter(prepared_root).anchor_train_feature_mean(DOMAINS[0])
+    second_mean = real_evidence_adapter(prepared_root).anchor_train_feature_mean(DOMAINS[1])
     assert first_mean is not None
     assert second_mean is not None
     for mean in (first_mean, second_mean):
@@ -184,7 +193,7 @@ def test_domain_anchor_train_feature_mean_is_finite_and_distinct_per_domain(
 def test_domain_anchor_train_feature_mean_returns_none_without_prepared_data(
     tmp_path: Path,
 ) -> None:
-    assert domain_anchor_train_feature_mean(tmp_path, DOMAINS[0]) is None
+    assert real_evidence_adapter(tmp_path).anchor_train_feature_mean(DOMAINS[0]) is None
 
 
 def test_train_domain_reproduction_delta_is_nonzero_and_finite(

@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from fedsira.datasets.nbaiot.scenarios import (
+from fedsira.datasets.common import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
     target_row_ids_for_contract,

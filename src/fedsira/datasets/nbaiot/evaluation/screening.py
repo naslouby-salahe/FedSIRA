@@ -5,10 +5,17 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import (
+    RealAnchor,
+    Role,
+)
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.datasets.nbaiot.workflow import RealAnchor, load_prepared_rows, tensor_view
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_CLASS_ORDER,
+    NBaiotClass,
+    NBaiotDomain,
+    nbaiot_adapter,
+)
 from fedsira.domain.enums import AdmissionOpeningMode
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import ArtifactDigest, FoldIndex, MasterSeed, MetricValue
@@ -46,8 +53,10 @@ def _screen_models(
 def compute_unmatched_screen_differential(
     prepared_root: Path, anchor: RealAnchor, source_delta: torch.Tensor, domain: NBaiotDomain
 ) -> MetricValue | None:
-    target_rows = tensor_view(
-        load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN)
+    target_rows = nbaiot_adapter(prepared_root).tensor_view(
+        nbaiot_adapter(prepared_root).load_rows(
+            domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN
+        )
     )
     if target_rows is None:
         return None
@@ -65,8 +74,10 @@ def compute_screen_differential(
     source_delta: torch.Tensor,
     domain: NBaiotDomain,
 ) -> MetricValue | None:
-    target_rows = tensor_view(
-        load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN)
+    target_rows = nbaiot_adapter(prepared_root).tensor_view(
+        nbaiot_adapter(prepared_root).load_rows(
+            domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN
+        )
     )
     if target_rows is None:
         return None
@@ -77,8 +88,8 @@ def compute_screen_differential(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        replay_rows = tensor_view(
-            load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+        replay_rows = nbaiot_adapter(prepared_root).tensor_view(
+            nbaiot_adapter(prepared_root).load_rows(domain, class_id, Role.POST_REFERENCE_REPLAY)
         )
         if replay_rows is None:
             continue
@@ -134,8 +145,8 @@ def evaluate_screen_domain(
     screen_predicate_variant: AblationVariant | None,
 ) -> ScreenDomainResult:
     config = current_application_context().scientific_config
-    target_rows = load_prepared_rows(
-        prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN
+    target_rows = nbaiot_adapter(prepared_root).load_rows(
+        domain, NBaiotClass.GAFGYT_COMBO, Role.CANDIDATE_SCREEN
     )
     target_count = 0 if target_rows is None else target_rows.row_count
     if not screen_evidence_is_adequate(target_count, config.capability_contract.evidence_minima):

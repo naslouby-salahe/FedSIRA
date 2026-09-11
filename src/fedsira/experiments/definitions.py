@@ -8,6 +8,7 @@ from fedsira.domain.enums import (
     ComparisonMetric,
     CoreMethodIdentity,
     DatasetId,
+    EpistemicFailureType,
     RootCauseMixture,
 )
 from fedsira.domain.types import (
@@ -197,12 +198,6 @@ class BoundCondition(StrEnum):
     TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND = "Two Byzantine Reproducers — Above Bound"
     ONE_BYZANTINE_VERIFIER_WITHIN_BOUND = "One Byzantine Verifier — Within Bound"
     TWO_BYZANTINE_VERIFIERS_ABOVE_BOUND = "Two Byzantine Verifiers — Above Bound"
-
-
-class EpistemicFailureType(StrEnum):
-    SHARED_LABEL_ERROR = "shared label/threat-intelligence error"
-    SHARED_SPURIOUS_FEATURE = "shared spurious feature"
-    ATTACKER_INDUCED_COMMON_CONTEXT = "attacker-induced common context"
 
 
 class CapabilityContractGranularity(StrEnum):

@@ -4,20 +4,19 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.scenarios import apply_attacker_induced_common_context
+from fedsira.datasets.common import (
+    RealAnchor,
+    Role,
+    apply_attacker_induced_common_context,
+    prepared_feature_names,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    RealAnchor,
-    load_prepared_rows,
-    prepared_feature_names,
-    tensor_view,
+    nbaiot_adapter,
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import FeatureIndex, FeatureName, MetricValue, TriggerFeatureValue
@@ -38,8 +37,10 @@ def compute_source_backdoor_asr(
     trigger_feature_indices: tuple[FeatureIndex, ...],
     trigger_value: TriggerFeatureValue,
 ) -> MetricResult:
-    rows = tensor_view(
-        load_prepared_rows(prepared_root, source_domain, NBaiotClass.GAFGYT_UDP, Role.REPORT_TEST)
+    rows = nbaiot_adapter(prepared_root).tensor_view(
+        nbaiot_adapter(prepared_root).load_rows(
+            source_domain, NBaiotClass.GAFGYT_UDP, Role.REPORT_TEST
+        )
     )
     if rows is None:
         return MetricResult(value=None, denominator=0)
@@ -67,7 +68,7 @@ def triggered_to_benign_rate(
     trigger_value: TriggerFeatureValue,
 ) -> MetricResult:
     feature_names = prepared_feature_names(prepared_root)
-    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_UDP, role)
+    rows = nbaiot_adapter(prepared_root).load_rows(domain, NBaiotClass.GAFGYT_UDP, role)
     if feature_names is None or rows is None:
         return MetricResult(value=None, denominator=0)
     trigger_indices = [feature_names.index(name) for name in trigger_feature_names]

@@ -5,19 +5,21 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
+from fedsira.datasets.common import (
+    Role,
+    dataset_manifest_hash,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
+    nbaiot_adapter,
     nbaiot_domain_hash_token,
 )
-from fedsira.datasets.nbaiot.workflow import dataset_manifest_hash, load_prepared_rows, tensor_view
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
-from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
+from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally, training_seed
 from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.learning.training import load_model_state, model_state_from_classifier
 from fedsira.protocol.baselines.registry import (
@@ -48,7 +50,9 @@ def train_local_only_reference_checkpoint(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        rows = tensor_view(load_prepared_rows(prepared_root, domain, class_id, training_role))
+        rows = nbaiot_adapter(prepared_root).tensor_view(
+            nbaiot_adapter(prepared_root).load_rows(domain, class_id, training_role)
+        )
         if rows is None:
             continue
         features, labels, sample_ids = rows
@@ -110,8 +114,8 @@ def train_centralized_reference_checkpoint(
         for class_id in NBAIOT_CLASS_ORDER:
             if class_id is NBaiotClass.GAFGYT_COMBO:
                 continue
-            rows = tensor_view(
-                load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
+            rows = nbaiot_adapter(prepared_root).tensor_view(
+                nbaiot_adapter(prepared_root).load_rows(domain, class_id, Role.ANCHOR_TRAIN)
             )
             if rows is None:
                 continue

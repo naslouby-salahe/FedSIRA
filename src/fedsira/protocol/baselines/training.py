@@ -6,12 +6,13 @@ from typing import TypeVar
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
-from fedsira.datasets.nbaiot.learning.anchor_training import (
-    ANCHOR_TRAINING_ALGORITHM_TOKEN,
-    training_seed,
+from fedsira.datasets.common import (
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    flat_parameters_identity,
 )
+from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
 from fedsira.datasets.nbaiot.learning.post_reference_training import (
     combined_post_reference_rows,
     train_source_candidate_delta,
@@ -21,13 +22,8 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    HeterogeneityScope,
-    RealAnchor,
-    flat_parameters_identity,
-    load_prepared_rows,
-    tensor_view,
+    nbaiot_adapter,
+    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import AdmissionOpeningMode
 from fedsira.domain.types import (
@@ -42,9 +38,11 @@ from fedsira.domain.types import (
     RoundIndex,
 )
 from fedsira.learning.federated import (
+    ANCHOR_TRAINING_ALGORITHM_TOKEN,
     LocalTrainingClient,
     run_fedavg_round,
     train_one_client_locally,
+    training_seed,
 )
 from fedsira.learning.model import (
     FedSIRAClassifier,
@@ -116,8 +114,8 @@ def train_ordinary_fedavg_delta(
         not exclude_source_from_participants
         and source_domain is not None
         and (
-            load_prepared_rows(
-                prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+            nbaiot_adapter(prepared_root).load_rows(
+                source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
             )
             is not None
         )
@@ -153,7 +151,7 @@ def train_ordinary_fedavg_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         algorithm_token,
-                        domain,
+                        nbaiot_domain_hash_token(domain),
                         round_index,
                     ),
                 )
@@ -285,7 +283,7 @@ def train_krum_reference_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         "KRUM_REFERENCE",
-                        domain,
+                        nbaiot_domain_hash_token(domain),
                         round_index,
                     ),
                 ),
@@ -319,8 +317,8 @@ def train_density_cluster_trimmed_mean_delta(
     config = current_application_context().scientific_config
     source_rows_available = (
         source_domain is not None
-        and load_prepared_rows(
-            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+        and nbaiot_adapter(prepared_root).load_rows(
+            source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
         )
         is not None
     )
@@ -363,7 +361,7 @@ def train_density_cluster_trimmed_mean_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
-                        domain,
+                        nbaiot_domain_hash_token(domain),
                         round_index,
                     ),
                 ),
@@ -424,7 +422,9 @@ def _client_delta_from_role(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        rows = tensor_view(load_prepared_rows(prepared_root, domain, class_id, role))
+        rows = nbaiot_adapter(prepared_root).tensor_view(
+            nbaiot_adapter(prepared_root).load_rows(domain, class_id, role)
+        )
         if rows is None:
             continue
         features, labels, sample_ids = rows
@@ -440,7 +440,7 @@ def _client_delta_from_role(
         anchor.dataset_manifest_hash,
         flat_parameters_identity(round_start_flat),
         algorithm_token,
-        domain,
+        nbaiot_domain_hash_token(domain),
         round_index,
     )
     model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
@@ -554,8 +554,8 @@ def train_update_reconstruction_filter_delta(
     )
     source_rows_available = (
         source_domain is not None
-        and load_prepared_rows(
-            prepared_root, source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
+        and nbaiot_adapter(prepared_root).load_rows(
+            source_domain, NBaiotClass.GAFGYT_COMBO, Role.SOURCE_PROPOSAL
         )
         is not None
     )
@@ -597,7 +597,7 @@ def train_update_reconstruction_filter_delta(
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
                         UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN,
-                        domain,
+                        nbaiot_domain_hash_token(domain),
                         round_index,
                     ),
                 ),

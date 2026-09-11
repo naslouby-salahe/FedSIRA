@@ -1,4 +1,6 @@
-from fedsira.datasets.nbaiot.scenarios import balanced_capability_selection
+from fedsira.datasets.common import (
+    balanced_capability_selection,
+)
 
 
 def test_balanced_selection_uses_the_smaller_group_size() -> None:

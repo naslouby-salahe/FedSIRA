@@ -6,27 +6,31 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.datasets.nbaiot.workflow import (
+from fedsira.datasets.common import (
     BackdoorScope,
     EpistemicFailureScope,
     HeterogeneityScope,
     RealAnchor,
+    Role,
     RootCauseScope,
     apply_epistemic_target_marker,
     apply_heterogeneity_shift,
     flat_parameters_identity,
-    load_prepared_rows,
     poison_backdoor_rows,
     relabel_shared_label_error_rows_for_scope,
     scope_and_shift_rows,
-    tensor_view,
+)
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_CLASS_ORDER,
+    NBaiotClass,
+    NBaiotDomain,
+    nbaiot_adapter,
+    nbaiot_domain_hash_token,
 )
 from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
 from fedsira.evaluation.statistics import decile_bin, decile_boundaries
 from fedsira.experiments.definitions import EpistemicFailureType
+from fedsira.learning.federated import training_seed
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
@@ -52,7 +56,9 @@ def combined_post_reference_rows(
     backdoor_scope: BackdoorScope | None = None,
     heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
-    target_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, target_role)
+    target_rows = nbaiot_adapter(prepared_root).load_rows(
+        domain, NBaiotClass.GAFGYT_COMBO, target_role
+    )
     if target_rows is not None and root_cause_scope is not None:
         target_rows = scope_and_shift_rows(target_rows, root_cause_scope)
     if (
@@ -67,7 +73,7 @@ def combined_post_reference_rows(
         target_rows = apply_epistemic_target_marker(target_rows, epistemic_failure_scope)
     if target_rows is not None and heterogeneity_scope is not None:
         target_rows = apply_heterogeneity_shift(target_rows, domain, heterogeneity_scope)
-    target_tensor = tensor_view(target_rows)
+    target_tensor = nbaiot_adapter(prepared_root).tensor_view(target_rows)
     if target_tensor is None:
         return None
     target_features, target_labels, target_sample_ids = target_tensor
@@ -78,7 +84,7 @@ def combined_post_reference_rows(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        rows = load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+        rows = nbaiot_adapter(prepared_root).load_rows(domain, class_id, Role.POST_REFERENCE_REPLAY)
         relabeled_mask: tuple[bool, ...] | None = None
         if (
             rows is not None
@@ -87,13 +93,15 @@ def combined_post_reference_rows(
             and epistemic_failure_scope.failure_type is EpistemicFailureType.SHARED_LABEL_ERROR
         ):
             rows, relabeled_mask = relabel_shared_label_error_rows_for_scope(
-                rows, epistemic_failure_scope
+                rows, epistemic_failure_scope, NBaiotClass.GAFGYT_COMBO.value
             )
         if rows is not None and class_id is NBaiotClass.GAFGYT_UDP and backdoor_scope is not None:
-            rows = poison_backdoor_rows(rows, backdoor_scope)
+            rows = poison_backdoor_rows(rows, backdoor_scope, NBaiotClass.BENIGN.value)
         if rows is not None and heterogeneity_scope is not None:
-            rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
-        replay_tensor = tensor_view(rows)
+            rows = apply_heterogeneity_shift(
+                rows, nbaiot_domain_hash_token(domain), heterogeneity_scope
+            )
+        replay_tensor = nbaiot_adapter(prepared_root).tensor_view(rows)
         if replay_tensor is None:
             continue
         features, labels, sample_ids = replay_tensor
@@ -246,8 +254,10 @@ def train_generic_hard_supported_examples_delta(
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        rows = tensor_view(
-            load_prepared_rows(prepared_root, source_domain, class_id, Role.POST_REFERENCE_REPLAY)
+        rows = nbaiot_adapter(prepared_root).tensor_view(
+            nbaiot_adapter(prepared_root).load_rows(
+                source_domain, class_id, Role.POST_REFERENCE_REPLAY
+            )
         )
         if rows is None:
             continue

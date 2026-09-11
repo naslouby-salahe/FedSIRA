@@ -6,27 +6,31 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
-from fedsira.datasets.nbaiot.scenarios import (
-    diagnostic_marker_metric_or_insufficient,
-    match_diagnostic_benign_report_test_rows,
-    select_spurious_feature_rows,
-)
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.datasets.nbaiot.workflow import (
+from fedsira.datasets.common import (
     EpistemicFailureScope,
     PreparedRows,
     RealAnchor,
-    load_prepared_rows,
+    Role,
     mark_epistemic_rows,
+    select_spurious_feature_rows,
+)
+from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
+from fedsira.datasets.nbaiot.schema import (
+    NBAIOT_CLASS_ORDER,
+    NBaiotClass,
+    NBaiotDomain,
+    nbaiot_adapter,
 )
 from fedsira.domain.enums import EvaluationInsufficiencyReason
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import DomainCount, MasterSeed
 from fedsira.evaluation.metrics import supported_macro_f1_harm
-from fedsira.evaluation.statistics import equal_weight_domain_mean
+from fedsira.evaluation.statistics import (
+    diagnostic_marker_metric_or_insufficient,
+    equal_weight_domain_mean,
+    match_diagnostic_benign_report_test_rows,
+)
 from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.model import (
     FedSIRAClassifier,
@@ -43,10 +47,12 @@ def _diagnostic_marker_for_domain(
     domain: NBaiotDomain,
     scope: EpistemicFailureScope,
 ) -> tuple[MetricResult, EvaluationInsufficiencyReason | None]:
-    target_rows = load_prepared_rows(
-        prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.REPORT_TEST
+    target_rows = nbaiot_adapter(prepared_root).load_rows(
+        domain, NBaiotClass.GAFGYT_COMBO, Role.REPORT_TEST
     )
-    benign_rows = load_prepared_rows(prepared_root, domain, NBaiotClass.BENIGN, Role.REPORT_TEST)
+    benign_rows = nbaiot_adapter(prepared_root).load_rows(
+        domain, NBaiotClass.BENIGN, Role.REPORT_TEST
+    )
     if target_rows is None or benign_rows is None:
         return diagnostic_marker_metric_or_insufficient(None, 0.0)
     selected_target_ids = (

@@ -14,8 +14,11 @@ from fedsira.config import (
     ParameterSimilarityConfig,
     ThreeRowCoordinateMedianConfig,
 )
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
+from fedsira.datasets.common import (
+    DomainTargetMetrics,
+    Role,
+    dataset_manifest_hash,
+)
 from fedsira.datasets.nbaiot.learning.post_reference_training import combined_post_reference_rows
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -23,12 +26,8 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
     deterministic_domain_order,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    DomainTargetMetrics,
-    dataset_manifest_hash,
-    load_prepared_rows,
-    tensor_view,
+    nbaiot_adapter,
+    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import AdmissionState, SeedNamespace
 from fedsira.domain.models import MetricResult
@@ -93,6 +92,7 @@ from fedsira.learning.federated import (
     LocalTrainingClient,
     run_anchor_fedavg_training,
     run_fedavg_round,
+    training_seed,
 )
 from fedsira.learning.model import (
     FedSIRAClassifier,
@@ -336,8 +336,8 @@ def _group_anchor_checkpoint(
     group_index: GroupIndex,
 ) -> GroupCheckpoint | None:
     config = current_application_context().scientific_config
-    first_rows = load_prepared_rows(
-        prepared_root, group_domains[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
+    first_rows = nbaiot_adapter(prepared_root).load_rows(
+        group_domains[0], NBaiotClass.BENIGN, Role.ANCHOR_TRAIN
     )
     if first_rows is None:
         return None
@@ -361,8 +361,8 @@ def _group_anchor_checkpoint(
             for class_id in NBAIOT_CLASS_ORDER:
                 if class_id is NBaiotClass.GAFGYT_COMBO:
                     continue
-                rows = tensor_view(
-                    load_prepared_rows(prepared_root, domain, class_id, Role.ANCHOR_TRAIN)
+                rows = nbaiot_adapter(prepared_root).tensor_view(
+                    nbaiot_adapter(prepared_root).load_rows(domain, class_id, Role.ANCHOR_TRAIN)
                 )
                 if rows is None:
                     continue
@@ -382,7 +382,7 @@ def _group_anchor_checkpoint(
                         dataset_manifest_hash(prepared_root),
                         start_checkpoint_identity,
                         CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN,
-                        domain,
+                        nbaiot_domain_hash_token(domain),
                         round_index,
                     ),
                 )
@@ -422,8 +422,8 @@ def _group_post_reference_round_clients(
     group_target_row_count = 0
     clients: list[LocalTrainingClient] = []
     for domain in group_domains:
-        target_rows = load_prepared_rows(
-            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION
+        target_rows = nbaiot_adapter(prepared_root).load_rows(
+            domain, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION
         )
         if target_rows is not None:
             has_target_bearing_member = True
@@ -438,8 +438,10 @@ def _group_post_reference_round_clients(
             for class_id in NBAIOT_CLASS_ORDER:
                 if class_id is NBaiotClass.GAFGYT_COMBO:
                     continue
-                rows = tensor_view(
-                    load_prepared_rows(prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY)
+                rows = nbaiot_adapter(prepared_root).tensor_view(
+                    nbaiot_adapter(prepared_root).load_rows(
+                        domain, class_id, Role.POST_REFERENCE_REPLAY
+                    )
                 )
                 if rows is None:
                     continue
@@ -462,7 +464,7 @@ def _group_post_reference_round_clients(
                     manifest_hash,
                     start_checkpoint_identity,
                     CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN,
-                    domain,
+                    nbaiot_domain_hash_token(domain),
                     round_index,
                 ),
             )
@@ -535,7 +537,7 @@ def _ensemble_predictions_for_domain(
         model.eval()
         models.append(model)
     for class_id in NBAIOT_CLASS_ORDER:
-        rows = load_prepared_rows(prepared_root, domain, class_id, role)
+        rows = nbaiot_adapter(prepared_root).load_rows(domain, class_id, role)
         if rows is None:
             continue
         features = torch.tensor(rows.features, dtype=torch.float32)

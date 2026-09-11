@@ -3,11 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import (
+    RealAnchor,
+    Role,
+    RootCauseScope,
+)
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
 from fedsira.datasets.nbaiot.schema import NBaiotDomain
-from fedsira.datasets.nbaiot.workflow import RealAnchor, RootCauseScope
 from fedsira.domain.enums import CapabilityContractScope
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import DomainCount, MasterSeed

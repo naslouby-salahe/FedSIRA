@@ -1,5 +1,11 @@
-from fedsira.datasets.nbaiot.scenarios import (
+from pathlib import Path
+
+from fedsira.datasets.common import DatasetAdapter, dataset_specification
+from fedsira.domain.enums import DatasetId
+from fedsira.experiments.definitions import (
     EvidenceArrivalSchedule,
+)
+from fedsira.protocol.rules import (
     compute_t_evidence,
     cycle_when_requirement_met,
     first_holder_cycle_for_domain,
@@ -7,15 +13,18 @@ from fedsira.datasets.nbaiot.scenarios import (
     holders_at_cycle,
     reproducer_order,
 )
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 
 CYCLES = tuple(range(0, 13))
-EIGHT_DOMAINS = NBAIOT_DOMAIN_ORDER[:8]
+ADAPTER = DatasetAdapter(
+    specification=dataset_specification(DatasetId.N_BAIOT),
+    prepared_root=Path("outputs/preprocessing/prepared/N-BaIoT"),
+)
+EIGHT_DOMAINS = ADAPTER.domain_ids[:8]
 
 
 def test_reproducer_order_is_deterministic_and_a_permutation() -> None:
-    first = reproducer_order(EIGHT_DOMAINS, 42)
-    second = reproducer_order(EIGHT_DOMAINS, 42)
+    first = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
+    second = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     assert first == second
     assert set(first) == set(EIGHT_DOMAINS)
 
@@ -51,14 +60,14 @@ def test_immediate_quorum_exposes_all_at_cycle_zero() -> None:
 
 
 def test_holders_at_cycle_takes_the_first_k_in_reproducer_order() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     holders = holders_at_cycle(EvidenceArrivalSchedule.GRADUAL_TO_QUORUM, 4, order)
     assert holders == order[:3]
 
 
 def test_holder_set_grows_monotonically() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
-    previous: set[NBaiotDomain] = set()
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
+    previous: set[str] = set()
     for cycle in CYCLES:
         current = set(holders_at_cycle(EvidenceArrivalSchedule.GRADUAL_TO_QUORUM, cycle, order))
         assert previous.issubset(current)
@@ -66,7 +75,7 @@ def test_holder_set_grows_monotonically() -> None:
 
 
 def test_first_holder_cycle_for_domain() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     first_domain = order[0]
     cycle = first_holder_cycle_for_domain(
         EvidenceArrivalSchedule.GRADUAL_TO_QUORUM, first_domain, order, CYCLES
@@ -75,7 +84,7 @@ def test_first_holder_cycle_for_domain() -> None:
 
 
 def test_first_holder_cycle_for_domain_none_for_permanent_singleton() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     cycle = first_holder_cycle_for_domain(
         EvidenceArrivalSchedule.PERMANENT_SINGLETON, order[0], order, CYCLES
     )
@@ -83,7 +92,7 @@ def test_first_holder_cycle_for_domain_none_for_permanent_singleton() -> None:
 
 
 def test_gradual_to_quorum_t_reproduction_and_t_evidence_match_roadmap_hand_fixture() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     schedule = EvidenceArrivalSchedule.GRADUAL_TO_QUORUM
     t_reproduction_evidence = cycle_when_requirement_met(schedule, order, CYCLES, 5)
     assert t_reproduction_evidence == 6
@@ -92,7 +101,7 @@ def test_gradual_to_quorum_t_reproduction_and_t_evidence_match_roadmap_hand_fixt
 
 
 def test_immediate_quorum_t_reproduction_and_t_evidence_are_zero() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     schedule = EvidenceArrivalSchedule.IMMEDIATE_QUORUM
     t_reproduction_evidence = cycle_when_requirement_met(schedule, order, CYCLES, 5)
     assert t_reproduction_evidence == 0
@@ -101,7 +110,7 @@ def test_immediate_quorum_t_reproduction_and_t_evidence_are_zero() -> None:
 
 
 def test_permanent_singleton_never_satisfies_requirement_and_reports_none() -> None:
-    order = reproducer_order(EIGHT_DOMAINS, 42)
+    order = reproducer_order(ADAPTER, EIGHT_DOMAINS, 42)
     schedule = EvidenceArrivalSchedule.PERMANENT_SINGLETON
     assert cycle_when_requirement_met(schedule, order, CYCLES, 5) is None
     assert compute_t_evidence(schedule, order, CYCLES, 5, 6) is None

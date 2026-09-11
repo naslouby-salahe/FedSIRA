@@ -1,16 +1,18 @@
 import torch
 
-from fedsira.datasets.nbaiot.scenarios import (
+from fedsira.datasets.common import (
     apply_attacker_induced_common_context,
     apply_shared_spurious_feature,
-    diagnostic_marker_metric_or_insufficient,
-    match_diagnostic_benign_report_test_rows,
     relabel_shared_label_error_rows,
     select_shared_label_error_rows,
     select_spurious_feature_rows,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import EvaluationInsufficiencyReason
+from fedsira.evaluation.statistics import (
+    diagnostic_marker_metric_or_insufficient,
+    match_diagnostic_benign_report_test_rows,
+)
 
 
 def test_select_shared_label_error_rows_uses_configured_fraction() -> None:
@@ -21,11 +23,11 @@ def test_select_shared_label_error_rows_uses_configured_fraction() -> None:
 
 
 def test_relabel_shared_label_error_rows_targets_only_selected() -> None:
-    labels = {"a": NBaiotClass.BENIGN, "b": NBaiotClass.BENIGN}
-    relabeled = relabel_shared_label_error_rows(labels, ["a"])
-    assert relabeled["a"] is NBaiotClass.GAFGYT_COMBO
-    assert relabeled["b"] is NBaiotClass.BENIGN
-    assert labels["a"] is NBaiotClass.BENIGN
+    labels = {"a": NBaiotClass.BENIGN.value, "b": NBaiotClass.BENIGN.value}
+    relabeled = relabel_shared_label_error_rows(labels, ["a"], NBaiotClass.GAFGYT_COMBO.value)
+    assert relabeled["a"] == NBaiotClass.GAFGYT_COMBO.value
+    assert relabeled["b"] == NBaiotClass.BENIGN.value
+    assert labels["a"] == NBaiotClass.BENIGN.value
 
 
 def test_apply_shared_spurious_feature_sets_only_the_given_index() -> None:

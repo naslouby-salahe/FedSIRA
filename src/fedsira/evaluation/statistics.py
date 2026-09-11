@@ -1,6 +1,6 @@
 import itertools
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TypeAlias, cast
 
 import numpy
@@ -9,8 +9,10 @@ from statsmodels.stats.multitest import (
 )
 
 from fedsira.config import BootstrapConfig
+from fedsira.domain.enums import EvaluationInsufficiencyReason
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
+    ArtifactDigest,
     ComparisonMargin,
     ComparisonName,
     ConfidenceIntervalBound,
@@ -23,6 +25,7 @@ from fedsira.domain.types import (
     Probability,
     PValue,
     SampleId,
+    ScreenLoss,
     Sign,
     SignFlipSampleCount,
 )
@@ -253,3 +256,25 @@ def bootstrap_percentile_confidence_interval(
         quantile_type7(sorted_means, lower_probability),
         quantile_type7(sorted_means, upper_probability),
     )
+
+
+def match_diagnostic_benign_report_test_rows(
+    target_report_losses: Sequence[tuple[ArtifactDigest, ScreenLoss]],
+    benign_report_test_losses: Sequence[tuple[ArtifactDigest, ScreenLoss]],
+) -> tuple[tuple[ArtifactDigest, ArtifactDigest], ...] | None:
+    boundary_values = tuple(loss for _, loss in benign_report_test_losses)
+    return match_nearest_within_decile(
+        tuple(target_report_losses), tuple(benign_report_test_losses), boundary_values
+    )
+
+
+def diagnostic_marker_metric_or_insufficient(
+    matched_pairs: tuple[tuple[ArtifactDigest, ArtifactDigest], ...] | None,
+    marker_value: MetricValue,
+) -> tuple[MetricResult, EvaluationInsufficiencyReason | None]:
+    if matched_pairs is None:
+        return (
+            MetricResult(value=None, denominator=0),
+            EvaluationInsufficiencyReason.INSUFFICIENT_MATCHED_BENIGN_REPORT_TEST_CONTROLS,
+        )
+    return MetricResult(value=marker_value, denominator=len(matched_pairs)), None

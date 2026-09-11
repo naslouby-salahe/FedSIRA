@@ -10,7 +10,27 @@ import torch
 
 from fedsira.artifacts.paths import experiment_repetition_telemetry_root, prepared_evidence_root
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
-from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.common import (
+    BackdoorScope,
+    DatasetAdapter,
+    EpistemicFailureScope,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    RootCauseScope,
+    apply_quantity_skew_to_cap,
+    dataset_manifest_hash,
+    dataset_specification,
+    exclude_source_from_quantity_skew,
+    feature_shift_sign,
+    prepared_feature_names,
+    quantity_skew_multiplier_by_domain,
+    quantity_skew_multiplier_for_domain,
+    role_hash_token,
+    select_heterogeneity_shift_features,
+    target_row_ids_for_contract,
+    validate_excluded_root_cause_not_supported,
+)
 from fedsira.datasets.nbaiot.cell_support import (
     BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
     RESOLVED_FEDSIRA_CORE_METHOD,
@@ -49,25 +69,10 @@ from fedsira.datasets.nbaiot.evaluation.screening import (
     compute_screen_differential,
     evaluate_screen_domain,
 )
-from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
 from fedsira.datasets.nbaiot.learning.post_reference_training import (
     certified_domain_delta_committee,
     train_generic_hard_supported_examples_delta,
     train_source_candidate_delta,
-)
-from fedsira.datasets.nbaiot.scenarios import (
-    EvidenceArrivalSchedule,
-    apply_quantity_skew_to_cap,
-    compute_t_evidence,
-    exclude_source_from_quantity_skew,
-    feature_shift_sign,
-    first_holder_cycle_for_domain,
-    holder_count_at_cycle,
-    quantity_skew_multiplier_by_domain,
-    quantity_skew_multiplier_for_domain,
-    select_heterogeneity_shift_features,
-    target_row_ids_for_contract,
-    validate_excluded_root_cause_not_supported,
 )
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -75,22 +80,11 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
+    nbaiot_adapter,
 )
 from fedsira.datasets.nbaiot.validation import (
     run_data_and_domain_evidence_validation,
     run_protocol_invariant_validation,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    BackdoorScope,
-    EpistemicFailureScope,
-    HeterogeneityScope,
-    RealAnchor,
-    RootCauseScope,
-    dataset_manifest_hash,
-    domain_anchor_train_feature_mean,
-    load_prepared_rows,
-    prepared_feature_names,
-    real_evidence_available,
 )
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -172,6 +166,7 @@ from fedsira.experiments.definitions import (
     BoundCondition,
     DescriptiveScientificMetric,
     EpistemicFailureType,
+    EvidenceArrivalSchedule,
     ExternalVerificationCondition,
     HeterogeneityRegime,
     OpeningMode,
@@ -194,6 +189,7 @@ from fedsira.experiments.engine import (
 from fedsira.experiments.planning import (
     ScientificCell,
 )
+from fedsira.learning.federated import train_anchor
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
     select_model_replacement_carrier_rows,
@@ -247,9 +243,12 @@ from fedsira.protocol.reproduction import (
 )
 from fedsira.protocol.rules import (
     apply_logical_cycle_expiry,
+    compute_t_evidence,
     deduplicate_reports_by_proxy,
     diagnostic_at_least_two_byzantine_probability,
     first_cycle_with_minimum_eligible_evidence_holders,
+    first_holder_cycle_for_domain,
+    holder_count_at_cycle,
     krum_committee_is_admissible,
     minimum_honest_positive_count,
     report_for_domain,
@@ -281,6 +280,7 @@ from fedsira.runtime import (
 
 
 class ProtocolCellDispatch:
+    _primary_adapter: DatasetAdapter
     _prepared_root: Path
     _secondary_prepared_root: Path
     _resolved_core: ResolvedCore | None
@@ -675,6 +675,7 @@ class ProtocolCellDispatch:
             heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
             if regime == HeterogeneityRegime.QUANTITY_SKEW:
                 multiplier_by_domain = quantity_skew_multiplier_by_domain(
+                    self._primary_adapter,
                     heterogeneity_seed,
                     config.attacks_and_boundaries.heterogeneity.quantity_skew_multipliers,
                 )
@@ -1312,8 +1313,7 @@ class ProtocolCellDispatch:
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(cell, self._prepared_root)
         carrier_rows = (
-            load_prepared_rows(
-                self._prepared_root,
+            nbaiot_adapter(self._prepared_root).load_rows(
                 source_domain,
                 NBaiotClass.GAFGYT_UDP,
                 Role.POST_REFERENCE_REPLAY,
@@ -1886,10 +1886,16 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         secondary_prepared_root: Path | None = None,
         resolved_core: ResolvedCore | None = None,
     ) -> None:
-        self._prepared_root = primary_prepared_root or prepared_evidence_root(DatasetId.N_BAIOT)
-        self._secondary_prepared_root = secondary_prepared_root or prepared_evidence_root(
-            DatasetId.CICIOT2023
+        self._primary_adapter = DatasetAdapter(
+            specification=dataset_specification(DatasetId.N_BAIOT),
+            prepared_root=primary_prepared_root or prepared_evidence_root(DatasetId.N_BAIOT),
         )
+        self._secondary_adapter = DatasetAdapter(
+            specification=dataset_specification(DatasetId.CICIOT2023),
+            prepared_root=secondary_prepared_root or prepared_evidence_root(DatasetId.CICIOT2023),
+        )
+        self._prepared_root = self._primary_adapter.prepared_root
+        self._secondary_prepared_root = self._secondary_adapter.prepared_root
         self._resolved_core = resolved_core
         self.real_anchor_cache: OrderedDict[MasterSeed, RealAnchor | None] = OrderedDict()
         self._pending_real_report: RealReportSummary | None = None
@@ -1898,8 +1904,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
         if master_seed not in self.real_anchor_cache:
             self.real_anchor_cache[master_seed] = (
-                train_anchor(self._prepared_root, master_seed)
-                if real_evidence_available(self._prepared_root)
+                train_anchor(self._primary_adapter, master_seed)
+                if self._primary_adapter.evidence_available()
                 else None
             )
         return self.real_anchor_cache[master_seed]
@@ -1915,8 +1921,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             for domain in NBAIOT_DOMAIN_ORDER
             if verifier_is_eligible(domain, source_domain, reproducer_domain)
         )
-        reproducer_feature_mean = domain_anchor_train_feature_mean(
-            self._prepared_root, reproducer_domain
+        reproducer_feature_mean = nbaiot_adapter(self._prepared_root).anchor_train_feature_mean(
+            reproducer_domain
         )
         if reproducer_feature_mean is None:
             raise ValueError(
@@ -1925,7 +1931,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             )
         eligible_verifier_feature_means: list[DomainFeatureMean] = []
         for domain in eligible_verifiers:
-            feature_mean = domain_anchor_train_feature_mean(self._prepared_root, domain)
+            feature_mean = nbaiot_adapter(self._prepared_root).anchor_train_feature_mean(domain)
             if feature_mean is None:
                 raise ValueError(
                     f"same-context verification requires real anchor-train features for {domain}"

@@ -4,7 +4,13 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.common import (
+    BackdoorScope,
+    RealAnchor,
+    Role,
+    flat_parameters_identity,
+    role_hash_token,
+)
 from fedsira.datasets.nbaiot.cell_support import (
     VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
     capability_contract_for_digest,
@@ -36,11 +42,6 @@ from fedsira.datasets.nbaiot.schema import (
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    BackdoorScope,
-    RealAnchor,
-    flat_parameters_identity,
 )
 from fedsira.domain.enums import (
     AdmissionState,

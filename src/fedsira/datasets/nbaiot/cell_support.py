@@ -7,7 +7,13 @@ from pathlib import Path
 import torch
 
 from fedsira.config import VerificationConfig
-from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.common import (
+    BackdoorScope,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    role_hash_token,
+)
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.datasets.nbaiot.evaluation.report_summary import (
     RealReportSummary,
@@ -18,18 +24,14 @@ from fedsira.datasets.nbaiot.learning.post_reference_training import (
     train_domain_reproduction_delta,
     train_source_candidate_delta,
 )
-from fedsira.datasets.nbaiot.scenarios import reproducer_order
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    BackdoorScope,
-    HeterogeneityScope,
-    RealAnchor,
-    load_prepared_rows,
+    nbaiot_adapter,
+    nbaiot_domain_from_hash_token,
+    nbaiot_domain_hash_token,
 )
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -119,6 +121,7 @@ from fedsira.protocol.reproduction import (
     validate_reproduction_starts_from_anchor,
 )
 from fedsira.protocol.rules import (
+    REPRODUCER_ORDER_SEPARATOR,
     reproduction_update_vector,
     resolve_ternary_outcome,
     validate_exactly_one_source_domain,
@@ -137,6 +140,7 @@ from fedsira.protocol.verification import (
 from fedsira.runtime import (
     current_application_context,
     derive_uint32,
+    deterministic_order,
 )
 
 SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
@@ -163,14 +167,14 @@ def opening_mode_for_cell(
 
 
 def target_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) -> ExampleCount:
-    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
+    rows = nbaiot_adapter(prepared_root).load_rows(domain, NBaiotClass.GAFGYT_COMBO, role)
     return 0 if rows is None else rows.row_count
 
 
 def first_target_sample_id(
     prepared_root: Path, domain: NBaiotDomain, role: Role
 ) -> ArtifactDigest | None:
-    rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
+    rows = nbaiot_adapter(prepared_root).load_rows(domain, NBaiotClass.GAFGYT_COMBO, role)
     if rows is None or not rows.sample_ids:
         return None
     return rows.sample_ids[0]
@@ -181,7 +185,7 @@ def supported_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) 
     for class_id in NBAIOT_CLASS_ORDER:
         if class_id is NBaiotClass.GAFGYT_COMBO:
             continue
-        rows = load_prepared_rows(prepared_root, domain, class_id, role)
+        rows = nbaiot_adapter(prepared_root).load_rows(domain, class_id, role)
         if rows is not None:
             total += rows.row_count
     return total
@@ -193,7 +197,7 @@ def domains_with_class(
     return frozenset(
         domain
         for domain in NBAIOT_DOMAIN_ORDER
-        if load_prepared_rows(prepared_root, domain, class_id, role) is not None
+        if nbaiot_adapter(prepared_root).load_rows(domain, class_id, role) is not None
     )
 
 
@@ -252,9 +256,13 @@ def source_domain_for_cell(
 
 
 def reproducer_order_for_cell(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
-    return reproducer_order(
-        NBAIOT_DOMAIN_ORDER, derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed)
+    tokens = tuple(nbaiot_domain_hash_token(domain) for domain in NBAIOT_DOMAIN_ORDER)
+    ordered_tokens = deterministic_order(
+        tokens,
+        REPRODUCER_ORDER_SEPARATOR,
+        derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed),
     )
+    return tuple(nbaiot_domain_from_hash_token(token) for token in ordered_tokens)
 
 
 def row_requirement(

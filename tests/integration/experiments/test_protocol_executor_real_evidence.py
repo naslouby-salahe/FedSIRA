@@ -4,9 +4,8 @@ import pandas
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import DatasetAdapter, Role, dataset_specification
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
 from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
     DiscoveredCsvFile,
@@ -18,7 +17,7 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
-from fedsira.domain.enums import CapabilityContractScope, SeedNamespace
+from fedsira.domain.enums import CapabilityContractScope, DatasetId, SeedNamespace
 from fedsira.experiments.collapse import resolve_core_mapping
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -43,8 +42,17 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.handlers import ProtocolCellExecutor
 from fedsira.experiments.planning import ScientificCell
+from fedsira.learning.federated import train_anchor
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed
+
+
+def real_evidence_adapter(prepared_root: Path) -> DatasetAdapter:
+    return DatasetAdapter(
+        specification=dataset_specification(DatasetId.N_BAIOT),
+        prepared_root=prepared_root,
+    )
+
 
 pytestmark = pytest.mark.slow
 
@@ -162,7 +170,7 @@ def test_execute_cell_is_deterministic_for_the_same_seed(prepared_root: Path) ->
 
 def test_final_gate_metrics_are_genuinely_computed_not_fabricated_na(prepared_root: Path) -> None:
     master_seed = 3
-    anchor = train_anchor(prepared_root, master_seed)
+    anchor = train_anchor(real_evidence_adapter(prepared_root), master_seed)
     assert anchor is not None
     source_selection_namespace_seed = namespace_seed(master_seed, SeedNamespace.SOURCE_SELECTION)
     source_order = source_selection_order(NBAIOT_DOMAIN_ORDER, source_selection_namespace_seed)

@@ -211,3 +211,9 @@ class CoreMethodIdentity(StrEnum):
 class EnvironmentReadinessEffect(StrEnum):
     BLOCKING = "Blocking"
     ADVISORY = "Advisory"
+
+
+class EpistemicFailureType(StrEnum):
+    SHARED_LABEL_ERROR = "shared label/threat-intelligence error"
+    SHARED_SPURIOUS_FEATURE = "shared spurious feature"
+    ATTACKER_INDUCED_COMMON_CONTEXT = "attacker-induced common context"

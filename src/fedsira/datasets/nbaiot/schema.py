@@ -1,7 +1,8 @@
 import re
 from enum import StrEnum
+from pathlib import Path
 
-from fedsira.datasets.common import DatasetSpecification
+from fedsira.datasets.common import DatasetAdapter, DatasetSpecification
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import (
     AttackBasename,
@@ -145,3 +146,7 @@ def specification() -> DatasetSpecification:
         domain_proxy_semantics="physical device proxy",
         raw_data_relative=DatasetId.N_BAIOT.value,
     )
+
+
+def nbaiot_adapter(prepared_root: Path) -> DatasetAdapter:
+    return DatasetAdapter(specification=specification(), prepared_root=prepared_root)

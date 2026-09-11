@@ -6,23 +6,22 @@ from pathlib import Path
 
 import torch
 
-from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.scenarios import root_cause_for_sample
+from fedsira.datasets.common import (
+    DomainTargetMetrics,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    RootCauseScope,
+    apply_heterogeneity_shift,
+    root_cause_for_sample,
+    scope_and_shift_rows,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
-)
-from fedsira.datasets.nbaiot.workflow import (
-    DomainTargetMetrics,
-    HeterogeneityScope,
-    RealAnchor,
-    RootCauseScope,
-    apply_heterogeneity_shift,
-    load_prepared_rows,
-    scope_and_shift_rows,
-    tensor_view,
+    nbaiot_adapter,
 )
 from fedsira.domain.enums import RootCause
 from fedsira.domain.types import ArtifactDigest, ClassLabel
@@ -64,7 +63,7 @@ def evaluate_domain(
                 if target_role is not None and class_id is NBaiotClass.GAFGYT_COMBO
                 else role
             )
-            rows = load_prepared_rows(prepared_root, domain, class_id, row_role)
+            rows = nbaiot_adapter(prepared_root).load_rows(domain, class_id, row_role)
             if (
                 class_id is NBaiotClass.GAFGYT_COMBO
                 and root_cause_scope is not None
@@ -73,7 +72,7 @@ def evaluate_domain(
                 rows = scope_and_shift_rows(rows, root_cause_scope)
             if rows is not None and heterogeneity_scope is not None:
                 rows = apply_heterogeneity_shift(rows, domain, heterogeneity_scope)
-            tensor_rows = tensor_view(rows)
+            tensor_rows = nbaiot_adapter(prepared_root).tensor_view(rows)
             if tensor_rows is None:
                 continue
             features, _labels, _sample_ids = tensor_rows
@@ -121,8 +120,8 @@ def root_cause_partitioned_row_ids(
     root_cause_b_ids: set[ArtifactDigest] = set()
     supported_ids: set[ArtifactDigest] = set()
     for domain in domains:
-        target_rows = load_prepared_rows(
-            prepared_root, domain, NBaiotClass.GAFGYT_COMBO, Role.POST_REFERENCE_REPLAY
+        target_rows = nbaiot_adapter(prepared_root).load_rows(
+            domain, NBaiotClass.GAFGYT_COMBO, Role.POST_REFERENCE_REPLAY
         )
         if target_rows is not None:
             for sample_id in target_rows.sample_ids:
@@ -133,8 +132,8 @@ def root_cause_partitioned_row_ids(
         for class_id in NBAIOT_CLASS_ORDER:
             if class_id is NBaiotClass.GAFGYT_COMBO:
                 continue
-            supported_rows = load_prepared_rows(
-                prepared_root, domain, class_id, Role.POST_REFERENCE_REPLAY
+            supported_rows = nbaiot_adapter(prepared_root).load_rows(
+                domain, class_id, Role.POST_REFERENCE_REPLAY
             )
             if supported_rows is not None:
                 supported_ids.update(supported_rows.sample_ids)
