@@ -74,8 +74,8 @@ from fedsira.experiments.definitions import (
     SecondaryScenario,
     VerifierCondition,
 )
+from fedsira.experiments.engine import PreparedEvidenceCounts
 from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.prerequisites import PreparedEvidenceCounts
 from fedsira.protocol.admission import (
     apply_production_update,
     final_gate_predicates_pass,

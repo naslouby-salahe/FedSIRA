@@ -68,7 +68,7 @@ from fedsira.experiments.definitions import (
     PrimaryScenario,
     VerifierCondition,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -81,7 +81,6 @@ BoundarySeries: TypeAlias = tuple[
     ...,
 ]
 AxisDraw: TypeAlias = Callable[[Axes], None]
-
 
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "FedSIRA Protocol Schematic",

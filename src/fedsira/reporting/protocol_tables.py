@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fedsira.artifacts.paths import prepared_evidence_root
-from fedsira.datasets.specification import (
+from fedsira.datasets.common import (
     PreparedDomainSummary,
     dataset_specification,
     prepared_domain_summaries,

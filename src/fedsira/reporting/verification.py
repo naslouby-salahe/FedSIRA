@@ -32,7 +32,7 @@ from fedsira.experiments.definitions import (
     DescriptiveScientificMetric,
     VerifierCondition,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
     ExperimentExecutionResult,

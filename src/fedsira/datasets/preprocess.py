@@ -17,7 +17,7 @@ from fedsira.datasets.ciciot2023.schema import (
     PSEUDO_DOMAIN_COUNT,
     CICIoT2023DatasetManifestPayload,
 )
-from fedsira.datasets.common import DatasetPreparationLogFields
+from fedsira.datasets.common import DatasetPreparationLogFields, dataset_specification
 from fedsira.datasets.nbaiot.prepare import (
     classes_structurally_unavailable,
     compute_dataset_manifest_hash,
@@ -26,7 +26,6 @@ from fedsira.datasets.nbaiot.prepare import (
     validate_target_holder_feasibility,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
-from fedsira.datasets.specification import dataset_specification
 from fedsira.domain.enums import ArtifactFamily, DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,

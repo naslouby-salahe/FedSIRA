@@ -86,18 +86,16 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     experiment_by_name,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     AdmissionStateObservation,
     CellExecutionOutcome,
     CellExecutor,
+    PreparedEvidenceCounts,
     ProtocolPhaseDurations,
+    load_prepared_evidence_counts,
 )
 from fedsira.experiments.planning import (
     ScientificCell,
-)
-from fedsira.experiments.prerequisites import (
-    PreparedEvidenceCounts,
-    load_prepared_evidence_counts,
 )
 from fedsira.protocol.baselines.defenses import (
     DomainFeatureMean,

@@ -10,8 +10,8 @@ from fedsira.experiments.definitions import (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
+from fedsira.experiments.engine import PreparedEvidenceCounts
 from fedsira.experiments.planning import ScientificCell
-from fedsira.experiments.prerequisites import PreparedEvidenceCounts
 
 
 def test_protocol_invariant_validation_cell_executes_smoke_invariants(

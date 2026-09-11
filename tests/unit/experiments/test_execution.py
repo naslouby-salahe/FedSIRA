@@ -11,14 +11,14 @@ from fedsira.datasets.nbaiot.validation import (
     validate_no_duplicate_semantic_cells,
 )
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedExecutionRecord,
     derive_experiment_lifecycle,
-    execute_experiment,
 )
+from fedsira.experiments.execution import execute_experiment
 from fedsira.experiments.planning import ScientificCell, build_plan
 
 

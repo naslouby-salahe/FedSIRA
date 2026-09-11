@@ -78,7 +78,7 @@ from fedsira.experiments.definitions import (
     DescriptiveScientificMetric,
     experiment_by_name,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,

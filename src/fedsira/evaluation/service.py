@@ -28,7 +28,7 @@ from fedsira.evaluation.comparisons import (
     evaluate_comparison,
 )
 from fedsira.experiments.definitions import ComparisonFamily, experiment_by_name
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedExecutionRecord,

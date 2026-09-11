@@ -95,7 +95,6 @@ def candidate_free_full_path_opening_mode() -> AdmissionOpeningMode:
 
 Domain = TypeVar("Domain", bound=Hashable)
 
-
 FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"
 SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SECURE_CONTINUAL_ASSESSMENT"
 RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (

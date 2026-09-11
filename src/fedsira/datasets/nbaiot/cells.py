@@ -137,14 +137,12 @@ from fedsira.experiments.definitions import (
     VerifierCondition,
     VerifierProfile,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
+    PreparedEvidenceCounts,
     ProtocolPhaseDurations,
 )
 from fedsira.experiments.planning import (
     ScientificCell,
-)
-from fedsira.experiments.prerequisites import (
-    PreparedEvidenceCounts,
 )
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,

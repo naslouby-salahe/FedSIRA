@@ -343,7 +343,6 @@ def baseline_contract(identity: BaselineIdentity) -> BaselineContract:
 if frozenset(contract.identity for contract in BASELINE_CONTRACTS) != frozenset(BaselineIdentity):
     raise AssertionError("every registered baseline must have exactly one contract")
 
-
 BASELINE_VALIDATION_FIXTURE_MAP: Final[
     tuple[tuple[BaselineIdentity, BaselineValidationFixture], ...]
 ] = (
@@ -415,7 +414,6 @@ if frozenset(identity for identity, _fixture in BASELINE_VALIDATION_FIXTURE_MAP)
     BaselineIdentity
 ):
     raise AssertionError("every registered baseline must have exactly one predeclared fixture")
-
 
 TUNING_FORBIDDEN_ROLES: Final[frozenset[Role]] = frozenset(
     {Role.REPORT_TEST, Role.FINAL_GATE, Role.ROW_VERIFICATION}

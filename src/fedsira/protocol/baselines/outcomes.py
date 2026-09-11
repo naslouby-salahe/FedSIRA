@@ -61,11 +61,11 @@ from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
     worst_domain_target_f1,
 )
+from fedsira.experiments.engine import (
+    PreparedEvidenceCounts,
+)
 from fedsira.experiments.planning import (
     ScientificCell,
-)
-from fedsira.experiments.prerequisites import (
-    PreparedEvidenceCounts,
 )
 from fedsira.protocol.admission import (
     final_gate_predicates_pass,

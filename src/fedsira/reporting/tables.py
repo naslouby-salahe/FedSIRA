@@ -65,7 +65,9 @@ from fedsira.experiments.definitions import (
     ablation_scenario_for_variant,
     experiment_by_name,
 )
-from fedsira.experiments.execution import CellExecutionOutcome
+from fedsira.experiments.engine import (
+    CellExecutionOutcome,
+)
 from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (

@@ -303,7 +303,6 @@ ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposit
 EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
 SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
 
-
 REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,

@@ -62,7 +62,9 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
-from fedsira.experiments.execution import PersistedExecutionRecord
+from fedsira.experiments.engine import (
+    PersistedExecutionRecord,
+)
 from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import current_application_context
 

@@ -122,7 +122,6 @@ TERMINAL_CELL_STATES: frozenset[ExperimentLifecycleState] = frozenset(
     )
 )
 
-
 SIGN_FLIP_CHECK_SAMPLE_COUNT = 10
 SIGN_FLIP_CHECK_EXPECTED_P_VALUE: PValue = 0.001953125
 HOLM_CHECK_RAW_P_VALUES: tuple[tuple[ComparisonName, PValue], ...] = (

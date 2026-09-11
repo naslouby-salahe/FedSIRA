@@ -34,7 +34,7 @@ from fedsira.experiments.definitions import (
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     PrimaryScenario,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     AdmissionStateObservation,
     CellExecutionOutcome,
     ExecutionRecordStore,

@@ -11,12 +11,12 @@ from fedsira.artifacts.paths import (
     smoke_record_path,
     workspace_root_for_family,
 )
+from fedsira.datasets.common import dataset_specification
 from fedsira.datasets.nbaiot.executor import (
     ProtocolCellExecutor,
 )
 from fedsira.datasets.nbaiot.validation import PersistedSmokeRecord
 from fedsira.datasets.preprocess import execute_preprocess
-from fedsira.datasets.specification import dataset_specification
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
 from fedsira.domain.types import (
     ApplicationExitCode,
@@ -61,11 +61,13 @@ from fedsira.experiments.definitions import (
     ComparisonFamily,
     experiment_by_name,
 )
-from fedsira.experiments.execution import (
+from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
     derive_experiment_lifecycle,
+)
+from fedsira.experiments.execution import (
     execute_experiment,
     execute_smoke,
     execute_status,
