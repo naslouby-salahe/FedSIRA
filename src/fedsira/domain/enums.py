@@ -206,3 +206,8 @@ class CoreMethodIdentity(StrEnum):
     RESOLVED_FEDSIRA_CORE = "Resolved FedSIRA Core"
     FULL_PLURALITY_PATH = "Full Plurality Path"
     ZERO_REFERENCE = "zero"
+
+
+class EnvironmentReadinessEffect(StrEnum):
+    BLOCKING = "Blocking"
+    ADVISORY = "Advisory"

@@ -21,6 +21,7 @@ from pydantic import Field
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, ScientificConfig, load_scientific_config
 from fedsira.domain.enums import (
+    EnvironmentReadinessEffect,
     FailureClass,
     ScientificCellPhase,
     SeedNamespace,
@@ -222,6 +223,7 @@ class EnvironmentMismatch(FrozenDomainModel):
     component: EnvironmentText
     expected: EnvironmentText
     actual: EnvironmentText
+    readiness_effect: EnvironmentReadinessEffect
 
 
 class _Fp32PrecisionController(Protocol):
@@ -235,6 +237,7 @@ def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
                 component="gpu_availability",
                 expected="available",
                 actual="unavailable",
+                readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
     return ()
@@ -258,6 +261,7 @@ def check_unrar_availability(
                 component="unrar_version",
                 expected="available",
                 actual="not installed",
+                readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
     if result.returncode != 0:
@@ -266,6 +270,7 @@ def check_unrar_availability(
                 component="unrar_version",
                 expected="available",
                 actual="unavailable",
+                readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
     return ()
@@ -285,6 +290,16 @@ def collect_environment_mismatches(
     rar_archives_present: RarArchivesPresent,
 ) -> tuple[EnvironmentMismatch, ...]:
     return check_gpu_requirements() + check_unrar_availability(rar_archives_present)
+
+
+def blocking_environment_mismatches(
+    observations: tuple[EnvironmentMismatch, ...],
+) -> tuple[EnvironmentMismatch, ...]:
+    return tuple(
+        observation
+        for observation in observations
+        if observation.readiness_effect is EnvironmentReadinessEffect.BLOCKING
+    )
 
 
 LOGGER_NAME_PREFIX = "fedsira"

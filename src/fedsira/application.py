@@ -76,6 +76,7 @@ from fedsira.runtime import (
     REPOSITORY_ROOT,
     ApplicationContext,
     EnvironmentMismatch,
+    blocking_environment_mismatches,
     bound_application_context,
     collect_environment_mismatches,
     configure_deterministic_backend,
@@ -114,8 +115,12 @@ class DoctorReport(FrozenDomainModel):
     next_valid_action: NextValidAction
 
     @property
+    def blocking_environment_mismatches(self) -> tuple[EnvironmentMismatch, ...]:
+        return blocking_environment_mismatches(self.environment_mismatches)
+
+    @property
     def is_deterministic_execution_ready(self) -> DeterministicExecutionReady:
-        return len(self.environment_mismatches) == 0 and self.configuration_loadable
+        return len(self.blocking_environment_mismatches) == 0 and self.configuration_loadable
 
 
 def diagnose(config_path: Path | None = None) -> DoctorReport:
@@ -134,8 +139,7 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             project_progress="doctor blocked by invalid configuration",
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
-    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
-    rar_archives_present = raw_data_root.exists() and any(raw_data_root.rglob("*.rar"))
+    rar_archives_present = _rar_archives_present(context)
     with bound_application_context(context):
         environment_mismatches = collect_environment_mismatches(rar_archives_present)
         return _diagnose_bound(context, environment_mismatches)
@@ -160,14 +164,14 @@ def _diagnose_bound(
     artifact_summary = _artifact_summary(dataset_readiness, resolved_core is not None)
     experiment_summary = _experiment_summary(plan, store)
     project_stage = _project_stage(
-        environment_mismatches=environment_mismatches,
+        environment_mismatches=blocking_environment_mismatches(environment_mismatches),
         dataset_readiness=dataset_readiness,
         plan=plan,
         store=store,
         resolved_core_present=resolved_core is not None,
     )
     project_progress, next_valid_action = _progress_and_action(
-        environment_mismatches,
+        blocking_environment_mismatches(environment_mismatches),
         project_stage,
     )
     _LOGGER.info("doctor diagnosis complete")
@@ -182,6 +186,11 @@ def _diagnose_bound(
         project_progress=project_progress,
         next_valid_action=next_valid_action,
     )
+
+
+def _rar_archives_present(context: ApplicationContext) -> BooleanValue:
+    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+    return raw_data_root.exists() and any(raw_data_root.rglob("*.rar"))
 
 
 def _raw_present(raw_root: Path, dataset: DatasetId) -> BooleanValue:
@@ -429,14 +438,25 @@ def render(report: DoctorReport, console: Console) -> None:
         console.print("configuration: valid")
     else:
         console.print(f"configuration: INVALID ({report.configuration_error})")
-    if report.environment_mismatches:
-        console.print("environment: mismatches found")
-        for mismatch in report.environment_mismatches:
+    blocking = report.blocking_environment_mismatches
+    if blocking:
+        console.print("environment: blocking mismatches found")
+        for mismatch in blocking:
             console.print(
                 f"  {mismatch.component}: expected {mismatch.expected}, found {mismatch.actual}"
             )
     else:
-        console.print("environment: matches the reference environment")
+        console.print("environment: no blocking mismatches")
+    advisories = tuple(
+        mismatch
+        for mismatch in report.environment_mismatches
+        if mismatch not in blocking
+    )
+    for mismatch in advisories:
+        console.print(
+            f"environment advisory: {mismatch.component} "
+            f"(expected {mismatch.expected}, found {mismatch.actual})"
+        )
     console.print(f"dataset readiness: {report.dataset_readiness.value}")
     console.print(f"artifacts: {report.artifact_validity_summary}")
     console.print(f"experiments: {report.experiment_summary}")
@@ -579,6 +599,12 @@ def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
 def execute_run(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
+        mismatches = blocking_environment_mismatches(
+            collect_environment_mismatches(_rar_archives_present(context))
+        )
+        if mismatches:
+            components = ", ".join(mismatch.component for mismatch in mismatches)
+            raise SystemExit(f"run blocked by reference-environment mismatches: {components}")
         configure_deterministic_backend()
         _execute_bound(name, overwrite)
 
