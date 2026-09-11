@@ -49,11 +49,6 @@ from fedsira.datasets.nbaiot.evaluation.screening import (
     compute_screen_differential,
     evaluate_screen_domain,
 )
-from fedsira.datasets.nbaiot.evaluation.timing import (
-    SingleProcessTimingWorker,
-    TimingRepetitionObservation,
-    TimingWorkerResult,
-)
 from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
 from fedsira.datasets.nbaiot.learning.post_reference_training import (
     certified_domain_delta_committee,
@@ -145,6 +140,11 @@ from fedsira.evaluation.metrics import (
     reproduction_attempt_count,
     supported_macro_f1_harm,
     target_capability_gain,
+)
+from fedsira.evaluation.service import (
+    SingleProcessTimingWorker,
+    TimingRepetitionObservation,
+    TimingWorkerResult,
 )
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
