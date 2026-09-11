@@ -303,6 +303,29 @@ ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposit
 EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
 SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
 
+
+REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
+    DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+    PROTOCOL_INVARIANT_VALIDATION_NAME,
+    BASELINE_IMPLEMENTATION_VALIDATION_NAME,
+    PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
+    SINGLE_REPRODUCTION_NECESSITY_NAME,
+    SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    EXTERNAL_VERIFICATION_NECESSITY_NAME,
+    PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+    MECHANISM_ABLATION_NAME,
+    COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+    COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+    BYZANTINE_BOUND_VIOLATION_NAME,
+    EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+    SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
+    CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+    HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+    ADMISSION_DELAY_DECOMPOSITION_NAME,
+    EFFICIENCY_MEASUREMENT_NAME,
+    SECONDARY_DATASET_GENERALIZATION_NAME,
+)
+
 COLLAPSE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
@@ -538,6 +561,17 @@ _ABLATION_SCENARIOS = _unique(ablation_scenario_for_variant(variant) for variant
 
 def experiment_registry() -> tuple[ExperimentDefinition, ...]:
     confirmatory_seed_count = _confirmatory_seed_count()
+    definitions = _experiment_definitions(confirmatory_seed_count)
+    registered = tuple(definition.name for definition in definitions)
+    if registered != REGISTERED_EXPERIMENT_NAMES:
+        raise ValueError(
+            f"experiment registry {registered} does not match the declared "
+            f"registered experiment names {REGISTERED_EXPERIMENT_NAMES}"
+        )
+    return definitions
+
+
+def _experiment_definitions(confirmatory_seed_count: SeedCount) -> tuple[ExperimentDefinition, ...]:
     return (
         ExperimentDefinition(
             name=DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,

@@ -78,6 +78,7 @@ from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
+    REGISTERED_EXPERIMENT_NAMES,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
@@ -85,7 +86,6 @@ from fedsira.experiments.definitions import (
     HeterogeneityRegime,
     ProposalEpisode,
     experiment_by_name,
-    experiment_registry,
 )
 from fedsira.experiments.execution import (
     AdmissionStateObservation,
@@ -151,7 +151,7 @@ CELL_HANDLER_BY_EXPERIMENT: Mapping[ExperimentName, CellHandlerName] = MappingPr
 
 
 def validate_cell_handler_registration() -> None:
-    registered = {definition.name for definition in experiment_registry()}
+    registered = set(REGISTERED_EXPERIMENT_NAMES)
     mapped = set(CELL_HANDLER_BY_EXPERIMENT)
     missing = registered - mapped
     if missing:
