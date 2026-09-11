@@ -24,8 +24,12 @@ from fedsira.domain.types import (
     ArtifactDigest,
     DerivedSeed,
     FeatureCount,
+    FederatedRoundCount,
+    FrozenDomainModel,
     MasterSeed,
+    RepositoryPath,
     RoundIndex,
+    WallClockSeconds,
 )
 from fedsira.experiments.definitions import ReproducerCondition
 from fedsira.learning.federated import LocalTrainingClient, run_anchor_fedavg_training
@@ -47,6 +51,13 @@ ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
 ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 
 ANCHOR_LOGGER = get_structured_logger("anchor_training")
+
+
+class AnchorTrainingLogFields(FrozenDomainModel):
+    master_seed: MasterSeed
+    prepared_root: RepositoryPath
+    round_count: FederatedRoundCount | None = None
+    elapsed_seconds: WallClockSeconds | None = None
 
 
 def training_seed(
@@ -80,7 +91,9 @@ def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | N
     timer = ElapsedTimer()
     ANCHOR_LOGGER.info(
         "anchor.training.started",
-        extra={"master_seed": master_seed, "prepared_root": prepared_root.as_posix()},
+        extra=AnchorTrainingLogFields(
+            master_seed=master_seed, prepared_root=prepared_root.as_posix()
+        ).model_dump(),
     )
     config = current_application_context().scientific_config
     first_rows = load_prepared_rows(
@@ -146,11 +159,12 @@ def train_anchor(prepared_root: Path, master_seed: MasterSeed) -> RealAnchor | N
     load_model_state(model, final_state)
     ANCHOR_LOGGER.info(
         "anchor.training.completed",
-        extra={
-            "master_seed": master_seed,
-            "round_count": config.model.anchor_fedavg.rounds,
-            "elapsed_seconds": timer.elapsed_seconds(),
-        },
+        extra=AnchorTrainingLogFields(
+            master_seed=master_seed,
+            prepared_root=prepared_root.as_posix(),
+            round_count=config.model.anchor_fedavg.rounds,
+            elapsed_seconds=timer.elapsed_seconds(),
+        ).model_dump(),
     )
     return RealAnchor(
         input_width=input_width,

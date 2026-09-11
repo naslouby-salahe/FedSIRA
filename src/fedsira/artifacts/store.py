@@ -132,11 +132,17 @@ def is_artifact_complete_and_valid(
     return True
 
 
+class ArtifactLogFields(FrozenDomainModel):
+    artifact_family: ArtifactFamily
+    artifact_identity: ArtifactDigest
+
+
 def _log_artifact_event(
     event: LogRecordText, family: ArtifactFamily, identity: ArtifactDigest
 ) -> None:
     ARTIFACT_LOGGER.info(
-        event, extra={"artifact_family": family.value, "artifact_identity": identity}
+        event,
+        extra=ArtifactLogFields(artifact_family=family, artifact_identity=identity).model_dump(),
     )
 
 
