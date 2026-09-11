@@ -47,6 +47,7 @@ from fedsira.domain.types import (
     ScenarioName,
     ScientificCellSemanticKey,
     WallClockSeconds,
+    WarmupPassCount,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonDefinition,
@@ -350,7 +351,10 @@ class SingleProcessTimingWorker:
     def measure(
         self,
         action: Callable[[], TimingWorkerResult],
+        warmup_forward_passes: WarmupPassCount = 0,
     ) -> TimingWorkerObservation:
+        for _ in range(warmup_forward_passes):
+            action()
         reset_peak_gpu_memory_counter()
         timer = ElapsedTimer()
         gpu_timer = CudaIntervalTimer()

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -41,6 +43,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     ScientificCellCount,
     ScientificCellSemanticKey,
+    TimeoutSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.definitions import experiment_by_name
@@ -61,6 +64,11 @@ if TYPE_CHECKING:
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
+
+
+class CellPhaseLogFields(FrozenDomainModel):
+    cell: ScientificCellSemanticKey
+    timeout_seconds: TimeoutSeconds | None = None
 
 
 class PersistedFailureDetail(FrozenDomainModel):
@@ -225,9 +233,10 @@ def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> Cel
 
     config = current_application_context().scientific_config
     attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
+    cell_phase_timeout = config.execution.timeouts_seconds.scientific_cell_phase
     last_outcome: CellExecutionOutcome | None = None
     for attempt in range(attempts):
-        outcome = executor.execute_cell(cell)
+        outcome = _execute_cell_phase_with_timeout(cell, executor, cell_phase_timeout)
         validate_cell_terminal_record(cell, outcome.terminal_state)
         if outcome.terminal_state is not ExperimentLifecycleState.FAILED:
             return outcome
@@ -241,6 +250,47 @@ def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> Cel
     if last_outcome is None:
         raise RuntimeError("cell retry loop produced no outcome")
     return last_outcome
+
+
+def _execute_cell_phase_with_timeout(
+    cell: ScientificCell,
+    executor: CellExecutor,
+    timeout_seconds: TimeoutSeconds,
+) -> CellExecutionOutcome:
+    EXECUTION_LOGGER.info(
+        "cell.phase.started",
+        extra=CellPhaseLogFields(
+            cell=cell.semantic_key, timeout_seconds=timeout_seconds
+        ).model_dump(),
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(executor.execute_cell, cell)
+        try:
+            outcome = future.result(timeout=timeout_seconds)
+        except FuturesTimeoutError:
+            future.cancel()
+            EXECUTION_LOGGER.info(
+                "cell.phase.timeout",
+                extra=CellPhaseLogFields(
+                    cell=cell.semantic_key, timeout_seconds=timeout_seconds
+                ).model_dump(),
+            )
+            return CellExecutionOutcome(
+                cell=cell,
+                terminal_state=ExperimentLifecycleState.FAILED,
+                failure=FailureDetail(
+                    failure_class=FailureClass.TIMEOUT,
+                    message=(
+                        "scientific cell phase exceeded "
+                        f"execution.timeouts_seconds.scientific_cell_phase={timeout_seconds}"
+                    ),
+                    cell_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
+                ),
+            )
+    EXECUTION_LOGGER.info(
+        "cell.phase.completed", extra=CellPhaseLogFields(cell=cell.semantic_key).model_dump()
+    )
+    return outcome
 
 
 def planned_execution_records(

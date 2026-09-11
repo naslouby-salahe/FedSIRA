@@ -1767,7 +1767,10 @@ class ProtocolCellDispatch:
                 model_transmission_count(tuple(metadata_records)),
             )
 
-        observation = SingleProcessTimingWorker().measure(measured_execution)
+        observation = SingleProcessTimingWorker().measure(
+            measured_execution,
+            current_application_context().scientific_config.execution.timing.warmup_forward_passes,
+        )
         state, bytes_total, transmissions = observation.value
         if cell.repetition is None:
             raise ValueError("Efficiency Measurement cell requires a repetition identity")
