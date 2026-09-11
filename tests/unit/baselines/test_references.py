@@ -39,7 +39,9 @@ def test_centralized_reference_pooled_rows_concatenates_in_canonical_domain_orde
         NBAIOT_DOMAIN_ORDER[1]: torch.full((2, 3), 1.0),
         NBAIOT_DOMAIN_ORDER[0]: torch.full((3, 3), 0.0),
     }
-    pooled = centralized_reference_pooled_rows(domain_rows)
+    pooled = centralized_reference_pooled_rows(
+        tuple(domain_rows[domain] for domain in NBAIOT_DOMAIN_ORDER if domain in domain_rows)
+    )
     assert pooled.shape == (5, 3)
     assert torch.equal(pooled[:3], torch.zeros(3, 3))
     assert torch.equal(pooled[3:], torch.ones(2, 3))
@@ -55,7 +57,9 @@ def test_fedavg_reference_post_reference_budget() -> None:
 
 def test_fedavg_reference_post_reference_participants_includes_source_when_available() -> None:
     eligible = NBAIOT_DOMAIN_ORDER[1:4]
-    with_source = fedavg_reference_post_reference_participants(eligible, SOURCE, True)
+    with_source = fedavg_reference_post_reference_participants(
+        NBAIOT_DOMAIN_ORDER, eligible, SOURCE, True
+    )
     assert SOURCE in with_source
     assert set(with_source) == set(eligible) | {SOURCE}
     assert list(with_source) == [d for d in NBAIOT_DOMAIN_ORDER if d in with_source]
@@ -63,6 +67,8 @@ def test_fedavg_reference_post_reference_participants_includes_source_when_avail
 
 def test_fedavg_reference_post_reference_participants_excludes_source_when_unavailable() -> None:
     eligible = NBAIOT_DOMAIN_ORDER[1:4]
-    without_source = fedavg_reference_post_reference_participants(eligible, SOURCE, False)
+    without_source = fedavg_reference_post_reference_participants(
+        NBAIOT_DOMAIN_ORDER, eligible, SOURCE, False
+    )
     assert SOURCE not in without_source
     assert set(without_source) == set(eligible)

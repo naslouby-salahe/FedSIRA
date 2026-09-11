@@ -3,7 +3,13 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from fedsira.artifacts.provenance import ReconstructionProvenance
+from fedsira.datasets.nbaiot.validation import (
+    ExperimentPrerequisiteState,
+    validate_cell_phase_sequence,
+    validate_cell_terminal_record,
+    validate_experiment_prerequisites_met,
+    validate_no_duplicate_semantic_cells,
+)
 from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
 from fedsira.experiments.execution import (
     TERMINAL_EXPERIMENT_STATES,
@@ -14,13 +20,6 @@ from fedsira.experiments.execution import (
     execute_experiment,
 )
 from fedsira.experiments.planning import ScientificCell, build_plan
-from fedsira.experiments.validation import (
-    ExperimentPrerequisiteState,
-    validate_cell_phase_sequence,
-    validate_cell_terminal_record,
-    validate_experiment_prerequisites_met,
-    validate_no_duplicate_semantic_cells,
-)
 
 
 def _cell(experiment: str, method: str, condition: str, master_seed: int) -> ScientificCell:
@@ -74,12 +73,7 @@ def test_derive_experiment_lifecycle_empty_post_core_experiment_is_blocked() -> 
 
 
 def test_record_store_round_trip(tmp_path: Path) -> None:
-    provenance = ReconstructionProvenance(
-        repository_commit="a" * 40,
-        dependency_lock_digest="b" * 64,
-        environment_fingerprint="c" * 64,
-    )
-    store = ExecutionRecordStore(tmp_path, reconstruction_provenance=provenance)
+    store = ExecutionRecordStore(tmp_path)
     cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
     outcome = _completed_outcome(cell)
     store.write_outcome(outcome)
@@ -88,7 +82,6 @@ def test_record_store_round_trip(tmp_path: Path) -> None:
     assert isinstance(restored, PersistedExecutionRecord)
     assert restored.terminal_state is ExperimentLifecycleState.COMPLETED
     assert restored.semantic_key == cell.semantic_key
-    assert restored.reconstruction_provenance == provenance
     assert len(store.read_all_outcomes(cell.experiment)) == 1
 
 

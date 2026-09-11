@@ -30,15 +30,6 @@ ArtifactDigest = Annotated[
     str,
     StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
 ]
-GitCommit = Annotated[
-    str,
-    StringConstraints(
-        min_length=7,
-        max_length=40,
-        strip_whitespace=True,
-        pattern=r"^[0-9a-f]{7,40}$",
-    ),
-]
 Doi = Annotated[
     str,
     StringConstraints(
@@ -80,9 +71,6 @@ PathToken = TextValue
 ModuleName = TextValue
 SchemaVersion = TextValue
 ExecutionSchemaVersion = SchemaVersion
-DependencyImportName = TextValue
-FingerprintPayload = TextValue
-AstDumpText = TextValue
 CapabilityIdentity = ArtifactDigest
 CollapseReason = TextValue
 AttackFamilyDirectoryToken = TextValue
@@ -113,6 +101,7 @@ FeatureSchemaDigest = ArtifactDigest
 RoundIndex = Annotated[int, Field(ge=-1, strict=True)]
 EpochIndex = NonNegativeInt
 RetryCount = NonNegativeInt
+BaselineRetrainingCount = NonNegativeInt
 
 RowCount = NonNegativeInt
 SourceRowIndex = NonNegativeInt
@@ -304,6 +293,7 @@ DecileBinIndex = NonNegativeInt
 ConfusionCount = NonNegativeInt
 VoteCount = NonNegativeInt
 RepetitionIndex = PositiveInt
+RepetitionCount = PositiveInt
 PeakMemoryBytes = ByteCount
 VectorNorm = NonNegativeFloat
 TrainingLoss = NonNegativeFloat

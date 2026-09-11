@@ -12,6 +12,12 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_domain_hash_token,
 )
+from fedsira.datasets.nbaiot.workflow import (
+    RealAnchor,
+    dataset_manifest_hash,
+    load_prepared_rows,
+    tensor_view,
+)
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import (
     AlgorithmName,
@@ -22,12 +28,6 @@ from fedsira.domain.types import (
     RoundIndex,
 )
 from fedsira.experiments.definitions import ReproducerCondition
-from fedsira.experiments.workflow import (
-    RealAnchor,
-    dataset_manifest_hash,
-    load_prepared_rows,
-    tensor_view,
-)
 from fedsira.learning.aggregation import ModelState, load_model_state, model_state_from_classifier
 from fedsira.learning.anchor import run_anchor_fedavg_training
 from fedsira.learning.federated import LocalTrainingClient

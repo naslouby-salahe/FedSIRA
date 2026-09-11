@@ -9,12 +9,14 @@ from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.domain.types import (
     BooleanValue,
     ComparisonName,
+    EvidenceCycleIndex,
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MethodName,
     MetricName,
     MetricValue,
+    RepetitionIndex,
     RepositoryPath,
     ScenarioName,
     ScientificCellCount,
@@ -25,6 +27,8 @@ from fedsira.experiments.definitions import (
     AGGREGATE_METRICS_PARQUET_NAME,
     CELL_METRICS_PARQUET_NAME,
     SEED_METRICS_PARQUET_NAME,
+    STATE_TRAJECTORY_PARQUET_NAME,
+    DescriptiveScientificMetric,
 )
 from fedsira.experiments.execution import CellExecutionOutcome, ExperimentExecutionResult
 
@@ -38,15 +42,15 @@ _TIMING_METRICS: frozenset[MetricName] = frozenset(
         "reproduce-seconds",
         "verify-seconds",
         "synthesize-seconds",
-        "post-evidence-wall-clock-seconds",
+        DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
     )
 )
 _RESOURCE_METRICS: frozenset[MetricName] = frozenset(
     (
-        "peak-gpu-memory-bytes",
-        "peak-host-rss-bytes",
-        "communication-bytes",
-        "model-transmissions",
+        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+        DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+        DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
+        DescriptiveScientificMetric.MODEL_TRANSMISSIONS.value,
     )
 )
 
@@ -56,6 +60,7 @@ class MetricEvidenceRow(FrozenDomainModel):
     method: MethodName
     condition: ScenarioName
     master_seed: MasterSeed
+    repetition: RepetitionIndex | None
     terminal_state: ExperimentLifecycleState
     metric: MetricName
     value: MetricValue | None
@@ -67,6 +72,7 @@ class MetricEvidenceRow(FrozenDomainModel):
         MethodName,
         ScenarioName,
         MasterSeed,
+        RepetitionIndex | None,
         TextValue,
         MetricName,
         MetricValue | None,
@@ -76,6 +82,7 @@ class MetricEvidenceRow(FrozenDomainModel):
             self.method,
             self.condition,
             self.master_seed,
+            self.repetition,
             self.terminal_state.value,
             self.metric,
             self.value,
@@ -107,6 +114,37 @@ class AggregateMetricEvidenceRow(FrozenDomainModel):
             self.metric,
             self.observation_count,
             self.mean_value,
+        )
+
+
+class StateTrajectoryEvidenceRow(FrozenDomainModel):
+    experiment: ExperimentName
+    method: MethodName
+    condition: ScenarioName
+    master_seed: MasterSeed
+    repetition: RepetitionIndex | None
+    logical_evidence_cycle: EvidenceCycleIndex
+    admission_state: TextValue
+
+    def values(
+        self,
+    ) -> tuple[
+        ExperimentName,
+        MethodName,
+        ScenarioName,
+        MasterSeed,
+        RepetitionIndex | None,
+        EvidenceCycleIndex,
+        TextValue,
+    ]:
+        return (
+            self.experiment,
+            self.method,
+            self.condition,
+            self.master_seed,
+            self.repetition,
+            self.logical_evidence_cycle,
+            self.admission_state,
         )
 
 
@@ -168,6 +206,7 @@ def _metric_rows(
             method=outcome.cell.method,
             condition=outcome.cell.condition,
             master_seed=outcome.cell.master_seed,
+            repetition=outcome.cell.repetition,
             terminal_state=outcome.terminal_state,
             metric=metric,
             value=value,
@@ -202,6 +241,25 @@ def _aggregate_rows(
     )
 
 
+def _state_trajectory_rows(
+    experiment: ExperimentName,
+    outcomes: tuple[CellExecutionOutcome, ...],
+) -> tuple[StateTrajectoryEvidenceRow, ...]:
+    return tuple(
+        StateTrajectoryEvidenceRow(
+            experiment=experiment,
+            method=outcome.cell.method,
+            condition=outcome.cell.condition,
+            master_seed=outcome.cell.master_seed,
+            repetition=outcome.cell.repetition,
+            logical_evidence_cycle=observation.cycle,
+            admission_state=observation.state.value,
+        )
+        for outcome in outcomes
+        for observation in outcome.state_trajectory
+    )
+
+
 def _comparison_rows(
     experiment: ExperimentName,
     comparison_results: tuple[ComparisonFamilyResult, ...],
@@ -232,6 +290,7 @@ def _write_metric_parquet(destination: Path, rows: tuple[MetricEvidenceRow, ...]
             "method",
             "condition",
             "master_seed",
+            "repetition",
             "terminal_state",
             "metric",
             "value",
@@ -248,6 +307,26 @@ def _write_aggregate_metric_parquet(
     frame = pandas.DataFrame(
         tuple(row.values() for row in rows),
         columns=("experiment", "method", "condition", "metric", "observation_count", "mean_value"),
+    )
+    frame.to_parquet(destination, index=False)
+    return destination
+
+
+def _write_state_trajectory_parquet(
+    destination: Path,
+    rows: tuple[StateTrajectoryEvidenceRow, ...],
+) -> Path:
+    frame = pandas.DataFrame(
+        tuple(row.values() for row in rows),
+        columns=(
+            "experiment",
+            "method",
+            "condition",
+            "master_seed",
+            "repetition",
+            "logical_evidence_cycle",
+            "admission_state",
+        ),
     )
     frame.to_parquet(destination, index=False)
     return destination
@@ -290,6 +369,14 @@ def materialize_experiment_evidence(
         ),
     ]
     comparison_rows = _comparison_rows(result.experiment, result.comparison_results)
+    trajectory_rows = _state_trajectory_rows(result.experiment, result.outcomes)
+    if trajectory_rows:
+        paths.append(
+            _write_state_trajectory_parquet(
+                metrics_root / STATE_TRAJECTORY_PARQUET_NAME,
+                trajectory_rows,
+            )
+        )
     if comparison_rows:
         paths.append(
             _write_comparison_parquet(

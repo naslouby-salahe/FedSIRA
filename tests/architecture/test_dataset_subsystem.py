@@ -128,7 +128,6 @@ def test_obsolete_dataset_modules_are_gone() -> None:
         DATASETS_ROOT / "scaling.py",
         DATASETS_ROOT / "nbaiot" / "loading.py",
         DATASETS_ROOT / "nbaiot" / "preprocessing.py",
-        DATASETS_ROOT / "nbaiot" / "validation.py",
         DATASETS_ROOT / "ciciot2023" / "loading.py",
         DATASETS_ROOT / "ciciot2023" / "preprocessing.py",
         DATASETS_ROOT / "ciciot2023" / "validation.py",

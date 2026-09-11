@@ -1,13 +1,13 @@
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.protocol.baselines.certified_ensemble import (
+from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
     certified_ensemble_domain_groups,
     certified_ensemble_post_reference_rounds,
     ensemble_predicted_label,
     validate_group_without_target_member_uses_supported_only,
 )
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 BASELINES_CONFIG = CONFIG.baselines

@@ -11,7 +11,6 @@ dependencies = [
     "pyarrow==17.0.0",
     "pydantic==2.9.2",
     "typer==0.12.5",
-    "click==8.1.7",
     "rich==13.9.4",
     "matplotlib==3.9.2",
     "statsmodels==0.14.4",
@@ -27,7 +26,6 @@ dev = [
     "pytest==8.3.3",
     "ruff==0.7.4",
     "pyright==1.1.389",
-    "nox==2024.10.9",
     "vulture==2.13",
     "deptry==0.20.0",
     "import-linter==2.1",
@@ -43,6 +41,8 @@ packages = ["src/fedsira"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = ["slow: fixture-based model-training integration coverage"]
 
 [tool.ruff]
 line-length = 100
@@ -65,20 +65,18 @@ max-statements = 80
 "tests/unit/domain/test_records.py" = ["B010"]
 "tests/unit/config/test_loading.py" = ["B010"]
 "tests/unit/artifacts/test_records.py" = ["B010"]
-"tests/unit/artifacts/test_provenance.py" = ["B010"]
 "src/fedsira/cli.py" = ["B008"]
-"src/fedsira/experiments/cells.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"src/fedsira/experiments/cell_support.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"src/fedsira/protocol/baselines/outcomes.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/nbaiot/cells.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/nbaiot/cell_support.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/nbaiot/baselines/outcomes.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 "src/fedsira/application.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/experiments/executor.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
+"src/fedsira/datasets/nbaiot/executor.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
 "src/fedsira/reporting/export.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/reporting/tables.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/reporting/figures.py" = ["C901", "PLR0912"]
 "src/fedsira/evaluation/comparisons.py" = ["C901", "PLR0912", "PLR0915"]
 "src/fedsira/datasets/nbaiot/prepare.py" = ["C901", "PLR0915"]
 "src/fedsira/datasets/ciciot2023/prepare.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/runtime/environment.py" = ["B009"]
 
 [tool.vulture]
 ignore_decorators = ["@model_validator", "@field_validator", "@app.command"]
@@ -111,15 +109,15 @@ root = "src/fedsira/learning/model.py"
 reportUnknownMemberType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/experiments/cell_support.py"
+root = "src/fedsira/datasets/nbaiot/cell_support.py"
 reportUnusedFunction = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/experiments/executor.py"
+root = "src/fedsira/datasets/nbaiot/executor.py"
 reportPrivateUsage = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/experiments/cells.py"
+root = "src/fedsira/datasets/nbaiot/cells.py"
 reportUnknownMemberType = "none"
 reportAttributeAccessIssue = "none"
 reportPrivateUsage = "none"
@@ -127,7 +125,34 @@ reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/protocol/baselines/outcomes.py"
+root = "src/fedsira/evaluation/standard.py"
+reportMissingTypeStubs = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/evaluation/metrics.py"
+reportMissingTypeStubs = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/evaluation/statistics.py"
+reportMissingTypeStubs = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/reporting/export.py"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests/unit/datasets/nbaiot/test_preprocessing.py"
+reportUnknownMemberType = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/fedsira/datasets/nbaiot/baselines/outcomes.py"
 reportUnknownMemberType = "none"
 reportAttributeAccessIssue = "none"
 reportPrivateUsage = "none"
@@ -135,11 +160,10 @@ reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
 
 [tool.deptry]
-extend_exclude = ["noxfile.py"]
 known_first_party = ["fedsira"]
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["pyarrow", "matplotlib", "statsmodels", "scikit-learn", "torch", "numpy", "pandas", "scipy", "click"]
+DEP002 = ["pyarrow", "matplotlib", "statsmodels", "scikit-learn", "torch", "numpy", "pandas", "scipy"]
 
 [tool.importlinter]
 root_package = "fedsira"

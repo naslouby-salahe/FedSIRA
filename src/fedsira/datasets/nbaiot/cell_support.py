@@ -8,11 +8,28 @@ import torch
 
 from fedsira.config import VerificationConfig
 from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.datasets.nbaiot.evaluation.report_summary import (
+    RealReportSummary,
+    compute_real_report_summary,
+)
+from fedsira.datasets.nbaiot.learning.post_reference_training import (
+    certified_domain_delta_committee,
+    train_domain_reproduction_delta,
+    train_source_candidate_delta,
+)
+from fedsira.datasets.nbaiot.scenarios import reproducer_order
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
+)
+from fedsira.datasets.nbaiot.workflow import (
+    BackdoorScope,
+    HeterogeneityScope,
+    RealAnchor,
+    load_prepared_rows,
 )
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -40,9 +57,7 @@ from fedsira.domain.types import (
     MasterSeed,
     RequiredReproductionRowCount,
 )
-from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.evaluation.metrics import supported_macro_f1_harm, target_capability_gain
-from fedsira.evaluation.report_summary import RealReportSummary, compute_real_report_summary
 from fedsira.evaluation.summaries import (
     equal_weight_domain_mean,
     worst_domain_target_f1,
@@ -61,18 +76,6 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.planning import ScientificCell
 from fedsira.experiments.prerequisites import PreparedEvidenceCounts
-from fedsira.experiments.scenarios import reproducer_order
-from fedsira.experiments.workflow import (
-    BackdoorScope,
-    HeterogeneityScope,
-    RealAnchor,
-    load_prepared_rows,
-)
-from fedsira.learning.post_reference_training import (
-    certified_domain_delta_committee,
-    train_domain_reproduction_delta,
-    train_source_candidate_delta,
-)
 from fedsira.protocol.admission import (
     apply_production_update,
     final_gate_predicates_pass,
@@ -149,7 +152,7 @@ class OpeningIdentity(FrozenDomainModel):
     contract_passes: CapabilityContractSatisfied
 
 
-def _opening_mode_for_cell(
+def opening_mode_for_cell(
     cell: ScientificCell, resolved_core: ResolvedCore | None = None
 ) -> AdmissionOpeningMode:
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
@@ -164,7 +167,7 @@ def _target_role_count(prepared_root: Path, domain: NBaiotDomain, role: Role) ->
     return 0 if rows is None else rows.row_count
 
 
-def _first_target_sample_id(
+def first_target_sample_id(
     prepared_root: Path, domain: NBaiotDomain, role: Role
 ) -> ArtifactDigest | None:
     rows = load_prepared_rows(prepared_root, domain, NBaiotClass.GAFGYT_COMBO, role)
@@ -208,7 +211,7 @@ def _capability_contract_for_digest(dataset_manifest_hash: ArtifactDigest) -> Ca
     )
 
 
-def _opening_identity(dataset_manifest_hash: ArtifactDigest) -> OpeningIdentity:
+def opening_identity(dataset_manifest_hash: ArtifactDigest) -> OpeningIdentity:
     contract = _capability_contract_for_digest(dataset_manifest_hash)
     return OpeningIdentity(
         capability_identity=compute_capability_identity(contract),
@@ -254,7 +257,7 @@ def _reproducer_order(cell: ScientificCell) -> tuple[NBaiotDomain, ...]:
     )
 
 
-def _row_requirement(
+def row_requirement(
     cell: ScientificCell, resolved_core: ResolvedCore | None = None
 ) -> RequiredReproductionRowCount:
     config = current_application_context().scientific_config
@@ -431,7 +434,7 @@ def _train_reproduction_update(
     return trained
 
 
-def _reproduction_progression(
+def reproduction_progression(
     cell: ScientificCell,
     evidence: PreparedEvidenceCounts,
     external_verification_active: BooleanValue,
@@ -534,7 +537,7 @@ def _reproduction_progression(
     return (state, tuple(attempts), tuple(commitment_hashes), updates)
 
 
-def _single_verifier_progression(
+def single_verifier_progression(
     cell: ScientificCell,
     source_domain: NBaiotDomain | None,
     prepared_root: Path,
@@ -691,7 +694,7 @@ def _real_final_gate_metrics(
     )
 
 
-def _final_gate_decision(
+def final_gate_decision(
     evidence: PreparedEvidenceCounts,
     source_domain: NBaiotDomain | None,
     reproducer_order: Sequence[NBaiotDomain],
@@ -699,10 +702,10 @@ def _final_gate_decision(
     prepared_root: Path,
     master_seed: MasterSeed,
     anchor: RealAnchor | None,
-    coordinate_median_active: BooleanValue = False,
-    no_final_synthesis_gate_active: BooleanValue = False,
-    use_source_delta_for_source_domain: BooleanValue = False,
-    force_first_row_to_source_delta: BooleanValue = False,
+    coordinate_median_active: BooleanValue,
+    no_final_synthesis_gate_active: BooleanValue,
+    use_source_delta_for_source_domain: BooleanValue,
+    force_first_row_to_source_delta: BooleanValue,
     heterogeneity_scope: HeterogeneityScope | None = None,
     precomputed_updates: OrderedDict[NBaiotDomain, torch.Tensor] | None = None,
 ) -> tuple[AdmissionState, RealReportSummary | None]:
@@ -747,6 +750,7 @@ def _final_gate_decision(
             prepared_root,
             anchor,
             production_checkpoint,
+            no_final_synthesis_gate_active,
             heterogeneity_scope=heterogeneity_scope,
         )
     krum_selected_update: torch.Tensor | None = None
@@ -789,34 +793,25 @@ def _final_gate_decision_from_production_checkpoint(
     evidence: PreparedEvidenceCounts,
     source_domain: NBaiotDomain | None,
     prepared_root: Path,
-    anchor: RealAnchor | None,
+    anchor: RealAnchor,
     production_checkpoint: torch.Tensor,
-    no_final_synthesis_gate_active: BooleanValue = False,
+    no_final_synthesis_gate_active: BooleanValue,
     heterogeneity_scope: HeterogeneityScope | None = None,
 ) -> tuple[AdmissionState, RealReportSummary | None]:
     config = current_application_context().scientific_config
-    if anchor is not None:
-        (
-            adequate_final_gate_domain_count,
-            median_target_f1,
-            minimum_target_f1,
-            pooled_supported_macro_f1_drop,
-            pooled_benign_far_increase,
-        ) = _real_final_gate_metrics(
-            prepared_root,
-            anchor,
-            source_domain,
-            production_checkpoint,
-            heterogeneity_scope=heterogeneity_scope,
-        )
-    else:
-        adequate_final_gate_domain_count = evidence.final_gate_adequate_domain_count
-        median_target_f1 = median_domain_target_f1(
-            tuple(MetricResult(value=None, denominator=0) for _domain in NBAIOT_DOMAIN_ORDER)
-        )
-        minimum_target_f1 = MetricResult(value=None, denominator=0)
-        pooled_supported_macro_f1_drop = MetricResult(value=None, denominator=0)
-        pooled_benign_far_increase = MetricResult(value=None, denominator=0)
+    (
+        adequate_final_gate_domain_count,
+        median_target_f1,
+        minimum_target_f1,
+        pooled_supported_macro_f1_drop,
+        pooled_benign_far_increase,
+    ) = _real_final_gate_metrics(
+        prepared_root,
+        anchor,
+        source_domain,
+        production_checkpoint,
+        heterogeneity_scope=heterogeneity_scope,
+    )
     predicates_pass = final_gate_predicates_pass(
         median_target_f1,
         minimum_target_f1,
@@ -827,17 +822,15 @@ def _final_gate_decision_from_production_checkpoint(
     )
     final_gate_state = (
         AdmissionState.ADMITTED
-        if no_final_synthesis_gate_active and anchor is not None
+        if no_final_synthesis_gate_active
         else synthesis_pending_transition(
             adequate_final_gate_domain_count=adequate_final_gate_domain_count,
             final_gate_predicates_pass=predicates_pass,
             final_gate_config=config.protocol.final_gate,
         )
     )
-    real_report_summary = (
-        compute_real_report_summary(prepared_root, anchor, source_domain, production_checkpoint)
-        if anchor is not None
-        else None
+    real_report_summary = compute_real_report_summary(
+        prepared_root, anchor, source_domain, production_checkpoint
     )
     if final_gate_state is not AdmissionState.ADMITTED:
         return (final_gate_state, real_report_summary)
@@ -846,7 +839,7 @@ def _final_gate_decision_from_production_checkpoint(
     return (AdmissionState.ADMITTED, real_report_summary)
 
 
-def _compromised_reproducer_count(condition: ConditionName) -> CompromisedReproducerCount:
+def compromised_reproducer_count(condition: ConditionName) -> CompromisedReproducerCount:
     if condition in (
         ReproducerCondition.ONE_SOURCE_COPY,
         ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
@@ -862,7 +855,7 @@ def _compromised_reproducer_count(condition: ConditionName) -> CompromisedReprod
     return 0
 
 
-def _compromised_verifier_count(condition: ConditionName) -> ByzantineDomainCount:
+def compromised_verifier_count(condition: ConditionName) -> ByzantineDomainCount:
     if condition in (
         VerifierCondition.ONE_FALSE_POSITIVE,
         VerifierCondition.ONE_FALSE_NEGATIVE,
@@ -879,7 +872,7 @@ def _compromised_verifier_count(condition: ConditionName) -> ByzantineDomainCoun
 RESOLVED_FEDSIRA_CORE_METHOD = CoreMethodIdentity.RESOLVED_FEDSIRA_CORE
 
 
-def _efficiency_message_counts() -> (
+def efficiency_message_counts() -> (
     tuple[
         tuple[CommunicationMessageType, CommunicationMessageCount],
         ...,

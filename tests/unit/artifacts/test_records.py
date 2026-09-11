@@ -26,7 +26,7 @@ def test_manifest_round_trips_fields() -> None:
 def test_manifest_is_frozen() -> None:
     manifest = make_manifest()
     with pytest.raises(ValidationError):
-        setattr(manifest, "lifecycle_state", ArtifactLifecycleState.STALE)
+        setattr(manifest, "lifecycle_state", ArtifactLifecycleState.STAGING)
 
 
 def test_manifest_rejects_unknown_fields() -> None:

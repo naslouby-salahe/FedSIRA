@@ -768,9 +768,9 @@ $$
 
 The scaler is fixed by hash and reused everywhere. No target/post-reference data influence scaling.
 
-## 10.6 Preprocessing dependency fingerprint
+## 10.6 Preprocessing semantic identity
 
-Preprocessing artifacts use the stage-scoped dependency rules in Sections 25–27. The preprocessing dependency fingerprint includes, as applicable to the specific prepared artifact:
+Preprocessing artifacts use the semantic identity rules in Sections 25–27. The required identity includes, as applicable to the specific prepared artifact:
 
 ```text
 dataset_file_manifest_hash
@@ -781,11 +781,9 @@ dataset_file_manifest_hash
 + preprocessing_sample_order_seed
 + scaling_spec
 + upstream_preparation_artifact_identities
-+ preprocessing_producer_component_fingerprint
-+ relevant_preprocessing_runtime_dependency_fingerprint
 ```
 
-A changed material dependency produces a cache miss for the affected preprocessing artifact and its descendants only. Repository commit, output path, logging changes, and unrelated package/code changes are not preprocessing invalidation inputs. Recomputed content is checksummed before atomic publication; if the published parent identity is unchanged, existing descendants remain valid.
+A changed required identity input produces a cache miss for the affected preprocessing artifact only. Repository commit, output path, logging changes, source fingerprints, and unrelated package/code changes are not preprocessing invalidation inputs. Recomputed content is checksummed before atomic publication; if the published parent identity is unchanged, existing descendants remain valid.
 
 ---
 
@@ -1119,11 +1117,10 @@ An admission artifact is valid only if it contains immutable identities for:
 * final-gate sample manifest, score/evaluation artifacts, and metrics;
 * seed bundle;
 * semantic experiment-cell key and current Section 19 cell-phase identity;
-* the dependency fingerprints of every upstream scientific artifact;
-* the producer-component fingerprints and relevant runtime/dependency signatures needed to reproduce those artifacts;
-* repository commit, full dependency lock, and environment/hardware record as provenance snapshots.
+* checksum identities of every upstream scientific artifact; and
+* informational execution metadata sufficient to interpret a descriptive timing observation.
 
-The repository commit and full dependency lock are recorded for reconstruction and audit, but they are not blanket cache keys. Reuse validity follows the stage-scoped dependency rules in Sections 25–27. A commit change that does not alter an artifact's material producer code, scientific configuration, relevant runtime dependencies, or upstream artifact identities does not invalidate that artifact.
+Repository commit, source fingerprints, dependency-lock snapshots, and exact machine inventories are not scientific artifact identities or report prerequisites. Reuse validity follows the declared semantic inputs and upstream checksum identities in Sections 25–27; timing metadata describes the actual measurement environment without asserting that it is an exact reconstruction requirement.
 
 The production model is `anchor + production_update`. On a plurality path, `production_update` is the Krum-selected update; on a single-reproduction path it is the selected honest/non-source reproduction update. The source checkpoint cannot be the production checkpoint and cannot be copied into the source-excluded production path by server code.
 
@@ -1523,7 +1520,7 @@ This fixture map is authoritative for baseline validation; the implementation en
 
 # 17. Metric registry and mathematical definitions
 
-All metric functions live in one registry and return both value and denominator metadata. Stored metrics use float64 and are never rounded before comparisons.
+All metric functions live in one registry and return both value and denominator metadata. Standard classification aggregates (accuracy, macro/weighted F1, and balanced accuracy) are computed with the pinned scikit-learn implementation; project-specific security and evidence metrics remain explicit registry functions. Stored metrics use float64 and are never rounded before comparisons.
 
 Let $TP_c,FP_c,FN_c,TN_c$ denote one-vs-rest counts for class $c$.
 
@@ -2241,130 +2238,303 @@ FedSIRA/
 │
 ├── src/
 │   └── fedsira/
+│       ├── artifacts/
+│       │   ├── __init__.py
+│       │   ├── paths.py
+│       │   ├── provenance.py
+│       │   └── storage.py
+│       ├── datasets/
+│       │   ├── ciciot2023/
+│       │   │   ├── __init__.py
+│       │   │   ├── prepare.py
+│       │   │   ├── schema.py
+│       │   │   └── specification.py
+│       │   ├── nbaiot/
+│       │   │   ├── baselines/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── calibration.py
+│       │   │   │   ├── certified_ensemble.py
+│       │   │   │   ├── fedavg_training.py
+│       │   │   │   ├── outcomes.py
+│       │   │   │   ├── reconstruction_training.py
+│       │   │   │   └── robust_training.py
+│       │   │   ├── evaluation/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── backdoor.py
+│       │   │   │   ├── capability_boundary.py
+│       │   │   │   ├── domain.py
+│       │   │   │   ├── epistemic_boundary.py
+│       │   │   │   ├── report_summary.py
+│       │   │   │   ├── screening.py
+│       │   │   │   └── timing.py
+│       │   │   ├── learning/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── anchor_training.py
+│       │   │   │   ├── post_reference_training.py
+│       │   │   │   └── reference.py
+│       │   │   ├── __init__.py
+│       │   │   ├── cell_support.py
+│       │   │   ├── cells.py
+│       │   │   ├── executor.py
+│       │   │   ├── prepare.py
+│       │   │   ├── scenarios.py
+│       │   │   ├── schema.py
+│       │   │   ├── specification.py
+│       │   │   ├── validation.py
+│       │   │   └── workflow.py
+│       │   ├── __init__.py
+│       │   ├── common.py
+│       │   ├── preprocess.py
+│       │   └── specification.py
+│       ├── domain/
+│       │   ├── __init__.py
+│       │   ├── enums.py
+│       │   ├── models.py
+│       │   └── types.py
+│       ├── evaluation/
+│       │   ├── __init__.py
+│       │   ├── comparisons.py
+│       │   ├── indexing.py
+│       │   ├── metrics.py
+│       │   ├── service.py
+│       │   ├── standard.py
+│       │   ├── statistics.py
+│       │   └── summaries.py
+│       ├── experiments/
+│       │   ├── __init__.py
+│       │   ├── collapse.py
+│       │   ├── definitions.py
+│       │   ├── execution.py
+│       │   ├── planning.py
+│       │   └── prerequisites.py
+│       ├── learning/
+│       │   ├── __init__.py
+│       │   ├── aggregation.py
+│       │   ├── anchor.py
+│       │   ├── federated.py
+│       │   ├── model.py
+│       │   ├── post_reference.py
+│       │   ├── scoring.py
+│       │   └── training.py
+│       ├── protocol/
+│       │   ├── attacks/
+│       │   │   ├── __init__.py
+│       │   │   ├── byzantine.py
+│       │   │   └── source.py
+│       │   ├── baselines/
+│       │   │   ├── __init__.py
+│       │   │   ├── independent_retraining.py
+│       │   │   ├── references.py
+│       │   │   ├── registry.py
+│       │   │   ├── robust_aggregation.py
+│       │   │   └── source_model.py
+│       │   ├── __init__.py
+│       │   ├── admission.py
+│       │   ├── capability_contract.py
+│       │   ├── proposal.py
+│       │   ├── reproduction.py
+│       │   ├── specification.py
+│       │   ├── state_machine.py
+│       │   ├── synthesis.py
+│       │   └── verification.py
+│       ├── reporting/
+│       │   ├── __init__.py
+│       │   ├── export.py
+│       │   ├── figures.py
+│       │   ├── materialization.py
+│       │   ├── project_evidence.py
+│       │   ├── protocol_tables.py
+│       │   ├── rendering.py
+│       │   ├── tables.py
+│       │   └── verification.py
 │       ├── __init__.py
 │       ├── application.py
 │       ├── cli.py
 │       ├── config.py
-│       ├── runtime.py
-│       │
-│       ├── domain/
-│       │   ├── __init__.py
-│       │   ├── types.py
-│       │   ├── enums.py
-│       │   └── models.py
-│       │
-│       ├── datasets/
-│       │   ├── __init__.py
-│       │   ├── common.py
-│       │   ├── preprocess.py
-│       │   ├── roles.py
-│       │   ├── sampling.py
-│       │   ├── scaling.py
-│       │   ├── nbaiot/
-│       │   │   ├── __init__.py
-│       │   │   ├── loading.py
-│       │   │   ├── preprocessing.py
-│       │   │   ├── schema.py
-│       │   │   └── validation.py
-│       │   └── ciciot2023/
-│       │       ├── __init__.py
-│       │       ├── loading.py
-│       │       ├── preprocessing.py
-│       │       ├── schema.py
-│       │       └── validation.py
-│       │
-│       ├── learning/
-│       │   ├── __init__.py
-│       │   ├── model.py
-│       │   ├── training.py
-│       │   ├── federated.py
-│       │   ├── aggregation.py
-│       │   ├── scoring.py
-│       │   ├── post_reference.py
-│       │   ├── post_reference_training.py
-│       │   ├── reference.py
-│       │   ├── anchor.py
-│       │   └── anchor_training.py
-│       │
-│       ├── protocol/
-│       │   ├── __init__.py
-│       │   ├── specification.py
-│       │   ├── capability_contract.py
-│       │   ├── proposal.py
-│       │   ├── reproduction.py
-│       │   ├── verification.py
-│       │   ├── synthesis.py
-│       │   ├── admission.py
-│       │   ├── state_machine.py
-│       │   ├── attacks/
-│       │   │   ├── __init__.py
-│       │   │   ├── source.py
-│       │   │   └── byzantine.py
-│       │   └── baselines/
-│       │       ├── __init__.py
-│       │       ├── references.py
-│       │       ├── registry.py
-│       │       ├── calibration.py
-│       │       ├── source_model.py
-│       │       ├── independent_retraining.py
-│       │       ├── reconstruction_training.py
-│       │       ├── fedavg_training.py
-│       │       ├── robust_aggregation.py
-│       │       ├── robust_training.py
-│       │       ├── certified_ensemble.py
-│       │       └── outcomes.py
-│       │
-│       ├── experiments/
-│       │   ├── __init__.py
-│       │   ├── definitions.py
-│       │   ├── planning.py
-│       │   ├── execution.py
-│       │   ├── executor.py
-│       │   ├── cells.py
-│       │   ├── cell_support.py
-│       │   ├── scenarios.py
-│       │   ├── collapse.py
-│       │   ├── prerequisites.py
-│       │   ├── validation.py
-│       │   └── workflow.py
-│       │
-│       ├── evaluation/
-│       │   ├── __init__.py
-│       │   ├── metrics.py
-│       │   ├── comparisons.py
-│       │   ├── statistics.py
-│       │   ├── summaries.py
-│       │   ├── indexing.py
-│       │   ├── service.py
-│       │   ├── domain.py
-│       │   ├── screening.py
-│       │   ├── backdoor.py
-│       │   ├── capability_boundary.py
-│       │   ├── epistemic_boundary.py
-│       │   └── report_summary.py
-│       │
-│       ├── artifacts/
-│       │   ├── __init__.py
-│       │   ├── paths.py
-│       │   ├── storage.py
-│       │   └── provenance.py
-│       │
-│       └── reporting/
-│           ├── __init__.py
-│           ├── tables.py
-│           ├── figures.py
-│           ├── materialization.py
-│           ├── verification.py
-│           └── export.py
+│       └── runtime.py
 │
 ├── tests/
 │   ├── architecture/
-│   ├── unit/
+│   │   ├── _repo.py
+│   │   ├── test_canonical_vocabulary.py
+│   │   ├── test_code_quality.py
+│   │   ├── test_config_as_parameter.py
+│   │   ├── test_configuration_ownership.py
+│   │   ├── test_dataset_subsystem.py
+│   │   ├── test_dead_code.py
+│   │   ├── test_dependency_boundaries.py
+│   │   ├── test_dependency_hygiene.py
+│   │   ├── test_domain_typing_hygiene.py
+│   │   ├── test_enum_integrity.py
+│   │   ├── test_experiment_registry_contracts.py
+│   │   ├── test_generic_wrappers.py
+│   │   ├── test_module_scale.py
+│   │   ├── test_naming_policy.py
+│   │   ├── test_no_any_dict_object.py
+│   │   ├── test_no_comments_or_docstrings.py
+│   │   ├── test_no_duplicate_constants.py
+│   │   ├── test_no_free_string_enum_bypass.py
+│   │   ├── test_no_hardcoded_values.py
+│   │   ├── test_no_primitive_leaks.py
+│   │   ├── test_no_redirects_shims_reexports.py
+│   │   ├── test_no_test_only_production_code.py
+│   │   ├── test_no_todos_or_temporary_code.py
+│   │   ├── test_public_type_boundaries.py
+│   │   ├── test_roadmap_source_tree.py
+│   │   ├── test_runtime_reachability.py
+│   │   ├── test_static_typing.py
+│   │   └── test_workflow_call_topology.py
+│   ├── e2e/
+│   │   ├── __init__.py
+│   │   ├── test_preprocess_plan_smoke.py
+│   │   ├── test_reuse_recovery_overwrite.py
+│   │   └── test_run_status_report.py
 │   ├── integration/
+│   │   ├── artifacts/
+│   │   │   └── __init__.py
+│   │   ├── datasets/
+│   │   │   └── __init__.py
+│   │   ├── experiments/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_protocol_executor_real_evidence.py
+│   │   │   └── test_real_evidence.py
+│   │   ├── learning/
+│   │   │   └── __init__.py
+│   │   ├── protocol/
+│   │   │   └── __init__.py
+│   │   ├── reporting/
+│   │   │   └── __init__.py
+│   │   └── __init__.py
 │   ├── scientific/
-│   └── e2e/
+│   │   ├── __init__.py
+│   │   ├── test_data_invariants.py
+│   │   ├── test_dataset_validation_gate.py
+│   │   ├── test_experiment_contracts.py
+│   │   ├── test_krum_contract.py
+│   │   ├── test_source_artifact_exclusion.py
+│   │   ├── test_statistical_contracts.py
+│   │   └── test_verification_and_certificate.py
+│   ├── smoke/
+│   │   └── __init__.py
+│   ├── unit/
+│   │   ├── analysis/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_comparisons.py
+│   │   │   └── test_statistics.py
+│   │   ├── artifacts/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_paths.py
+│   │   │   ├── test_records.py
+│   │   │   ├── test_storage.py
+│   │   │   └── test_validation.py
+│   │   ├── attacks/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_reproduction.py
+│   │   │   ├── test_source_backdoor.py
+│   │   │   └── test_verification.py
+│   │   ├── baselines/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_calibration.py
+│   │   │   ├── test_certified_ensemble.py
+│   │   │   ├── test_independent_retraining.py
+│   │   │   ├── test_references.py
+│   │   │   ├── test_registry.py
+│   │   │   ├── test_registry_fixture_map.py
+│   │   │   ├── test_robust_aggregation.py
+│   │   │   ├── test_robust_aggregation_krum_reference.py
+│   │   │   ├── test_source_authority.py
+│   │   │   └── test_source_authority_prior_art.py
+│   │   ├── boundaries/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_capability_balancing.py
+│   │   │   ├── test_capability_granularity.py
+│   │   │   ├── test_epistemic_failure.py
+│   │   │   ├── test_evidence_arrival.py
+│   │   │   └── test_heterogeneity.py
+│   │   ├── cli/
+│   │   │   ├── __init__.py
+│   │   │   └── test_commands.py
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_loading.py
+│   │   │   └── test_validation.py
+│   │   ├── datasets/
+│   │   │   ├── ciciot2023/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_acquisition.py
+│   │   │   │   ├── test_preprocessing.py
+│   │   │   │   ├── test_schema.py
+│   │   │   │   └── test_validation.py
+│   │   │   ├── nbaiot/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_acquisition.py
+│   │   │   │   ├── test_preprocessing.py
+│   │   │   │   ├── test_schema.py
+│   │   │   │   └── test_validation.py
+│   │   │   ├── __init__.py
+│   │   │   ├── test_common.py
+│   │   │   ├── test_roles.py
+│   │   │   ├── test_sampling.py
+│   │   │   └── test_scaling.py
+│   │   ├── domain/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_enums.py
+│   │   │   └── test_records.py
+│   │   ├── evaluation/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregation.py
+│   │   │   ├── test_communication.py
+│   │   │   ├── test_metrics.py
+│   │   │   ├── test_records.py
+│   │   │   └── test_validation.py
+│   │   ├── experiments/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_collapse.py
+│   │   │   ├── test_execution.py
+│   │   │   ├── test_planning.py
+│   │   │   ├── test_registry.py
+│   │   │   ├── test_smoke.py
+│   │   │   ├── test_validation.py
+│   │   │   └── test_validation_run_path.py
+│   │   ├── learning/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_aggregation.py
+│   │   │   ├── test_anchor.py
+│   │   │   ├── test_federated.py
+│   │   │   ├── test_post_reference.py
+│   │   │   ├── test_scoring.py
+│   │   │   └── test_training.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   └── test_mlp.py
+│   │   ├── protocol/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_admission.py
+│   │   │   ├── test_capability_contract.py
+│   │   │   ├── test_invariants.py
+│   │   │   ├── test_opening.py
+│   │   │   ├── test_reproduction.py
+│   │   │   ├── test_screen.py
+│   │   │   ├── test_source_selection.py
+│   │   │   ├── test_state_machine.py
+│   │   │   ├── test_synthesis.py
+│   │   │   ├── test_theory.py
+│   │   │   └── test_verification.py
+│   │   ├── reporting/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_export_and_figures.py
+│   │   │   └── test_verification.py
+│   │   ├── runtime/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_determinism.py
+│   │   │   ├── test_environment.py
+│   │   │   ├── test_logging.py
+│   │   │   ├── test_recovery.py
+│   │   │   ├── test_state.py
+│   │   │   └── test_timing.py
+│   │   └── __init__.py
+│   └── conftest.py
 │
-├── noxfile.py
 └── pyproject.toml
 ```
 
@@ -2672,6 +2842,8 @@ execution:
   automatic_infrastructure_retries_per_cell_phase: 1
   timing:
     warmup_forward_passes: 1
+    repetitions_per_cell: 5
+    diagnostic_master_seed_count: 3
   same_environment_absolute_metric_tolerance: 1.0e-06
 claim_support_thresholds:
   byzantine_operating_region:
@@ -2691,7 +2863,7 @@ validation_tolerances:
   delay_component_sum_seconds_absolute: 1.0e-09
 ```
 
-The typed loader may expose enums and immutable objects generated from this YAML, but generated objects are representations of configuration data rather than a second authority. Fixed methodology is implemented from the corresponding roadmap contracts; raw-data manifests, observed values, derived quantities, artifact identities, dependency fingerprints, and runtime measurements are not hand-configured values.
+The typed loader may expose enums and immutable objects generated from this YAML, but generated objects are representations of configuration data rather than a second authority. Fixed methodology is implemented from the corresponding roadmap contracts; raw-data manifests, observed values, derived quantities, artifact identities, declared dependency versions, and runtime measurements are not hand-configured values.
 
 
 # 22. `outputs/` execution workspace
@@ -2723,9 +2895,8 @@ Every mutating command follows the same execution rule:
 ```text
 validate existing outputs
 → reuse compatible outputs
-→ identify and deactivate stale descendants
-→ recompute only missing/invalidated producers
-→ continue from the nearest valid output
+→ identify semantic-identity and direct-upstream-identity matches
+→ recompute only missing or checksum-invalid producers
 → atomically publish completed outputs
 ```
 
@@ -2733,15 +2904,15 @@ Dependency validity is stage-scoped as defined in Sections 25–27. No command t
 
 ## 24.1 `fedsira doctor`
 
-`doctor` is the authoritative read-only project, dataset, output, and experiment status command. It reports environment/configuration health; raw and preprocessed dataset readiness; output validity/stale-descendant status; each experiment's state, progress, nearest resumable boundary, blockers, failures/invalid cells, and report-export state; whether the four collapse decisions and `Resolved FedSIRA Core` record are complete; the current Section 29 project stage; and the next valid action. It writes no scientific output and does not repair or delete outputs.
+`doctor` is the authoritative read-only project, dataset, output, and experiment status command. It reports environment/configuration health; raw and preprocessed dataset readiness; output validity status; each experiment's state, progress, nearest resumable boundary, blockers, failures/invalid cells, and report-export state; whether the four collapse decisions and `Resolved FedSIRA Core` record are complete; the current Section 29 project stage; and the next valid action. It writes no scientific output and does not repair or delete outputs.
 
 ## 24.2 `fedsira preprocess ["N-BaIoT"|"CICIoT2023"]`
 
 With a dataset identity, preprocess exactly that dataset; without one, preprocess all roadmap datasets requiring preprocessing. Preprocessing performs Sections 9–11, including raw identity/schema validation, canonicalization, archive/shard discovery, role/split construction, scaling, sampling caps, feasibility checks, leakage checks, and dataset/domain manifests. Raw source files are never modified.
 
-A valid prepared-data artifact, split/role manifest, scaler, or deterministic prepared view is reused independently when its own dependency fingerprint matches. Reprocessing a dataset does not force retraining if the resulting upstream artifact identities are unchanged.
+A valid prepared-data artifact, split/role manifest, scaler, or deterministic prepared view is reused independently when its semantic identity and direct upstream identities match. Reprocessing a dataset does not force retraining if the resulting upstream artifact identities are unchanged.
 
-`--overwrite` forces rematerialization of preprocessing-owned artifacts under the same specified contract. Publication is atomic. If recomputed logical content and scientific identities are unchanged, existing descendants remain valid; if a published parent identity changes, only its descendants are marked stale.
+`--overwrite` forces rematerialization of preprocessing-owned artifacts under the same specified contract. Publication is atomic. If recomputed logical content and scientific identities are unchanged, existing descendants remain valid; if a published parent identity changes, only its dependents lose reuse compatibility.
 
 ## 24.3 `fedsira plan`
 
@@ -2761,23 +2932,23 @@ A valid prepared-data artifact, split/role manifest, scaler, or deterministic pr
 
 `<experiment name>` is the exact descriptive experiment name from Section 30. One invocation owns the complete scientific lifecycle for that experiment: prerequisite validation, planned cell execution, metric computation, statistical analysis, confidence intervals/effect sizes, multiplicity correction, scientific gates, invariant verification, provenance verification, and experiment completion.
 
-Before executing a cell, `run` resolves its artifact DAG. Prepared data, split/scaler artifacts, anchors, source candidates, honest or malicious training checkpoints, model scores, calibration products, verifier/final-gate evaluations, and other intermediates are reused whenever their actual dependency fingerprints match, even if first produced for another experiment. Experiment identity is included in an artifact fingerprint only when the experiment definition changes the artifact's scientific semantics.
+Before executing a cell, `run` resolves its declared artifact inputs. Prepared data, split/scaler artifacts, anchors, source candidates, honest or malicious training checkpoints, model scores, calibration products, verifier/final-gate evaluations, and other intermediates are reused whenever their semantic inputs and direct upstream identities match, even if first produced for another experiment. Experiment identity is included only when the experiment definition changes an artifact's scientific semantics.
 
-For collapse experiments, once the fourth required decision becomes complete, `run` also materializes/validates the deterministic `Resolved FedSIRA Core` artifact from Section 18.7. Post-core experiments refuse execution while that prerequisite is absent or stale.
+For collapse experiments, once the fourth required decision becomes complete, `run` also materializes/validates the deterministic `Resolved FedSIRA Core` artifact from Section 18.7. Post-core experiments refuse execution while that prerequisite is absent or invalid.
 
-If a later cell fails, already completed independent cells and shared upstream artifacts remain valid. After code/configuration is corrected, a later invocation recomputes only the first affected artifact and descendants. A metrics-code correction may reuse scores; a scoring-code correction may reuse checkpoints; a training-code correction may reuse prepared data and unaffected anchors; a reporting correction never reruns scientific computation.
+If a later cell fails, already completed independent cells and shared upstream artifacts remain valid. After a configuration or data correction, a later invocation recomputes only products whose semantic identities no longer match. A metrics-code correction may reuse scores; a scoring-code correction may reuse checkpoints; a training-code correction may reuse prepared data and unaffected anchors; a reporting correction never reruns scientific computation.
 
 Analysis/statistics/protocol verification are internal parts of `run`; there is no separate public analysis or verification command. A scientifically unfavorable/null result is still `Completed`. Technical execution failure is `Failed`; leakage, invariant, provenance, or authoritative-configuration violation is `Invalid`.
 
 If every required artifact for the experiment is validly complete, `run` returns a successful already-completed message and creates no duplicate observation.
 
-`--overwrite` deliberately recomputes artifacts owned by the requested experiment under the same authoritative scientific contract but does not recursively rebuild compatible shared prerequisites. Each replacement is staged and atomically activated. If a recomputed artifact has the same dependency/content identity as the active artifact, downstream artifacts remain valid; otherwise only descendants become stale. `--overwrite` never creates a second logical scientific observation.
+`--overwrite` deliberately recomputes artifacts owned by the requested experiment under the same authoritative scientific contract but does not recursively rebuild compatible shared prerequisites. Each replacement is staged and atomically activated. If a recomputed artifact has the same semantic/content identity as the active artifact, it is reused. `--overwrite` never creates a second logical scientific observation.
 
 ## 24.7 `fedsira report [<experiment name>]`
 
 `report` performs no scientific training, scoring, metric computation, or inferential recomputation. With an experiment identity it verifies that experiment's required scientific outputs and materializes the applicable Section 33–34 exports. Without an experiment identity it first performs project-completion verification: Section 31 nominal/completion counts, all required experiment terminal states, invariant/leakage checks, declared dependency compatibility, Section 18 statistical/multiplicity outputs, and Section 35 claim states must be internally consistent before project-summary exports are produced.
 
-Matching exports are reused when their reporting dependency fingerprint matches. `--overwrite` rematerializes only reporting artifacts and never causes preprocessing, training, scoring, evaluation, metric, or statistical recomputation. A stale report descendant is removed from the active result set before replacement.
+Matching exports are reused when their reporting inputs and direct source identities match. `--overwrite` rematerializes only reporting artifacts and never causes preprocessing, training, scoring, evaluation, metric, or statistical recomputation.
 
 The authoritative execution order is Section 29; operator commands do not need to be repeated under individual experiment definitions.
 
@@ -2787,9 +2958,9 @@ A scientific cell is identified only by the semantic coordinates that distinguis
 
 Artifact identity is finer-grained than cell identity. A cell may consume artifacts produced for another cell or experiment when the artifact's actual dependencies are identical. Conversely, two artifacts in the same cell are independently invalidated when they depend on different code/configuration/upstream scopes.
 
-For an already completed matching cell, `run` validates all expected artifacts and their dependency fingerprints and skips every valid producer. It does not create a second active record, run ID, timestamped duplicate, or extra scientific observation.
+For an already completed matching cell, `run` validates all expected artifacts, checksums, semantic inputs, and direct upstream identities and skips every valid producer. It does not create a second active record, run ID, timestamped duplicate, or extra scientific observation.
 
-An artifact dependency fingerprint is SHA-256 over canonical serialization of only the material dependencies declared for that artifact type:
+An artifact identity is SHA-256 over canonical serialization of its payload and the material scientific inputs declared for that artifact type:
 
 ```text
 artifact_schema/version
@@ -2797,17 +2968,15 @@ artifact_schema/version
 + relevant observed dataset/split/view identities
 + relevant semantic coordinates and seed namespace values
 + exact upstream artifact identities
-+ producer-component implementation fingerprint
-+ relevant external runtime/dependency fingerprint
 ```
 
-The producer-component fingerprint covers the local code units that implement that producer and their declared transitive scientific helpers. The relevant external dependency fingerprint includes only libraries/runtime components capable of changing that producer's scientific output. The full repository commit, full dependency lock, machine path, timestamps, logging configuration, comments, documentation, tests, unrelated CLI code, and unrelated package versions are provenance fields, not universal invalidation inputs.
+Repository source, dependency-lock snapshots, machine path, timestamps, logging configuration, comments, documentation, tests, unrelated CLI code, and package versions are not universal artifact inputs. Runtime metadata may be recorded for timing interpretation but is not a cache key.
 
-A producer's declared dependency scope is part of its artifact schema and is tested by Section 28. Changing that scope is itself a producer-schema change and invalidates artifacts of that type.
+The declared semantic input schema is part of an artifact's format and is tested by Section 28.
 
-Selective invalidation is transitive only downstream. When a complete parent output changes identity, its declared downstream consumers are marked stale before any new downstream read. Unrelated work remains complete and reusable.
+No mutable stale-propagation graph is maintained. A consumer is reusable only when its declared semantic inputs and direct upstream identities match; unrelated complete artifacts remain reusable.
 
-An infrastructure interruption may resume the same unchanged Section 19 scientific cell phase once from the nearest hash-valid recovery checkpoint. It does not create an additional seed or condition. After a genuine implementation correction, rerunning the same experiment is permitted under the unchanged scientific plan: the corrected producer-component fingerprint invalidates only affected artifacts and descendants, while compatible upstream science remains reusable.
+An infrastructure interruption may resume the same unchanged Section 19 scientific cell phase once from the nearest hash-valid recovery checkpoint. It does not create an additional seed or condition. Rerunning the same experiment under unchanged semantic inputs reuses compatible artifacts while preserving the scientific plan.
 
 `--overwrite` is explicit recomputation, not scientific redesign. It recomputes the requested command's owned products under the same authoritative inputs and may reuse compatible shared parents. Atomic replacement occurs only after the new artifact is complete and verified. A retained old payload is diagnostic history only and can never remain simultaneously active.
 
@@ -2840,8 +3009,7 @@ The normal execution path is always:
 ```text
 validate existing artifacts
 → reuse compatible artifacts
-→ mark stale descendants inactive
-→ recompute missing or affected nodes only
+→ recompute only nodes whose required semantic or upstream identities do not match
 → continue execution
 ```
 
@@ -2850,46 +3018,47 @@ validate existing artifacts
 Every reusable scientific artifact has one producer type and may have many consumers. It is valid only when:
 
 1. its semantic key is well-formed for that artifact type;
-2. its dependency fingerprint matches the currently resolved dependencies;
-3. every referenced upstream artifact is itself `Complete` and hash-valid;
+2. its declared governing dependency versions match the resolved environment;
+3. every referenced upstream artifact is itself `Complete` and content-valid;
 4. every payload checksum matches the manifest;
-5. its producer finished successfully and atomically published the complete manifest;
-6. no active ancestor identity has changed since publication.
+5. its producer finished successfully and atomically published the complete manifest.
+
+Because identity already encodes the exact upstream identities, an artifact whose ancestors changed simply stops matching and is not reusable; no separate mutable stale-propagation state is maintained.
 
 The lifecycle is:
 
 ```text
-Staging → Complete → Stale/Retired
+Staging → Complete
 ```
 
-`Failed`, interrupted, partial, or checksum-mismatched staging data never becomes `Complete`. Only `Complete` artifacts may be consumed. `Stale` and `Retired` artifacts are diagnostic history only.
+`Failed`, interrupted, partial, or checksum-mismatched staging data never becomes `Complete`. Only `Complete` artifacts may be consumed. Incompatible previously published artifacts are diagnostic history only.
 
 ## 26.3 Reusable artifact families
 
 | Artifact family                                    | Clear producer                           | Material dependencies                                                                                                                                                                         | Primary consumers and reuse boundary                                                                                                                    |
 | -------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Raw dataset identity                               | `preprocess` acquisition/validation path | exact raw bytes/file hashes and raw-manifest schema                                                                                                                                           | all preparation; reused until raw identity changes                                                                                                      |
-| Canonical dataset/schema/exclusion manifest        | dataset preparation                      | raw identity, parser/label/schema/nonfinite rules, preparation component fingerprint                                                                                                          | role/split/scaler construction; a parser/schema change invalidates preparation descendants but not unrelated datasets                                   |
-| Role/split/sample manifest                         | preprocessing                            | canonical dataset identity, role intervals, guard gaps, domain partitioning, sampling caps/order seed, target/support mapping, split component fingerprint                                    | all training/evaluation views; reused across all experiments with the same protocol                                                                     |
-| Scaler                                             | preprocessing                            | supported `Anchor Train` rows, scaling formula, feature schema, scaling component fingerprint                                                                                                 | all model inputs for that dataset/protocol                                                                                                              |
+| Canonical dataset/schema/exclusion manifest        | dataset preparation                      | raw identity, parser/label/schema/nonfinite rules, preparation conversion contract                                                                                                          | role/split/scaler construction; a parser/schema change invalidates preparation descendants but not unrelated datasets                                   |
+| Role/split/sample manifest                         | preprocessing                            | canonical dataset identity, role intervals, guard gaps, domain partitioning, sampling caps/order seed, target/support mapping, split procedure identity                                    | all training/evaluation views; reused across all experiments with the same protocol                                                                     |
+| Scaler                                             | preprocessing                            | supported `Anchor Train` rows, scaling formula, feature schema, scaling procedure identity                                                                                                 | all model inputs for that dataset/protocol                                                                                                              |
 | Prepared role view                                 | preprocessing                            | role/split manifest, scaler, deterministic transformation-independent view definition                                                                                                         | training/scoring; role-specific views are independently reusable                                                                                        |
-| Anchor checkpoint and round checkpoints            | anchor training                          | prepared anchor views, model definition/init, anchor optimizer/training contract, master-seed namespaces, relevant PyTorch/CUDA deterministic runtime, training component fingerprint         | source training, reproductions, baselines, scoring; shared across experiments when identical                                                            |
-| Source candidate checkpoint/update                 | source training                          | anchor identity, source domain, source/scenario/attack training data view, Capability Contract-relevant training config, attack transform when applicable, seeds, training component/runtime fingerprint      | proposal screen, source-authority baselines, malicious source scenarios                                                                                 |
-| Honest or Byzantine reproduction checkpoint/update | reproduction training/attack producer    | anchor identity, reproducer, exact reproduction view, training objective/config, attack strategy/strength if any, seeds, relevant training/attack component/runtime fingerprint               | external reproduction verification, direct-Krum comparators, robustness, ablations; the same row is reused when these dependencies match                                               |
-| Standard FL/baseline checkpoint/update             | baseline trainer                         | exact baseline algorithm, prepared views, anchor/start model, budget, attack condition, seeds, baseline-training component/runtime fingerprint                                                | baseline scoring/evaluation; no reuse across scientifically different baseline algorithms                                                               |
-| Model score artifact                               | scoring producer                         | exact model/checkpoint identity, exact sample/view identity, scoring transform, output-class registry, scoring component fingerprint, relevant numerical runtime                              | screen calculations, verifier/final/report metrics; checkpoint remains valid when only metric code changes                                              |
-| Screen matching/differential artifact              | proposal-screen calibration producer     | anchor/source score artifacts, screen folds, matching/quantile rule, Capability Contract screen constants, calibration component fingerprint                                                                  | proposal opening decision; reusable across experiments with identical source/screen semantics                                                           |
-| Baseline calibration artifact                      | named baseline calibration producer      | exact calibration score/update population, calibration rule and percentile, relevant baseline config and calibration component fingerprint                                                    | `Update Reconstruction Filter`, `Recovery after Source Admission`, `Source-Update Sanitization Reference`; each calibration type is independently keyed |
+| Anchor checkpoint and round checkpoints            | anchor training                          | prepared anchor views, model definition/init, anchor optimizer/training contract, master-seed namespaces, relevant PyTorch/CUDA deterministic runtime, training procedure identity         | source training, reproductions, baselines, scoring; shared across experiments when identical                                                            |
+| Source candidate checkpoint/update                 | source training                          | anchor identity, source domain, source/scenario/attack training data view, Capability Contract-relevant training config, attack transform when applicable, seeds, training procedure identity and relevant runtime capability record      | proposal screen, source-authority baselines, malicious source scenarios                                                                                 |
+| Honest or Byzantine reproduction checkpoint/update | reproduction training/attack producer    | anchor identity, reproducer, exact reproduction view, training objective/config, attack strategy/strength if any, seeds, training/attack procedure identity and relevant runtime capability record               | external reproduction verification, direct-Krum comparators, robustness, ablations; the same row is reused when these dependencies match                                               |
+| Standard FL/baseline checkpoint/update             | baseline trainer                         | exact baseline algorithm, prepared views, anchor/start model, budget, attack condition, seeds, baseline-training procedure identity and relevant runtime capability record                                                | baseline scoring/evaluation; no reuse across scientifically different baseline algorithms                                                               |
+| Model score artifact                               | scoring producer                         | exact model/checkpoint identity, exact sample/view identity, scoring transform, output-class registry, scoring procedure identity, relevant numerical runtime                              | screen calculations, verifier/final/report metrics; checkpoint remains valid when only metric code changes                                              |
+| Screen matching/differential artifact              | proposal-screen calibration producer     | anchor/source score artifacts, screen folds, matching/quantile rule, Capability Contract screen constants, calibration procedure identity                                                                  | proposal opening decision; reusable across experiments with identical source/screen semantics                                                           |
+| Baseline calibration artifact                      | named baseline calibration producer      | exact calibration score/update population, calibration rule and percentile, relevant baseline config and calibration procedure identity                                                    | `Update Reconstruction Filter`, `Recovery after Source Admission`, `Source-Update Sanitization Reference`; each calibration type is independently keyed |
 | Fixed Capability Contract/Krum/protocol configuration              | Configuration YAML           | Sections 5–7 and 13 constants                                                                                                                                                                 | all protocol decisions; fixed thresholds are configuration, not learned calibration outputs                                                             |
-| Verifier assignment/report                         | external reproduction verification evaluator                            | committed reproduction identity, Capability Contract identity, eligible-domain state, verifier-order seed, exact row-verification score artifact, verifier behavior profile, evaluation component fingerprint | reproduction certificate                                                                                                                                |
+| Verifier assignment/report                         | external reproduction verification evaluator                            | committed reproduction identity, Capability Contract identity, eligible-domain state, verifier-order seed, exact row-verification score artifact, verifier behavior profile, evaluation procedure identity | reproduction certificate                                                                                                                                |
 | Reproduction certificate                           | certificate producer                     | certified-row reports/commitments and certificate rule                                                                                                                                        | Krum synthesis; reused only for the same five certified row identities/order semantics                                                                  |
-| Krum synthesized update/model                      | synthesis producer                       | five certified/noncertified input row identities as required by method, Krum config, synthesis component fingerprint                                                                          | final gate, report-test scoring                                                                                                                         |
-| Final-gate evaluation/decision                     | final-gate evaluator                     | synthesized/production model identity, exact final-gate score artifacts, domain adequacy, Capability Contract/final-gate rules, evaluation component fingerprint                                              | admission outcome, metrics, claims                                                                                                                      |
-| Domain/seed metric artifact                        | metric registry                          | score/evaluation artifacts, exact metric definitions, aggregation rules, adequacy/NA rules, metric component fingerprint                                                                      | statistics, tables, figures; a metric-code change need not invalidate models or scores                                                                  |
-| Statistical comparison/gate artifact               | evaluation producer                      | exact seed-level metrics, pairing set, comparison definition, test/sidedness, Holm family, bootstrap seed/resamples, materiality rule, evaluation component fingerprint                       | claim-support decisions, tables, figures                                                                                                                 |
+| Krum synthesized update/model                      | synthesis producer                       | five certified/noncertified input row identities as required by method, Krum config, synthesis procedure identity                                                                          | final gate, report-test scoring                                                                                                                         |
+| Final-gate evaluation/decision                     | final-gate evaluator                     | synthesized/production model identity, exact final-gate score artifacts, domain adequacy, Capability Contract/final-gate rules, evaluation procedure identity                                              | admission outcome, metrics, claims                                                                                                                      |
+| Domain/seed metric artifact                        | metric registry                          | score/evaluation artifacts, exact metric definitions, aggregation rules, adequacy/NA rules, metric procedure identity                                                                      | statistics, tables, figures; a metric-code change need not invalidate models or scores                                                                  |
+| Statistical comparison/gate artifact               | evaluation producer                      | exact seed-level metrics, pairing set, comparison definition, test/sidedness, Holm family, bootstrap seed/resamples, materiality rule, evaluation procedure identity                       | claim-support decisions, tables, figures                                                                                                                 |
 | Claim-state artifact                               | claim-decision producer                  | mandatory statistical/gate artifacts and Section 35 rule                                                                                                                                      | project summary/report                                                                                                                                  |
 | Table/figure source data                           | reporting source-data producer           | exact verified metric/statistical/claim identities and table/figure data-selection spec                                                                                                       | renderers; stored under `outputs/` according to the producer's declared reuse scope                                                                    |
-| Table/figure/report export                         | `report`                                 | source-data identities, formatting/rendering specification, reporting component/dependency fingerprint                                                                                        | manuscript-facing `results/experiments/<descriptive-experiment-name>/` or `results/project_summary/` only                                                                                                            |
+| Table/figure/report export                         | `report`                                 | source-data identities, formatting/rendering specification, reporting procedure identity                                                                                        | manuscript-facing `results/experiments/<descriptive-experiment-name>/` or `results/project_summary/` only                                                                                                            |
 
 A score artifact contains per-sample model outputs needed by downstream metrics, including logits/probabilities/predictions and losses when required by the screen/calibration definition. The implementation may shard large score artifacts deterministically; a complete score artifact is publishable only when every declared shard is complete and its aggregate manifest verifies.
 
@@ -2910,7 +3079,7 @@ The following are the minimum invalidation rules. A change may invalidate a narr
 | Plot style, layout, table renderer, caption/template, output format                                                                                                                                                       | affected report export only                     | all scientific artifacts and report source data                                                 |
 | Timing instrumentation, physical machine, CPU-thread profile, CUDA timing method, or concurrent-load condition                                                                                                            | affected efficiency/timing artifact only        | non-timing scientific model/metric artifacts unless a separate material dependency also changed |
 
-A repository commit hash is never by itself a recomputation boundary. The full dependency lock is likewise not a blanket invalidation key: only relevant dependency versions declared by the producer are fingerprinted for reuse. The complete commit and lock remain recorded for provenance and reconstruction.
+A repository commit hash is never by itself a recomputation boundary. The full dependency lock is likewise not a blanket invalidation key: only the dependency versions a producer declares as governing are compared for reuse. The complete commit and lock remain recorded for provenance and reconstruction.
 
 Changes to documentation, comments, tests, CI, logging, `doctor`/`plan` presentation, filesystem paths, compression/containerization that preserves logical payloads, report formatting, or code wholly outside a producer's declared component dependency scope do **not** invalidate scientific artifacts.
 
@@ -2958,48 +3127,17 @@ Scientific independence requirements override cache reuse. Distinct master seeds
 
 The implementation must retain all scientifically meaningful objects needed by this study: dataset/preprocessing/split/domain identity and leakage validation; seed bundle and semantic cell identity; claim/Capability Contract and evidence state; source/reproducer/verifier/final-gate assignments; domain- and seed-level metrics; paired statistics/effects/CIs/multiplicity/materiality decisions; technical versus scientific terminal outcomes; final claim state; and table/figure source data. Logs are never result storage.
 
-# 27. Logging, provenance, and dependency fingerprints
+# 27. Logging, provenance, and reuse identity
 
 Logging is diagnostic and may use any structured format that preserves enough context to diagnose failures; exact event fields and filenames under `outputs/` are implementation choices.
 
-Every manuscript-facing number must be reproducibly traceable to completed scientific evidence: the owning experiment/cell and producer/cell-phase identities, applicable configuration subset, dataset and split/domain identities, seeds, upstream artifact identities, producer-component fingerprints, relevant runtime/dependency signatures, and the statistical analysis that produced the reported value.
+Every manuscript-facing number must be traceable to completed scientific evidence: its experiment/cell identity, applicable configuration subset, dataset and split/domain identities, seed, upstream artifact identities, and the analysis that produced it. Git state, source-tree fingerprints, lock-file digests, and exact machine identity are not scientific artifact inputs.
 
-For reconstruction, each artifact also records the repository commit, full dependency lock identity, environment/hardware record, and creation context. These broad provenance records do not replace stage-scoped dependency fingerprints and do not cause blanket invalidation.
+## 27.1 Semantic identity and lightweight execution records
 
-## 27.1 Producer-component and external-dependency fingerprint construction
+Artifact reuse is determined only by the required semantic identity, content checksum, and immutable upstream identities. Atomic publication and lifecycle validation reject incomplete or corrupted inputs. A compatible completed artifact is reusable; a changed scientific configuration, dataset/split identity, or required upstream identity naturally selects a different artifact. Reporting-only changes, documentation, logging, tests, Git state, and environment changes do not invalidate scientific artifacts.
 
-Producer fingerprints are computed from executable scientific code semantics rather than whole-repository commits. For each output family, the responsible producer starts from the entry modules below and recursively includes every imported `fedsira.*` module, excluding imports guarded solely by `TYPE_CHECKING`, tests, reporting-only modules not imported by the producer, and package `__init__.py` files that contain no executable statements beyond imports/version constants. Dynamic imports in scientific producer code are forbidden.
-
-| Artifact family | Producer entry modules | Relevant external dependency identity |
-| --- | --- | --- |
-| raw/schema/exclusion manifest | dataset-specific `loading.py`, `schema.py`, `preprocessing.py` | Python, pandas, NumPy, archive reader used for acquired format |
-| role/split/sample/prepared/scaler | `datasets/common.py`, `sampling.py`, `scaling.py`, dataset-specific `preprocessing.py` | Python, pandas, NumPy, pyarrow |
-| anchor/FedAvg checkpoints | `learning/model.py`, `learning/training.py`, `federated.py`, `anchor.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
-| source/reproduction checkpoints | `learning/model.py`, `learning/training.py`, applicable `attacks/*.py` | Python, PyTorch, CUDA/cuDNN runtime identity, NumPy |
-| baseline checkpoint/calibration | applicable `baselines/*.py`, shared `learning/*.py` | Python, PyTorch where trained, NumPy, SciPy/scikit-learn where used |
-| model scores | `learning/model.py`, `learning/scoring.py` | Python, PyTorch, CUDA runtime identity, NumPy |
-| opening/verifier/certificate/synthesis/final gate | applicable `protocol/*.py`, `evaluation/metrics.py`, `learning/aggregation.py` | Python, NumPy, SciPy/scikit-learn only when imported by the resolved producer |
-| boundary transformation | applicable `experiments/scenarios/*.py`, `attacks/*.py`, `datasets/sampling.py` | Python, NumPy, pandas/pyarrow for materialization |
-| metric artifact | `evaluation/metrics.py`, `evaluation/summaries.py` | Python, NumPy, scikit-learn only for metrics actually using it |
-| statistical/comparison artifact | `evaluation/statistics.py`, `evaluation/comparisons.py` | Python, NumPy, SciPy, statsmodels where imported |
-| claim-state artifact | `evaluation/summaries.py`, `evaluation/comparisons.py` | Python, NumPy |
-| report source/export | applicable `reporting/*.py` | Python, pandas, pyarrow, Matplotlib for figures |
-
-For every included Python source module, parse with the reference Python version, remove location metadata, remove module/class/function docstring expressions, and serialize `ast.dump(tree, annotate_fields=True, include_attributes=False)` as UTF-8. Comments and formatting never enter the AST. The component fingerprint is SHA-256 over canonical length-prefixed `(normalized_relative_path, normalized_ast_dump)` pairs sorted by relative path, plus the artifact producer-schema version. Consequently comments/docstrings/formatting do not invalidate science, while executable literals, imports, control flow, formulas, and dependency-scope changes do. Syntax-invalid or dynamically generated scientific source is `Configuration Invalid`.
-
-The external-dependency fingerprint includes the exact version/build identity for packages in the table's relevant set that are actually imported by the transitive producer closure **and for any declared external executable actually invoked by that producer**; for N-BaIoT acquisition this includes the Section 9.1.1 `unrar` version whenever RAR extraction is used. For CUDA-producing components it additionally includes PyTorch CUDA build, CUDA runtime, cuDNN version, GPU compute capability, and deterministic backend flags. The complete `uv.lock`, OS/hardware record, and repository commit remain broad provenance snapshots but are not universal cache keys.
-
-Architecture tests must verify that each scientific producer's runtime import closure is reproducible and that importing a new local/external scientific dependency changes the corresponding component/dependency fingerprint before an old artifact can be selected.
-
-Provenance validation must distinguish:
-
-* **scientific/configuration mismatch** — invalidate the affected producer and descendants;
-* **dataset/split/upstream mismatch** — invalidate the affected producer and descendants;
-* **material producer-code/runtime mismatch** — invalidate the affected producer and descendants;
-* **non-material repository/dependency change** — record the new provenance context but preserve the artifact;
-* **partial/stale payload** — reject immediately.
-
-The active dependency graph is derived from immutable upstream artifact identities. When a producer is republished with a different identity, descendants are marked stale before they can be read. Incomplete, stale, or technically invalid evidence can never substitute for required completed verified evidence.
+Execution records retain the cell identity, terminal state, metrics, failures, and telemetry needed to interpret timing results. Hardware may be recorded as informational timing metadata, but it never acts as a global readiness gate or cache key. The locked `uv` environment is the dependency authority; production code does not maintain a duplicate package or source-fingerprint registry.
 
 # 28. Validation and smoke-test contract
 
@@ -3078,20 +3216,20 @@ Generic software tests must additionally cover deterministic serialization/confi
 
 The implementation-quality suite must additionally prove:
 
-* a repository-only documentation/comment/test change leaves scientific artifact fingerprints unchanged;
+* a repository-only documentation/comment/test change leaves every scientific artifact identity unchanged;
 * changing preprocessing logic invalidates the affected prepared artifacts and all scientific descendants, but not the other dataset;
 * changing training logic invalidates affected checkpoints/scores/metrics/statistics/reports while preserving compatible prepared data;
 * changing scoring logic invalidates scores and descendants while preserving checkpoints;
 * changing metric logic invalidates metrics/statistics/reports while preserving scores and checkpoints;
 * changing statistical logic invalidates statistics/claim/report products while preserving seed metrics;
 * changing only figure/table rendering invalidates only reporting artifacts;
-* changing one parent identity marks exactly its transitive descendants stale and removes them from active selection;
+* changing one parent identity makes exactly its dependents unable to match their required upstream identities and removes them from active selection;
 * a staged/crashed/checksum-corrupt artifact is never accepted as complete;
-* rerunning an already complete experiment performs zero scientific recomputation when all required fingerprints match;
+* rerunning an already complete experiment performs zero scientific recomputation when all required semantic and upstream identities match;
 * a resumed deterministic training trajectory from a recovery checkpoint satisfies the Section 20 prediction tolerance against uninterrupted execution;
 * `--overwrite` cannot create duplicate logical observations and does not rebuild compatible shared prerequisites;
 * identical reusable artifacts requested by two experiments resolve to one canonical artifact identity;
-* executable-code AST changes alter only the producer families whose transitive component scope includes the changed module, while comment/docstring-only changes leave the component fingerprint unchanged.
+* a producer procedure change alters only the artifact families whose declared identity includes that procedure, while documentation, comment, logging, and test changes leave every scientific artifact identity unchanged.
 
 # 29. Authoritative execution sequence
 
@@ -3116,7 +3254,7 @@ The implementation-quality suite must additionally prove:
 
 The resolved-core artifact is a deterministic derived scientific artifact, not an operator-managed planning step. Once all four collapse experiments are complete, the next `fedsira run`/`doctor` resolution pass creates or validates it automatically from the four decision artifacts.
 
-The sequence is a scientific ordering constraint, not a requirement to recompute earlier stages. At every stage the implementation first validates and reuses compatible artifacts from Sections 25–27. Failure of one later experiment leaves earlier completed experiments and shared parents intact. After a repair, execution resumes from the first stale or missing dependency in the affected branch.
+The sequence is a scientific ordering constraint, not a requirement to recompute earlier stages. At every stage the implementation first validates and reuses compatible artifacts from Sections 25–27. Failure of one later experiment leaves earlier completed experiments and shared parents intact. After a repair, execution resumes from the first missing or non-matching dependency in the affected branch.
 
 A technical failure blocks only dependent science. A valid null or boundary result does not become a software failure and cannot be used to retune the method. If a collapse gate rejects a central mechanism claim, later characterization may continue but cannot resurrect that rejected claim through post-hoc selection.
 
@@ -3497,7 +3635,7 @@ Before each timed repetition:
 * do not clear OS filesystem cache;
 * ensure no concurrent scientific GPU job.
 
-Report median and IQR over the five timing repetitions for each seed, then descriptive median across the three seed medians. Do not run significance tests on timing repetitions.
+Report median and IQR over the five timing repetitions for each seed, then the descriptive median and IQR across the three seed medians. The exported timing observation carries both quartiles and its seed count. Do not run significance tests on timing repetitions.
 
 **Metrics:** wall-clock, GPU time, peak GPU memory, host RSS, communication bytes, transmissions, storage.
 
@@ -3956,7 +4094,7 @@ The scientific result set is the complete Section 30 experiment plan, not a favo
 
 Artifact reuse never changes the logical result set. Reusing one valid anchor, source candidate, reproduction row, score artifact, or calibration product across compatible cells is computational reuse of the same declared scientific object, not removal of planned cells or inferential repetition. Each planned cell retains its own required terminal outcome and metric/statistical record.
 
-An experiment is complete only when all required cells have valid terminal scientific outcomes, required metrics/statistics and claim/gate decisions exist, scientific invariants pass, and claim-bearing evidence is traceable through a complete non-stale artifact lineage to the exact data/configuration/seed/implementation dependencies.
+An experiment is complete only when all required cells have valid terminal scientific outcomes, required metrics/statistics and claim/gate decisions exist, scientific invariants pass, and claim-bearing evidence is traceable through a complete, identity-matching artifact lineage to the exact data/configuration/seed/implementation dependencies.
 
 # 37. Scientific completeness verification
 
@@ -3966,14 +4104,14 @@ The verification must confirm:
 
 1. the Section 31 planned-cell count is exactly satisfied by the active semantic-cell registry, with every cell represented by exactly one scientific terminal record;
 2. every required preprocessing, model, protocol, evaluation, metric, statistical, comparison, and claim artifact is `Complete`, checksum-valid, dependency-compatible, and reachable through the active artifact DAG;
-3. no active scientific artifact has a stale or invalid ancestor;
+3. no active scientific artifact depends on a missing or identity-incompatible ancestor;
 4. every required comparison has the prescribed complete-pair state and every Holm family has deterministic membership and adjustment artifacts;
 5. all Section 28 scientific invariants and leakage barriers passed for the active producer identities;
 6. all Section 35 claim states are mechanically derivable from valid evidence with no manual override;
 7. each Section 33–34 reporting source-data artifact resolves to valid scientific inputs;
-8. every manuscript-facing number is traceable to the exact dataset, role/split manifest, seed bundle, producer-component fingerprint, relevant dependency/runtime signature, and upstream artifact identities.
+8. every manuscript-facing number is traceable to the exact dataset, role/split manifest, seed bundle, producer procedure identity, relevant dependency/runtime record, and upstream artifact identities.
 
-If any condition fails, project-summary reporting is `Blocked`; `fedsira doctor` reports the first missing, stale, invalid, or incomplete dependency and the next valid command. Experiment-specific reporting may still materialize an individually complete experiment whose own dependencies pass verification.
+If any condition fails, project-summary reporting is `Blocked`; `fedsira doctor` reports the first missing, identity-incompatible, invalid, or incomplete dependency and the next valid command. Experiment-specific reporting may still materialize an individually complete experiment whose own dependencies pass verification.
 
 # 38. Manuscript-facing result materialization
 
@@ -3983,13 +4121,13 @@ The named tables in Section 33 and figures in Section 34 are mandatory. They mus
 
 Table/figure source-data products remain computational outputs under `outputs/` according to their declared reuse scope. `results/` contains only the compact verified render/export products defined in Section 23 and is never read back by scientific execution.
 
-Reporting artifacts have their own dependency fingerprints. A reporting-code or formatting change rematerializes only the affected table/figure/report descendants. It cannot invalidate the scientific metric/statistical artifacts from which they are rendered.
+Reporting artifacts declare their own source-data identities. A reporting-code or formatting change rematerializes only the affected table/figure/report descendants. It cannot invalidate the scientific metric/statistical artifacts from which they are rendered.
 
 Final exports exclude caches, debug logs, failed/invalid/stale runs, overwritten archives, temporary files, and incomplete analysis.
 
 # 39. Reproducibility and study-completion contract
 
-A third party must be able to reproduce the study from the recorded reconstruction commit, complete dependency lock, stage-scoped producer-component fingerprints, exact raw-data identities, single schema-validated `configs/fedsira.yaml`, fixed deterministic contracts in Sections 9–13, descriptive CLI sequence, fixed Section 30 experiment plan, and immutable upstream artifact identities.
+A third party must be able to reproduce the study from the recorded reconstruction commit, complete dependency lock, stage-scoped producer identities and declared governing inputs, exact raw-data identities, single schema-validated `configs/fedsira.yaml`, fixed deterministic contracts in Sections 9–13, descriptive CLI sequence, fixed Section 30 experiment plan, and immutable upstream artifact identities.
 
 Reproducibility requires traceability sufficient to detect dataset/split, configuration, seed, material producer-code/runtime, cell-phase, or upstream-artifact mismatch. It must also distinguish these from unrelated repository or dependency changes that do not affect a producer. A prescribed generic workflow-engine provenance schema is not required.
 
@@ -3999,7 +4137,7 @@ The study is ready for manuscript reporting only when:
 * the Section 31 count invariant and Section 37 scientific completeness verification are satisfied;
 * required metrics, statistics, effects, confidence intervals, multiplicity and materiality decisions exist;
 * every scientific invariant and data-leakage barrier passes;
-* every active artifact lineage is complete, hash-valid, dependency-compatible, and free of active stale descendants;
+* every active artifact lineage is complete, checksum-valid, and dependency-compatible;
 * final claim states are mechanically determined by Section 35;
 * every manuscript-facing number is traceable to the fixed scientific lineage;
 * all Section 33–34 products can be generated without manually transcribing scientific values.
@@ -4035,7 +4173,7 @@ These references justify externally grounded dataset/methodology choices and pri
 
 # 42. Implementation-completion rule
 
-Implementation readiness is satisfied when the single schema-validated `configs/fedsira.yaml` supplies every value that is genuinely configuration data, every fixed scientific/execution rule is implemented from its authoritative roadmap section without hidden defaults, preprocessing and smoke validation pass, every Section 16 baseline and Section 30 experiment is executable without inventing a scientific choice, the stage artifact DAG and producer dependency scopes in Sections 25–27 are implemented, completed reruns are idempotent, compatible expensive artifacts are reused across cells/experiments, stale descendants are automatically excluded, recovery resumes from the nearest valid artifact, overwrite/recovery cannot create duplicate scientific observations, all claim-bearing metrics/statistics implement Sections 17–18, and `doctor` can identify any remaining data, artifact, experiment, or evidence blocker.
+Implementation readiness is satisfied when the single schema-validated `configs/fedsira.yaml` supplies every value that is genuinely configuration data, every fixed scientific/execution rule is implemented from its authoritative roadmap section without hidden defaults, preprocessing and smoke validation pass, every Section 16 baseline and Section 30 experiment is executable without inventing a scientific choice, the stage artifact DAG and producer dependency scopes in Sections 25–27 are implemented, completed reruns are idempotent, compatible expensive artifacts are reused across cells/experiments, identity-incompatible artifacts are automatically excluded, recovery resumes from the nearest valid artifact, overwrite/recovery cannot create duplicate scientific observations, all claim-bearing metrics/statistics implement Sections 17–18, and `doctor` can identify any remaining data, artifact, experiment, or evidence blocker.
 
 This is an implementation gate only. Final scientific study completion is defined once in Section 39.
 
@@ -4049,12 +4187,12 @@ The precedence order is:
 2. `configs/fedsira.yaml` for values that are genuinely supplied configuration data: dataset/target identifiers, numerical parameters and thresholds, split/sampling intervals, experiment-strength grids, actual seeds, paths, runtime limits, and genuine categorical selections;
 3. validated raw-data manifests for observed release facts that cannot be known before acquisition;
 4. deterministic derivation functions for values computable from configured, fixed-specification, and observed inputs;
-5. runtime measurements and immutable artifact manifests for observed efficiency/resource quantities, realized producer identities, dependency fingerprints, and hashes.
+5. runtime measurements and immutable artifact manifests for observed efficiency/resource quantities, realized producer identities, declared governing dependency versions, and content checksums.
 
 Typed Python models, enums, resolved experiment objects, generated manifests, and CLI registries are validated implementations or representations of these authorities and may not override them. A fixed scientific rule is not converted into user-configurable behavior merely because software represents it with an enum, constant, or registry entry.
 
-Derived facts are never independently configured. This includes model input/output widths from validated schemas/class registries, trainable parameter count, non-source domain count, Krum count admissibility and nearest-neighbor count where derivable, guaranteed honest verifier positives, secondary pseudo-domain count, ensemble group size, random-panel contamination probability, transformation row counts, evidence-role row counts, equal-domain/equal-class weights, semantic-cell fingerprints, artifact dependency fingerprints, artifact identities, transitive stale-descendant sets, and the Section 31 cell/phase totals.
+Derived facts are never independently configured. This includes model input/output widths from validated schemas/class registries, trainable parameter count, non-source domain count, Krum count admissibility and nearest-neighbor count where derivable, guaranteed honest verifier positives, secondary pseudo-domain count, ensemble group size, random-panel contamination probability, transformation row counts, evidence-role row counts, equal-domain/equal-class weights, semantic-cell keys, artifact identities, and the Section 31 cell/phase totals.
 
 Raw dataset facts that can vary by release or local bytes—file/shard counts, row counts, exact file hashes, observed feature/label inventories, target availability by domain, nonfinite-row exclusions, and per-role evidence sufficiency—are materialized by `preprocess`. Official expectations remain validation expectations; actual validated bytes determine execution. Observed insufficiency leads to the scientific blocked/`Abstain`/`Dormant` behavior already defined, never to a post-hoc change in thresholds or sample requirements.
 
-Artifact-type dependency scopes remain implementation metadata adjacent to each producer. They identify which YAML fields, fixed roadmap rules, observed inputs, upstream artifacts, implementation components, and external dependencies materially determine the artifact. A scope change changes the artifact schema/component fingerprint and invalidates that artifact type as required by Sections 25–27; it does not create a second configuration authority.
+Artifact-type dependency scopes remain implementation metadata adjacent to each producer. They identify which configuration values, fixed roadmap rules, observed inputs, upstream artifact identities, and declared governing dependency versions materially determine the artifact. A scope change changes the artifact schema and declared governing inputs, and invalidates that artifact type as required by Sections 25–27; it does not create a second configuration authority.

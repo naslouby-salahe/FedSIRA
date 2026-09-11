@@ -8,12 +8,39 @@ import torch
 from fedsira.artifacts.paths import prepared_evidence_root
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.nbaiot.baselines.calibration import (
+    DomainFeatureMean,
+    same_context_verifier_panel,
+)
+from fedsira.datasets.nbaiot.baselines.outcomes import ProtocolBaselineOutcomes
+from fedsira.datasets.nbaiot.cells import ProtocolCellDispatch
+from fedsira.datasets.nbaiot.evaluation.domain import (
+    evaluate_domain,
+)
+from fedsira.datasets.nbaiot.evaluation.report_summary import RealReportSummary, metrics_from_state
+from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
+from fedsira.datasets.nbaiot.scenarios import (
+    select_heterogeneity_shift_features,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
+)
+from fedsira.datasets.nbaiot.validation import (
+    run_data_and_domain_evidence_validation,
+    run_protocol_invariant_validation,
+)
+from fedsira.datasets.nbaiot.workflow import (
+    BackdoorScope,
+    HeterogeneityScope,
+    RealAnchor,
+    RootCauseScope,
+    domain_anchor_train_feature_mean,
+    prepared_feature_names,
+    real_evidence_available,
 )
 from fedsira.domain.enums import (
     AdmissionState,
@@ -30,15 +57,10 @@ from fedsira.domain.types import (
     MasterSeed,
     MetricObservation,
 )
-from fedsira.evaluation.domain import (
-    evaluate_domain,
-)
 from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
-from fedsira.evaluation.report_summary import RealReportSummary, metrics_from_state
-from fedsira.experiments.cells import ProtocolCellDispatch
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -65,6 +87,7 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.execution import (
+    AdmissionStateObservation,
     CellExecutionOutcome,
     CellExecutor,
     ProtocolPhaseDurations,
@@ -76,28 +99,6 @@ from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
     load_prepared_evidence_counts,
 )
-from fedsira.experiments.scenarios import (
-    select_heterogeneity_shift_features,
-)
-from fedsira.experiments.validation import (
-    run_data_and_domain_evidence_validation,
-    run_protocol_invariant_validation,
-)
-from fedsira.experiments.workflow import (
-    BackdoorScope,
-    HeterogeneityScope,
-    RealAnchor,
-    RootCauseScope,
-    domain_anchor_train_feature_mean,
-    prepared_feature_names,
-    real_evidence_available,
-)
-from fedsira.learning.anchor_training import train_anchor
-from fedsira.protocol.baselines.calibration import (
-    DomainFeatureMean,
-    same_context_verifier_panel,
-)
-from fedsira.protocol.baselines.outcomes import ProtocolBaselineOutcomes
 from fedsira.protocol.capability_contract import (
     build_capability_contract,
     capability_contract_passes,
@@ -373,11 +374,41 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
                     cell_phase=ScientificCellPhase.PREPARE,
                 ),
             )
+        trajectory = (
+            self._evidence_scarcity_trajectory(metrics, _state)
+            if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
+            else ()
+        )
         return CellExecutionOutcome(
             cell=cell,
             terminal_state=ExperimentLifecycleState.COMPLETED,
             failure=None,
             metrics=metrics,
+            state_trajectory=trajectory,
+        )
+
+    def _evidence_scarcity_trajectory(
+        self,
+        metrics: tuple[MetricObservation, ...],
+        terminal_state: AdmissionState,
+    ) -> tuple[AdmissionStateObservation, ...]:
+        arrival_cycle = next(
+            (value for name, value in metrics if name == "evidence-arrival-cycle"), None
+        )
+        scientific_config = current_application_context().scientific_config
+        horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles
+        return tuple(
+            AdmissionStateObservation(
+                cycle=cycle,
+                state=(
+                    AdmissionState.DORMANT
+                    if arrival_cycle is None or cycle < arrival_cycle
+                    else AdmissionState.VERIFICATION_PENDING
+                    if cycle == arrival_cycle
+                    else terminal_state
+                ),
+            )
+            for cycle in range(horizon + 1)
         )
 
     def _execute_cell_protocol(

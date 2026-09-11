@@ -5,11 +5,35 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.baselines.calibration import (
+    clip_source_update,
+    reconstruction_error,
+    reconstruction_filter_accepts,
+    reconstruction_filter_calibration_error_count,
+    reconstruction_filter_reweight,
+    reconstruction_rejection_threshold,
+    sanitization_clip_bounds,
+)
+from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
+from fedsira.datasets.nbaiot.learning.anchor_training import (
+    ANCHOR_TRAINING_ALGORITHM_TOKEN,
+    training_seed,
+)
+from fedsira.datasets.nbaiot.learning.post_reference_training import (
+    combined_post_reference_rows,
+    train_source_candidate_delta,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
+)
+from fedsira.datasets.nbaiot.workflow import (
+    RealAnchor,
+    flat_parameters_identity,
+    load_prepared_rows,
+    tensor_view,
 )
 from fedsira.domain.types import (
     AlgorithmName,
@@ -20,38 +44,17 @@ from fedsira.domain.types import (
     ReconstructionError,
     RoundIndex,
 )
-from fedsira.evaluation.domain import non_source_domains
-from fedsira.experiments.workflow import (
-    RealAnchor,
-    flat_parameters_identity,
-    load_prepared_rows,
-    tensor_view,
-)
 from fedsira.learning.aggregation import (
     ModelState,
     WeightedModelState,
     load_model_state,
     model_state_from_classifier,
 )
-from fedsira.learning.anchor_training import ANCHOR_TRAINING_ALGORITHM_TOKEN, training_seed
 from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
-)
-from fedsira.learning.post_reference_training import (
-    combined_post_reference_rows,
-    train_source_candidate_delta,
-)
-from fedsira.protocol.baselines.calibration import (
-    clip_source_update,
-    reconstruction_error,
-    reconstruction_filter_accepts,
-    reconstruction_filter_calibration_error_count,
-    reconstruction_filter_reweight,
-    reconstruction_rejection_threshold,
-    sanitization_clip_bounds,
 )
 from fedsira.protocol.baselines.references import (
     fedavg_reference_post_reference_participants,
@@ -225,7 +228,10 @@ def train_update_reconstruction_filter_delta(
         is not None
     )
     participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
+        NBAIOT_DOMAIN_ORDER,
+        non_source_domains(source_domain),
+        source_domain,
+        source_rows_available,
     )
     if not participants:
         return None

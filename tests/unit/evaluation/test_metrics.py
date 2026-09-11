@@ -5,7 +5,6 @@ from fedsira.evaluation.metrics import (
     attack_success_rate_within_domain,
     auprc_one_vs_rest,
     auroc_one_vs_rest,
-    balanced_accuracy,
     benign_false_alarm_rate,
     benign_false_alarm_rate_increase,
     clean_oracle_degradation_is_material,
@@ -23,7 +22,6 @@ from fedsira.evaluation.metrics import (
     macro_f1,
     malicious_admission_rate,
     precision_for_class,
-    recall_for_class,
     reproduction_abstention_rate,
     reproduction_attempt_count,
     supported_macro_f1_harm,
@@ -31,7 +29,6 @@ from fedsira.evaluation.metrics import (
     target_f1,
     true_negative_rate_for_class,
     verifier_abstention_rate,
-    weighted_f1,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -47,20 +44,18 @@ def test_confusion_counts_partition_all_examples() -> None:
     assert counts.true_negative == 1
 
 
-def test_precision_recall_f1_are_na_on_zero_denominator() -> None:
+def test_precision_and_f1_are_na_on_zero_denominator() -> None:
     counts_by_class = compute_confusion_counts_by_class(["B"], ["B"], ["A"])
     counts = counts_by_class["A"]
     assert precision_for_class(counts).value is None
-    assert recall_for_class(counts).value is None
     assert f1_for_class(counts).value is None
 
 
-def test_precision_recall_f1_numeric_values() -> None:
+def test_precision_and_f1_numeric_values() -> None:
     true_labels = ["A", "A", "B", "B"]
     predicted_labels = ["A", "B", "B", "B"]
     counts = compute_confusion_counts(true_labels, predicted_labels, "A")
     assert precision_for_class(counts).value == 1.0
-    assert recall_for_class(counts).value == 0.5
     assert f1_for_class(counts).value == 2 / 3
 
 
@@ -92,26 +87,6 @@ def test_macro_f1_excludes_undefined_classes() -> None:
     result = macro_f1(f1_by_class)
     assert result.value == 1.0
     assert result.denominator == 1
-
-
-def test_weighted_f1_uses_support_weighting() -> None:
-    true_labels = ["A", "A", "A", "B"]
-    predicted_labels = ["A", "A", "B", "B"]
-    counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, ["A", "B"])
-    f1_by_class = {token: f1_for_class(counts) for token, counts in counts_by_class.items()}
-    support_by_class = {"A": 3, "B": 1}
-    result = weighted_f1(f1_by_class, support_by_class)
-    assert result.value is not None
-    assert result.denominator == 4
-
-
-def test_balanced_accuracy_is_unweighted_recall_mean() -> None:
-    true_labels = ["A", "A", "B"]
-    predicted_labels = ["A", "B", "B"]
-    counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, ["A", "B"])
-    recall_by_class = {token: recall_for_class(counts) for token, counts in counts_by_class.items()}
-    result = balanced_accuracy(recall_by_class)
-    assert result.value == 0.75
 
 
 def test_target_f1_selects_target_class() -> None:

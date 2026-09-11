@@ -32,8 +32,6 @@ def test_artifact_lifecycle_state_members() -> None:
     assert {member.value for member in ArtifactLifecycleState} == {
         "Staging",
         "Complete",
-        "Stale",
-        "Retired",
     }
 
 

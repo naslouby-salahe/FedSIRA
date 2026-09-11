@@ -4,7 +4,6 @@ import hashlib
 import math
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from enum import StrEnum
 
 import torch
 
@@ -49,7 +48,10 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.summaries import match_nearest_within_decile
 from fedsira.protocol.attacks.source import apply_trigger_transform, select_fractional_attack_rows
-from fedsira.protocol.specification import first_cycle_with_minimum_eligible_evidence_holders
+from fedsira.protocol.specification import (
+    EvidenceArrivalSchedule,
+    first_cycle_with_minimum_eligible_evidence_holders,
+)
 from fedsira.runtime import deterministic_order, framed_bytes
 
 ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
@@ -132,13 +134,6 @@ _GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[
     (6, 5),
     (8, 8),
 )
-
-
-class EvidenceArrivalSchedule(StrEnum):
-    PERMANENT_SINGLETON = "Permanent Singleton"
-    ONE_HONEST_HOLDER = "One Honest Holder"
-    GRADUAL_TO_QUORUM = "Gradual to Quorum"
-    IMMEDIATE_QUORUM = "Immediate Quorum"
 
 
 def reproducer_order(

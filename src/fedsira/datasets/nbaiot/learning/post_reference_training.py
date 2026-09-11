@@ -7,11 +7,9 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
 from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
-from fedsira.evaluation.summaries import decile_bin, decile_boundaries
-from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.workflow import (
+from fedsira.datasets.nbaiot.workflow import (
     BackdoorScope,
     EpistemicFailureScope,
     HeterogeneityScope,
@@ -26,7 +24,9 @@ from fedsira.experiments.workflow import (
     scope_and_shift_rows,
     tensor_view,
 )
-from fedsira.learning.anchor_training import training_seed
+from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
+from fedsira.evaluation.summaries import decile_bin, decile_boundaries
+from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,

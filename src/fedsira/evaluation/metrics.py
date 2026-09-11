@@ -13,7 +13,6 @@ from fedsira.domain.types import (
     AdmissionCount,
     AdmissionIndicatorSeries,
     BinaryLabelMaskSeries,
-    ClassSupportCounts,
     CleanOracleDegradationMaterial,
     DatasetClassToken,
     DomainCount,
@@ -34,6 +33,7 @@ from fedsira.domain.types import (
     VerifierReportCount,
 )
 from fedsira.evaluation.comparisons import ComparisonMetric
+from fedsira.evaluation.standard import standard_classification_metrics
 from fedsira.evaluation.summaries import minimum_defined_domain_count
 
 
@@ -131,13 +131,6 @@ def precision_for_class(counts: ConfusionCounts) -> MetricResult:
     return MetricResult(value=counts.true_positive / denominator, denominator=denominator)
 
 
-def recall_for_class(counts: ConfusionCounts) -> MetricResult:
-    denominator = counts.true_positive + counts.false_negative
-    if denominator == 0:
-        return MetricResult(value=None, denominator=0)
-    return MetricResult(value=counts.true_positive / denominator, denominator=denominator)
-
-
 def false_positive_rate_for_class(counts: ConfusionCounts) -> MetricResult:
     denominator = counts.false_positive + counts.true_negative
     if denominator == 0:
@@ -177,29 +170,8 @@ def _mean_of_defined_values(
     )
 
 
-def balanced_accuracy(recall_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
-    return _mean_of_defined_values(recall_by_class)
-
-
 def macro_f1(f1_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
     return _mean_of_defined_values(f1_by_class)
-
-
-def weighted_f1(
-    f1_by_class: Mapping[DatasetClassToken, MetricResult],
-    support_by_class: ClassSupportCounts,
-) -> MetricResult:
-    weighted_sum = 0.0
-    total_support = 0
-    for class_token, f1_result in f1_by_class.items():
-        if f1_result.value is None:
-            continue
-        support = support_by_class[class_token]
-        weighted_sum += support * f1_result.value
-        total_support += support
-    if total_support == 0:
-        return MetricResult(value=None, denominator=0)
-    return MetricResult(value=weighted_sum / total_support, denominator=total_support)
 
 
 def target_f1(
@@ -578,11 +550,11 @@ def report_metric_set(
         class_tokens, target_class_token, benign_class_token, supported_class_tokens
     )
     counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
+    standard_accuracy, standard_macro_f1, standard_weighted_f1, standard_balanced_accuracy = (
+        standard_classification_metrics(true_labels, predicted_labels, class_tokens)
+    )
     f1_by_class = OrderedDict(
         (token, f1_for_class(counts)) for token, counts in counts_by_class.items()
-    )
-    recall_by_class = OrderedDict(
-        (token, recall_for_class(counts)) for token, counts in counts_by_class.items()
     )
     supported_f1 = OrderedDict(
         (token, f1_by_class[token]) for token in supported_class_tokens if token in f1_by_class
@@ -609,9 +581,6 @@ def report_metric_set(
         and anchor_benign_far.value is not None
         else MetricResult(value=None, denominator=0)
     )
-    support_by_class = OrderedDict(
-        (token, sum(1 for label in true_labels if label == token)) for token in class_tokens
-    )
     asr = (
         attack_success_rate_within_domain(
             true_labels,
@@ -630,10 +599,10 @@ def report_metric_set(
         class_metrics.append((f"{token}:fnr", false_negative_rate_for_class(counts)))
         class_metrics.append((f"{token}:tnr", true_negative_rate_for_class(counts)))
     return (
-        ("accuracy", accuracy(counts_by_class, len(true_labels))),
-        ("macro-f1", macro_f1(f1_by_class)),
-        ("weighted-f1", weighted_f1(f1_by_class, support_by_class)),
-        ("balanced-accuracy", balanced_accuracy(recall_by_class)),
+        ("accuracy", standard_accuracy),
+        ("macro-f1", standard_macro_f1),
+        ("weighted-f1", standard_weighted_f1),
+        ("balanced-accuracy", standard_balanced_accuracy),
         (ComparisonMetric.TARGET_F1.value, current_target_f1),
         ("target-f1-gain", gain),
         (ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value, supported_harm),

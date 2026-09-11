@@ -1,15 +1,22 @@
 import csv
 from pathlib import Path
 
-import pandas
 import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
+    AdmissionState,
     CoreMethodIdentity,
     ExperimentLifecycleState,
     RootCauseMixture,
+)
+from fedsira.evaluation.comparisons import (
+    ComparisonFamilyResult,
+    ComparisonMetric,
+    ComparisonResult,
+    ComparisonState,
+    build_comparison_registry,
 )
 from fedsira.experiments.collapse import (
     CollapseDecision,
@@ -20,14 +27,15 @@ from fedsira.experiments.collapse import (
     RowVerificationMode,
 )
 from fedsira.experiments.definitions import (
-    ADMISSION_DELAY_DECOMPOSITION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     PrimaryScenario,
 )
 from fedsira.experiments.execution import (
+    AdmissionStateObservation,
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
@@ -44,6 +52,7 @@ from fedsira.reporting.export import (
 )
 from fedsira.reporting.figures import (
     MANDATORY_FIGURE_NAMES,
+    EvidenceStateFraction,
     render_capability_granularity_boundary,
     render_protocol_schematic,
     render_security_utility_tradeoff,
@@ -51,11 +60,7 @@ from fedsira.reporting.figures import (
     validate_mandatory_figures_covered,
 )
 from fedsira.reporting.materialization import (
-    AGGREGATE_METRICS_PARQUET_NAME,
     CELL_METRICS_PARQUET_NAME,
-    RESOURCES_PARQUET_NAME,
-    SEED_METRICS_PARQUET_NAME,
-    TIMINGS_PARQUET_NAME,
 )
 from fedsira.reporting.tables import (
     format_metric_value,
@@ -70,6 +75,49 @@ from fedsira.reporting.verification import (
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+
+
+def _with_primary_comparison_evidence(
+    result: ExperimentExecutionResult,
+) -> ExperimentExecutionResult:
+    required_metrics = frozenset(
+        (
+            ComparisonMetric.TARGET_F1,
+            ComparisonMetric.ATTACK_SUCCESS_RATE,
+            ComparisonMetric.MALICIOUS_ADMISSION,
+        )
+    )
+    definitions = tuple(
+        definition
+        for definition in build_comparison_registry()
+        if (
+            definition.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME
+            and definition.metric in required_metrics
+        )
+    )
+    comparisons = tuple(
+        ComparisonResult(
+            definition=definition,
+            paired_differences=(0.1, 0.1, 0.1),
+            complete_seed_count=3,
+            mean_paired_difference=0.1,
+            median_paired_difference=0.1,
+            paired_standardized_effect=1.0,
+            raw_p_value=0.01,
+            adjusted_p_value=0.01,
+            confidence_interval=(0.05, 0.15),
+            materiality_passes=True,
+            comparison_state=ComparisonState.PASSED,
+        )
+        for definition in definitions
+    )
+    return result.model_copy(
+        update={
+            "comparison_results": (
+                ComparisonFamilyResult(family=definitions[0].family, comparisons=comparisons),
+            )
+        }
+    )
 
 
 def test_format_metric_value_na_and_rounding() -> None:
@@ -96,7 +144,11 @@ def test_capability_granularity_boundary_uses_completed_outcome_evidence(tmp_pat
         ),
         terminal_state=ExperimentLifecycleState.COMPLETED,
         failure=None,
-        metrics=(("false-same-capability-rate", 0.25),),
+        metrics=(
+            ("false-same-capability-rate", 0.25),
+            ("root-cause-a-target-f1", 0.7),
+            ("root-cause-b-target-f1", 0.6),
+        ),
     )
     destination = tmp_path / "Capability-Granularity Boundary.png"
     assert render_capability_granularity_boundary((), destination, (outcome,)) == destination
@@ -108,13 +160,16 @@ def test_render_experiment_plan_table_is_csv() -> None:
     table = render_experiment_plan_table(plan)
     lines = table.csv_text.splitlines()
     assert table.name == "Experiment Plan"
-    assert (
-        lines[0] == "experiment,class,methods,conditions,seeds,nominal_run_count,comparison_family"
+    assert lines[0] == (
+        "experiment,class,methods,scenarios_or_variants,seeds,nominal_run_count,"
+        "primary_metrics,claim_family,prerequisite,downstream_role"
     )
     assert len(lines) - 1 == len(plan.experiments)
 
 
-def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_path: Path) -> None:
+def test_export_experiment_report_blocks_primary_figure_without_comparison_evidence(
+    tmp_path: Path,
+) -> None:
     result = ExperimentExecutionResult(
         experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
         lifecycle_state=ExperimentLifecycleState.COMPLETED,
@@ -132,26 +187,13 @@ def test_export_experiment_report_materializes_observed_metrics_and_figure(tmp_p
             ),
         ),
     )
-    export = export_experiment_report(result, tmp_path)
-    assert export.verification.passed
-    exported = {Path(path).name for path in export.exported_paths}
-    assert "Cell Metrics.csv" in exported
-    assert "FedSIRA Protocol Schematic.png" in exported
-    assert CELL_METRICS_PARQUET_NAME in exported
-    assert SEED_METRICS_PARQUET_NAME in exported
-    assert AGGREGATE_METRICS_PARQUET_NAME in exported
-    assert "manifest.json" in exported
-    cell_metrics = pandas.read_parquet(tmp_path / "metrics" / "primary" / CELL_METRICS_PARQUET_NAME)
-    assert cell_metrics.shape[0] == 1
-    assert cell_metrics.iloc[0]["metric"] == "target-f1"
-    summary = ExperimentReportSummary.model_validate_json(
-        (tmp_path / "metrics" / "primary" / "summary.json").read_text()
-    )
-    assert summary.experiment == result.experiment
-    assert summary.execution_digest == result.execution_digest
+    with pytest.raises(ValueError, match="missing comparison evidence"):
+        export_experiment_report(result, tmp_path)
 
 
-def test_export_experiment_report_materializes_efficiency_telemetry(tmp_path: Path) -> None:
+def test_export_experiment_report_blocks_efficiency_figure_without_repeated_telemetry(
+    tmp_path: Path,
+) -> None:
     result = ExperimentExecutionResult(
         experiment=EFFICIENCY_MEASUREMENT_NAME,
         lifecycle_state=ExperimentLifecycleState.COMPLETED,
@@ -172,10 +214,8 @@ def test_export_experiment_report_materializes_efficiency_telemetry(tmp_path: Pa
             ),
         ),
     )
-    export = export_experiment_report(result, tmp_path)
-    assert export.verification.passed
-    assert (tmp_path / "telemetry" / TIMINGS_PARQUET_NAME).is_file()
-    assert (tmp_path / "telemetry" / RESOURCES_PARQUET_NAME).is_file()
+    with pytest.raises(ValueError, match="missing timing and resource telemetry"):
+        export_experiment_report(result, tmp_path)
 
 
 def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_path: Path) -> None:
@@ -196,7 +236,7 @@ def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_pa
             ),
         ),
     )
-    export_experiment_report(result, tmp_path)
+    export_experiment_report(_with_primary_comparison_evidence(result), tmp_path)
     (tmp_path / "metrics" / "primary" / CELL_METRICS_PARQUET_NAME).unlink()
     verification = verify_experiment_artifacts(
         result,
@@ -227,7 +267,7 @@ def test_experiment_evidence_verification_rejects_wrong_summary_identity(tmp_pat
             ),
         ),
     )
-    export_experiment_report(result, tmp_path)
+    export_experiment_report(_with_primary_comparison_evidence(result), tmp_path)
     summary_path = tmp_path / "metrics" / "primary" / "summary.json"
     summary = ExperimentReportSummary.model_validate_json(summary_path.read_text())
     summary_path.write_text(
@@ -262,7 +302,7 @@ def test_experiment_evidence_verification_rejects_stale_summary_digest(tmp_path:
             ),
         ),
     )
-    export_experiment_report(result, tmp_path)
+    export_experiment_report(_with_primary_comparison_evidence(result), tmp_path)
     summary_path = tmp_path / "metrics" / "primary" / "summary.json"
     summary = ExperimentReportSummary.model_validate_json(summary_path.read_text())
     summary_path.write_text(
@@ -297,7 +337,7 @@ def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path:
             ),
         ),
     )
-    export_experiment_report(result, tmp_path)
+    export_experiment_report(_with_primary_comparison_evidence(result), tmp_path)
     table_path = tmp_path / "tables" / "main" / "Cell Metrics.csv"
     table_path.write_text("")
     verification = verify_experiment_artifacts(
@@ -308,7 +348,9 @@ def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path:
         tmp_path / "metrics" / "primary" / "summary.json",
     )
     assert not verification.passed
-    assert any("required table Cell Metrics" in failure for failure in verification.failures)
+    assert any(
+        "Cell Metrics: rendered table is empty" in failure for failure in verification.failures
+    )
 
 
 def test_experiment_evidence_verification_rejects_empty_required_figure(tmp_path: Path) -> None:
@@ -329,7 +371,7 @@ def test_experiment_evidence_verification_rejects_empty_required_figure(tmp_path
             ),
         ),
     )
-    export_experiment_report(result, tmp_path)
+    export_experiment_report(_with_primary_comparison_evidence(result), tmp_path)
     figure_path = tmp_path / "figures" / "main" / "FedSIRA Protocol Schematic.png"
     figure_path.write_bytes(b"")
     verification = verify_experiment_artifacts(
@@ -382,6 +424,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
     return (
         CollapseDecision(
             kind=CollapseDecisionKind.PROPOSAL_ASSISTANCE,
+            comparator="Candidate-Free",
             survives=True,
             primary_material_effect="false-launch",
             adjusted_p_value=0.01,
@@ -390,6 +433,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.PLURALITY,
+            comparator="One Independent Retrain",
             survives=True,
             primary_material_effect="malicious-admission",
             adjusted_p_value=0.02,
@@ -398,6 +442,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
+            comparator="Source-Update Sanitization Reference",
             survives=True,
             primary_material_effect="asr",
             adjusted_p_value=0.03,
@@ -406,6 +451,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.EXTERNAL_VERIFICATION,
+            comparator="Multiple Retrains with Direct Krum",
             survives=True,
             primary_material_effect="malicious-admission",
             adjusted_p_value=0.04,
@@ -427,7 +473,7 @@ def _lifecycle_records() -> tuple[ExperimentLifecycleRecord, ...]:
 
 
 def _override_results_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("fedsira.reporting.export._results_root", lambda: tmp_path)
+    monkeypatch.setattr("fedsira.reporting.export.project_summary_root", lambda: tmp_path)
 
 
 def test_export_project_summary_blocks_empty_result_evidence(
@@ -441,12 +487,61 @@ def test_export_project_summary_blocks_empty_result_evidence(
         plan,
         _lifecycle_records(),
         verification,
+        collapse_decisions=None,
+        resolved_core=None,
+        comparison_results=(),
+        outcomes=(),
+        evidence_trajectory=(),
+        telemetry=(),
     )
     assert isinstance(result, ReportExportResult)
     assert not result.exported_paths
     assert not result.verification.passed
     assert any("Primary Results" in failure for failure in result.verification.failures)
     assert any("Statistical Summary" in failure for failure in result.verification.failures)
+
+
+def test_export_project_summary_accepts_descriptive_experiments_without_comparisons(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = build_plan(resolved_core_complete=True)
+    verification = CompletenessVerificationResult(passed=True, failures=())
+    _override_results_root(tmp_path, monkeypatch)
+    descriptive_outcome = CellExecutionOutcome(
+        cell=ScientificCell(
+            experiment=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
+            method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+            condition="Immediate Quorum",
+            master_seed=1103,
+        ),
+        terminal_state=ExperimentLifecycleState.COMPLETED,
+        failure=None,
+        metrics=(("legitimate-admission", 1.0),),
+    )
+    result = export_project_summary(
+        plan,
+        _lifecycle_records(),
+        verification,
+        collapse_decisions=None,
+        resolved_core=None,
+        comparison_results=(),
+        outcomes=(descriptive_outcome,),
+        evidence_trajectory=(
+            EvidenceStateFraction(
+                condition="Immediate Quorum",
+                cycle=0,
+                state=AdmissionState.ADMITTED,
+                fraction=1.0,
+            ),
+        ),
+        telemetry=(),
+    )
+    failures = result.verification.failures
+    assert not any(
+        EVIDENCE_SCARCITY_AND_DORMANCY_NAME in failure and "missing required" in failure
+        for failure in failures
+    )
 
 
 def test_export_project_summary_with_collapse_decisions_still_requires_result_evidence(
@@ -472,15 +567,19 @@ def test_export_project_summary_with_collapse_decisions_still_requires_result_ev
         verification,
         collapse_decisions=_collapse_decisions(),
         resolved_core=resolved_core,
+        comparison_results=(),
+        outcomes=(),
+        evidence_trajectory=(),
+        telemetry=(),
     )
     assert not result.exported_paths
     assert not result.verification.passed
 
 
-def test_render_security_utility_tradeoff_empty_is_no_evidence(tmp_path: Path) -> None:
+def test_render_security_utility_tradeoff_blocks_without_evidence(tmp_path: Path) -> None:
     destination = tmp_path / "tradeoff.png"
-    path = render_security_utility_tradeoff((), destination)
-    assert path.exists()
+    with pytest.raises(ValueError, match="missing comparison evidence"):
+        render_security_utility_tradeoff((), destination)
 
 
 def test_render_useful_backdoored_source_uses_completed_outcome_metrics(tmp_path: Path) -> None:
@@ -495,7 +594,7 @@ def test_render_useful_backdoored_source_uses_completed_outcome_metrics(tmp_path
         terminal_state=ExperimentLifecycleState.COMPLETED,
         failure=None,
         metrics=(
-            ("attack-success-rate", 0.1),
+            ("asr", 0.1),
             ("target-f1", 0.8),
         ),
     )
@@ -526,14 +625,17 @@ def test_project_evidence_trajectory_uses_persisted_cycle_and_terminal_state(
     store.write_outcome(
         CellExecutionOutcome(
             cell=ScientificCell(
-                experiment=ADMISSION_DELAY_DECOMPOSITION_NAME,
+                experiment=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
                 method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
                 condition="Immediate Quorum",
                 master_seed=1103,
             ),
             terminal_state=ExperimentLifecycleState.COMPLETED,
             failure=None,
-            metrics=(("terminal-state", 1.0), ("evidence-arrival-cycle", 2.0)),
+            state_trajectory=(
+                AdmissionStateObservation(cycle=0, state=AdmissionState.DORMANT),
+                AdmissionStateObservation(cycle=2, state=AdmissionState.ADMITTED),
+            ),
         )
     )
     trajectory = project_evidence_trajectory(store)
@@ -546,10 +648,11 @@ def test_project_evidence_trajectory_uses_persisted_cycle_and_terminal_state(
 def test_project_efficiency_telemetry_aggregates_completed_outcome_timings() -> None:
     outcome = CellExecutionOutcome(
         cell=ScientificCell(
-            experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
+            experiment=EFFICIENCY_MEASUREMENT_NAME,
             method="Resolved FedSIRA Core",
-            condition="Legitimate Unsupported Capability",
+            condition="timed",
             master_seed=1103,
+            repetition=1,
         ),
         terminal_state=ExperimentLifecycleState.COMPLETED,
         failure=None,
@@ -560,7 +663,7 @@ def test_project_efficiency_telemetry_aggregates_completed_outcome_timings() -> 
         ),
     )
     assert {
-        (observation.metric, observation.value)
+        (observation.metric, observation.median)
         for observation in project_efficiency_telemetry((outcome,))
     } == {
         ("post-evidence-wall-clock-seconds", 3.0),
@@ -591,6 +694,9 @@ def test_delay_and_efficiency_table_uses_unique_outcome_evidence_rows() -> None:
     )
     table = render_delay_and_efficiency_table((), outcomes)
     row = next(csv.reader((table.csv_text.splitlines()[1],)))
-    assert row[:2] == ["Resolved FedSIRA Core", "Efficiency"]
-    assert row[7] == "3.00 [3.00,3.00]"
-    assert row[10:14] == ["10.000", "20.000", "30.000", "40.000"]
+    assert row[:3] == ["Efficiency Measurement", "Resolved FedSIRA Core", "Efficiency"]
+    assert row[8] == "3.00 [3.00,3.00]"
+    assert row[10] == "10.000"
+    assert row[11] == "20.000"
+    assert row[12] == "30.000"
+    assert row[13] == "40.000"

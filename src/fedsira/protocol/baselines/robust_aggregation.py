@@ -1,7 +1,8 @@
+from typing import TypeVar
+
 import torch
 
 from fedsira.config import ThreeRowCoordinateMedianConfig
-from fedsira.datasets.nbaiot.schema import NBaiotDomain, deterministic_domain_order
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import (
     CommitteeSize,
@@ -13,9 +14,10 @@ from fedsira.domain.types import (
     RoundIndex,
 )
 from fedsira.protocol.synthesis import CertifiedReproductionRow
-from fedsira.runtime import current_application_context, derive_uint32
+from fedsira.runtime import current_application_context, derive_uint32, deterministic_order
 
 CLIENT_SAMPLING_SEPARATOR = SeedNamespace.CLIENT_SAMPLING.value
+Domain = TypeVar("Domain")
 
 
 def direct_krum_committee_rows(
@@ -65,19 +67,19 @@ def client_sampling_round_seed(master_seed: MasterSeed, round_index: RoundIndex)
 
 
 def client_sampling_round_order(
-    eligible_domains: tuple[NBaiotDomain, ...],
+    eligible_domains: tuple[Domain, ...],
     master_seed: MasterSeed,
     round_index: RoundIndex,
-) -> tuple[NBaiotDomain, ...]:
+) -> tuple[Domain, ...]:
     round_seed = client_sampling_round_seed(master_seed, round_index)
-    return deterministic_domain_order(eligible_domains, CLIENT_SAMPLING_SEPARATOR, round_seed)
+    return deterministic_order(eligible_domains, CLIENT_SAMPLING_SEPARATOR, round_seed)
 
 
 def krum_reference_round_participants(
-    round_order: tuple[NBaiotDomain, ...],
-    compromised_domain: NBaiotDomain | None,
+    round_order: tuple[Domain, ...],
+    compromised_domain: Domain | None,
     participant_count: ParticipantCount,
-) -> tuple[NBaiotDomain, ...] | None:
+) -> tuple[Domain, ...] | None:
     if compromised_domain is None:
         selected = round_order[:participant_count]
     else:

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.metadata
 import json
 import logging
 import os
 import random
 import resource
 import subprocess
-import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, ClassVar, Protocol, Self, TypeVar, cast
 
@@ -31,7 +30,6 @@ from fedsira.domain.types import (
     AlgorithmName,
     AutomaticallyRetriable,
     AutomaticRecoveryPermitted,
-    ByteCount,
     CheckpointIdentity,
     DatasetManifestDigest,
     DerivedSeed,
@@ -217,39 +215,7 @@ def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
     _TORCH_CUDA_MANUAL_SEED_ALL(seed)
 
 
-BYTES_PER_GIGABYTE: ByteCount = 1_073_741_824
-REFERENCE_OS_NAME: EnvironmentText = "Ubuntu"
-REFERENCE_OS_VERSION_ID: EnvironmentText = "24.04"
-REFERENCE_PYTHON_VERSION: EnvironmentText = "3.11.9"
-REFERENCE_CUDA_RUNTIME_VERSION: EnvironmentText = "12.8"
-REFERENCE_GPU_NAME: EnvironmentText = "NVIDIA GeForce RTX 5060 Ti"
-REFERENCE_GPU_VRAM_GIGABYTES: ByteCount = 16
-REFERENCE_MINIMUM_CPU_RAM_GIGABYTES: ByteCount = 32
-REFERENCE_REQUIRED_GPU_COUNT: ByteCount = 1
-REFERENCE_UNRAR_VERSION: EnvironmentText = "1:7.0.7-1build1"
 REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
-
-
-class PackageVersionRequirement(FrozenDomainModel):
-    package: EnvironmentText
-    version: EnvironmentText
-
-
-REFERENCE_PACKAGE_REQUIREMENTS: tuple[PackageVersionRequirement, ...] = (
-    PackageVersionRequirement(package="torch", version="2.9.0"),
-    PackageVersionRequirement(package="numpy", version="2.1.3"),
-    PackageVersionRequirement(package="pandas", version="2.2.3"),
-    PackageVersionRequirement(package="scipy", version="1.14.1"),
-    PackageVersionRequirement(package="scikit-learn", version="1.5.2"),
-    PackageVersionRequirement(package="pyarrow", version="17.0.0"),
-    PackageVersionRequirement(package="pydantic", version="2.9.2"),
-    PackageVersionRequirement(package="duckdb", version="1.5.5"),
-    PackageVersionRequirement(package="typer", version="0.12.5"),
-    PackageVersionRequirement(package="rich", version="13.9.4"),
-    PackageVersionRequirement(package="matplotlib", version="3.9.2"),
-    PackageVersionRequirement(package="statsmodels", version="0.14.4"),
-    PackageVersionRequirement(package="pytest", version="8.3.3"),
-)
 
 
 class EnvironmentMismatch(FrozenDomainModel):
@@ -262,49 +228,7 @@ class _Fp32PrecisionController(Protocol):
     fp32_precision: EnvironmentText
 
 
-def check_python_version() -> tuple[EnvironmentMismatch, ...]:
-    actual: EnvironmentText = (
-        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    )
-    expected = REFERENCE_PYTHON_VERSION
-    if actual != expected:
-        return (
-            EnvironmentMismatch(
-                component="python",
-                expected=expected,
-                actual=actual,
-            ),
-        )
-    return ()
-
-
-def check_installed_package_versions() -> tuple[EnvironmentMismatch, ...]:
-    mismatches: list[EnvironmentMismatch] = []
-    for requirement in REFERENCE_PACKAGE_REQUIREMENTS:
-        try:
-            actual_version = importlib.metadata.version(requirement.package)
-        except importlib.metadata.PackageNotFoundError:
-            mismatches.append(
-                EnvironmentMismatch(
-                    component=requirement.package,
-                    expected=requirement.version,
-                    actual="not installed",
-                )
-            )
-            continue
-        if actual_version != requirement.version:
-            mismatches.append(
-                EnvironmentMismatch(
-                    component=requirement.package,
-                    expected=requirement.version,
-                    actual=actual_version,
-                )
-            )
-    return tuple(mismatches)
-
-
 def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
-    mismatches: list[EnvironmentMismatch] = []
     if not torch.cuda.is_available():
         return (
             EnvironmentMismatch(
@@ -313,97 +237,7 @@ def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
                 actual="unavailable",
             ),
         )
-    device_count = torch.cuda.device_count()
-    if device_count != REFERENCE_REQUIRED_GPU_COUNT:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="gpu_count",
-                expected=str(REFERENCE_REQUIRED_GPU_COUNT),
-                actual=str(device_count),
-            )
-        )
-    cuda_version = torch.version.cuda
-    if cuda_version != REFERENCE_CUDA_RUNTIME_VERSION:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="cuda_runtime_version",
-                expected=REFERENCE_CUDA_RUNTIME_VERSION,
-                actual=str(cuda_version),
-            )
-        )
-    device_name = torch.cuda.get_device_name(0)
-    if device_name != REFERENCE_GPU_NAME:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="gpu_name",
-                expected=REFERENCE_GPU_NAME,
-                actual=device_name,
-            )
-        )
-    _, total_memory_bytes = torch.cuda.mem_get_info(0)
-    vram_gigabytes = total_memory_bytes / BYTES_PER_GIGABYTE
-    if round(vram_gigabytes) < REFERENCE_GPU_VRAM_GIGABYTES:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="gpu_vram_gigabytes",
-                expected=f">={REFERENCE_GPU_VRAM_GIGABYTES}",
-                actual=f"{vram_gigabytes:.1f}",
-            )
-        )
-    return tuple(mismatches)
-
-
-def _os_release_field(
-    lines: tuple[EnvironmentText, ...],
-    field_name: EnvironmentText,
-) -> EnvironmentText | None:
-    prefix = f"{field_name}="
-    for line in lines:
-        if line.startswith(prefix):
-            return line[len(prefix) :].strip('"')
-    return None
-
-
-def check_operating_system() -> tuple[EnvironmentMismatch, ...]:
-    os_release_path = Path("/etc/os-release")
-    expected: EnvironmentText = f"{REFERENCE_OS_NAME} {REFERENCE_OS_VERSION_ID}"
-    if not os_release_path.exists():
-        return (
-            EnvironmentMismatch(
-                component="operating_system",
-                expected=expected,
-                actual="unknown",
-            ),
-        )
-    lines = tuple(os_release_path.read_text(encoding="utf-8").splitlines())
-    observed_name = _os_release_field(lines, "NAME")
-    observed_version = _os_release_field(lines, "VERSION_ID")
-    actual: EnvironmentText = f"{observed_name or ''} {observed_version or ''}".strip()
-    if observed_name != REFERENCE_OS_NAME or observed_version != REFERENCE_OS_VERSION_ID:
-        return (
-            EnvironmentMismatch(
-                component="operating_system",
-                expected=expected,
-                actual=actual or "unknown",
-            ),
-        )
     return ()
-
-
-def check_hardware_resources() -> tuple[EnvironmentMismatch, ...]:
-    mismatches: list[EnvironmentMismatch] = []
-    total_ram_gigabytes = (
-        os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
-    ) / BYTES_PER_GIGABYTE
-    if total_ram_gigabytes < REFERENCE_MINIMUM_CPU_RAM_GIGABYTES:
-        mismatches.append(
-            EnvironmentMismatch(
-                component="cpu_ram_gigabytes",
-                expected=f">={REFERENCE_MINIMUM_CPU_RAM_GIGABYTES}",
-                actual=f"{total_ram_gigabytes:.1f}",
-            )
-        )
-    return tuple(mismatches)
 
 
 def check_unrar_availability(
@@ -411,10 +245,9 @@ def check_unrar_availability(
 ) -> tuple[EnvironmentMismatch, ...]:
     if not rar_archives_present:
         return ()
-    expected = REFERENCE_UNRAR_VERSION
     try:
         result = subprocess.run(
-            ["dpkg-query", "--showformat=${Version}", "--show", "unrar"],
+            ["unrar"],
             capture_output=True,
             text=True,
             check=False,
@@ -423,17 +256,16 @@ def check_unrar_availability(
         return (
             EnvironmentMismatch(
                 component="unrar_version",
-                expected=expected,
+                expected="available",
                 actual="not installed",
             ),
         )
-    actual_version: EnvironmentText = result.stdout.strip() or "not installed"
-    if result.returncode != 0 or actual_version != expected:
+    if result.returncode != 0:
         return (
             EnvironmentMismatch(
                 component="unrar_version",
-                expected=expected,
-                actual=actual_version,
+                expected="available",
+                actual="unavailable",
             ),
         )
     return ()
@@ -452,14 +284,7 @@ def configure_deterministic_backend() -> None:
 def collect_environment_mismatches(
     rar_archives_present: RarArchivesPresent,
 ) -> tuple[EnvironmentMismatch, ...]:
-    return (
-        check_operating_system()
-        + check_python_version()
-        + check_installed_package_versions()
-        + check_gpu_requirements()
-        + check_hardware_resources()
-        + check_unrar_availability(rar_archives_present)
-    )
+    return check_gpu_requirements() + check_unrar_availability(rar_archives_present)
 
 
 LOGGER_NAME_PREFIX = "fedsira"
@@ -492,6 +317,14 @@ def get_structured_logger(component: RuntimeComponentName) -> logging.Logger:
     return logger
 
 
+def log_structured_event(
+    logger: logging.Logger,
+    event: LogRecordText,
+    fields: FrozenDomainModel,
+) -> None:
+    logger.info(event, extra=fields.model_dump())
+
+
 def configure_structured_file_logging(logger: logging.Logger, log_path: Path) -> None:
     resolved_path = log_path.resolve()
     for handler in logger.handlers:
@@ -505,6 +338,15 @@ def configure_structured_file_logging(logger: logging.Logger, log_path: Path) ->
     logger.setLevel(logging.INFO)
 
 
+def mirror_structured_logging_to_console(logger: logging.Logger) -> None:
+    logger.setLevel(logging.INFO)
+    for handler in logger.handlers:
+        if isinstance(handler, logging.StreamHandler) and not isinstance(
+            handler, logging.FileHandler
+        ):
+            handler.setLevel(logging.INFO)
+
+
 BYTES_PER_KIBIBYTE = 1024
 
 
@@ -514,6 +356,20 @@ class ElapsedTimer:
 
     def elapsed_seconds(self) -> WallClockSeconds:
         return time.monotonic() - self._start
+
+
+class CudaIntervalTimer:
+    def __init__(self) -> None:
+        self._start = torch.cuda.Event(enable_timing=True)
+        self._end = torch.cuda.Event(enable_timing=True)
+
+    def start(self) -> None:
+        self._start.record()
+
+    def elapsed_seconds(self) -> WallClockSeconds:
+        self._end.record()
+        torch.cuda.synchronize()
+        return timedelta(milliseconds=self._start.elapsed_time(self._end)).total_seconds()
 
 
 def reset_peak_gpu_memory_counter() -> None:

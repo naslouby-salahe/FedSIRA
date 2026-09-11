@@ -228,6 +228,7 @@ def test_external_verification_survival_requires_effect_and_liveness_constraint(
 def _decision(kind: CollapseDecisionKind, survives: bool) -> CollapseDecision:
     return CollapseDecision(
         kind=kind,
+        comparator="Candidate-Free",
         survives=survives,
         primary_material_effect="malicious-admission" if survives else None,
         adjusted_p_value=0.001 if survives else None,

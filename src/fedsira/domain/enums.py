@@ -43,8 +43,6 @@ class SeedNamespace(StrEnum):
 class ArtifactLifecycleState(StrEnum):
     STAGING = "Staging"
     COMPLETE = "Complete"
-    STALE = "Stale"
-    RETIRED = "Retired"
 
 
 class CellPhaseState(StrEnum):
@@ -188,6 +186,20 @@ class TernaryOutcome(StrEnum):
     POSITIVE = "POSITIVE"
     NEGATIVE = "NEGATIVE"
     ABSTAIN = "ABSTAIN"
+
+
+class ComparisonMetric(StrEnum):
+    FALSE_LAUNCH = "false-launch"
+    REPRODUCTION_ATTEMPTS = "reproduction-attempts"
+    POST_EVIDENCE_OVERHEAD = "post-evidence-overhead"
+    LEGITIMATE_ADMISSION = "legitimate-admission"
+    MALICIOUS_ADMISSION = "malicious-admission"
+    WORST_DOMAIN_TARGET_F1 = "worst-domain-target-f1"
+    ATTACK_SUCCESS_RATE = "asr"
+    TARGET_F1 = "target-f1"
+    SUPPORTED_MACRO_F1_HARM = "supported-macro-f1-harm"
+    BENIGN_FALSE_ALARM_RATE_INCREASE = "benign-far-increase"
+    FALSE_SAME_CAPABILITY_CERTIFICATION_RATE = "false-same-capability-certification-rate"
 
 
 class CoreMethodIdentity(StrEnum):

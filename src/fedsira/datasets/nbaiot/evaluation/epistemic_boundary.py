@@ -7,28 +7,28 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
-from fedsira.domain.enums import EvaluationInsufficiencyReason
-from fedsira.domain.models import MetricResult
-from fedsira.domain.types import DomainCount, MasterSeed
-from fedsira.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.evaluation.metrics import supported_macro_f1_harm
-from fedsira.evaluation.summaries import equal_weight_domain_mean
-from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.scenarios import (
+from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
+from fedsira.datasets.nbaiot.learning.post_reference_training import train_domain_reproduction_delta
+from fedsira.datasets.nbaiot.scenarios import (
     diagnostic_marker_metric_or_insufficient,
     match_diagnostic_benign_report_test_rows,
     select_spurious_feature_rows,
 )
-from fedsira.experiments.workflow import (
+from fedsira.datasets.nbaiot.schema import NBAIOT_CLASS_ORDER, NBaiotClass, NBaiotDomain
+from fedsira.datasets.nbaiot.workflow import (
     EpistemicFailureScope,
     PreparedRows,
     RealAnchor,
     load_prepared_rows,
     mark_epistemic_rows,
 )
+from fedsira.domain.enums import EvaluationInsufficiencyReason
+from fedsira.domain.models import MetricResult
+from fedsira.domain.types import DomainCount, MasterSeed
+from fedsira.evaluation.metrics import supported_macro_f1_harm
+from fedsira.evaluation.summaries import equal_weight_domain_mean
+from fedsira.experiments.definitions import EpistemicFailureType
 from fedsira.learning.model import FedSIRAClassifier, load_flat_trainable_parameters
-from fedsira.learning.post_reference_training import train_domain_reproduction_delta
 from fedsira.learning.scoring import logits_for_samples, per_sample_cross_entropy
 
 

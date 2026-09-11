@@ -6,12 +6,13 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.datasets.nbaiot.schema import NBaiotDomain
+from fedsira.datasets.nbaiot.workflow import RealAnchor
 from fedsira.domain.enums import AdmissionState
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import MetricObservation, MetricValue
 from fedsira.evaluation.comparisons import ComparisonMetric
-from fedsira.evaluation.domain import evaluate_domain, non_source_domains
 from fedsira.evaluation.metrics import (
     dormant_admission_rate,
     legitimate_admission_rate,
@@ -25,7 +26,7 @@ from fedsira.evaluation.summaries import (
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
 )
-from fedsira.experiments.workflow import RealAnchor
+from fedsira.experiments.definitions import DescriptiveScientificMetric
 
 
 @dataclass(frozen=True)
@@ -165,7 +166,7 @@ def metrics_from_state(
         (ComparisonMetric.FALSE_LAUNCH, undefined.value),
         (ComparisonMetric.POST_EVIDENCE_OVERHEAD, undefined.value),
         (
-            "dormant-admission-rate",
+            DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
             dormant_admission_rate(
                 dormant_admission_count=1 if is_dormant else 0, eligible_admission_count=1
             ).value,

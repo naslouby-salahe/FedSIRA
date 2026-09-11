@@ -1,24 +1,32 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
+
+import pandas
 
 from fedsira.artifacts.paths import (
-    OUTPUTS_ROOT,
     RESULTS_ROOT,
+    artifact_publication_root,
+    execution_outputs_root,
+    experiment_metrics_root,
+    experiment_result_root,
+    experiment_telemetry_root,
+    manuscript_figures_root,
+    manuscript_tables_root,
+    preprocessing_log_path,
     preprocessing_root,
+    project_summary_root,
     workspace_root_for_family,
 )
-from fedsira.artifacts.provenance import load_published_artifact_graph, stale_artifact_identities
-from fedsira.domain.enums import AdmissionState, ArtifactFamily, ExperimentLifecycleState
+from fedsira.artifacts.provenance import load_published_manifests
+from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
-    EvidenceCycleIndex,
     ExperimentName,
     FigureName,
     FrozenDomainModel,
-    MetricName,
-    MetricValue,
     OverwriteExisting,
     ReportVerificationFailure,
     RepositoryPath,
@@ -38,31 +46,22 @@ from fedsira.experiments.collapse import (
     read_resolved_core,
 )
 from fedsira.experiments.definitions import (
-    ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME,
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    AGGREGATE_METRICS_PARQUET_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
-    CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-    COLLAPSE_DECISION_EFFECTS_FIGURE_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
-    COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-    COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
-    EFFICIENCY_PROFILE_FIGURE_NAME,
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
-    HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME,
     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
     MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-    PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
-    SECONDARY_GENERALIZATION_FIGURE_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-    SHARED_EPISTEMIC_FAILURE_FIGURE_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
+    STATE_TRAJECTORY_PARQUET_NAME,
     ComparisonFamily,
     experiment_by_name,
 )
@@ -70,7 +69,6 @@ from fedsira.experiments.execution import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
-    PersistedExecutionRecord,
     PersistedFailureDetail,
     derive_experiment_lifecycle,
 )
@@ -84,28 +82,19 @@ from fedsira.reporting import tables as table_renderers
 from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
-    render_admission_delay_decomposition,
-    render_capability_granularity_boundary,
-    render_collapse_decision_effects,
-    render_compromised_reproducer_boundary,
-    render_compromised_verifier_boundary,
-    render_efficiency_profile,
-    render_heterogeneity_synthesis_boundary,
+    render_experiment_figures,
     render_mandatory_figures,
-    render_protocol_schematic,
-    render_secondary_generalization,
-    render_security_utility_tradeoff,
-    render_shared_epistemic_failure,
-    render_useful_backdoored_source,
     validate_mandatory_figures_covered,
 )
 from fedsira.reporting.materialization import (
     materialize_experiment_evidence,
-    parquet_contains_rows,
 )
+from fedsira.reporting.project_evidence import efficiency_telemetry as project_efficiency_telemetry
+from fedsira.reporting.project_evidence import evidence_trajectory as project_evidence_trajectory
+from fedsira.reporting.project_evidence import outcome_evidence_trajectory, project_result_evidence
+from fedsira.reporting.rendering import RenderedTable
 from fedsira.reporting.tables import (
     MANUSCRIPT_TABLE_NAMES,
-    RenderedTable,
     render_experiment_cell_metrics_table,
     render_mandatory_tables,
 )
@@ -113,21 +102,38 @@ from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
     ExperimentTerminalCount,
+    artifact_manifest_dependency_failures,
+    table_header,
     terminal_count_for_planned_experiment,
+    verify_artifact_manifest_dependencies,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
-    verify_no_stale_ancestors,
+    verify_mandatory_figure_source_data,
     verify_planned_cell_count_satisfied,
+    verify_rendered_table,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
     ApplicationContext,
     FailureDetail,
     bound_application_context,
+    configure_structured_file_logging,
     current_application_context,
+    get_structured_logger,
+    log_structured_event,
 )
 
 EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
+
+REPORT_LOGGER = get_structured_logger("reporting")
+
+PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"
+
+
+class ReportLogFields(FrozenDomainModel):
+    report_scope: ExperimentName
+    artifact_count: ScientificCellCount | None = None
+
 
 _RESULT_TABLE_EVIDENCE: tuple[tuple[TableName, tuple[ExperimentName, ...]], ...] = (
     ("Primary Results", (PRIMARY_CONFIRMATORY_EVALUATION_NAME,)),
@@ -195,14 +201,79 @@ class ReportExportResult(FrozenDomainModel):
     verification: CompletenessVerificationResult
 
 
-def _results_root() -> Path:
-    return Path("results")
-
-
 def _write_table(root: Path, table: RenderedTable) -> Path:
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
     return destination
+
+
+def _metric_artifact_is_semantically_complete(
+    path: Path,
+    result: ExperimentExecutionResult,
+) -> BooleanValue:
+    if not path.is_file():
+        return False
+    frame = pandas.read_parquet(path)
+    if path.name == STATE_TRAJECTORY_PARQUET_NAME:
+        required_columns = frozenset(
+            (
+                "experiment",
+                "method",
+                "condition",
+                "master_seed",
+                "logical_evidence_cycle",
+                "admission_state",
+            )
+        )
+        if not required_columns.issubset(frame.columns) or frame.empty:
+            return False
+        experiment_rows = frame[frame["experiment"] == result.experiment]
+        expected_cells = frozenset(
+            (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
+            for outcome in result.outcomes
+        )
+        observed_cells = frozenset(
+            (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
+        )
+        return expected_cells.issubset(observed_cells) and bool(
+            experiment_rows["admission_state"].notna().all()
+        )
+    required_columns = (
+        frozenset(
+            ("experiment", "method", "condition", "metric", "observation_count", "mean_value")
+        )
+        if path.name == AGGREGATE_METRICS_PARQUET_NAME
+        else frozenset(("experiment", "method", "condition", "master_seed", "terminal_state"))
+    )
+    if not required_columns.issubset(frame.columns) or frame.empty:
+        return False
+    experiment_rows = frame[frame["experiment"] == result.experiment]
+    if experiment_rows.empty:
+        return False
+    if path.name == AGGREGATE_METRICS_PARQUET_NAME:
+        expected_conditions = frozenset(
+            (outcome.cell.method, outcome.cell.condition) for outcome in result.outcomes
+        )
+        observed_conditions = frozenset(
+            (row.method, row.condition) for row in experiment_rows.itertuples()
+        )
+        return expected_conditions.issubset(observed_conditions) and bool(
+            (experiment_rows["observation_count"] > 0).all()
+        )
+    terminal_state_values = cast(list[str], experiment_rows["terminal_state"].tolist())
+    recorded_terminal_states = frozenset(
+        ExperimentLifecycleState(state) for state in terminal_state_values
+    )
+    if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
+        return False
+    expected_cells = frozenset(
+        (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
+        for outcome in result.outcomes
+    )
+    observed_cells = frozenset(
+        (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
+    )
+    return expected_cells.issubset(observed_cells)
 
 
 def verify_experiment_artifacts(
@@ -233,121 +304,50 @@ def verify_experiment_artifacts(
                 failures.append(f"{result.experiment}: metric summary execution digest is stale")
     for filename in specification.required_metric_artifacts:
         path = metrics_root / filename
-        if not parquet_contains_rows(path):
+        if not _metric_artifact_is_semantically_complete(path, result):
             failures.append(
                 f"{result.experiment}: required metric artifact {filename} is missing or empty"
             )
     for table_name in specification.required_tables:
-        path = tables_root / f"{table_name}.csv"
-        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
-            failures.append(f"{result.experiment}: required table {table_name} is missing or empty")
+        expected_header = table_header(table_name)
+        required_rows = frozenset(
+            (
+                outcome.cell.experiment,
+                outcome.cell.method,
+                outcome.cell.condition,
+                str(outcome.cell.master_seed),
+                "" if outcome.cell.repetition is None else str(outcome.cell.repetition),
+            )
+            for outcome in result.outcomes
+        )
+        failures.extend(
+            verify_rendered_table(
+                tables_root / f"{table_name}.csv",
+                expected_header,
+                required_rows,
+            )
+        )
     for figure_name in specification.required_figures:
         path = figures_root / f"{figure_name}.png"
         if not path.is_file() or path.stat().st_size == 0:
             failures.append(
                 f"{result.experiment}: required figure {figure_name} is missing or empty"
             )
+    failures.extend(
+        verify_mandatory_figure_source_data(
+            result,
+            outcome_evidence_trajectory(result.outcomes)
+            if result.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
+            else (),
+            project_efficiency_telemetry(result.outcomes)
+            if result.experiment == EFFICIENCY_MEASUREMENT_NAME
+            else (),
+            result.outcomes,
+        )
+    )
+    if not result.outcomes or any(not outcome.completed for outcome in result.outcomes):
+        failures.append(f"{result.experiment}: figures lack completed source evidence")
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
-
-
-def _render_specialized_figure(
-    result: ExperimentExecutionResult,
-    figures_root: Path,
-) -> Path | None:
-    figure: Path | None = None
-    if result.experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
-        figure = render_compromised_reproducer_boundary(
-            result.comparison_results,
-            figures_root / f"{COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-        figure = render_compromised_verifier_boundary(
-            result.comparison_results,
-            figures_root / f"{COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
-        figure = render_shared_epistemic_failure(
-            result.comparison_results,
-            figures_root / f"{SHARED_EPISTEMIC_FAILURE_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
-        figure = render_capability_granularity_boundary(
-            result.comparison_results,
-            figures_root / f"{CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
-        figure = render_heterogeneity_synthesis_boundary(
-            result.comparison_results,
-            figures_root / f"{HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == ADMISSION_DELAY_DECOMPOSITION_NAME:
-        figure = render_admission_delay_decomposition(
-            result.comparison_results,
-            figures_root / f"{ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME}.png",
-            result.outcomes,
-        )
-    elif result.experiment == SECONDARY_DATASET_GENERALIZATION_NAME:
-        figure = render_secondary_generalization(
-            result.comparison_results,
-            figures_root / f"{SECONDARY_GENERALIZATION_FIGURE_NAME}.png",
-        )
-    return figure
-
-
-def _render_experiment_figures(
-    result: ExperimentExecutionResult,
-    figures_root: Path,
-) -> tuple[Path, ...]:
-    figures: list[Path] = [
-        render_protocol_schematic(figures_root / "FedSIRA Protocol Schematic.png")
-    ]
-    if result.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME:
-        figures.append(
-            render_security_utility_tradeoff(
-                result.comparison_results,
-                figures_root / f"{PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME}.png",
-            )
-        )
-    elif result.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME:
-        figures.append(
-            render_useful_backdoored_source(
-                result.comparison_results,
-                figures_root / f"{USEFUL_BACKDOORED_SOURCE_FIGURE_NAME}.png",
-                result.outcomes,
-            )
-        )
-        figures.append(
-            render_collapse_decision_effects(
-                result.comparison_results,
-                figures_root / f"{COLLAPSE_DECISION_EFFECTS_FIGURE_NAME}.png",
-            )
-        )
-    elif result.experiment in COLLAPSE_EXPERIMENT_NAMES:
-        figures.append(
-            render_collapse_decision_effects(
-                result.comparison_results,
-                figures_root / f"{COLLAPSE_DECISION_EFFECTS_FIGURE_NAME}.png",
-            )
-        )
-    elif result.experiment == EFFICIENCY_MEASUREMENT_NAME:
-        figures.append(
-            render_efficiency_profile(
-                (),
-                None,
-                figures_root / f"{EFFICIENCY_PROFILE_FIGURE_NAME}.png",
-                result.comparison_results,
-            )
-        )
-    else:
-        specialized = _render_specialized_figure(result, figures_root)
-        if specialized is not None:
-            figures.append(specialized)
-    return tuple(figures)
 
 
 def export_experiment_report(
@@ -365,10 +365,10 @@ def export_experiment_report(
             verification=verification,
         )
 
-    tables_root = experiment_root / "tables" / "main"
-    figures_root = experiment_root / "figures" / "main"
-    metrics_root = experiment_root / "metrics" / "primary"
-    telemetry_root = experiment_root / "telemetry"
+    tables_root = manuscript_tables_root(experiment_root)
+    figures_root = manuscript_figures_root(experiment_root)
+    metrics_root = experiment_metrics_root(experiment_root)
+    telemetry_root = experiment_telemetry_root(experiment_root)
     tables_root.mkdir(parents=True, exist_ok=True)
     figures_root.mkdir(parents=True, exist_ok=True)
     metrics_root.mkdir(parents=True, exist_ok=True)
@@ -376,8 +376,22 @@ def export_experiment_report(
 
     exported: list[Path] = [
         _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
-        *_render_experiment_figures(result, figures_root),
+        *render_experiment_figures(
+            result,
+            figures_root,
+            outcome_evidence_trajectory(result.outcomes)
+            if result.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
+            else (),
+            project_efficiency_telemetry(result.outcomes)
+            if result.experiment == EFFICIENCY_MEASUREMENT_NAME
+            else (),
+        ),
     ]
+    log_structured_event(
+        REPORT_LOGGER,
+        "report.experiment.artifacts.rendered",
+        ReportLogFields(report_scope=result.experiment, artifact_count=len(exported)),
+    )
     evidence = materialize_experiment_evidence(result, metrics_root, telemetry_root)
     exported.extend(Path(path) for path in evidence.paths)
     if result.comparison_results:
@@ -435,21 +449,31 @@ def _report_material_failures(
 
 def _missing_result_evidence(
     comparison_results: tuple[ComparisonFamilyResult, ...],
+    outcomes: tuple[CellExecutionOutcome, ...],
 ) -> tuple[ReportVerificationFailure, ...]:
     evidenced_experiments = frozenset(
         comparison.definition.experiment
         for family in comparison_results
         for comparison in family.comparisons
     )
+    completed_experiments = frozenset(
+        outcome.cell.experiment for outcome in outcomes if outcome.completed
+    )
     failures: list[ReportVerificationFailure] = []
     for table_name, expected_experiments in _RESULT_TABLE_EVIDENCE:
         missing = tuple(
             experiment
             for experiment in expected_experiments
-            if experiment not in evidenced_experiments
+            if (
+                experiment not in evidenced_experiments
+                if experiment_by_name(experiment).comparison_family is not None
+                else experiment not in completed_experiments
+            )
         )
         if missing:
-            failures.append(f"{table_name}: missing comparison evidence for {', '.join(missing)}")
+            failures.append(
+                f"{table_name}: missing required scientific evidence for {', '.join(missing)}"
+            )
     if not comparison_results:
         failures.append("Statistical Summary: no comparison evidence")
     return tuple(failures)
@@ -459,12 +483,12 @@ def export_project_summary(
     plan: ExperimentPlan,
     lifecycle_states: tuple[ExperimentLifecycleRecord, ...],
     verification: CompletenessVerificationResult,
-    collapse_decisions: tuple[CollapseDecision, ...] | None = None,
-    resolved_core: ResolvedCore | None = None,
-    comparison_results: tuple[ComparisonFamilyResult, ...] = (),
-    outcomes: tuple[CellExecutionOutcome, ...] = (),
-    evidence_trajectory: tuple[EvidenceStateFraction, ...] | None = None,
-    telemetry: tuple[EfficiencyMetricObservation, ...] | None = None,
+    collapse_decisions: tuple[CollapseDecision, ...] | None,
+    resolved_core: ResolvedCore | None,
+    comparison_results: tuple[ComparisonFamilyResult, ...],
+    outcomes: tuple[CellExecutionOutcome, ...],
+    evidence_trajectory: tuple[EvidenceStateFraction, ...],
+    telemetry: tuple[EfficiencyMetricObservation, ...],
 ) -> ReportExportResult:
     if not verification.passed:
         return ReportExportResult(
@@ -473,7 +497,14 @@ def export_project_summary(
             verification=verification,
         )
 
-    evidence_failures = _missing_result_evidence(comparison_results)
+    evidence_failures = _missing_result_evidence(comparison_results, outcomes)
+    if not evidence_trajectory:
+        evidence_failures = (
+            *evidence_failures,
+            "Evidence-Arrival State Trajectory: missing state evidence",
+        )
+    if not telemetry:
+        evidence_failures = (*evidence_failures, "Efficiency Profile: missing telemetry evidence")
     if evidence_failures:
         return ReportExportResult(
             experiment=None,
@@ -484,16 +515,21 @@ def export_project_summary(
             ),
         )
 
-    project_root = _results_root() / "project_summary"
-    tables_root = project_root / "tables" / "main"
+    project_root = project_summary_root()
+    tables_root = manuscript_tables_root(project_root)
     reproducibility_root = project_root / "reproducibility" / "execution"
-    figures_root = project_root / "figures" / "main"
+    figures_root = manuscript_figures_root(project_root)
     for directory in (tables_root, reproducibility_root, figures_root):
         directory.mkdir(parents=True, exist_ok=True)
 
     exported: list[Path] = []
     materialized_tables: list[TableName] = []
 
+    log_structured_event(
+        REPORT_LOGGER,
+        "report.project.tables.started",
+        ReportLogFields(report_scope=PROJECT_SUMMARY_EXPORT_NAME),
+    )
     for table in render_mandatory_tables(
         plan,
         collapse_decisions=collapse_decisions,
@@ -555,7 +591,12 @@ _COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
 def execute_report(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
+        configure_structured_file_logging(REPORT_LOGGER, REPOSITORY_ROOT / preprocessing_log_path())
+        scope = name if name is not None else PROJECT_SUMMARY_EXPORT_NAME
+        fields = ReportLogFields(report_scope=scope)
+        log_structured_event(REPORT_LOGGER, "report.started", fields)
         _execute_bound(name, overwrite)
+        log_structured_event(REPORT_LOGGER, "report.completed", fields)
 
 
 def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) -> None:
@@ -565,12 +606,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     )
     if name is not None:
         result = _load_experiment_result(name, store)
-        experiment_root = (
-            REPOSITORY_ROOT
-            / Path(config.execution.repository_layout.manuscript_results)
-            / "experiments"
-            / name
-        )
+        experiment_root = REPOSITORY_ROOT / experiment_result_root(name)
         if overwrite and experiment_root.exists():
             for child in experiment_root.rglob("*"):
                 if child.is_file():
@@ -610,24 +646,24 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     )
     artifact_roots = (
         REPOSITORY_ROOT / preprocessing_root(),
-        REPOSITORY_ROOT / OUTPUTS_ROOT / "artifacts",
-        REPOSITORY_ROOT / OUTPUTS_ROOT / "experiments",
+        REPOSITORY_ROOT / artifact_publication_root(),
+        REPOSITORY_ROOT / execution_outputs_root(),
         REPOSITORY_ROOT / RESULTS_ROOT,
     )
-    artifact_graph, unresolved_identities = load_published_artifact_graph(artifact_roots)
-    stale_ancestor_verification = verify_no_stale_ancestors(
-        (*stale_artifact_identities(artifact_graph), *unresolved_identities)
+    manifest_dependency_verification = verify_artifact_manifest_dependencies(
+        artifact_manifest_dependency_failures(load_published_manifests(artifact_roots))
     )
     failures = (
         *count_verification.failures,
         *completion_verification.failures,
         *terminal_verification.failures,
-        *stale_ancestor_verification.failures,
+        *manifest_dependency_verification.failures,
     )
     verification = CompletenessVerificationResult(passed=not failures, failures=failures)
     collapse_decisions = _load_collapse_decisions(store)
-    comparison_results = _project_comparison_results(plan, store)
-    outcomes = _project_outcomes(plan, store)
+    comparison_results, outcomes = project_result_evidence(
+        plan, lambda name: _load_experiment_result(name, store)
+    )
     export = export_project_summary(
         plan,
         lifecycle_records,
@@ -650,120 +686,6 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         raise SystemExit(1)
 
 
-def _project_comparison_results(
-    plan: ExperimentPlan,
-    store: ExecutionRecordStore,
-) -> tuple[ComparisonFamilyResult, ...]:
-    return tuple(
-        comparison
-        for planned in plan.experiments
-        for comparison in _load_experiment_result(planned.definition.name, store).comparison_results
-    )
-
-
-def _project_outcomes(
-    plan: ExperimentPlan,
-    store: ExecutionRecordStore,
-) -> tuple[CellExecutionOutcome, ...]:
-    return tuple(
-        outcome
-        for planned in plan.experiments
-        for outcome in _load_experiment_result(planned.definition.name, store).outcomes
-    )
-
-
-def project_efficiency_telemetry(
-    outcomes: tuple[CellExecutionOutcome, ...],
-) -> tuple[EfficiencyMetricObservation, ...]:
-    metric_names: tuple[MetricName, ...] = (
-        "post-evidence-wall-clock-seconds",
-        "communication-bytes",
-        "peak-gpu-memory-bytes",
-    )
-    methods = tuple(sorted(frozenset(outcome.cell.method for outcome in outcomes)))
-    observations: list[EfficiencyMetricObservation] = []
-    for metric_name in metric_names:
-        for method in methods:
-            values = tuple(
-                value
-                for outcome in outcomes
-                if outcome.completed and outcome.cell.method == method
-                for recorded_metric, value in outcome.metrics
-                if recorded_metric == metric_name and value is not None
-            )
-            if values:
-                observations.append(
-                    EfficiencyMetricObservation(
-                        method=method,
-                        metric=metric_name,
-                        value=sum(values) / len(values),
-                    )
-                )
-    return tuple(observations)
-
-
-def _record_metric(record: PersistedExecutionRecord, name: MetricName) -> MetricValue | None:
-    for metric_name, value in record.metrics:
-        if metric_name == name:
-            return value
-    return None
-
-
-def _state_from_encoding(value: MetricValue) -> AdmissionState:
-    states = (
-        (1.0, AdmissionState.ADMITTED),
-        (-1.0, AdmissionState.REJECTED),
-        (-2.0, AdmissionState.EXPIRED),
-        (0.0, AdmissionState.DORMANT),
-    )
-    for encoding, state in states:
-        if value == encoding:
-            return state
-    raise ValueError(f"unknown terminal-state encoding: {value}")
-
-
-def project_evidence_trajectory(
-    store: ExecutionRecordStore,
-) -> tuple[EvidenceStateFraction, ...]:
-    config = current_application_context().scientific_config
-    records = tuple(
-        record
-        for record in store.read_all_outcomes(ADMISSION_DELAY_DECOMPOSITION_NAME)
-        if record.terminal_state is ExperimentLifecycleState.COMPLETED
-    )
-    if not records:
-        return ()
-    horizon = config.protocol.resource_horizon.maximum_logical_evidence_cycles
-    result: list[EvidenceStateFraction] = []
-    displayed_states = (
-        AdmissionState.DORMANT,
-        AdmissionState.ADMITTED,
-        AdmissionState.REJECTED,
-        AdmissionState.EXPIRED,
-    )
-    for cycle in range(horizon + 1):
-        for state in displayed_states:
-            count = sum(1 for record in records if _state_at_evidence_cycle(record, cycle) is state)
-            if count:
-                result.append(
-                    EvidenceStateFraction(cycle=cycle, state=state, fraction=count / len(records))
-                )
-    return tuple(result)
-
-
-def _state_at_evidence_cycle(
-    record: PersistedExecutionRecord,
-    cycle: EvidenceCycleIndex,
-) -> AdmissionState:
-    terminal_encoding = _record_metric(record, "terminal-state")
-    if terminal_encoding is None:
-        raise ValueError("completed evidence-arrival record lacks terminal-state metric")
-    arrival_cycle = _record_metric(record, "evidence-arrival-cycle")
-    if arrival_cycle is None or cycle < arrival_cycle:
-        return AdmissionState.DORMANT
-    return _state_from_encoding(terminal_encoding)
-
-
 def _resolved_core_complete() -> BooleanValue:
     directory = REPOSITORY_ROOT / workspace_root_for_family(
         ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
@@ -784,10 +706,12 @@ def _load_experiment_result(
                 method=record.method,
                 condition=record.condition,
                 master_seed=record.master_seed,
+                repetition=record.repetition,
             ),
             terminal_state=record.terminal_state,
             failure=_to_failure_detail(record.failure),
             metrics=record.metrics,
+            state_trajectory=record.state_trajectory,
         )
         for record in records
     )
@@ -825,10 +749,12 @@ def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecis
                     method=record.method,
                     condition=record.condition,
                     master_seed=record.master_seed,
+                    repetition=record.repetition,
                 ),
                 terminal_state=record.terminal_state,
                 failure=None,
                 metrics=record.metrics,
+                state_trajectory=record.state_trajectory,
             )
             for record in records
         )

@@ -1,6 +1,9 @@
 from fedsira.artifacts.paths import (
+    artifact_staging_root,
     prepared_evidence_root,
     prepared_feature_root,
+    preprocessing_extraction_cache_root,
+    preprocessing_log_path,
     preprocessing_metadata_root,
     workspace_root_for_family,
 )
@@ -18,6 +21,7 @@ from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
 )
+from fedsira.datasets.common import DatasetPreparationLogFields
 from fedsira.datasets.nbaiot.prepare import (
     classes_structurally_unavailable,
     compute_dataset_manifest_hash,
@@ -25,6 +29,7 @@ from fedsira.datasets.nbaiot.prepare import (
     materialize_nbaiot_prepared_views,
     validate_target_holder_feasibility,
 )
+from fedsira.datasets.specification import dataset_specification
 from fedsira.domain.enums import ArtifactFamily, DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -37,12 +42,17 @@ from fedsira.runtime import (
     REPOSITORY_ROOT,
     ApplicationContext,
     bound_application_context,
+    configure_structured_file_logging,
     current_application_context,
+    get_structured_logger,
+    log_structured_event,
+    mirror_structured_logging_to_console,
 )
+
+PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
 
 
 def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseDecision:
-    config = current_application_context().scientific_config
     serialized_payload = payload.model_dump_json().encode("utf-8")
     identity: ArtifactDigest = compute_checksum(serialized_payload)
     _, reused = publish_or_reuse_artifact_payload(
@@ -51,10 +61,7 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
         payload=serialized_payload,
         published_directory=REPOSITORY_ROOT
         / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST),
-        staging_root=REPOSITORY_ROOT
-        / config.execution.repository_layout.execution_workspace
-        / "cache"
-        / "staging",
+        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
     )
     return reused
 
@@ -62,15 +69,18 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     raw_root = (
-        REPOSITORY_ROOT / config.execution.repository_layout.raw_data / DatasetId.N_BAIOT.value
-    )
-    extraction_cache_root = (
         REPOSITORY_ROOT
-        / config.execution.repository_layout.execution_workspace
-        / "cache"
-        / "preprocessing"
+        / config.execution.repository_layout.raw_data
+        / dataset_specification(DatasetId.N_BAIOT).raw_data_relative
     )
-    print("N-BaIoT preprocessing: discovering CSV files")
+    extraction_cache_root = preprocessing_extraction_cache_root(
+        REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
+    )
+    log_structured_event(
+        PREPROCESSING_LOGGER,
+        "dataset.preprocessing.started",
+        DatasetPreparationLogFields(dataset=DatasetId.N_BAIOT),
+    )
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
     validate_target_holder_feasibility(
         discovered,
@@ -94,13 +104,17 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         overwrite,
         retain_materialized_views=False,
     )
-    print(
-        "N-BaIoT preprocessing complete: "
-        f"dataset_file_manifest_hash={manifest_hash}, "
-        f"structurally_unavailable_classes={list(unavailable_classes)}, "
-        f"prepared_views={len(tuple(prepared_root.glob('*.json')))}, "
-        f"scaler_training_rows={moments.training_row_count}, "
-        f"dataset_manifest_reused={reused}"
+    log_structured_event(
+        PREPROCESSING_LOGGER,
+        "dataset.preprocessing.completed",
+        DatasetPreparationLogFields(
+            dataset=DatasetId.N_BAIOT,
+            dataset_file_manifest_hash=manifest_hash,
+            structurally_unavailable_classes=unavailable_classes,
+            prepared_views=len(tuple(prepared_root.glob("*.json"))),
+            training_rows=moments.training_row_count,
+            dataset_manifest_reused=reused,
+        ),
     )
 
 
@@ -109,16 +123,16 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     csv_root = (
         REPOSITORY_ROOT
         / config.execution.repository_layout.raw_data
-        / "CIC_IOT_Dataset2023"
-        / "CSV"
+        / dataset_specification(DatasetId.CICIOT2023).raw_data_relative
     )
-    print("CICIoT2023 preprocessing: discovering CSV shards")
+    log_structured_event(
+        PREPROCESSING_LOGGER,
+        "dataset.preprocessing.started",
+        DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023),
+    )
     discovered = discover_secondary_csv_files(csv_root)
-    cache_root = (
-        REPOSITORY_ROOT
-        / config.execution.repository_layout.execution_workspace
-        / "cache"
-        / "preprocessing"
+    cache_root = preprocessing_extraction_cache_root(
+        REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
     )
     summary = materialize_ciciot2023_prepared_views(
         discovered,
@@ -145,19 +159,23 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     exclusion_rate: Probability = (
         summary.excluded_row_count / summary.raw_row_count if summary.raw_row_count else 0.0
     )
-    print(
-        "CICIoT2023 preprocessing complete: "
-        f"dataset_file_manifest_hash={summary.dataset_manifest_hash}, "
-        f"files={len(discovered)}, raw_rows={summary.raw_row_count}, "
-        f"retained_rows={summary.retained_row_count}, "
-        f"excluded_rows={summary.excluded_row_count}, "
-        f"exclusion_rate={exclusion_rate:.8f}, "
-        f"predictor_count={len(summary.predictor_columns)}, "
-        f"predictor_count_matches_official={summary.predictor_count_matches_official}, "
-        f"class_count={len(summary.class_registry)}, "
-        f"prepared_views={len(summary.views)}, "
-        f"scaler_training_rows={summary.scaler.training_row_count}, "
-        f"dataset_manifest_reused={reused}"
+    log_structured_event(
+        PREPROCESSING_LOGGER,
+        "dataset.preprocessing.completed",
+        DatasetPreparationLogFields(
+            dataset=DatasetId.CICIOT2023,
+            dataset_file_manifest_hash=summary.dataset_manifest_hash,
+            raw_rows=summary.raw_row_count,
+            retained_rows=summary.retained_row_count,
+            excluded_rows=summary.excluded_row_count,
+            exclusion_rate=exclusion_rate,
+            predictor_count=len(summary.predictor_columns),
+            predictor_count_matches_official=summary.predictor_count_matches_official,
+            class_count=len(summary.class_registry),
+            prepared_views=len(summary.views),
+            training_rows=summary.scaler.training_row_count,
+            dataset_manifest_reused=reused,
+        ),
     )
 
 
@@ -168,6 +186,10 @@ def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) 
 
 
 def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
+    configure_structured_file_logging(
+        PREPROCESSING_LOGGER, REPOSITORY_ROOT / preprocessing_log_path()
+    )
+    mirror_structured_logging_to_console(PREPROCESSING_LOGGER)
     selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
     for selected_dataset in selected_datasets:
         if selected_dataset is DatasetId.N_BAIOT:

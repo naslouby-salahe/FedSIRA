@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from fedsira.artifacts.paths import experiment_log_path, workspace_root_for_family
-from fedsira.artifacts.provenance import ReconstructionProvenance, collect_reconstruction_provenance
 from fedsira.domain.enums import (
+    AdmissionState,
     ArtifactFamily,
     DatasetId,
     ExperimentLifecycleState,
@@ -16,6 +16,7 @@ from fedsira.domain.enums import (
 from fedsira.domain.types import (
     ArtifactDigest,
     CellCompletionStatus,
+    EvidenceCycleIndex,
     ExecutionSchemaVersion,
     ExperimentName,
     FailureMessage,
@@ -27,6 +28,7 @@ from fedsira.domain.types import (
     MetricObservation,
     MetricValue,
     OverwriteExisting,
+    RepetitionIndex,
     ResolvedCoreComplete,
     ScenarioName,
     ScientificCellCount,
@@ -56,7 +58,7 @@ from fedsira.runtime import (
 )
 
 if TYPE_CHECKING:
-    from fedsira.experiments.validation import ExperimentPrerequisiteState
+    from fedsira.datasets.nbaiot.validation import ExperimentPrerequisiteState
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
@@ -68,6 +70,11 @@ class PersistedFailureDetail(FrozenDomainModel):
     cell_phase: ScientificCellPhase | None
 
 
+class AdmissionStateObservation(FrozenDomainModel):
+    cycle: EvidenceCycleIndex
+    state: AdmissionState
+
+
 class PersistedExecutionRecord(FrozenDomainModel):
     schema_version: ExecutionSchemaVersion
     semantic_key: ScientificCellSemanticKey
@@ -75,10 +82,11 @@ class PersistedExecutionRecord(FrozenDomainModel):
     method: MethodName
     condition: ScenarioName
     master_seed: MasterSeed
+    repetition: RepetitionIndex | None = None
     terminal_state: ExperimentLifecycleState
     metrics: tuple[MetricObservation, ...]
+    state_trajectory: tuple[AdmissionStateObservation, ...] = ()
     failure: PersistedFailureDetail | None
-    reconstruction_provenance: ReconstructionProvenance | None = None
 
 
 class CellExecutionOutcome(FrozenDomainModel):
@@ -86,6 +94,7 @@ class CellExecutionOutcome(FrozenDomainModel):
     terminal_state: ExperimentLifecycleState
     failure: FailureDetail | None
     metrics: tuple[MetricObservation, ...] = ()
+    state_trajectory: tuple[AdmissionStateObservation, ...] = ()
 
     @property
     def completed(self) -> CellCompletionStatus:
@@ -117,6 +126,7 @@ class ProtocolPhaseDurations(FrozenDomainModel):
 
 class ExecutionLogFields(FrozenDomainModel):
     experiment: ExperimentName
+    dataset: DatasetId | None = None
     overwrite: OverwriteExisting | None = None
     cell: ScientificCellSemanticKey | None = None
     method: MethodName | None = None
@@ -212,7 +222,7 @@ def execution_digest(
 
 
 def execute_cell_with_retry(cell: ScientificCell, executor: CellExecutor) -> CellExecutionOutcome:
-    from fedsira.experiments.validation import validate_cell_terminal_record
+    from fedsira.datasets.nbaiot.validation import validate_cell_terminal_record
 
     config = current_application_context().scientific_config
     attempts = config.execution.automatic_infrastructure_retries_per_cell_phase + 1
@@ -277,7 +287,7 @@ class ComparisonResultBuilder(Protocol):
 def _prerequisite_states_from_store(
     plan: ExperimentPlan, experiment: ExperimentName, store: ExecutionRecordStore
 ) -> tuple[ExperimentPrerequisiteState, ...]:
-    from fedsira.experiments.validation import ExperimentPrerequisiteState
+    from fedsira.datasets.nbaiot.validation import ExperimentPrerequisiteState
 
     definition = experiment_by_name(experiment)
     return tuple(
@@ -301,7 +311,7 @@ def execute_experiment(
     resolved_core_complete: ResolvedCoreComplete = False,
     prerequisite_states: tuple[ExperimentPrerequisiteState, ...] | None = None,
 ) -> ExperimentExecutionResult:
-    from fedsira.experiments.validation import (
+    from fedsira.datasets.nbaiot.validation import (
         validate_condition_vocabulary,
         validate_experiment_prerequisites_met,
         validate_no_duplicate_semantic_cells,
@@ -331,17 +341,18 @@ def execute_experiment(
     planned = plan.experiment(experiment)
     _log_execution_event(
         "experiment.plan.created",
-        ExecutionLogFields(experiment=experiment, total_cells=len(planned.cells)),
+        ExecutionLogFields(
+            experiment=experiment,
+            dataset=definition.dataset,
+            total_cells=len(planned.cells),
+        ),
     )
     if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
         return ExperimentExecutionResult(
             experiment=experiment, lifecycle_state=ExperimentLifecycleState.BLOCKED, outcomes=()
         )
     store = ExecutionRecordStore(
-        Path(resolved_config.execution.repository_layout.execution_workspace),
-        reconstruction_provenance=collect_reconstruction_provenance(
-            current_application_context().repository_root
-        ),
+        Path(resolved_config.execution.repository_layout.execution_workspace)
     )
     states = prerequisite_states or _prerequisite_states_from_store(plan, experiment, store)
     validate_experiment_prerequisites_met(experiment, states)
@@ -352,6 +363,7 @@ def execute_experiment(
     for cell in planned.cells:
         fields = ExecutionLogFields(
             experiment=experiment,
+            dataset=definition.dataset,
             cell=cell.semantic_key,
             method=cell.method,
             condition=cell.condition,
@@ -374,6 +386,7 @@ def execute_experiment(
                     terminal_state=existing.terminal_state,
                     failure=None,
                     metrics=existing.metrics,
+                    state_trajectory=existing.state_trajectory,
                 )
             )
             continue
@@ -425,10 +438,8 @@ class ExecutionRecordStore:
     def __init__(
         self,
         workspace_root: Path,
-        reconstruction_provenance: ReconstructionProvenance | None = None,
     ) -> None:
         self._workspace_root = workspace_root
-        self._reconstruction_provenance = reconstruction_provenance
 
     def _record_directory(self, experiment: ExperimentName) -> Path:
         return self._workspace_root / "experiments" / experiment / "records"
@@ -452,10 +463,11 @@ class ExecutionRecordStore:
             method=outcome.cell.method,
             condition=outcome.cell.condition,
             master_seed=outcome.cell.master_seed,
+            repetition=outcome.cell.repetition,
             terminal_state=outcome.terminal_state,
             metrics=outcome.metrics,
+            state_trajectory=outcome.state_trajectory,
             failure=failure,
-            reconstruction_provenance=self._reconstruction_provenance,
         )
         digest = hashlib.sha256(framed_bytes(outcome.cell.semantic_key)).hexdigest()
         (directory / f"{digest}.json").write_text(
@@ -529,7 +541,7 @@ def execute_status() -> None:
 
 
 def execute_smoke(overwrite: OverwriteExisting) -> None:
-    from fedsira.experiments.validation import render_smoke, run_smoke_suite
+    from fedsira.datasets.nbaiot.validation import render_smoke, run_smoke_suite
 
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):

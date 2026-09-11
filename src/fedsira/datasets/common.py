@@ -10,14 +10,18 @@ import duckdb
 from pydantic import model_validator
 
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain, ScalingConfig
-from fedsira.domain.enums import Role
+from fedsira.domain.enums import DatasetId, Role
 from fedsira.domain.types import (
     UINT32_MODULUS,
     ArtifactDigest,
+    ArtifactReuseDecision,
     BooleanValue,
+    ClassCount,
     ClassLabel,
+    DatasetClassToken,
     DatasetColumnName,
     DatasetFileDigest,
+    DatasetManifestDigest,
     DerivedSeed,
     DomainId,
     FeatureAccumulator,
@@ -25,7 +29,9 @@ from fedsira.domain.types import (
     FeatureName,
     FrozenDomainModel,
     OverwriteExisting,
+    PredictorCount,
     PreparedViewKey,
+    Probability,
     RelativePathText,
     RoleBoundary,
     RolePosition,
@@ -436,3 +442,26 @@ def fetch_feature_statistics(
             )
         )
     return tuple(statistics)
+
+
+class DatasetPreparationLogFields(FrozenDomainModel):
+    dataset: DatasetId | None = None
+    domain: DomainId | None = None
+    class_id: DatasetClassToken | None = None
+    file: RelativePathText | None = None
+    rows: RowCount | None = None
+    selected: RowCount | None = None
+    training_rows: RowCount | None = None
+    view: PreparedViewKey | None = None
+    path: RelativePathText | None = None
+    raw_rows: RowCount | None = None
+    retained_rows: RowCount | None = None
+    excluded_rows: RowCount | None = None
+    class_count: ClassCount | None = None
+    predictor_count: PredictorCount | None = None
+    predictor_count_matches_official: BooleanValue | None = None
+    prepared_views: RowCount | None = None
+    exclusion_rate: Probability | None = None
+    dataset_file_manifest_hash: DatasetManifestDigest | None = None
+    structurally_unavailable_classes: tuple[DatasetClassToken, ...] | None = None
+    dataset_manifest_reused: ArtifactReuseDecision | None = None

@@ -14,6 +14,6 @@ def test_only_complete_artifacts_are_readable() -> None:
         upstream_identities=(),
     )
     validate_artifact_lifecycle_readable(manifest)
-    incomplete = manifest.model_copy(update={"lifecycle_state": ArtifactLifecycleState.STALE})
+    incomplete = manifest.model_copy(update={"lifecycle_state": ArtifactLifecycleState.STAGING})
     with pytest.raises(ValueError):
         validate_artifact_lifecycle_readable(incomplete)

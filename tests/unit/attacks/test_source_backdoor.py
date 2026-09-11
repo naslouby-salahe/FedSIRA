@@ -60,7 +60,7 @@ def test_select_source_backdoor_poison_rows_selects_expected_count() -> None:
 
 def test_relabel_triggered_rows_as_benign_only_touches_selected_rows() -> None:
     labels = {"a": NBaiotClass.GAFGYT_UDP, "b": NBaiotClass.GAFGYT_UDP, "c": NBaiotClass.BENIGN}
-    relabeled = relabel_triggered_rows_as_benign(labels, ["a"])
+    relabeled = relabel_triggered_rows_as_benign(labels, ["a"], NBaiotClass.BENIGN)
     assert relabeled["a"] is NBaiotClass.BENIGN
     assert relabeled["b"] is NBaiotClass.GAFGYT_UDP
     assert relabeled["c"] is NBaiotClass.BENIGN

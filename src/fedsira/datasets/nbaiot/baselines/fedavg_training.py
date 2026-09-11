@@ -5,23 +5,23 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.domain.types import AlgorithmName, BooleanValue, FederatedRoundCount, MasterSeed
-from fedsira.evaluation.domain import non_source_domains
-from fedsira.experiments.workflow import (
+from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
+from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
+from fedsira.datasets.nbaiot.learning.post_reference_training import combined_post_reference_rows
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotClass, NBaiotDomain
+from fedsira.datasets.nbaiot.workflow import (
     RealAnchor,
     flat_parameters_identity,
     load_prepared_rows,
 )
+from fedsira.domain.types import AlgorithmName, BooleanValue, FederatedRoundCount, MasterSeed
 from fedsira.learning.aggregation import load_model_state, model_state_from_classifier
-from fedsira.learning.anchor_training import training_seed
 from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
-from fedsira.learning.post_reference_training import combined_post_reference_rows
 from fedsira.protocol.baselines.references import (
     fedavg_reference_post_reference_local_epochs,
     fedavg_reference_post_reference_participants,
@@ -61,7 +61,10 @@ def train_ordinary_fedavg_delta(
         )
     )
     participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
+        NBAIOT_DOMAIN_ORDER,
+        non_source_domains(source_domain),
+        source_domain,
+        source_rows_available,
     )
     if not participants:
         return None

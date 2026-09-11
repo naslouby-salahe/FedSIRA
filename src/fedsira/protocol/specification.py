@@ -1,5 +1,6 @@
 import math
 from collections.abc import Sequence
+from enum import StrEnum
 
 import torch
 
@@ -113,3 +114,10 @@ def reproduction_update_vector(
     reproduced_flat_parameters: torch.Tensor,
 ) -> torch.Tensor:
     return reproduced_flat_parameters - anchor_flat_parameters
+
+
+class EvidenceArrivalSchedule(StrEnum):
+    PERMANENT_SINGLETON = "Permanent Singleton"
+    ONE_HONEST_HOLDER = "One Honest Holder"
+    GRADUAL_TO_QUORUM = "Gradual to Quorum"
+    IMMEDIATE_QUORUM = "Immediate Quorum"

@@ -3,7 +3,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest, ArtifactPayloadBytes
+from fedsira.artifacts.provenance import ArtifactManifest, ArtifactPayloadBytes
 from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
 from fedsira.domain.types import ArtifactComplete, ArtifactDigest, ArtifactReuseDecision
 
@@ -18,42 +18,6 @@ def compute_checksum(payload: ArtifactPayloadBytes) -> ArtifactDigest:
 def verify_checksum(payload: ArtifactPayloadBytes, manifest: ArtifactManifest) -> None:
     if compute_checksum(payload) != manifest.checksum:
         raise ValueError(f"checksum mismatch for artifact {manifest.identity}")
-
-
-def publish(
-    graph: ArtifactGraph,
-    staged_manifest: ArtifactManifest,
-    payload: ArtifactPayloadBytes,
-) -> ArtifactManifest:
-    if staged_manifest.lifecycle_state is not ArtifactLifecycleState.STAGING:
-        raise ValueError("only a staged manifest may be published")
-    verify_checksum(payload, staged_manifest)
-    completed = staged_manifest.with_lifecycle_state(ArtifactLifecycleState.COMPLETE)
-    graph.register(completed)
-    return completed
-
-
-def retire(graph: ArtifactGraph, identity: ArtifactDigest) -> ArtifactManifest:
-    current = graph.get(identity)
-    if current.lifecycle_state not in (
-        ArtifactLifecycleState.COMPLETE,
-        ArtifactLifecycleState.STALE,
-    ):
-        raise ValueError(f"artifact {identity} is not eligible for retirement")
-    retired = current.with_lifecycle_state(ArtifactLifecycleState.RETIRED)
-    graph.register(retired)
-    return retired
-
-
-def replace(
-    graph: ArtifactGraph,
-    superseded_identity: ArtifactDigest,
-    new_manifest: ArtifactManifest,
-    new_payload: ArtifactPayloadBytes,
-) -> ArtifactManifest:
-    published = publish(graph, new_manifest, new_payload)
-    retire(graph, superseded_identity)
-    return published
 
 
 def stage_payload(cache_staging_root: Path, payload: ArtifactPayloadBytes) -> Path:

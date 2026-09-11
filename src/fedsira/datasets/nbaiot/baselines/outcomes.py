@@ -1,6 +1,52 @@
 from __future__ import annotations
 
+import torch
+
 from fedsira.datasets.common import Role, role_hash_token
+from fedsira.datasets.nbaiot.baselines.calibration import (
+    recovery_rollback_is_triggered,
+)
+from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
+    evaluate_certified_ensemble,
+    train_certified_ensemble_group_checkpoints,
+)
+from fedsira.datasets.nbaiot.baselines.fedavg_training import (
+    train_fedavg_reference_delta,
+    train_recovery_after_source_admission_delta,
+    train_secure_continual_assessment_delta,
+)
+from fedsira.datasets.nbaiot.baselines.reconstruction_training import (
+    train_source_update_sanitization_delta,
+    train_update_reconstruction_filter_delta,
+)
+from fedsira.datasets.nbaiot.baselines.robust_training import (
+    train_density_cluster_trimmed_mean_delta,
+    train_krum_reference_delta,
+)
+from fedsira.datasets.nbaiot.cell_support import (
+    VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
+    _capability_contract_for_digest,
+    _commitment_digest,
+    _final_gate_decision_from_production_checkpoint,
+    _honest_verifier_report,
+    _source_domain_for_cell,
+    _verifier_panel,
+)
+from fedsira.datasets.nbaiot.evaluation.backdoor import (
+    recovery_backdoor_alarm_threshold,
+    triggered_to_benign_rate,
+)
+from fedsira.datasets.nbaiot.evaluation.domain import (
+    evaluate_domain,
+    non_source_domains,
+)
+from fedsira.datasets.nbaiot.learning.post_reference_training import (
+    train_source_candidate_delta,
+)
+from fedsira.datasets.nbaiot.learning.reference import (
+    train_centralized_reference_checkpoint,
+    train_local_only_reference_checkpoint,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -8,20 +54,16 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     NBaiotDomain,
 )
+from fedsira.datasets.nbaiot.workflow import (
+    RealAnchor,
+    flat_parameters_identity,
+)
 from fedsira.domain.enums import (
     AdmissionState,
     TernaryOutcome,
 )
 from fedsira.domain.models import (
     MetricResult,
-)
-from fedsira.evaluation.backdoor import (
-    recovery_backdoor_alarm_threshold,
-    triggered_to_benign_rate,
-)
-from fedsira.evaluation.domain import (
-    evaluate_domain,
-    non_source_domains,
 )
 from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
@@ -31,60 +73,21 @@ from fedsira.evaluation.summaries import (
     equal_weight_domain_mean,
     worst_domain_target_f1,
 )
-from fedsira.experiments.cell_support import (
-    VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
-    _capability_contract_for_digest,
-    _commitment_digest,
-    _final_gate_decision_from_production_checkpoint,
-    _honest_verifier_report,
-    _source_domain_for_cell,
-    _verifier_panel,
-)
 from fedsira.experiments.planning import (
     ScientificCell,
 )
 from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
 )
-from fedsira.experiments.workflow import (
-    flat_parameters_identity,
-)
-from fedsira.learning.post_reference_training import (
-    train_source_candidate_delta,
-)
-from fedsira.learning.reference import (
-    train_centralized_reference_checkpoint,
-    train_local_only_reference_checkpoint,
-)
 from fedsira.protocol.admission import (
     final_gate_predicates_pass,
     median_domain_target_f1,
-)
-from fedsira.protocol.baselines.calibration import (
-    recovery_rollback_is_triggered,
-)
-from fedsira.protocol.baselines.certified_ensemble import (
-    evaluate_certified_ensemble,
-    train_certified_ensemble_group_checkpoints,
-)
-from fedsira.protocol.baselines.fedavg_training import (
-    train_fedavg_reference_delta,
-    train_recovery_after_source_admission_delta,
-    train_secure_continual_assessment_delta,
-)
-from fedsira.protocol.baselines.reconstruction_training import (
-    train_source_update_sanitization_delta,
-    train_update_reconstruction_filter_delta,
 )
 from fedsira.protocol.baselines.references import (
     local_only_reference_evaluation_is_domain_local,
 )
 from fedsira.protocol.baselines.registry import (
     review_style_baseline_outcome,
-)
-from fedsira.protocol.baselines.robust_training import (
-    train_density_cluster_trimmed_mean_delta,
-    train_krum_reference_delta,
 )
 from fedsira.protocol.baselines.source_model import (
     CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
@@ -115,6 +118,23 @@ from fedsira.runtime import (
 
 
 class ProtocolBaselineOutcomes:
+    def _final_gate_outcome(
+        self,
+        evidence: PreparedEvidenceCounts,
+        source_domain: NBaiotDomain | None,
+        real_anchor: RealAnchor,
+        production_checkpoint: torch.Tensor,
+    ) -> AdmissionState:
+        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
+            evidence,
+            source_domain,
+            self._prepared_root,
+            real_anchor,
+            production_checkpoint,
+            no_final_synthesis_gate_active=False,
+        )
+        return state
+
     def _client_review_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
         source_domain = _source_domain_for_cell(cell, self._prepared_root)
@@ -169,14 +189,7 @@ class ProtocolBaselineOutcomes:
         )
         if review_state is not AdmissionState.ADMITTED:
             return review_state
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _source_release_after_full_external_check_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -222,14 +235,7 @@ class ProtocolBaselineOutcomes:
         )
         if review_state is not AdmissionState.ADMITTED:
             return review_state
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _recovery_after_source_admission_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -302,14 +308,7 @@ class ProtocolBaselineOutcomes:
             production_checkpoint = real_anchor.flat_parameters + recovery_delta
         else:
             production_checkpoint = admitted_checkpoint
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _fedavg_reference_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -324,14 +323,7 @@ class ProtocolBaselineOutcomes:
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _krum_reference_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -346,14 +338,7 @@ class ProtocolBaselineOutcomes:
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _density_cluster_trimmed_mean_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -368,14 +353,7 @@ class ProtocolBaselineOutcomes:
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _update_reconstruction_filter_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -390,14 +368,7 @@ class ProtocolBaselineOutcomes:
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _secure_continual_assessment_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -432,14 +403,7 @@ class ProtocolBaselineOutcomes:
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _local_only_reference_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
@@ -573,14 +537,7 @@ class ProtocolBaselineOutcomes:
         )
         if production_checkpoint is None:
             return AdmissionState.DORMANT
-        state, self._pending_real_report = _final_gate_decision_from_production_checkpoint(
-            evidence,
-            source_domain,
-            self._prepared_root,
-            real_anchor,
-            production_checkpoint,
-        )
-        return state
+        return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _independent_local_reference_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config

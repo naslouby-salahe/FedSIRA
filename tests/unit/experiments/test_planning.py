@@ -45,11 +45,12 @@ def test_efficiency_measurement_has_five_repetitions_per_method_seed() -> None:
         method_cells = tuple(cell for cell in efficiency.cells if cell.method == method)
         assert len(method_cells) == 15
         assert len({cell.master_seed for cell in method_cells}) == 3
-        repetitions = tuple(cell.condition for cell in method_cells)
-        assert set(repetitions) == {
-            "repetition-1",
-            "repetition-2",
-            "repetition-3",
-            "repetition-4",
-            "repetition-5",
-        }
+        assert {cell.condition for cell in method_cells} == {"timed"}
+        for seed in {cell.master_seed for cell in method_cells}:
+            assert {cell.repetition for cell in method_cells if cell.master_seed == seed} == {
+                1,
+                2,
+                3,
+                4,
+                5,
+            }

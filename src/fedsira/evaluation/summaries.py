@@ -29,18 +29,7 @@ def quantile_type7(
 ) -> MetricValue:
     if not sorted_values:
         raise ValueError("quantile requires at least one value")
-    sample_count = len(sorted_values)
-    if sample_count == 1:
-        return sorted_values[0]
-    position = (sample_count - 1) * probability
-    lower_index = math.floor(position)
-    upper_index = math.ceil(position)
-    if lower_index == upper_index:
-        return sorted_values[lower_index]
-    fraction = position - lower_index
-    return sorted_values[lower_index] + fraction * (
-        sorted_values[upper_index] - sorted_values[lower_index]
-    )
+    return float(numpy.quantile(sorted_values, probability, method="linear"))
 
 
 def decile_boundaries(
@@ -173,10 +162,12 @@ def bootstrap_percentile_confidence_interval(
     generator = numpy.random.default_rng(analysis_seed)
     values = numpy.asarray(seed_level_values, dtype=numpy.float64)
     sample_size = len(values)
-    resampled_means = numpy.empty(bootstrap_config.resamples, dtype=numpy.float64)
-    for resample_index in range(bootstrap_config.resamples):
-        indices = generator.integers(0, sample_size, size=sample_size)
-        resampled_means[resample_index] = values[indices].mean()
+    indices = generator.integers(
+        0,
+        sample_size,
+        size=(bootstrap_config.resamples, sample_size),
+    )
+    resampled_means = values[indices].mean(axis=1)
     sorted_means = tuple(float(value) for value in numpy.sort(resampled_means))
     lower_probability = (1.0 - bootstrap_config.confidence_level) / 2.0
     upper_probability = 1.0 - lower_probability

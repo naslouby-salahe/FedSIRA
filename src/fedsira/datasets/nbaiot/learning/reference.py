@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
@@ -13,11 +14,10 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_domain_hash_token,
 )
+from fedsira.datasets.nbaiot.workflow import dataset_manifest_hash, load_prepared_rows, tensor_view
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import AlgorithmName, ArtifactDigest, MasterSeed
-from fedsira.experiments.workflow import dataset_manifest_hash, load_prepared_rows, tensor_view
 from fedsira.learning.aggregation import load_model_state, model_state_from_classifier
-from fedsira.learning.anchor_training import training_seed
 from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
 from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_parameters
 from fedsira.protocol.baselines.references import (
@@ -126,8 +126,14 @@ def train_centralized_reference_checkpoint(
         domain_sample_ids[domain] = tuple(combined_sample_ids)
     if not domain_features:
         return None
-    pooled_features = centralized_reference_pooled_rows(domain_features)
-    pooled_labels = centralized_reference_pooled_rows(domain_labels)
+    pooled_features = centralized_reference_pooled_rows(
+        tuple(
+            domain_features[domain] for domain in NBAIOT_DOMAIN_ORDER if domain in domain_features
+        )
+    )
+    pooled_labels = centralized_reference_pooled_rows(
+        tuple(domain_labels[domain] for domain in NBAIOT_DOMAIN_ORDER if domain in domain_labels)
+    )
     pooled_sample_ids = tuple(
         sample_id
         for domain in NBAIOT_DOMAIN_ORDER

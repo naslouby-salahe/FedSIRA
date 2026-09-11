@@ -3,12 +3,86 @@ from __future__ import annotations
 import hashlib
 from dataclasses import replace
 
+from fedsira.artifacts.paths import experiment_repetition_telemetry_root
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.baselines.calibration import (
+    parameter_similarity_certification_row_results,
+)
+from fedsira.datasets.nbaiot.baselines.certified_ensemble import (
+    validate_group_without_target_member_uses_supported_only,
+)
+from fedsira.datasets.nbaiot.cell_support import (
+    BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
+    RESOLVED_FEDSIRA_CORE_METHOD,
+    _capability_contract_for_digest,
+    _honest_verifier_report,
+    _reproducer_order,
+    _source_domain_for_cell,
+    _verifier_panel,
+    compromised_reproducer_count,
+    compromised_verifier_count,
+    efficiency_message_counts,
+    final_gate_decision,
+    first_target_sample_id,
+    opening_identity,
+    opening_mode_for_cell,
+    reproduction_progression,
+    row_requirement,
+    single_verifier_progression,
+)
+from fedsira.datasets.nbaiot.evaluation.backdoor import (
+    compute_source_backdoor_asr,
+)
+from fedsira.datasets.nbaiot.evaluation.capability_boundary import (
+    compute_capability_under_specification_summary,
+)
+from fedsira.datasets.nbaiot.evaluation.domain import (
+    non_source_domains,
+    root_cause_partitioned_row_ids,
+)
+from fedsira.datasets.nbaiot.evaluation.epistemic_boundary import (
+    compute_shared_epistemic_failure_summary,
+)
+from fedsira.datasets.nbaiot.evaluation.report_summary import metrics_from_state
+from fedsira.datasets.nbaiot.evaluation.screening import (
+    compute_screen_differential,
+    evaluate_screen_domain,
+)
+from fedsira.datasets.nbaiot.evaluation.timing import (
+    SingleProcessTimingWorker,
+    TimingRepetitionObservation,
+    TimingWorkerResult,
+)
+from fedsira.datasets.nbaiot.learning.post_reference_training import (
+    certified_domain_delta_committee,
+    train_generic_hard_supported_examples_delta,
+    train_source_candidate_delta,
+)
+from fedsira.datasets.nbaiot.scenarios import (
+    EvidenceArrivalSchedule,
+    apply_quantity_skew_to_cap,
+    compute_t_evidence,
+    exclude_source_from_quantity_skew,
+    feature_shift_sign,
+    first_holder_cycle_for_domain,
+    holder_count_at_cycle,
+    quantity_skew_multiplier_by_domain,
+    quantity_skew_multiplier_for_domain,
+    target_row_ids_for_contract,
+    validate_excluded_root_cause_not_supported,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_DOMAIN_ORDER,
     NBAIOT_TRIGGER_FEATURES,
     NBaiotClass,
     NBaiotDomain,
+)
+from fedsira.datasets.nbaiot.workflow import (
+    EpistemicFailureScope,
+    RootCauseScope,
+    dataset_manifest_hash,
+    load_prepared_rows,
+    prepared_feature_names,
 )
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -37,21 +111,8 @@ from fedsira.domain.types import (
     ArtifactDigest,
     MetricObservation,
 )
-from fedsira.evaluation.backdoor import (
-    compute_source_backdoor_asr,
-)
-from fedsira.evaluation.capability_boundary import (
-    compute_capability_under_specification_summary,
-)
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
-)
-from fedsira.evaluation.domain import (
-    non_source_domains,
-    root_cause_partitioned_row_ids,
-)
-from fedsira.evaluation.epistemic_boundary import (
-    compute_shared_epistemic_failure_summary,
 )
 from fedsira.evaluation.metrics import (
     boundary_metric_set,
@@ -60,30 +121,6 @@ from fedsira.evaluation.metrics import (
     legitimate_admission_rate,
     malicious_admission_rate,
     reproduction_attempt_count,
-)
-from fedsira.evaluation.report_summary import metrics_from_state
-from fedsira.evaluation.screening import (
-    compute_screen_differential,
-    evaluate_screen_domain,
-)
-from fedsira.experiments.cell_support import (
-    BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
-    RESOLVED_FEDSIRA_CORE_METHOD,
-    _capability_contract_for_digest,
-    _compromised_reproducer_count,
-    _compromised_verifier_count,
-    _efficiency_message_counts,
-    _final_gate_decision,
-    _first_target_sample_id,
-    _honest_verifier_report,
-    _opening_identity,
-    _opening_mode_for_cell,
-    _reproducer_order,
-    _reproduction_progression,
-    _row_requirement,
-    _single_verifier_progression,
-    _source_domain_for_cell,
-    _verifier_panel,
 )
 from fedsira.experiments.definitions import (
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
@@ -94,6 +131,7 @@ from fedsira.experiments.definitions import (
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     AblationVariant,
     BoundCondition,
+    DescriptiveScientificMetric,
     EpistemicFailureType,
     ExternalVerificationCondition,
     HeterogeneityRegime,
@@ -114,43 +152,12 @@ from fedsira.experiments.planning import (
 from fedsira.experiments.prerequisites import (
     PreparedEvidenceCounts,
 )
-from fedsira.experiments.scenarios import (
-    EvidenceArrivalSchedule,
-    apply_quantity_skew_to_cap,
-    compute_t_evidence,
-    exclude_source_from_quantity_skew,
-    feature_shift_sign,
-    first_holder_cycle_for_domain,
-    holder_count_at_cycle,
-    quantity_skew_multiplier_by_domain,
-    quantity_skew_multiplier_for_domain,
-    target_row_ids_for_contract,
-    validate_excluded_root_cause_not_supported,
-)
-from fedsira.experiments.workflow import (
-    EpistemicFailureScope,
-    RootCauseScope,
-    dataset_manifest_hash,
-    load_prepared_rows,
-    prepared_feature_names,
-)
-from fedsira.learning.post_reference_training import (
-    certified_domain_delta_committee,
-    train_generic_hard_supported_examples_delta,
-    train_source_candidate_delta,
-)
 from fedsira.protocol.attacks.byzantine import (
     resolve_byzantine_verifier_vote,
 )
 from fedsira.protocol.attacks.source import (
     select_model_replacement_carrier_rows,
     source_copy_update,
-)
-from fedsira.protocol.baselines.calibration import (
-    parameter_similarity_certification_row_results,
-)
-from fedsira.protocol.baselines.certified_ensemble import (
-    validate_group_without_target_member_uses_supported_only,
 )
 from fedsira.protocol.baselines.independent_retraining import (
     candidate_free_full_path_opening_mode,
@@ -160,6 +167,7 @@ from fedsira.protocol.baselines.references import (
     standard_fl_anchor_rounds,
 )
 from fedsira.protocol.baselines.registry import (
+    ORDINARY_POST_REFERENCE_DATA_ACCESS,
     BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
@@ -223,12 +231,10 @@ from fedsira.protocol.verification import (
     verifier_is_eligible,
 )
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
     ElapsedTimer,
     current_application_context,
     derive_uint32,
-    peak_gpu_memory_bytes,
-    peak_host_resident_set_bytes,
-    reset_peak_gpu_memory_counter,
 )
 
 
@@ -292,7 +298,7 @@ class ProtocolCellDispatch:
                 extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD:
             validate_three_row_coordinate_median_committee_size(
-                _row_requirement(cell, self._resolved_core),
+                row_requirement(cell, self._resolved_core),
                 config.baselines.three_row_coordinate_median,
             )
             if krum_committee_is_admissible(3, 1):
@@ -435,6 +441,18 @@ class ProtocolCellDispatch:
                     expected_domain_count=8,
                     generic_defined_domain_fraction_minimum=config.metrics_and_statistics.metric_aggregation.generic_defined_domain_fraction_minimum,
                     capability_contract_config=config.capability_contract,
+                )
+                extra.append(
+                    (
+                        "root-cause-a-target-f1",
+                        capability_summary.root_cause_a_target_f1.value,
+                    )
+                )
+                extra.append(
+                    (
+                        "root-cause-b-target-f1",
+                        capability_summary.root_cause_b_target_f1.value,
+                    )
                 )
             else:
                 oracle_label = clean_proposal_oracle_label(
@@ -585,7 +603,7 @@ class ProtocolCellDispatch:
         screen_predicate_variant: AblationVariant | None = None,
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         config = current_application_context().scientific_config
-        opening_mode = _opening_mode_for_cell(cell)
+        opening_mode = opening_mode_for_cell(cell)
         entry = start_admission(opening_mode)
         if entry.direct_production_weight != 0.0:
             raise ValueError("source direct production weight must be 0.0")
@@ -596,10 +614,8 @@ class ProtocolCellDispatch:
         )
         source_domain = _source_domain_for_cell(cell, self._prepared_root)
         real_anchor = self._real_anchor(cell.master_seed)
-        opening_identity = (
-            _opening_identity(real_anchor.dataset_manifest_hash)
-            if real_anchor is not None
-            else None
+        resolved_opening_identity = (
+            opening_identity(real_anchor.dataset_manifest_hash) if real_anchor is not None else None
         )
         if (
             real_anchor is not None
@@ -681,7 +697,7 @@ class ProtocolCellDispatch:
         )
         screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
         fold_sample_id = (
-            _first_target_sample_id(
+            first_target_sample_id(
                 self._prepared_root, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
             )
             if screen_results
@@ -701,7 +717,7 @@ class ProtocolCellDispatch:
                 (
                     "capability-contract-passes",
                     1.0
-                    if opening_identity is not None and state is AdmissionState.ADMITTED
+                    if resolved_opening_identity is not None and state is AdmissionState.ADMITTED
                     else 0.0,
                 ),
                 (
@@ -827,7 +843,7 @@ class ProtocolCellDispatch:
                 and cell.method == SourceExclusionMethod.FULL_FEDSIRA
             )
             single_verifier_active = False
-        row_requirement = _row_requirement(cell, self._resolved_core)
+        required_row_count = row_requirement(cell, self._resolved_core)
         source_delta = (
             train_source_candidate_delta(
                 self._prepared_root,
@@ -848,7 +864,7 @@ class ProtocolCellDispatch:
         backdoor_scope = self._backdoor_scope_for_cell(cell)
         if single_verifier_active:
             reproduction_timer = ElapsedTimer()
-            progression_state, attempts, commitment_hashes, updates = _single_verifier_progression(
+            progression_state, attempts, commitment_hashes, updates = single_verifier_progression(
                 cell,
                 source_domain,
                 self._prepared_root,
@@ -860,11 +876,11 @@ class ProtocolCellDispatch:
             )
         else:
             reproduction_timer = ElapsedTimer()
-            progression_state, attempts, commitment_hashes, updates = _reproduction_progression(
+            progression_state, attempts, commitment_hashes, updates = reproduction_progression(
                 cell,
                 evidence,
                 external_verification_active,
-                row_requirement,
+                required_row_count,
                 frozenset(),
                 self._prepared_root,
                 real_anchor,
@@ -932,7 +948,7 @@ class ProtocolCellDispatch:
                 progression_state = verification_pending_transition(
                     eligible_verifier_count,
                     certified_positive_report_count,
-                    certified_attempts >= row_requirement,
+                    certified_attempts >= required_row_count,
                     config.protocol.verification,
                 )
                 self._last_protocol_phase_durations = (
@@ -942,7 +958,7 @@ class ProtocolCellDispatch:
                 )
         if progression_state is AdmissionState.SYNTHESIS_PENDING:
             synthesis_timer = ElapsedTimer()
-            state, self._pending_real_report = _final_gate_decision(
+            state, self._pending_real_report = final_gate_decision(
                 evidence,
                 source_domain,
                 tuple(NBaiotDomain(attempt.domain) for attempt in attempts),
@@ -1102,7 +1118,9 @@ class ProtocolCellDispatch:
         method = cell.method
         validate_role_not_used_for_tuning(Role.POST_REFERENCE_REPLAY)
         domain_target_view(
-            NBAIOT_DOMAIN_ORDER[0], _source_domain_for_cell(cell, self._prepared_root)
+            NBAIOT_DOMAIN_ORDER[0],
+            _source_domain_for_cell(cell, self._prepared_root),
+            ORDINARY_POST_REFERENCE_DATA_ACCESS,
         )
         state: AdmissionState
         if method == BaselineIdentity.LOCAL_ONLY_REFERENCE:
@@ -1175,7 +1193,7 @@ class ProtocolCellDispatch:
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         config = current_application_context().scientific_config
         condition = cell.condition
-        compromised_count = _compromised_reproducer_count(condition)
+        compromised_count = compromised_reproducer_count(condition)
         attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
         real_anchor = self._real_anchor(cell.master_seed)
         source_domain = _source_domain_for_cell(cell, self._prepared_root)
@@ -1227,12 +1245,12 @@ class ProtocolCellDispatch:
                 if selected is not None
                 else frozenset()
             )
-            row_requirement = _row_requirement(cell)
-            progression_state, attempts, _commitment_hashes, updates = _reproduction_progression(
+            required_row_count = row_requirement(cell)
+            progression_state, attempts, _commitment_hashes, updates = reproduction_progression(
                 cell,
                 evidence,
                 False,
-                row_requirement,
+                required_row_count,
                 compromised_reproducers,
                 self._prepared_root,
                 real_anchor,
@@ -1244,7 +1262,7 @@ class ProtocolCellDispatch:
                     len(attempts), config.protocol.synthesis.maximum_byzantine_reproduction_rows
                 )
             ):
-                state, self._pending_real_report = _final_gate_decision(
+                state, self._pending_real_report = final_gate_decision(
                     evidence,
                     source_domain,
                     tuple(NBaiotDomain(attempt.domain) for attempt in attempts),
@@ -1252,6 +1270,10 @@ class ProtocolCellDispatch:
                     prepared_root=self._prepared_root,
                     master_seed=cell.master_seed,
                     anchor=real_anchor,
+                    coordinate_median_active=False,
+                    no_final_synthesis_gate_active=False,
+                    use_source_delta_for_source_domain=False,
+                    force_first_row_to_source_delta=False,
                     precomputed_updates=updates,
                 )
             else:
@@ -1285,7 +1307,7 @@ class ProtocolCellDispatch:
                 eligible_verifiers,
                 derive_uint32(BYZANTINE_VERIFIER_SELECTION_SEPARATOR, cell.master_seed),
             )
-            compromised_count = _compromised_verifier_count(condition)
+            compromised_count = compromised_verifier_count(condition)
             compromised_verifiers = select_compromised_verifiers(byzantine_order, compromised_count)
             compromised_domains = byzantine_order[:compromised_count]
             honest_post_commitment_order = tuple(
@@ -1465,9 +1487,12 @@ class ProtocolCellDispatch:
                     "logical-information-arrival-cycles",
                     float(delay_decomposition.logical_information_arrival_cycles),
                 ),
-                ("t-evidence", float(t_evidence) if t_evidence is not None else None),
+                (
+                    DescriptiveScientificMetric.T_EVIDENCE.value,
+                    float(t_evidence) if t_evidence is not None else None,
+                ),
                 ("first-holder-cycle", float(first_holder) if first_holder is not None else None),
-                ("post-evidence-wall-clock-seconds", None),
+                (DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value, None),
             ),
         )
 
@@ -1508,12 +1533,18 @@ class ProtocolCellDispatch:
             (
                 *metrics,
                 ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
-                ("t-evidence", float(t_evidence) if t_evidence is not None else None),
+                (
+                    DescriptiveScientificMetric.T_EVIDENCE.value,
+                    float(t_evidence) if t_evidence is not None else None,
+                ),
                 ("assignment-seconds", phase_durations.assignment_seconds),
                 ("reproduce-seconds", phase_durations.reproduce_seconds),
                 ("verify-seconds", phase_durations.verify_seconds),
                 ("synthesize-seconds", phase_durations.synthesize_seconds),
-                ("post-evidence-wall-clock-seconds", post_evidence_wall_clock_seconds),
+                (
+                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
+                    post_evidence_wall_clock_seconds,
+                ),
             ),
         )
 
@@ -1536,75 +1567,106 @@ class ProtocolCellDispatch:
             )
         model_size_bytes = len(tensor_payload)
         semantic_cell_key_hash = hashlib.sha256(cell.semantic_key.encode("utf-8")).hexdigest()
-        envelopes: list[bytes] = []
-        metadata_records: list[CommunicationMessageMetadata] = []
         tensor_name = parameter_tensor_name(TensorParameterKind.MODEL, "linear.weight")
         receiver = NBAIOT_DOMAIN_ORDER[0].name
-        timer = ElapsedTimer()
-        for message_type, count in _efficiency_message_counts():
-            for _index in range(count):
-                metadata = CommunicationMessageMetadata(
-                    message_type=message_type,
-                    dataset_manifest_hash=manifest_hash,
-                    semantic_cell_key_hash=semantic_cell_key_hash,
-                    master_seed=cell.master_seed,
-                    round_index=None,
-                    sender=SERVER_ID,
-                    receiver=receiver,
-                    capability_contract_hash=capability_hash,
-                    payload_tensor_count=1 if model_size_bytes else 0,
-                )
-                envelopes.append(
-                    encode_message_envelope(
-                        metadata,
-                        (
-                            TensorEnvelopePayload(
-                                metadata=TensorPayloadMetadata(
-                                    name=tensor_name,
-                                    shape=parameter_shape,
-                                    nbytes=model_size_bytes,
-                                ),
-                                payload=tensor_payload,
-                            ),
-                        )
-                        if model_size_bytes
-                        else (),
+
+        def measured_execution() -> TimingWorkerResult:
+            envelopes: list[bytes] = []
+            metadata_records: list[CommunicationMessageMetadata] = []
+            for message_type, count in efficiency_message_counts():
+                for _index in range(count):
+                    metadata = CommunicationMessageMetadata(
+                        message_type=message_type,
+                        dataset_manifest_hash=manifest_hash,
+                        semantic_cell_key_hash=semantic_cell_key_hash,
+                        master_seed=cell.master_seed,
+                        round_index=None,
+                        sender=SERVER_ID,
+                        receiver=receiver,
+                        capability_contract_hash=capability_hash,
+                        payload_tensor_count=1 if model_size_bytes else 0,
                     )
-                )
-                metadata_records.append(metadata)
-        encode_elapsed_seconds = timer.elapsed_seconds()
-        bytes_total = communication_bytes(tuple(envelopes))
-        transmissions = model_transmission_count(tuple(metadata_records))
-        reset_peak_gpu_memory_counter()
-        protocol_timer = ElapsedTimer()
-        if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
-            state = self._advance_protocol(cell, evidence)
-        else:
-            state, _baseline_metrics = self._execute_baseline_cell(cell, evidence)
-        post_evidence_seconds = protocol_timer.elapsed_seconds()
-        delay_decomposition = AdmissionDelayDecomposition(
-            logical_information_arrival_cycles=0,
-            assignment_seconds=0.0,
-            reproduce_seconds=0.0,
-            verify_seconds=encode_elapsed_seconds,
-            synthesize_seconds=post_evidence_seconds,
+                    envelopes.append(
+                        encode_message_envelope(
+                            metadata,
+                            (
+                                TensorEnvelopePayload(
+                                    metadata=TensorPayloadMetadata(
+                                        name=tensor_name,
+                                        shape=parameter_shape,
+                                        nbytes=model_size_bytes,
+                                    ),
+                                    payload=tensor_payload,
+                                ),
+                            )
+                            if model_size_bytes
+                            else (),
+                        )
+                    )
+                    metadata_records.append(metadata)
+            if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
+                state = self._advance_protocol(cell, evidence)
+            else:
+                state, _baseline_metrics = self._execute_baseline_cell(cell, evidence)
+            return (
+                state,
+                communication_bytes(tuple(envelopes)),
+                model_transmission_count(tuple(metadata_records)),
+            )
+
+        observation = SingleProcessTimingWorker().measure(measured_execution)
+        state, bytes_total, transmissions = observation.value
+        if cell.repetition is None:
+            raise ValueError("Efficiency Measurement cell requires a repetition identity")
+        diagnostic_root = REPOSITORY_ROOT / experiment_repetition_telemetry_root(
+            cell.experiment,
+            cell.method,
+            cell.master_seed,
+            cell.repetition,
         )
-        gpu_memory_bytes = peak_gpu_memory_bytes()
-        host_rss_bytes = peak_host_resident_set_bytes()
+        diagnostic_root.mkdir(parents=True, exist_ok=True)
+        (diagnostic_root / "timing-observation.json").write_text(
+            TimingRepetitionObservation(
+                experiment=cell.experiment,
+                method=cell.method,
+                condition=cell.condition,
+                master_seed=cell.master_seed,
+                repetition=cell.repetition,
+                semantic_key=cell.semantic_key,
+                wall_clock_seconds=observation.wall_clock_seconds,
+                gpu_seconds=observation.gpu_seconds,
+                peak_gpu_memory_bytes=observation.peak_gpu_memory_bytes,
+                peak_host_rss_bytes=observation.peak_host_rss_bytes,
+                communication_bytes=bytes_total,
+                model_transmissions=transmissions,
+            ).model_dump_json(indent=2)
+            + "\n"
+        )
+        storage_bytes = sum(
+            path.stat().st_size for path in diagnostic_root.rglob("*") if path.is_file()
+        )
         return (
             state,
             (
                 (
                     ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-                    delay_decomposition.post_evidence_wall_clock_seconds,
+                    observation.wall_clock_seconds,
                 ),
-                ("communication-bytes", float(bytes_total)),
-                ("model-transmissions", float(transmissions)),
+                (DescriptiveScientificMetric.COMMUNICATION_BYTES.value, float(bytes_total)),
+                (DescriptiveScientificMetric.MODEL_TRANSMISSIONS.value, float(transmissions)),
                 (
-                    "post-evidence-wall-clock-seconds",
-                    delay_decomposition.post_evidence_wall_clock_seconds,
+                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
+                    observation.wall_clock_seconds,
                 ),
-                ("peak-gpu-memory-bytes", float(gpu_memory_bytes)),
-                ("peak-host-rss-bytes", float(host_rss_bytes)),
+                (DescriptiveScientificMetric.GPU_SECONDS.value, observation.gpu_seconds),
+                (
+                    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+                    float(observation.peak_gpu_memory_bytes),
+                ),
+                (
+                    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+                    float(observation.peak_host_rss_bytes),
+                ),
+                (DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value, float(storage_bytes)),
             ),
         )

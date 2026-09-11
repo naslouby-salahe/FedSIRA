@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
+from typing import TypeAlias
 
-from fedsira.domain.enums import CoreMethodIdentity, DatasetId, RootCauseMixture
+from fedsira.domain.enums import (
+    ComparisonMetric,
+    CoreMethodIdentity,
+    DatasetId,
+    RootCauseMixture,
+)
 from fedsira.domain.types import (
     ArtifactFileName,
     BooleanValue,
@@ -16,12 +22,12 @@ from fedsira.domain.types import (
     SeedCount,
     TableName,
 )
-from fedsira.experiments.scenarios import EvidenceArrivalSchedule
 from fedsira.protocol.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
     BaselineIdentity,
     BaselineValidationFixture,
 )
+from fedsira.protocol.specification import EvidenceArrivalSchedule
 from fedsira.runtime import current_application_context
 
 
@@ -49,6 +55,41 @@ class ExperimentClass(StrEnum):
     FAILURE_BOUNDARY = "Failure Boundary"
     DIAGNOSTIC = "Diagnostic"
     GENERALIZATION = "Generalization"
+
+
+class EfficiencyCondition(StrEnum):
+    TIMED = "timed"
+
+
+class TrainingProtocolStage(StrEnum):
+    ANCHOR = "anchor"
+    SOURCE_CANDIDATE = "source candidate"
+    HONEST_REPRODUCTION = "honest reproduction"
+
+
+class DescriptiveScientificMetric(StrEnum):
+    VALIDATION_GATE = "validation gate"
+    LOGICAL_STATE_BY_CYCLE = "state-by-logical-cycle"
+    TIME_TO_FIRST_REPRODUCTION = "time-to-first-reproduction"
+    T_EVIDENCE = "t-evidence"
+    TIME_TO_CERTIFICATE = "time-to-certificate"
+    TERMINAL_PROTOCOL_OUTCOME = "terminal-protocol-outcome"
+    CROSS_DOMAIN_VERIFIER_AGREEMENT = "cross-domain-verifier-agreement"
+    CERTIFIED_ROW_YIELD = "certified-row-yield"
+    ROOT_CAUSE_TARGET_F1 = "root-cause-target-f1"
+    CERTIFICATE_ADMISSION_RATE = "certificate-admission-rate-under-corrupted-operational-evidence"
+    WALL_CLOCK_SECONDS = "post-evidence-wall-clock-seconds"
+    GPU_SECONDS = "gpu-seconds"
+    PEAK_GPU_MEMORY_BYTES = "peak-gpu-memory-bytes"
+    PEAK_HOST_RSS_BYTES = "peak-host-rss-bytes"
+    COMMUNICATION_BYTES = "communication-bytes"
+    MODEL_TRANSMISSIONS = "model-transmissions"
+    PERSISTENT_STORAGE_BYTES = "persistent-storage-bytes"
+    TOTAL_ATTEMPTS = "total-attempts"
+    DORMANT_ADMISSION_RATE = "dormant-admission-rate"
+
+
+ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric
 
 
 class OpeningMode(StrEnum):
@@ -186,6 +227,7 @@ CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
 CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
 SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
 AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
+STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"
 PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
 PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
 USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
@@ -197,6 +239,7 @@ CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularit
 HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"
 ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"
 EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"
+EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"
 SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
 
 
@@ -209,6 +252,7 @@ class ExperimentArtifactSpecification(FrozenDomainModel):
 
 def experiment_artifacts(
     *specialized_figures: FigureName,
+    additional_metric_artifacts: tuple[ArtifactFileName, ...] = (),
 ) -> ExperimentArtifactSpecification:
     return ExperimentArtifactSpecification(
         metrics_required=True,
@@ -216,6 +260,7 @@ def experiment_artifacts(
             CELL_METRICS_PARQUET_NAME,
             SEED_METRICS_PARQUET_NAME,
             AGGREGATE_METRICS_PARQUET_NAME,
+            *additional_metric_artifacts,
         ),
         required_tables=(CELL_METRICS_TABLE_NAME,),
         required_figures=(PROTOCOL_SCHEMATIC_FIGURE_NAME, *specialized_figures),
@@ -229,9 +274,10 @@ class ExperimentDefinition(FrozenDomainModel):
     conditions: tuple[ConditionName, ...]
     seed_count: SeedCount
     nominal_cell_count: ScientificCellCount
+    primary_metrics: tuple[ScientificMetric, ...]
     comparison_family: ComparisonFamily | None
     prerequisites: tuple[ExperimentName, ...]
-    dataset: DatasetId = DatasetId.N_BAIOT
+    dataset: DatasetId
     artifacts: ExperimentArtifactSpecification
 
 
@@ -281,10 +327,127 @@ POST_CORE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
 
 _SMOKE_SEED_COUNT: SeedCount = 1
 
+_VALIDATION_METRICS: tuple[ScientificMetric, ...] = (DescriptiveScientificMetric.VALIDATION_GATE,)
+_OPENING_NECESSITY_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.FALSE_LAUNCH,
+    ComparisonMetric.REPRODUCTION_ATTEMPTS,
+    ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.MALICIOUS_ADMISSION,
+)
+_PLURALITY_NECESSITY_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+)
+_SOURCE_EXCLUSION_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.ATTACK_SUCCESS_RATE,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+)
+_EXTERNAL_VERIFICATION_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+)
+_PRIMARY_CONFIRMATORY_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.ATTACK_SUCCESS_RATE,
+)
+_MECHANISM_ABLATION_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.ATTACK_SUCCESS_RATE,
+    ComparisonMetric.REPRODUCTION_ATTEMPTS,
+    ComparisonMetric.FALSE_LAUNCH,
+    ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+    ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+)
+_REPRODUCER_ROBUSTNESS_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.ATTACK_SUCCESS_RATE,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+)
+_VERIFIER_ROBUSTNESS_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+)
+_BYZANTINE_BOUND_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    ComparisonMetric.ATTACK_SUCCESS_RATE,
+    ComparisonMetric.TARGET_F1,
+)
+_EVIDENCE_SCARCITY_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.LOGICAL_STATE_BY_CYCLE,
+    DescriptiveScientificMetric.TIME_TO_FIRST_REPRODUCTION,
+    DescriptiveScientificMetric.T_EVIDENCE,
+    DescriptiveScientificMetric.TIME_TO_CERTIFICATE,
+    DescriptiveScientificMetric.TERMINAL_PROTOCOL_OUTCOME,
+)
+_EPISTEMIC_FAILURE_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.CERTIFICATE_ADMISSION_RATE,
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+)
+_CAPABILITY_GRANULARITY_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.CROSS_DOMAIN_VERIFIER_AGREEMENT,
+    DescriptiveScientificMetric.CERTIFIED_ROW_YIELD,
+    DescriptiveScientificMetric.ROOT_CAUSE_TARGET_F1,
+    ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
+)
+_HETEROGENEITY_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.WORST_DOMAIN_TARGET_F1,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+    DescriptiveScientificMetric.DORMANT_ADMISSION_RATE,
+)
+_DELAY_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.T_EVIDENCE,
+    DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
+    DescriptiveScientificMetric.TOTAL_ATTEMPTS,
+    DescriptiveScientificMetric.TERMINAL_PROTOCOL_OUTCOME,
+)
+_EFFICIENCY_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
+    DescriptiveScientificMetric.GPU_SECONDS,
+    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
+    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
+    DescriptiveScientificMetric.COMMUNICATION_BYTES,
+    DescriptiveScientificMetric.MODEL_TRANSMISSIONS,
+    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES,
+)
+_SECONDARY_GENERALIZATION_METRICS: tuple[ScientificMetric, ...] = (
+    ComparisonMetric.TARGET_F1,
+    ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
+    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE,
+    ComparisonMetric.MALICIOUS_ADMISSION,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+)
+
 
 def _confirmatory_seed_count() -> SeedCount:
     seeds = current_application_context().scientific_config.seeds_and_determinism
     return seeds.confirmatory_seed_count
+
+
+def _timing_diagnostic_seed_count() -> SeedCount:
+    timing = current_application_context().scientific_config.execution.timing
+    return timing.diagnostic_master_seed_count
 
 
 def _unique(values: Iterable[ConditionName]) -> tuple[ConditionName, ...]:
@@ -383,8 +546,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=("primary",),
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=1,
+            primary_metrics=_VALIDATION_METRICS,
             comparison_family=None,
             prerequisites=(),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
@@ -394,8 +559,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=("aggregate",),
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=1,
+            primary_metrics=_VALIDATION_METRICS,
             comparison_family=None,
             prerequisites=(),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
@@ -405,8 +572,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=_BASELINE_FIXTURES,
             seed_count=_SMOKE_SEED_COUNT,
             nominal_cell_count=17,
+            primary_metrics=_VALIDATION_METRICS,
             comparison_family=None,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
@@ -416,8 +585,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(episode.value for episode in ProposalEpisode),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
+            primary_metrics=_OPENING_NECESSITY_METRICS,
             comparison_family=ComparisonFamily.PROPOSAL_SCREEN_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -430,8 +601,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in PluralityCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
+            primary_metrics=_PLURALITY_NECESSITY_METRICS,
             comparison_family=ComparisonFamily.PLURALITY_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -441,8 +614,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
+            primary_metrics=_SOURCE_EXCLUSION_METRICS,
             comparison_family=ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(
                 USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
                 COLLAPSE_DECISION_EFFECTS_FIGURE_NAME,
@@ -458,8 +633,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in ExternalVerificationCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
+            primary_metrics=_EXTERNAL_VERIFICATION_METRICS,
             comparison_family=ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
             prerequisites=(DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(COLLAPSE_DECISION_EFFECTS_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -484,8 +661,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(scenario.value for scenario in PrimaryScenario),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=420,
+            primary_metrics=_PRIMARY_CONFIRMATORY_METRICS,
             comparison_family=ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY,
             prerequisites=(PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -495,8 +674,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=_ABLATION_SCENARIOS,
             seed_count=confirmatory_seed_count,
             nominal_cell_count=180,
+            primary_metrics=_MECHANISM_ABLATION_METRICS,
             comparison_family=ComparisonFamily.MECHANISM_ABLATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
@@ -511,8 +692,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in ReproducerCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=280,
+            primary_metrics=_REPRODUCER_ROBUSTNESS_METRICS,
             comparison_family=ComparisonFamily.REPRODUCER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -522,8 +705,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in VerifierCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=100,
+            primary_metrics=_VERIFIER_ROBUSTNESS_METRICS,
             comparison_family=ComparisonFamily.VERIFIER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -536,8 +721,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(condition.value for condition in BoundCondition),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=80,
+            primary_metrics=_BYZANTINE_BOUND_METRICS,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(),
         ),
         ExperimentDefinition(
@@ -547,9 +734,14 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=40,
+            primary_metrics=_EVIDENCE_SCARCITY_METRICS,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
-            artifacts=experiment_artifacts(),
+            dataset=DatasetId.N_BAIOT,
+            artifacts=experiment_artifacts(
+                EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME,
+                additional_metric_artifacts=(STATE_TRAJECTORY_PARQUET_NAME,),
+            ),
         ),
         ExperimentDefinition(
             name=SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -562,8 +754,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             ),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=90,
+            primary_metrics=_EPISTEMIC_FAILURE_METRICS,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(SHARED_EPISTEMIC_FAILURE_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -573,8 +767,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(mixture.value for mixture in RootCauseMixture),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,
+            primary_metrics=_CAPABILITY_GRANULARITY_METRICS,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -589,8 +785,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(regime.value for regime in HeterogeneityRegime),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=160,
+            primary_metrics=_HETEROGENEITY_METRICS,
             comparison_family=ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -604,8 +802,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(schedule.value for schedule in EvidenceArrivalSchedule),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=120,
+            primary_metrics=_DELAY_METRICS,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -617,11 +817,13 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
                 BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value,
                 BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION.value,
             ),
-            conditions=("timed",),
-            seed_count=3,
+            conditions=(EfficiencyCondition.TIMED.value,),
+            seed_count=_timing_diagnostic_seed_count(),
             nominal_cell_count=60,
+            primary_metrics=_EFFICIENCY_METRICS,
             comparison_family=None,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
+            dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(EFFICIENCY_PROFILE_FIGURE_NAME),
         ),
         ExperimentDefinition(
@@ -637,6 +839,7 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
             conditions=tuple(scenario.value for scenario in SecondaryScenario),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=100,
+            primary_metrics=_SECONDARY_GENERALIZATION_METRICS,
             comparison_family=ComparisonFamily.SECONDARY_GENERALIZATION,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
             dataset=DatasetId.CICIOT2023,

@@ -5,30 +5,30 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBaiotClass, NBaiotDomain
-from fedsira.domain.types import MasterSeed
-from fedsira.evaluation.domain import non_source_domains
-from fedsira.experiments.workflow import (
-    HeterogeneityScope,
-    RealAnchor,
-    flat_parameters_identity,
-    load_prepared_rows,
-)
-from fedsira.learning.aggregation import ModelState, load_model_state, model_state_from_classifier
-from fedsira.learning.anchor_training import training_seed
-from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
-from fedsira.learning.model import (
-    FedSIRAClassifier,
-    flatten_trainable_parameters,
-    load_flat_trainable_parameters,
-)
-from fedsira.learning.post_reference_training import combined_post_reference_rows
-from fedsira.protocol.baselines.calibration import (
+from fedsira.datasets.nbaiot.baselines.calibration import (
     cosine_distance_matrix,
     density_cluster_labels,
     l2_normalize,
     select_largest_density_cluster,
     trimmed_mean_aggregate,
+)
+from fedsira.datasets.nbaiot.evaluation.domain import non_source_domains
+from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
+from fedsira.datasets.nbaiot.learning.post_reference_training import combined_post_reference_rows
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotClass, NBaiotDomain
+from fedsira.datasets.nbaiot.workflow import (
+    HeterogeneityScope,
+    RealAnchor,
+    flat_parameters_identity,
+    load_prepared_rows,
+)
+from fedsira.domain.types import MasterSeed
+from fedsira.learning.aggregation import ModelState, load_model_state, model_state_from_classifier
+from fedsira.learning.federated import LocalTrainingClient, train_one_client_locally
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    load_flat_trainable_parameters,
 )
 from fedsira.protocol.baselines.references import (
     fedavg_reference_post_reference_participants,
@@ -140,7 +140,10 @@ def train_density_cluster_trimmed_mean_delta(
         is not None
     )
     participants = fedavg_reference_post_reference_participants(
-        non_source_domains(source_domain), source_domain, source_rows_available
+        NBAIOT_DOMAIN_ORDER,
+        non_source_domains(source_domain),
+        source_domain,
+        source_rows_available,
     )
     if not participants:
         return None

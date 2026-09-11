@@ -1,16 +1,19 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
+from typing import TypeVar
 
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
 from fedsira.domain.types import (
+    DomainId,
     DomainLocalEvaluation,
     FederatedRoundCount,
     LocalEpochCount,
     SourceAvailable,
 )
 from fedsira.runtime import current_application_context
+
+Domain = TypeVar("Domain", bound=Hashable)
 
 
 def local_only_reference_local_epochs() -> LocalEpochCount:
@@ -22,7 +25,7 @@ def local_only_reference_training_role() -> Role:
 
 
 def local_only_reference_evaluation_is_domain_local(
-    checkpoint_domain: NBaiotDomain, evaluation_domain: NBaiotDomain
+    checkpoint_domain: DomainId, evaluation_domain: DomainId
 ) -> DomainLocalEvaluation:
     return checkpoint_domain == evaluation_domain
 
@@ -32,16 +35,15 @@ def centralized_reference_local_epochs() -> LocalEpochCount:
 
 
 def pool_domain_rows(
-    ordered_domains: Sequence[NBaiotDomain], domain_rows: Mapping[NBaiotDomain, torch.Tensor]
+    ordered_domains: Sequence[DomainId], domain_rows: Mapping[DomainId, torch.Tensor]
 ) -> torch.Tensor:
     return torch.cat([domain_rows[domain] for domain in ordered_domains], dim=0)
 
 
 def centralized_reference_pooled_rows(
-    domain_rows: Mapping[NBaiotDomain, torch.Tensor],
+    ordered_rows: Sequence[torch.Tensor],
 ) -> torch.Tensor:
-    ordered_domains = [domain for domain in NBAIOT_DOMAIN_ORDER if domain in domain_rows]
-    return pool_domain_rows(ordered_domains, domain_rows)
+    return torch.cat(tuple(ordered_rows), dim=0)
 
 
 def fedavg_reference_post_reference_rounds() -> FederatedRoundCount:
@@ -63,11 +65,12 @@ def post_reference_retrain_maximum_local_epochs() -> LocalEpochCount:
 
 
 def fedavg_reference_post_reference_participants(
-    post_reference_eligible_domains: Sequence[NBaiotDomain],
-    source_domain: NBaiotDomain | None,
+    domain_order: Sequence[Domain],
+    post_reference_eligible_domains: Sequence[Domain],
+    source_domain: Domain | None,
     source_is_available: SourceAvailable,
-) -> tuple[NBaiotDomain, ...]:
+) -> tuple[Domain, ...]:
     participant_set = set(post_reference_eligible_domains)
     if source_is_available and source_domain is not None:
         participant_set.add(source_domain)
-    return tuple(domain for domain in NBAIOT_DOMAIN_ORDER if domain in participant_set)
+    return tuple(domain for domain in domain_order if domain in participant_set)

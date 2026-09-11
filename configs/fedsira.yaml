@@ -299,6 +299,8 @@ execution:
   automatic_infrastructure_retries_per_cell_phase: 1
   timing:
     warmup_forward_passes: 1
+    repetitions_per_cell: 5
+    diagnostic_master_seed_count: 3
   same_environment_absolute_metric_tolerance: 1.0e-06
 evidence_thresholds:
   byzantine_operating_region:

@@ -12,6 +12,7 @@ from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
     DatasetExclusionReason,
+    DatasetPreparationLogFields,
     FeatureMoments,
     Role,
     RoleSamplingCap,
@@ -50,6 +51,7 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
+from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
@@ -70,12 +72,19 @@ from fedsira.domain.types import (
     SourceRowIndex,
     TextValue,
 )
-from fedsira.runtime import current_application_context, framed_bytes
+from fedsira.runtime import (
+    current_application_context,
+    framed_bytes,
+    get_structured_logger,
+    log_structured_event,
+)
 
 NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"
 PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|1"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"
 BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"
+
+NBAIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")
 
 
 class DiscoveredCsvFile(FrozenDomainModel):
@@ -487,9 +496,15 @@ def materialize_nbaiot_prepared_views(
     connection = open_tabular_engine()
     try:
         for item in discovered:
-            print(
-                "N-BaIoT ingest: "
-                f"domain={item.domain.name} class={item.class_id} file={item.relative_path}"
+            log_structured_event(
+                NBAIOT_PREPARATION_LOGGER,
+                "dataset.ingest",
+                DatasetPreparationLogFields(
+                    dataset=DatasetId.N_BAIOT,
+                    domain=item.domain.name,
+                    class_id=item.class_id,
+                    file=item.relative_path,
+                ),
             )
             observed_header = read_predictor_header(item.absolute_path)
             validate_consistent_predictor_schema(feature_names, observed_header)
@@ -510,9 +525,15 @@ def materialize_nbaiot_prepared_views(
                 role_intervals=config.datasets.primary.role_intervals,
                 sampling_caps_per_domain=config.datasets.primary.sampling_caps_per_domain,
             )
-            print(
-                "N-BaIoT roles: "
-                f"file={item.relative_path} rows={row_count} selected={len(assignments)}"
+            log_structured_event(
+                NBAIOT_PREPARATION_LOGGER,
+                "dataset.roles",
+                DatasetPreparationLogFields(
+                    dataset=DatasetId.N_BAIOT,
+                    file=item.relative_path,
+                    rows=row_count,
+                    selected=len(assignments),
+                ),
             )
             connection.executemany(
                 "INSERT INTO selected VALUES (?, ?, ?, ?, ?)",
@@ -539,7 +560,14 @@ def materialize_nbaiot_prepared_views(
             fetch_feature_statistics(connection, train_sql, feature_names),
             config.datasets.primary.scaling,
         )
-        print(f"N-BaIoT scaler fitted on {moments.training_row_count} anchor-train rows")
+        log_structured_event(
+            NBAIOT_PREPARATION_LOGGER,
+            "dataset.scaler.fitted",
+            DatasetPreparationLogFields(
+                dataset=DatasetId.N_BAIOT,
+                training_rows=moments.training_row_count,
+            ),
+        )
         prepared_root.mkdir(parents=True, exist_ok=True)
         scaler_root.mkdir(parents=True, exist_ok=True)
         views: list[PreparedView] = []
@@ -586,8 +614,15 @@ def materialize_nbaiot_prepared_views(
                 ),
                 overwrite,
             )
-            print(
-                f"N-BaIoT view written: {view_key} rows={view_row_count} path={parquet_path.name}"
+            log_structured_event(
+                NBAIOT_PREPARATION_LOGGER,
+                "dataset.view.written",
+                DatasetPreparationLogFields(
+                    dataset=DatasetId.N_BAIOT,
+                    view=view_key,
+                    rows=view_row_count,
+                    path=parquet_path.name,
+                ),
             )
             if retain_materialized_views:
                 rows = connection.execute(

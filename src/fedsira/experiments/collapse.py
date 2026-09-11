@@ -102,6 +102,7 @@ class ProductionUpdateRule(StrEnum):
 
 class CollapseDecision(FrozenDomainModel):
     kind: CollapseDecisionKind
+    comparator: MethodName
     survives: CollapseDecisionPassed
     primary_material_effect: MetricName | None
     adjusted_p_value: PValue | None
@@ -536,6 +537,18 @@ def _decision_kind(family: ComparisonFamily) -> CollapseDecisionKind:
     raise ValueError(f"{family.value} is not a collapse family")
 
 
+def _collapse_comparator(family: ComparisonFamily) -> MethodName:
+    if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
+        return OpeningMode.CANDIDATE_FREE.value
+    if family is ComparisonFamily.PLURALITY_NECESSITY:
+        return BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value
+    if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
+        return BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value
+    if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
+        return BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
+    raise ValueError(f"{family.value} is not a collapse family")
+
+
 def _positive_metrics(family: ComparisonFamily) -> frozenset[ComparisonMetric]:
     if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
         return frozenset(
@@ -581,6 +594,7 @@ def collapse_decision_from_comparison_families(
         reason = "survival rule passed"
     return CollapseDecision(
         kind=_decision_kind(family),
+        comparator=_collapse_comparator(family),
         survives=survives,
         primary_material_effect=metric,
         adjusted_p_value=adjusted_p_value,

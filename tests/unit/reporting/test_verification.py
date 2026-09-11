@@ -4,9 +4,9 @@ from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
     ExperimentTerminalCount,
+    verify_artifact_manifest_dependencies,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
-    verify_no_stale_ancestors,
     verify_planned_cell_count_satisfied,
 )
 
@@ -38,7 +38,7 @@ def test_execution_evidence_verification_requires_complete_terminal_experiments(
     ).passed
 
 
-def test_stale_artifact_evidence_blocks_completion() -> None:
-    assert verify_no_stale_ancestors(()).passed
-    assert not verify_no_stale_ancestors(("a" * 64,)).passed
+def test_invalid_artifact_evidence_blocks_completion() -> None:
+    assert verify_artifact_manifest_dependencies(()).passed
+    assert not verify_artifact_manifest_dependencies(("a" * 64,)).passed
     assert CompletenessVerificationResult(passed=True, failures=()).passed

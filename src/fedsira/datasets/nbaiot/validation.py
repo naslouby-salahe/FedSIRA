@@ -8,7 +8,7 @@ import numpy
 import torch
 
 from fedsira.artifacts.paths import smoke_record_path
-from fedsira.artifacts.provenance import ArtifactGraph, ArtifactManifest
+from fedsira.artifacts.provenance import ArtifactManifest, validate_artifact_lifecycle_readable
 from fedsira.config import (
     TEST_FIXTURE_CONFIG_PATH,
     load_test_fixture_config,
@@ -611,29 +611,22 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
 
 
 def _artifact_invariants() -> tuple[SmokeCheckResult, ...]:
-    graph = ArtifactGraph()
-    parent = ArtifactManifest(
+    manifest = ArtifactManifest(
         family=ArtifactFamily.SCALER,
         identity="a" * 64,
         checksum="b" * 64,
         lifecycle_state=ArtifactLifecycleState.COMPLETE,
         upstream_identities=(),
     )
-    child = ArtifactManifest(
-        family=ArtifactFamily.SCALER,
-        identity="c" * 64,
-        checksum="d" * 64,
-        lifecycle_state=ArtifactLifecycleState.COMPLETE,
-        upstream_identities=(parent.identity,),
-    )
-    graph.register(parent)
-    graph.register(child)
-    staled = graph.mark_stale_descendants(parent.identity)
-    stale_ok = staled == (child.identity,) and not graph.is_active(child.identity)
+    try:
+        validate_artifact_lifecycle_readable(manifest)
+        lifecycle_is_readable = True
+    except ValueError:
+        lifecycle_is_readable = False
     return (
         SmokeCheckResult(
-            name="changing one parent identity marks transitive descendants stale",
-            passed=stale_ok,
+            name="complete artifact manifest is readable",
+            passed=lifecycle_is_readable,
         ),
     )
 
@@ -667,7 +660,7 @@ def run_data_and_domain_evidence_validation(
 
 
 def run_protocol_invariant_validation() -> None:
-    result = run_smoke_suite()
+    result = run_smoke_suite(overwrite=False)
     if not result.passed:
         failed = tuple(check.name for check in result.checks if not check.passed)
         raise ValueError(f"protocol invariant validation failed: {', '.join(failed)}")
@@ -683,7 +676,7 @@ def _load_persisted_smoke_record() -> PersistedSmokeRecord | None:
         return None
 
 
-def run_smoke_suite(overwrite: OverwriteExisting = False) -> SmokeSuiteResult:
+def run_smoke_suite(overwrite: OverwriteExisting) -> SmokeSuiteResult:
     existing = None if overwrite else _load_persisted_smoke_record()
     if existing is not None and existing.passed:
         return SmokeSuiteResult(checks=existing.checks)

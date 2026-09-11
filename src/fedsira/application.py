@@ -5,11 +5,18 @@ from pathlib import Path
 from rich.console import Console
 
 from fedsira.artifacts.paths import (
+    manuscript_tables_root,
     prepared_evidence_root,
+    project_summary_root,
     smoke_record_path,
     workspace_root_for_family,
 )
+from fedsira.datasets.nbaiot.executor import (
+    ProtocolCellExecutor,
+)
+from fedsira.datasets.nbaiot.validation import PersistedSmokeRecord
 from fedsira.datasets.preprocess import execute_preprocess
+from fedsira.datasets.specification import dataset_specification
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
 from fedsira.domain.types import (
     ApplicationExitCode,
@@ -63,11 +70,7 @@ from fedsira.experiments.execution import (
     execute_smoke,
     execute_status,
 )
-from fedsira.experiments.executor import (
-    ProtocolCellExecutor,
-)
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell, build_plan, execute_plan
-from fedsira.experiments.validation import PersistedSmokeRecord
 from fedsira.reporting.export import execute_report, export_experiment_report
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -81,7 +84,6 @@ from fedsira.runtime import (
 )
 
 _LOGGER = get_structured_logger("doctor")
-_CICIOT2023_RAW_RELATIVE = Path("CIC_IOT_Dataset2023") / "CSV"
 _RESOLVED_CORE_DIRECTORY = workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
 _BOUNDARY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
@@ -117,8 +119,6 @@ class DoctorReport(FrozenDomainModel):
 
 
 def diagnose(config_path: Path | None = None) -> DoctorReport:
-    raw_data_path = REPOSITORY_ROOT / "data" / "raw"
-    rar_archives_present = raw_data_path.exists() and any(raw_data_path.rglob("*.rar"))
     try:
         context = ApplicationContext.load(REPOSITORY_ROOT, config_path)
     except ValueError as error:
@@ -134,6 +134,8 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             project_progress="doctor blocked by invalid configuration",
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
+    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+    rar_archives_present = raw_data_root.exists() and any(raw_data_root.rglob("*.rar"))
     with bound_application_context(context):
         environment_mismatches = collect_environment_mismatches(rar_archives_present)
         return _diagnose_bound(context, environment_mismatches)
@@ -183,9 +185,7 @@ def _diagnose_bound(
 
 
 def _raw_present(raw_root: Path, dataset: DatasetId) -> BooleanValue:
-    if dataset is DatasetId.N_BAIOT:
-        return (raw_root / dataset.value).is_dir()
-    return (raw_root / _CICIOT2023_RAW_RELATIVE).is_dir()
+    return (raw_root / dataset_specification(dataset).raw_data_relative).is_dir()
 
 
 def _prepared_present(dataset: DatasetId) -> BooleanValue:
@@ -313,8 +313,7 @@ def _project_stage(
         ExperimentLifecycleState.COMPLETED
     ):
         return ProjectStage.SECONDARY_GENERALIZATION
-    results_root = REPOSITORY_ROOT / "results" / "project_summary"
-    if not (results_root / "tables" / "main").exists():
+    if not (REPOSITORY_ROOT / manuscript_tables_root(project_summary_root())).exists():
         return ProjectStage.STATISTICAL_EVIDENCE_COMPLETION
     return ProjectStage.REPORT_EXPORT
 

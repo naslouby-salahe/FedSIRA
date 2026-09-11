@@ -26,12 +26,18 @@ from fedsira.experiments.definitions import (
     PROTOCOL_INVARIANT_VALIDATION_NAME,
     AblationScenario,
     AblationVariant,
+    EfficiencyCondition,
     ExperimentDefinition,
     ablation_scenario_for_variant,
     baseline_validation_fixture_for_method,
     experiment_registry,
 )
-from fedsira.runtime import REPOSITORY_ROOT, ApplicationContext, bound_application_context
+from fedsira.runtime import (
+    REPOSITORY_ROOT,
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
+)
 
 
 class ScientificCell(FrozenDomainModel):
@@ -39,10 +45,14 @@ class ScientificCell(FrozenDomainModel):
     method: MethodName
     condition: ConditionName
     master_seed: MasterSeed
+    repetition: RepetitionIndex | None = None
 
     @property
     def semantic_key(self) -> ScientificCellSemanticKey:
-        return "|".join((self.experiment, self.method, self.condition, str(self.master_seed)))
+        repetition = "" if self.repetition is None else str(self.repetition)
+        return "|".join(
+            (self.experiment, self.method, self.condition, str(self.master_seed), repetition)
+        )
 
 
 class PlannedExperiment(FrozenDomainModel):
@@ -116,7 +126,16 @@ PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
         *COLLAPSE_EXPERIMENT_NAMES,
     }
 )
-EFFICIENCY_REPETITION_INDICES: tuple[RepetitionIndex, ...] = (1, 2, 3, 4, 5)
+
+
+def efficiency_repetition_indices() -> tuple[RepetitionIndex, ...]:
+    timing = current_application_context().scientific_config.execution.timing
+    indices: list[RepetitionIndex] = []
+    for index in range(1, timing.repetitions_per_cell + 1):
+        indices.append(index)
+    return tuple(indices)
+
+
 PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
     data_and_domain_evidence_validation=1,
     protocol_invariant_validation=1,
@@ -189,6 +208,10 @@ def _ablation_cells(
     )
 
 
+def efficiency_condition() -> ConditionName:
+    return EfficiencyCondition.TIMED.value
+
+
 def _efficiency_cells(
     definition: ExperimentDefinition,
     seeds: tuple[MasterSeed, ...],
@@ -197,12 +220,13 @@ def _efficiency_cells(
         ScientificCell(
             experiment=definition.name,
             method=method,
-            condition=f"repetition-{repetition_index}",
+            condition=efficiency_condition(),
             master_seed=seed,
+            repetition=repetition_index,
         )
         for method in definition.methods
         for seed in seeds
-        for repetition_index in EFFICIENCY_REPETITION_INDICES
+        for repetition_index in efficiency_repetition_indices()
     )
 
 
@@ -327,7 +351,7 @@ def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
         )
 
 
-def resolve_plan(resolved_core_complete: ResolvedCoreComplete = False) -> ExperimentPlan:
+def resolve_plan(resolved_core_complete: ResolvedCoreComplete) -> ExperimentPlan:
     plan = build_plan(resolved_core_complete=resolved_core_complete)
     validate_planned_cell_count_invariant(plan)
     return plan

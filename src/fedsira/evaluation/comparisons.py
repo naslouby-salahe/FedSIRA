@@ -4,7 +4,7 @@ import math
 from enum import StrEnum
 
 from fedsira.config import BootstrapConfig, MultiplicityConfig
-from fedsira.domain.enums import CoreMethodIdentity, RootCauseMixture
+from fedsira.domain.enums import ComparisonMetric, CoreMethodIdentity, RootCauseMixture
 from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
@@ -68,6 +68,24 @@ class ComparisonTestKind(StrEnum):
     NON_INFERIORITY = "non-inferiority"
 
 
+class ComparisonSidedness(StrEnum):
+    TWO_SIDED = "two-sided"
+    ONE_SIDED = "one-sided"
+
+
+COMPARISON_SIDEDNESS_BY_TEST_KIND: tuple[tuple[ComparisonTestKind, ComparisonSidedness], ...] = (
+    (ComparisonTestKind.SUPERIORITY, ComparisonSidedness.TWO_SIDED),
+    (ComparisonTestKind.NON_INFERIORITY, ComparisonSidedness.ONE_SIDED),
+)
+
+
+def comparison_sidedness(test_kind: ComparisonTestKind) -> ComparisonSidedness:
+    for registered_test_kind, sidedness in COMPARISON_SIDEDNESS_BY_TEST_KIND:
+        if registered_test_kind is test_kind:
+            return sidedness
+    raise ValueError(f"unsupported comparison test kind: {test_kind.value}")
+
+
 class ComparisonOrientation(StrEnum):
     HIGHER_IS_BETTER = "higher_is_better"
     LOWER_IS_BETTER = "lower_is_better"
@@ -96,20 +114,6 @@ class ComparisonState(StrEnum):
     INCONCLUSIVE_TECHNICAL = "Inconclusive Technical"
 
 
-class ComparisonMetric(StrEnum):
-    FALSE_LAUNCH = "false-launch"
-    REPRODUCTION_ATTEMPTS = "reproduction-attempts"
-    POST_EVIDENCE_OVERHEAD = "post-evidence-overhead"
-    LEGITIMATE_ADMISSION = "legitimate-admission"
-    MALICIOUS_ADMISSION = "malicious-admission"
-    WORST_DOMAIN_TARGET_F1 = "worst-domain-target-f1"
-    ATTACK_SUCCESS_RATE = "asr"
-    TARGET_F1 = "target-f1"
-    SUPPORTED_MACRO_F1_HARM = "supported-macro-f1-harm"
-    BENIGN_FALSE_ALARM_RATE_INCREASE = "benign-far-increase"
-    FALSE_SAME_CAPABILITY_CERTIFICATION_RATE = "false-same-capability-certification-rate"
-
-
 class ComparisonDefinition(FrozenDomainModel):
     comparison_name: ComparisonName
     family: ComparisonFamily
@@ -123,6 +127,7 @@ class ComparisonDefinition(FrozenDomainModel):
     metric: ComparisonMetric
     orientation: ComparisonOrientation
     test_kind: ComparisonTestKind
+    sidedness: ComparisonSidedness
     effect_scale: ComparisonEffectScale = ComparisonEffectScale.ABSOLUTE
     materiality_direction: MaterialityDirection = MaterialityDirection.BENEFIT_AT_LEAST
     margin: ComparisonMargin | None = None
@@ -389,6 +394,7 @@ def _definition(
         metric=template.metric,
         orientation=template.orientation,
         test_kind=template.test_kind,
+        sidedness=comparison_sidedness(template.test_kind),
         effect_scale=template.effect_scale,
         materiality_direction=template.materiality_direction,
         margin=template.margin,
@@ -816,7 +822,7 @@ def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
     return tuple(definitions)
 
 
-def _ablation_metric(
+def ablation_metric(
     variant: AblationVariant,
 ) -> tuple[ComparisonMetric, ComparisonOrientation]:
     if variant is AblationVariant.NO_PROPOSAL_SCREEN:
@@ -860,7 +866,7 @@ def _ablation_metric(
     raise ValueError(f"ablation variant {variant} has no predeclared metric")
 
 
-def _ablation_threshold(
+def ablation_material_threshold(
     variant: AblationVariant,
     metric: ComparisonMetric,
 ) -> MaterialThreshold:
@@ -891,7 +897,7 @@ def _ablation_comparisons() -> tuple[ComparisonDefinition, ...]:
     for variant in AblationVariant:
         if variant is AblationVariant.FULL_FEDSIRA:
             continue
-        metric, orientation = _ablation_metric(variant)
+        metric, orientation = ablation_metric(variant)
         effect_scale = (
             ComparisonEffectScale.RELATIVE_REFERENCE_REDUCTION
             if metric
@@ -911,7 +917,7 @@ def _ablation_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _superiority(
                     metric,
                     orientation,
-                    _ablation_threshold(variant, metric),
+                    ablation_material_threshold(variant, metric),
                     effect_scale=effect_scale,
                     materiality_direction=MaterialityDirection.DETERIORATION_AT_LEAST,
                 ),

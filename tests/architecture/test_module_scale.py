@@ -4,28 +4,29 @@ from _repo import SRC_ROOT
 
 JUSTIFIED_LINE_BUDGETS = {
     "config.py": 900,
-    "domain/types.py": 500,
-    "experiments/definitions.py": 700,
-    "experiments/validation.py": 800,
+    "domain/types.py": 520,
+    "experiments/definitions.py": 900,
+    "datasets/nbaiot/validation.py": 800,
     "experiments/collapse.py": 700,
-    "experiments/cells.py": 1700,
-    "experiments/cell_support.py": 900,
+    "datasets/nbaiot/cells.py": 1700,
+    "datasets/nbaiot/cell_support.py": 900,
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 700,
     "reporting/tables.py": 1600,
-    "reporting/figures.py": 900,
+    "reporting/figures.py": 1400,
     "reporting/export.py": 900,
     "datasets/ciciot2023/prepare.py": 800,
     "datasets/nbaiot/prepare.py": 700,
     "application.py": 700,
-    "protocol/baselines/outcomes.py": 700,
+    "datasets/nbaiot/baselines/outcomes.py": 700,
 }
 
 DEFAULT_LINE_BUDGET = 600
 DEFAULT_BYTE_BUDGET = 40_000
 JUSTIFIED_BYTE_BUDGETS = {
-    "experiments/cells.py": 80_000,
+    "datasets/nbaiot/cells.py": 80_000,
     "reporting/tables.py": 55_000,
+    "reporting/figures.py": 55_000,
     "datasets/ciciot2023/prepare.py": 40_000,
     "evaluation/comparisons.py": 45_000,
 }

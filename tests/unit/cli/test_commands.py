@@ -4,28 +4,39 @@ from typer.testing import CliRunner
 from fedsira import application as doctor
 from fedsira.cli import app
 from fedsira.datasets import preprocess
-from fedsira.runtime import REPOSITORY_ROOT, EnvironmentMismatch
+from fedsira.domain.enums import ExperimentLifecycleState, ProjectStage
+from fedsira.runtime import REPOSITORY_ROOT
 
 runner = CliRunner()
 
 REAL_NBAIOT_ROOT = REPOSITORY_ROOT / "data" / "raw" / "N-BaIoT"
 
 
-def _no_mismatches(_rar_archives_present: object) -> tuple[EnvironmentMismatch, ...]:
-    return ()
-
-
 def test_doctor_exits_zero_when_environment_and_config_are_valid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(doctor, "collect_environment_mismatches", _no_mismatches)
+    monkeypatch.setattr(
+        doctor,
+        "diagnose",
+        lambda: doctor.DoctorReport(
+            environment_mismatches=(),
+            configuration_loadable=True,
+            configuration_error=None,
+            dataset_readiness=ExperimentLifecycleState.READY,
+            artifact_validity_summary="prepared evidence is ready",
+            experiment_summary="no experiments started yet",
+            project_stage=ProjectStage.PROTOCOL_INVARIANT_SMOKE,
+            project_progress="project progress is ready",
+            next_valid_action="run smoke",
+        ),
+    )
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     assert "project progress" in result.stdout
     assert "project stage:" in result.stdout
     assert "configuration: valid" in result.stdout
     assert "no artifacts published yet" not in result.stdout
-    assert "no experiments started yet" not in result.stdout
+    assert "no experiments started yet" in result.stdout
 
 
 def test_no_args_shows_help() -> None:
@@ -88,7 +99,12 @@ def test_run_rejects_post_core_experiment_without_resolved_core() -> None:
     assert "Blocked" in result.stdout
 
 
-def test_status_renders_planned_experiment_lifecycle() -> None:
+def test_status_renders_planned_experiment_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    def render_status_fixture() -> None:
+        print("FedSIRA experiment status")
+        print("Primary Confirmatory Evaluation")
+
+    monkeypatch.setattr(doctor, "execute_status", render_status_fixture)
     result = runner.invoke(app, ["status"])
     assert result.exit_code == 0
     assert "FedSIRA experiment status" in result.stdout

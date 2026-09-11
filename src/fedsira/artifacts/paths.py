@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
-from fedsira.domain.types import ExperimentName
+from fedsira.domain.types import ExperimentName, MasterSeed, MethodName, RepetitionIndex
 
 OUTPUTS_ROOT = Path("outputs")
 RESULTS_ROOT = Path("results")
@@ -49,12 +49,32 @@ def preprocessing_metadata_root() -> Path:
     return preprocessing_root() / "metadata"
 
 
+def preprocessing_extraction_cache_root(execution_workspace: Path) -> Path:
+    return execution_workspace / "cache" / "preprocessing"
+
+
+def artifact_staging_root() -> Path:
+    return OUTPUTS_ROOT / "cache" / "staging"
+
+
+def artifact_publication_root() -> Path:
+    return OUTPUTS_ROOT / "artifacts"
+
+
+def execution_outputs_root() -> Path:
+    return OUTPUTS_ROOT / "experiments"
+
+
 def prepared_evidence_root(dataset: DatasetId) -> Path:
     return preprocessing_root() / "prepared" / dataset
 
 
 def prepared_feature_root() -> Path:
     return preprocessing_root() / "features"
+
+
+def preprocessing_log_path() -> Path:
+    return preprocessing_root() / "logs" / "preprocessing.log"
 
 
 def smoke_record_path() -> Path:
@@ -65,8 +85,48 @@ def experiment_execution_root(experiment: ExperimentName) -> Path:
     return OUTPUTS_ROOT / "experiments" / experiment
 
 
+def experiment_repetition_telemetry_root(
+    experiment: ExperimentName,
+    method: MethodName,
+    master_seed: MasterSeed,
+    repetition: RepetitionIndex,
+) -> Path:
+    return (
+        experiment_execution_root(experiment)
+        / "telemetry"
+        / "repetitions"
+        / method
+        / str(master_seed)
+        / str(repetition)
+    )
+
+
 def experiment_log_path(experiment: ExperimentName) -> Path:
     return experiment_execution_root(experiment) / "logs" / "experiment.log"
+
+
+def experiment_result_root(experiment: ExperimentName) -> Path:
+    return RESULTS_ROOT / "experiments" / experiment
+
+
+def manuscript_tables_root(root: Path) -> Path:
+    return root / "tables" / "main"
+
+
+def manuscript_figures_root(root: Path) -> Path:
+    return root / "figures" / "main"
+
+
+def experiment_metrics_root(root: Path) -> Path:
+    return root / "metrics" / "primary"
+
+
+def experiment_telemetry_root(root: Path) -> Path:
+    return root / "telemetry"
+
+
+def project_summary_root() -> Path:
+    return RESULTS_ROOT / "project_summary"
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
@@ -89,7 +149,7 @@ def workspace_root_for_family(
     if scope is ArtifactPathScope.PREPROCESSING:
         return preprocessing_root()
     if scope is ArtifactPathScope.PROJECT_ARTIFACT:
-        return OUTPUTS_ROOT / "artifacts"
+        return artifact_publication_root()
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:
         if experiment is None:
             raise ValueError(f"artifact family {family.value} requires an owning experiment name")

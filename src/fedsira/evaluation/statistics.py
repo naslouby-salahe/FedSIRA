@@ -1,5 +1,10 @@
 import itertools
-from typing import TypeAlias
+from collections.abc import Callable
+from typing import TypeAlias, cast
+
+from statsmodels.stats.multitest import (
+    multipletests as _multipletests,
+)
 
 from fedsira.domain.types import (
     ComparisonMargin,
@@ -13,6 +18,10 @@ from fedsira.domain.types import (
 SignFlipSign: TypeAlias = Sign
 SignFlipAssignment: TypeAlias = tuple[SignFlipSign, ...]
 NamedPValue: TypeAlias = tuple[ComparisonName, PValue]
+_multipletests_typed = cast(
+    Callable[..., tuple[tuple[bool, ...], tuple[float, ...], float, float]],
+    _multipletests,
+)
 
 
 def enumerate_sign_flip_assignments(
@@ -61,13 +70,13 @@ def holm_adjusted_p_values(
     named_raw_p_values: tuple[NamedPValue, ...],
 ) -> tuple[NamedPValue, ...]:
     ordered = sorted(named_raw_p_values, key=lambda item: (item[1], item[0]))
-    comparison_count = len(ordered)
-    adjusted_p_values: list[PValue] = []
-    running_maximum: PValue = 0.0
-    for rank, (_, raw_p_value) in enumerate(ordered):
-        candidate = min((comparison_count - rank) * raw_p_value, 1.0)
-        running_maximum = max(running_maximum, candidate)
-        adjusted_p_values.append(running_maximum)
+    if not ordered:
+        return ()
+    _rejected, adjusted_p_values, _sidak, _bonferroni = _multipletests_typed(
+        tuple(raw_p_value for _name, raw_p_value in ordered),
+        method="holm",
+    )
     return tuple(
-        (name, adjusted) for (name, _), adjusted in zip(ordered, adjusted_p_values, strict=True)
+        (name, float(adjusted))
+        for (name, _), adjusted in zip(ordered, adjusted_p_values, strict=True)
     )

@@ -3,7 +3,6 @@ import re
 import unicodedata
 from enum import IntEnum, StrEnum
 
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.types import (
     ClassLabel,
     DatasetManifestDigest,
@@ -56,9 +55,6 @@ OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
 PSEUDO_DOMAIN_COUNT: DomainCount = len(CICIoT2023PseudoDomain)
 PSEUDO_DOMAIN_HASH_SEPARATOR: SeedDerivationLabel = "CIC_IOT_2023_PSEUDO_DOMAIN"
 _NON_ALPHANUMERIC_RUN = re.compile(r"[^0-9A-Za-z]+")
-
-if len(NBAIOT_DOMAIN_ORDER) != PSEUDO_DOMAIN_COUNT:
-    raise RuntimeError("CICIoT2023 pseudo-domain count must equal the primary device-proxy count")
 
 
 def normalize_label_token(raw_label: ClassLabel) -> ClassLabel:

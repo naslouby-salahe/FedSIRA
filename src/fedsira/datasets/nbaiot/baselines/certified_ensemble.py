@@ -8,12 +8,20 @@ from pathlib import Path
 import torch
 
 from fedsira.datasets.common import Role
+from fedsira.datasets.nbaiot.learning.anchor_training import training_seed
+from fedsira.datasets.nbaiot.learning.post_reference_training import combined_post_reference_rows
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBAIOT_DOMAIN_ORDER,
     NBaiotClass,
     NBaiotDomain,
     deterministic_domain_order,
+)
+from fedsira.datasets.nbaiot.workflow import (
+    DomainTargetMetrics,
+    dataset_manifest_hash,
+    load_prepared_rows,
+    tensor_view,
 )
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.models import MetricResult
@@ -40,22 +48,14 @@ from fedsira.evaluation.metrics import (
     f1_for_class,
     macro_f1,
 )
-from fedsira.experiments.workflow import (
-    DomainTargetMetrics,
-    dataset_manifest_hash,
-    load_prepared_rows,
-    tensor_view,
-)
 from fedsira.learning.aggregation import load_model_state, model_state_from_classifier
 from fedsira.learning.anchor import run_anchor_fedavg_training
-from fedsira.learning.anchor_training import training_seed
 from fedsira.learning.federated import LocalTrainingClient, run_fedavg_round
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
     load_flat_trainable_parameters,
 )
-from fedsira.learning.post_reference_training import combined_post_reference_rows
 from fedsira.learning.scoring import logits_for_samples
 from fedsira.runtime import (
     current_application_context,

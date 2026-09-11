@@ -115,7 +115,9 @@ def cosine_distance(first: torch.Tensor, second: torch.Tensor) -> PairwiseDistan
         return 0.0
     if first_norm == 0.0 or second_norm == 0.0:
         return 1.0
-    cosine_similarity = float(torch.dot(first, second)) / (first_norm * second_norm)
+    cosine_similarity = float(torch.dot(first.detach(), second.detach())) / (
+        first_norm * second_norm
+    )
     return 1.0 - max(-1.0, min(1.0, cosine_similarity))
 
 
@@ -325,7 +327,9 @@ def parameter_similarity(
     mean_norm = vector_l2_norm(other_rows_mean_vector)
     if row_norm == 0.0 or mean_norm == 0.0:
         return None
-    return float(torch.dot(row_vector, other_rows_mean_vector)) / (row_norm * mean_norm)
+    return float(torch.dot(row_vector.detach(), other_rows_mean_vector.detach())) / (
+        row_norm * mean_norm
+    )
 
 
 def parameter_similarity_certifies(

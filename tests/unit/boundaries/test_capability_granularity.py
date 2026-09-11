@@ -1,13 +1,13 @@
 import pytest
 import torch
 
-from fedsira.domain.enums import CapabilityContractScope, RootCause
-from fedsira.experiments.scenarios import (
+from fedsira.datasets.nbaiot.scenarios import (
     apply_root_cause_feature_shift,
     root_cause_for_sample,
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
 )
+from fedsira.domain.enums import CapabilityContractScope, RootCause
 
 
 def test_root_cause_for_sample_is_deterministic() -> None:

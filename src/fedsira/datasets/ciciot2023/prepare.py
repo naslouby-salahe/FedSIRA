@@ -24,6 +24,7 @@ from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
     DatasetExclusionReason,
+    DatasetPreparationLogFields,
     FeatureMoments,
     Role,
     ScalerMetadata,
@@ -46,6 +47,7 @@ from fedsira.datasets.common import (
     view_parquet_path,
     write_json_payload,
 )
+from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -70,7 +72,12 @@ from fedsira.domain.types import (
     SourceRowIndex,
     TextValue,
 )
-from fedsira.runtime import current_application_context, framed_bytes
+from fedsira.runtime import (
+    current_application_context,
+    framed_bytes,
+    get_structured_logger,
+    log_structured_event,
+)
 
 _ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
 DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"
@@ -80,6 +87,8 @@ SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
 ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"
 EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
 _WHITESPACE_HYPHEN_UNDERSCORE = re.compile(r"[\s\-_]+")
+
+CICIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")
 
 
 class SecondaryCsvFile(FrozenDomainModel):
@@ -397,7 +406,11 @@ def _ingest_shard(
     dataset_manifest_hash: DatasetManifestDigest,
     partition_salt: PartitionSalt,
 ) -> tuple[RowCount, tuple[ClassLabel, ...]]:
-    print(f"CICIoT2023 ingest: file={item.relative_path}")
+    log_structured_event(
+        CICIOT_PREPARATION_LOGGER,
+        "dataset.ingest",
+        DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023, file=item.relative_path),
+    )
     try:
         connection.execute(
             "CREATE OR REPLACE TABLE shard AS "
@@ -598,7 +611,13 @@ def _write_secondary_views(
             ),
             overwrite,
         )
-        print(f"CICIoT2023 view written: {view_key} rows={row_count}")
+        log_structured_event(
+            CICIOT_PREPARATION_LOGGER,
+            "dataset.view.written",
+            DatasetPreparationLogFields(
+                dataset=DatasetId.CICIOT2023, view=view_key, rows=row_count
+            ),
+        )
         summaries.append(
             SecondaryPreparedViewSummary(
                 pseudo_domain=pseudo_domain,
@@ -661,7 +680,15 @@ def materialize_ciciot2023_prepared_views(
         normalized_labels = frozenset(normalize_label(label) for label in observed_raw)
         validate_target_label_present(normalized_labels)
         class_registry = build_class_registry(normalized_labels)
-        print(f"CICIoT2023 ingest complete: raw_rows={raw_row_count} classes={len(class_registry)}")
+        log_structured_event(
+            CICIOT_PREPARATION_LOGGER,
+            "dataset.ingest.completed",
+            DatasetPreparationLogFields(
+                dataset=DatasetId.CICIOT2023,
+                raw_rows=raw_row_count,
+                class_count=len(class_registry),
+            ),
+        )
         connection.close()
         assign_secondary_roles(database_path, dataset_manifest_hash)
         connection = open_tabular_engine(database_path)
@@ -677,7 +704,13 @@ def materialize_ciciot2023_prepared_views(
             fetch_feature_statistics(connection, train_sql, predictor_columns),
             config.datasets.primary.scaling,
         )
-        print(f"CICIoT2023 scaler fitted on {moments.training_row_count} anchor-train rows")
+        log_structured_event(
+            CICIOT_PREPARATION_LOGGER,
+            "dataset.scaler.fitted",
+            DatasetPreparationLogFields(
+                dataset=DatasetId.CICIOT2023, training_rows=moments.training_row_count
+            ),
+        )
         views = _write_secondary_views(
             connection, predictor_columns, moments, prepared_root, overwrite
         )

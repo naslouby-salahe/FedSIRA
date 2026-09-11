@@ -82,6 +82,7 @@ from fedsira.domain.types import (
     RateReduction,
     RateWorsening,
     RegularizationWeight,
+    RepetitionCount,
     RepositoryPath,
     ReproductionRowCount,
     RetryCount,
@@ -657,6 +658,8 @@ class TimeoutsSecondsConfig(FrozenConfigModel):
 
 class TimingConfig(FrozenConfigModel):
     warmup_forward_passes: WarmupPassCount
+    repetitions_per_cell: RepetitionCount
+    diagnostic_master_seed_count: SeedCount
 
 
 class ExecutionConfig(FrozenConfigModel):
@@ -778,7 +781,7 @@ def _read_yaml_mapping(path: Path) -> Mapping[TextValue, YamlValue]:
     return parsed
 
 
-def load_scientific_config(path: Path = PRODUCTION_CONFIG_PATH) -> ScientificConfig:
+def load_scientific_config(path: Path) -> ScientificConfig:
     payload = _read_yaml_mapping(path)
     try:
         config = ScientificConfig.model_validate(payload)
@@ -788,7 +791,7 @@ def load_scientific_config(path: Path = PRODUCTION_CONFIG_PATH) -> ScientificCon
     return config
 
 
-def load_test_fixture_config(path: Path = TEST_FIXTURE_CONFIG_PATH) -> TestFixtureConfig:
+def load_test_fixture_config(path: Path) -> TestFixtureConfig:
     payload = _read_yaml_mapping(path)
     try:
         return TestFixtureConfig.model_validate(payload)

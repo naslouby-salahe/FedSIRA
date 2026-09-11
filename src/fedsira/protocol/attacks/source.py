@@ -4,11 +4,11 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from fedsira.datasets.nbaiot.schema import NBaiotClass
 from fedsira.domain.enums import SeedNamespace
 from fedsira.domain.types import (
     ArtifactDigest,
     AttackCount,
+    DatasetClassToken,
     DeltaScale,
     ExampleCount,
     FeatureIndex,
@@ -68,12 +68,13 @@ def select_source_backdoor_poison_rows(
 
 
 def relabel_triggered_rows_as_benign(
-    labels_by_row_id: Mapping[ArtifactDigest, NBaiotClass],
+    labels_by_row_id: Mapping[ArtifactDigest, DatasetClassToken],
     poisoned_row_ids: Sequence[ArtifactDigest],
-) -> Mapping[ArtifactDigest, NBaiotClass]:
-    relabeled: OrderedDict[ArtifactDigest, NBaiotClass] = OrderedDict(labels_by_row_id)
+    benign_class: DatasetClassToken,
+) -> Mapping[ArtifactDigest, DatasetClassToken]:
+    relabeled: OrderedDict[ArtifactDigest, DatasetClassToken] = OrderedDict(labels_by_row_id)
     for row_id in poisoned_row_ids:
-        relabeled[row_id] = NBaiotClass.BENIGN
+        relabeled[row_id] = benign_class
     return relabeled
 
 

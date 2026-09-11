@@ -5,10 +5,27 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
-import pandas
 import torch
 
-from fedsira.datasets.common import Role, role_hash_token, view_parquet_path
+from fedsira.datasets.common import (
+    Role,
+    open_tabular_engine,
+    role_hash_token,
+    sql_string,
+    view_parquet_path,
+)
+from fedsira.datasets.nbaiot.scenarios import (
+    apply_attacker_induced_common_context,
+    apply_root_cause_feature_shift,
+    apply_shared_spurious_feature,
+    balanced_capability_selection,
+    feature_shift_sign,
+    relabel_shared_label_error_rows,
+    root_cause_for_sample,
+    select_shared_label_error_rows,
+    select_spurious_feature_rows,
+    target_row_ids_for_contract,
+)
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
     NBaiotClass,
@@ -34,18 +51,6 @@ from fedsira.domain.types import (
     TriggerFeatureValue,
 )
 from fedsira.experiments.definitions import EpistemicFailureType
-from fedsira.experiments.scenarios import (
-    apply_attacker_induced_common_context,
-    apply_root_cause_feature_shift,
-    apply_shared_spurious_feature,
-    balanced_capability_selection,
-    feature_shift_sign,
-    relabel_shared_label_error_rows,
-    root_cause_for_sample,
-    select_shared_label_error_rows,
-    select_spurious_feature_rows,
-    target_row_ids_for_contract,
-)
 from fedsira.protocol.attacks.source import (
     apply_trigger_transform,
     relabel_triggered_rows_as_benign,
@@ -133,20 +138,21 @@ def load_prepared_rows(
     path = view_parquet_path(prepared_root, prepared_view_key(domain, class_id, role))
     if not path.exists():
         return None
-    frame: pandas.DataFrame = pandas.read_parquet(path)
-    if len(frame) == 0:
+    connection = open_tabular_engine()
+    cursor = connection.execute(f"SELECT * FROM read_parquet({sql_string(path.as_posix())})")
+    columns = tuple(item[0] for item in cursor.description)
+    rows = cursor.fetchall()
+    if not rows:
         return None
-    feature_names = tuple(
-        column for column in frame.columns if column not in ("sample_id", "label")
+    feature_indices = tuple(
+        index for index, column in enumerate(columns) if column not in ("sample_id", "label")
     )
-    sample_id_column: pandas.Series[str] = frame["sample_id"].astype(str)
-    features = tuple(
-        tuple(float(value) for value in row)
-        for row in frame[list(feature_names)].itertuples(index=False)
-    )
-    label_column: pandas.Series[str] = frame["label"].astype(str)
+    sample_id_index = columns.index("sample_id")
+    label_index = columns.index("label")
     return PreparedRows(
-        sample_ids=tuple(sample_id_column), features=features, labels=tuple(label_column)
+        sample_ids=tuple(str(row[sample_id_index]) for row in rows),
+        features=tuple(tuple(float(row[index]) for index in feature_indices) for row in rows),
+        labels=tuple(str(row[label_index]) for row in rows),
     )
 
 
@@ -154,8 +160,12 @@ def prepared_feature_names(prepared_root: Path) -> tuple[FeatureName, ...] | Non
     parquet_files = tuple(sorted(prepared_root.glob("*.parquet")))
     if not parquet_files:
         return None
-    frame: pandas.DataFrame = pandas.read_parquet(parquet_files[0])
-    return tuple(column for column in frame.columns if column not in ("sample_id", "label"))
+    connection = open_tabular_engine()
+    cursor = connection.execute(
+        f"DESCRIBE SELECT * FROM read_parquet({sql_string(parquet_files[0].as_posix())})"
+    )
+    columns = tuple(str(row[0]) for row in cursor.fetchall())
+    return tuple(column for column in columns if column not in ("sample_id", "label"))
 
 
 def dataset_manifest_hash(prepared_root: Path) -> ArtifactDigest:
@@ -208,16 +218,18 @@ def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRo
     if not poisoned_ids:
         return rows
     poisoned_id_set = frozenset(poisoned_ids)
-    labels_by_row_id = OrderedDict(
-        zip(rows.sample_ids, (NBaiotClass(label) for label in rows.labels), strict=True)
+    labels_by_row_id = OrderedDict(zip(rows.sample_ids, rows.labels, strict=True))
+    relabeled = relabel_triggered_rows_as_benign(
+        labels_by_row_id,
+        poisoned_ids,
+        NBaiotClass.BENIGN.value,
     )
-    relabeled = relabel_triggered_rows_as_benign(labels_by_row_id, poisoned_ids)
     kept_features: list[tuple[float, ...]] = []
     kept_labels: list[ClassLabel] = []
     for sample_id, features in zip(rows.sample_ids, rows.features, strict=True):
         if sample_id not in poisoned_id_set:
             kept_features.append(features)
-            kept_labels.append(relabeled[sample_id].value)
+            kept_labels.append(relabeled[sample_id])
             continue
         triggered = apply_trigger_transform(
             torch.tensor(features, dtype=torch.float32),
@@ -225,7 +237,7 @@ def poison_backdoor_rows(rows: PreparedRows, scope: BackdoorScope) -> PreparedRo
             scope.trigger_value,
         )
         kept_features.append(tuple(float(value) for value in triggered))
-        kept_labels.append(relabeled[sample_id].value)
+        kept_labels.append(relabeled[sample_id])
     return PreparedRows(
         sample_ids=rows.sample_ids, features=tuple(kept_features), labels=tuple(kept_labels)
     )
