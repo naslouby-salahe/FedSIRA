@@ -6,7 +6,6 @@ import pytest
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import Role
 from fedsira.datasets.nbaiot.evaluation.domain import evaluate_domain, non_source_domains
-from fedsira.datasets.nbaiot.executor import ProtocolCellExecutor
 from fedsira.datasets.nbaiot.learning.anchor_training import train_anchor
 from fedsira.datasets.nbaiot.prepare import (
     NBAIOT_PRIMARY_PREDICTOR_COUNT,
@@ -42,6 +41,7 @@ from fedsira.experiments.definitions import (
     ProposalEpisode,
     SourceExclusionMethod,
 )
+from fedsira.experiments.handlers import ProtocolCellExecutor
 from fedsira.experiments.planning import ScientificCell
 from fedsira.protocol.proposal import select_source_domain, source_selection_order
 from fedsira.runtime import namespace_seed

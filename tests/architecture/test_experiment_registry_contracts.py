@@ -154,11 +154,11 @@ def test_production_has_no_repository_state_or_source_fingerprint_machinery() ->
 
 
 def test_every_registered_experiment_maps_to_a_live_cell_handler() -> None:
-    from fedsira.datasets.nbaiot.executor import (
+    from fedsira.experiments.definitions import REGISTERED_EXPERIMENT_NAMES
+    from fedsira.experiments.handlers import (
         CELL_HANDLER_REGISTRATIONS,
         ProtocolCellExecutor,
     )
-    from fedsira.experiments.definitions import REGISTERED_EXPERIMENT_NAMES
 
     registered = {registration.experiment for registration in CELL_HANDLER_REGISTRATIONS}
     assert registered == set(

@@ -8,7 +8,7 @@ JUSTIFIED_LINE_BUDGETS = {
     "experiments/definitions.py": 900,
     "datasets/nbaiot/validation.py": 800,
     "experiments/collapse.py": 700,
-    "datasets/nbaiot/cells.py": 1700,
+    "experiments/handlers.py": 2250,
     "datasets/nbaiot/cell_support.py": 900,
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 700,
@@ -26,7 +26,7 @@ JUSTIFIED_LINE_BUDGETS = {
 DEFAULT_LINE_BUDGET = 600
 DEFAULT_BYTE_BUDGET = 40_000
 JUSTIFIED_BYTE_BUDGETS = {
-    "datasets/nbaiot/cells.py": 80_000,
+    "experiments/handlers.py": 100_000,
     "reporting/tables.py": 55_000,
     "reporting/figures.py": 55_000,
     "reporting/export.py": 45_000,

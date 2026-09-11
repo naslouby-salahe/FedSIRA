@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.datasets.nbaiot.executor import ProtocolCellExecutor
 from fedsira.datasets.nbaiot.validation import run_data_and_domain_evidence_validation
 from fedsira.domain.enums import ExperimentLifecycleState
 from fedsira.experiments.definitions import (
@@ -11,6 +10,7 @@ from fedsira.experiments.definitions import (
     PROTOCOL_INVARIANT_VALIDATION_NAME,
 )
 from fedsira.experiments.engine import PreparedEvidenceCounts
+from fedsira.experiments.handlers import ProtocolCellExecutor
 from fedsira.experiments.planning import ScientificCell
 
 
@@ -79,7 +79,7 @@ def test_baseline_implementation_validation_dispatches_to_baseline_cell(
         return evidence
 
     monkeypatch.setattr(
-        "fedsira.datasets.nbaiot.executor.load_prepared_evidence_counts",
+        "fedsira.experiments.handlers.load_prepared_evidence_counts",
         _prepared_counts,
     )
     executor = ProtocolCellExecutor()

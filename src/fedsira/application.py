@@ -12,9 +12,6 @@ from fedsira.artifacts.paths import (
     workspace_root_for_family,
 )
 from fedsira.datasets.common import dataset_specification
-from fedsira.datasets.nbaiot.executor import (
-    ProtocolCellExecutor,
-)
 from fedsira.datasets.nbaiot.validation import PersistedSmokeRecord
 from fedsira.datasets.preprocess import execute_preprocess
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
@@ -71,6 +68,9 @@ from fedsira.experiments.execution import (
     execute_experiment,
     execute_smoke,
     execute_status,
+)
+from fedsira.experiments.handlers import (
+    ProtocolCellExecutor,
 )
 from fedsira.experiments.planning import ExperimentPlan, ScientificCell, build_plan, execute_plan
 from fedsira.reporting.export import execute_report, export_experiment_report
