@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Publication rendering
+
+Rendered byte-valued metrics (`Peak GPU Memory`, `Peak Host RSS`, `Communication Bytes`, `Persistent Storage Bytes`) use `metrics_and_statistics.publication_rounding.byte_units` and `.byte_decimals`; the `IEC` unit renders gibibytes. Paired standardized effects use `.effect_size_decimals`, p-values use `.p_value_significant_digits` with `.p_value_display_floor`, and F1/accuracy rates use `.f1_accuracy_rates_decimals`. Reporting never substitutes a different precision for these.
+
 ### Metric adequacy minima
 
 A supported metric is defined only where every supported class present in the scored population has at least `datasets.primary.supported_metric_minimum_report_examples_per_class` examples of true support; below that the supported metric is `NA` and the insufficiency is recorded rather than reported as a low value. The primary and secondary programs share this rule.
