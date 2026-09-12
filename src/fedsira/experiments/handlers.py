@@ -150,7 +150,10 @@ from fedsira.experiments.definitions import (
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
+    ablation_opening_mode,
     ablation_reproducer_strategy,
+    ablation_scenario_episode,
+    ablation_scenario_for_condition,
     experiment_by_name,
     feature_shift_magnitude,
 )
@@ -174,6 +177,7 @@ from fedsira.learning.post_reference import (
     certified_domain_delta_committee,
     train_domain_reproduction_delta,
     train_generic_hard_supported_examples_delta,
+    train_irrelevant_source_improvement_delta,
     train_source_candidate_delta,
     train_verifier_aware_reproduction_delta,
 )
@@ -229,6 +233,7 @@ from fedsira.protocol.capability_contract import (
     verification_evidence_is_adequate,
 )
 from fedsira.protocol.proposal import (
+    OpeningStageOutcome,
     ScreenDomainResult,
     candidate_screen_transition,
     first_target_sample_id,
@@ -307,6 +312,7 @@ class ProtocolCellDispatch:
     _last_compromised_reproducers: frozenset[DomainId]
     _last_ablation_strategy: AblationReproducerStrategy
     _last_reproduction_attempts: ReproductionAttemptCount
+    _last_opening_stage: OpeningStageOutcome | None
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None: ...
 
@@ -776,36 +782,44 @@ class ProtocolCellDispatch:
                     extra.append(("feature-shift-count", 0.0))
         return (state, (*metrics, *extra))
 
-    def _execute_opening_cell(
+    def _run_opening_stage(
         self,
         cell: ScientificCell,
-        evidence: PreparedEvidenceCounts,
+        episode: ProposalEpisode,
+        opening_mode: AdmissionOpeningMode,
         screen_predicate_variant: AblationVariant | None = None,
-    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+    ) -> OpeningStageOutcome:
         config = current_application_context().scientific_config
-        opening_mode = opening_mode_for_cell(cell)
         entry = start_admission(opening_mode)
         if entry.direct_production_weight != 0.0:
             raise ValueError("source direct production weight must be 0.0")
-        episode = cell.condition
         episode_is_legitimate = episode in (
             ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
             ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
         )
-        source_domain = source_domain_for_cell(self._primary_adapter, cell)
+        screen_cell = replace(cell, condition=episode)
+        source_domain = source_domain_for_cell(self._primary_adapter, screen_cell)
         real_anchor = self.real_anchor(cell.master_seed)
         resolved_opening_identity = (
             opening_identity(self._primary_adapter, real_anchor.dataset_manifest_hash)
             if real_anchor is not None
             else None
         )
+        real_source_delta: torch.Tensor | None = None
         if (
             real_anchor is not None
             and source_domain is not None
             and opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED
         ):
-            if episode == ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES:
+            if episode is ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES:
                 real_source_delta = train_generic_hard_supported_examples_delta(
+                    nbaiot_adapter(self._primary_adapter.prepared_root),
+                    cell.master_seed,
+                    real_anchor,
+                    source_domain,
+                )
+            elif episode is ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT:
+                real_source_delta = train_irrelevant_source_improvement_delta(
                     nbaiot_adapter(self._primary_adapter.prepared_root),
                     cell.master_seed,
                     real_anchor,
@@ -817,14 +831,12 @@ class ProtocolCellDispatch:
                     cell.master_seed,
                     real_anchor,
                     source_domain,
-                    backdoor_scope=self.backdoor_scope_for_cell(cell),
+                    backdoor_scope=self.backdoor_scope_for_cell(screen_cell),
                 )
-        else:
-            real_source_delta = None
         if real_anchor is None or source_domain is None:
             state = AdmissionState.DORMANT
             screen_results: tuple[ScreenDomainResult, ...] = ()
-            real_differential_a: float | None = None
+            real_differential_a: MetricValue | None = None
         else:
             non_source = tuple(domain for domain in NBAIOT_DOMAIN_ORDER if domain != source_domain)
             screen_order = screen_domain_order(
@@ -860,30 +872,6 @@ class ProtocolCellDispatch:
             state = candidate_screen_transition(
                 opening_mode, screen_results, config.protocol.admission_opening
             )
-        if state is AdmissionState.ADMISSION_OPEN:
-            state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(
-            state,
-            self._pending_real_report,
-            legitimate_admission_eligible=episode_is_legitimate,
-        )
-        false_launch_result = false_launch_rate(
-            false_launch_count=1
-            if state is AdmissionState.ADMITTED and (not episode_is_legitimate)
-            else 0,
-            adequate_defined_oracle_count=1 if screen_results else 0,
-        )
-        trained_domains = frozenset(
-            result.domain for result in screen_results if result.meets_opening_predicate
-        )
-        attempts = reproduction_attempt_count(
-            domains_with_training_start=trained_domains
-            if state is AdmissionState.ADMITTED
-            else frozenset(),
-            evidence_inadequate_domains=frozenset(
-                result.domain for result in screen_results if not result.is_evidence_adequate
-            ),
-        )
         screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
         fold_sample_id = (
             first_target_sample_id(
@@ -892,48 +880,93 @@ class ProtocolCellDispatch:
             if screen_results
             else None
         )
-        screen_fold_for_target = (
-            screen_fold_index(
-                fold_sample_id, screen_fold_seed, config.protocol.proposal_screen.fold_count
-            )
-            if fold_sample_id is not None
-            else None
+        return OpeningStageOutcome(
+            state=state,
+            episode=episode,
+            source_delta=real_source_delta,
+            screen_results=screen_results,
+            screen_differential_a=real_differential_a,
+            capability_contract_passes=(1.0 if resolved_opening_identity is not None else 0.0),
+            screen_fold_index=(
+                float(
+                    screen_fold_index(
+                        fold_sample_id, screen_fold_seed, config.protocol.proposal_screen.fold_count
+                    )
+                )
+                if fold_sample_id is not None
+                else None
+            ),
+            legitimate_admission_eligible=episode_is_legitimate,
+        )
+
+    def _execute_opening_cell(
+        self,
+        cell: ScientificCell,
+        evidence: PreparedEvidenceCounts,
+        screen_predicate_variant: AblationVariant | None = None,
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+        episode = ProposalEpisode(cell.condition)
+        stage = self._run_opening_stage(
+            cell,
+            episode,
+            opening_mode_for_cell(cell, self._resolved_core),
+            screen_predicate_variant,
+        )
+        self._last_opening_stage = stage
+        state = stage.state
+        if state is AdmissionState.ADMISSION_OPEN:
+            state = self._advance_protocol(cell, evidence, opening_resolved=True)
+        metrics = metrics_from_state(
+            state,
+            self._pending_real_report,
+            legitimate_admission_eligible=stage.legitimate_admission_eligible,
+        )
+        return (state, (*metrics, *self._opening_stage_observations(state)))
+
+    def _opening_stage_observations(self, state: AdmissionState) -> tuple[MetricObservation, ...]:
+        stage = self._last_opening_stage
+        if stage is None:
+            return ()
+        false_launch_result = false_launch_rate(
+            false_launch_count=1
+            if state is AdmissionState.ADMITTED and (not stage.legitimate_admission_eligible)
+            else 0,
+            adequate_defined_oracle_count=1 if stage.screen_results else 0,
+        )
+        trained_domains = frozenset(
+            result.domain for result in stage.screen_results if result.meets_opening_predicate
+        )
+        attempts = reproduction_attempt_count(
+            domains_with_training_start=trained_domains
+            if state is AdmissionState.ADMITTED
+            else frozenset(),
+            evidence_inadequate_domains=frozenset(
+                result.domain for result in stage.screen_results if not result.is_evidence_adequate
+            ),
         )
         return (
-            state,
+            ("capability-contract-passes", stage.capability_contract_passes),
+            ("screen-fold-index", stage.screen_fold_index),
+            ("screen-differential-a", stage.screen_differential_a),
+            (ComparisonMetric.FALSE_LAUNCH, false_launch_result.value),
+            (ComparisonMetric.REPRODUCTION_ATTEMPTS, float(attempts)),
             (
-                *metrics,
-                (
-                    "capability-contract-passes",
-                    1.0
-                    if resolved_opening_identity is not None and state is AdmissionState.ADMITTED
-                    else 0.0,
-                ),
-                (
-                    "screen-fold-index",
-                    float(screen_fold_for_target) if screen_fold_for_target is not None else None,
-                ),
-                ("screen-differential-a", real_differential_a),
-                (ComparisonMetric.FALSE_LAUNCH, false_launch_result.value),
-                (ComparisonMetric.REPRODUCTION_ATTEMPTS, float(attempts)),
-                (
-                    ComparisonMetric.POST_EVIDENCE_OVERHEAD,
-                    self._last_protocol_phase_durations.reproduce_seconds
-                    + self._last_protocol_phase_durations.verify_seconds
-                    + self._last_protocol_phase_durations.synthesize_seconds
-                    + self._last_protocol_phase_durations.assignment_seconds,
-                ),
-                (
-                    ComparisonMetric.MALICIOUS_ADMISSION,
-                    malicious_admission_rate(
-                        [
-                            state is AdmissionState.ADMITTED
-                            and episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                        ]
-                    ).value
-                    if episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                    else None,
-                ),
+                ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+                self._last_protocol_phase_durations.reproduce_seconds
+                + self._last_protocol_phase_durations.verify_seconds
+                + self._last_protocol_phase_durations.synthesize_seconds
+                + self._last_protocol_phase_durations.assignment_seconds,
+            ),
+            (
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                malicious_admission_rate(
+                    [
+                        state is AdmissionState.ADMITTED
+                        and stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+                    ]
+                ).value
+                if stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+                else None,
             ),
         )
 
@@ -1087,14 +1120,42 @@ class ProtocolCellDispatch:
             return frozenset()
         return frozenset(NBaiotDomain(domain) for domain in selected)
 
+    def _ablation_opening_stage(self, cell: ScientificCell) -> OpeningStageOutcome | None:
+        if cell.experiment != MECHANISM_ABLATION_NAME:
+            return None
+        variant = AblationVariant(cell.method)
+        if variant in (
+            AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
+            AblationVariant.NO_MATCHED_CONTROL,
+        ):
+            return None
+        scenario = ablation_scenario_for_condition(cell.condition)
+        if scenario is None:
+            return None
+        return self._run_opening_stage(
+            cell,
+            ablation_scenario_episode(scenario),
+            ablation_opening_mode(variant),
+        )
+
     def _advance_protocol(
-        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+        self,
+        cell: ScientificCell,
+        evidence: PreparedEvidenceCounts,
+        opening_resolved: BooleanValue = False,
     ) -> AdmissionState:
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
         self._last_committee_deltas = OrderedDict()
         self._last_compromised_reproducers = frozenset()
         self._last_ablation_strategy = AblationReproducerStrategy.NONE
         self._last_reproduction_attempts = 0
+        self._last_opening_stage = None
+        if not opening_resolved:
+            stage = self._ablation_opening_stage(cell)
+            if stage is not None:
+                self._last_opening_stage = stage
+                if stage.state is not AdmissionState.ADMISSION_OPEN:
+                    return stage.state
         config = current_application_context().scientific_config
         self._pending_real_report = None
         evidence_minima = config.capability_contract.evidence_minima
@@ -1212,9 +1273,14 @@ class ProtocolCellDispatch:
         )
         heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
         backdoor_scope = self.backdoor_scope_for_cell(cell)
-        ablation_strategy = (
-            ablation_reproducer_strategy(AblationScenario(cell.condition))
+        ablation_scenario = (
+            ablation_scenario_for_condition(cell.condition)
             if cell.experiment == MECHANISM_ABLATION_NAME
+            else None
+        )
+        ablation_strategy = (
+            ablation_reproducer_strategy(ablation_scenario)
+            if ablation_scenario is not None
             else AblationReproducerStrategy.NONE
         )
         compromised_reproducers = self._ablation_compromised_reproducers(cell, ablation_strategy)

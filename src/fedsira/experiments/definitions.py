@@ -6,6 +6,7 @@ from typing import TypeAlias
 
 from fedsira.domain.enums import (
     AblationReproducerStrategy,
+    AdmissionOpeningMode,
     ComparisonMetric,
     CoreMethodIdentity,
     DatasetId,
@@ -507,6 +508,81 @@ def feature_shift_magnitude(condition: ConditionName) -> FeatureShiftMagnitude |
     if condition in FEATURE_SHIFT_1_0_CONDITIONS:
         return magnitudes[1]
     return None
+
+
+ABLATION_SCENARIO_EPISODES: tuple[tuple[AblationScenario, ProposalEpisode], ...] = (
+    (
+        AblationScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+        ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+    ),
+    (
+        AblationScenario.GENERIC_HARD_SUPPORTED_EXAMPLES,
+        ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES,
+    ),
+    (
+        AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+    (
+        AblationScenario.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+    (
+        AblationScenario.FEATURE_SHIFT_1_0,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+    (AblationScenario.NATURAL, ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY),
+    (AblationScenario.ONE_MALICIOUS_REPRODUCER, ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY),
+    (
+        AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+    (AblationScenario.ONE_COMPROMISED_VERIFIER, ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY),
+    (
+        AblationScenario.UNDER_SPECIFICATION_FIXTURE,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+    (
+        AblationScenario.LEGITIMATE_TARGET_CAPABILITY,
+        ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+    ),
+)
+
+ABLATION_CANDIDATE_FREE_VARIANTS: tuple[AblationVariant, ...] = (
+    AblationVariant.NO_PROPOSAL_SCREEN,
+    AblationVariant.CANDIDATE_FREE_REPRODUCTION,
+)
+
+
+def ablation_scenario_for_condition(condition: ConditionName) -> AblationScenario | None:
+    for scenario in AblationScenario:
+        if scenario.value == condition:
+            return scenario
+    return None
+
+
+def ablation_scenario_episode(scenario: AblationScenario) -> ProposalEpisode:
+    for candidate, episode in ABLATION_SCENARIO_EPISODES:
+        if candidate is scenario:
+            return episode
+    raise ValueError(f"ablation scenario has no declared proposal episode: {scenario.value}")
+
+
+def ablation_opening_mode(variant: AblationVariant) -> AdmissionOpeningMode:
+    if variant in ABLATION_CANDIDATE_FREE_VARIANTS:
+        return AdmissionOpeningMode.CANDIDATE_FREE
+    return AdmissionOpeningMode.PROPOSAL_ASSISTED
+
+
+def ablation_mixed_episode_instances(
+    scenario: AblationScenario,
+) -> tuple[ProposalEpisode, ...]:
+    if scenario is AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL:
+        return (
+            ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
+            ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT,
+        )
+    return (ablation_scenario_episode(scenario),)
 
 
 def ablation_reproducer_strategy(scenario: AblationScenario) -> AblationReproducerStrategy:

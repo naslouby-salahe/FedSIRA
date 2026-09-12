@@ -1,6 +1,9 @@
 import hashlib
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+
+import torch
 
 from fedsira.config import (
     AdmissionOpeningConfig,
@@ -32,6 +35,8 @@ from fedsira.domain.types import (
     FoldCount,
     FoldIndex,
     FrozenDomainModel,
+    LegitimateAdmissionEligible,
+    MetricValue,
     NamespaceSeed,
     OpeningPredicateSatisfied,
     ProductionWeight,
@@ -72,6 +77,18 @@ def start_admission(opening_mode: AdmissionOpeningMode) -> AdmissionOpeningEntry
         source_committed=opening_mode is AdmissionOpeningMode.PROPOSAL_ASSISTED,
         direct_production_weight=0.0,
     )
+
+
+@dataclass(frozen=True)
+class OpeningStageOutcome:
+    state: AdmissionState
+    episode: ProposalEpisode
+    source_delta: torch.Tensor | None
+    screen_results: tuple["ScreenDomainResult", ...]
+    screen_differential_a: MetricValue | None
+    capability_contract_passes: MetricValue
+    screen_fold_index: MetricValue | None
+    legitimate_admission_eligible: LegitimateAdmissionEligible
 
 
 class ScreenDomainResult(FrozenDomainModel):

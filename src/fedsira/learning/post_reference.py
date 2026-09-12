@@ -31,6 +31,7 @@ from fedsira.domain.types import (
     AlgorithmName,
     ArtifactDigest,
     BooleanValue,
+    DatasetClassToken,
     DerivedSeed,
     DomainId,
     LocalEpochCount,
@@ -361,6 +362,9 @@ def train_centralized_reference_checkpoint(
 SOURCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "REPRODUCTION"
 VERIFIER_AWARE_REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "VERIFIER_AWARE_REPRODUCTION"
+IRRELEVANT_SOURCE_IMPROVEMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
+    "IRRELEVANT_SOURCE_IMPROVEMENT"
+)
 GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
     "GENERIC_HARD_SUPPORTED_EXAMPLES"
 )
@@ -374,8 +378,13 @@ def combined_post_reference_rows(
     epistemic_failure_scope: EpistemicFailureScope | None = None,
     backdoor_scope: BackdoorScope | None = None,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    irrelevant_class: DatasetClassToken | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, tuple[ArtifactDigest, ...], torch.Tensor] | None:
-    target_rows = adapter.load_rows(domain, adapter.target_class_token, target_role)
+    target_rows = (
+        adapter.load_rows(domain, irrelevant_class, Role.POST_REFERENCE_REPLAY)
+        if irrelevant_class is not None
+        else adapter.load_rows(domain, adapter.target_class_token, target_role)
+    )
     if target_rows is not None and root_cause_scope is not None:
         target_rows = scope_and_shift_rows(target_rows, root_cause_scope)
     if (
@@ -394,12 +403,19 @@ def combined_post_reference_rows(
     if target_tensor is None:
         return None
     target_features, target_labels, target_sample_ids = target_tensor
+    target_is_supported = irrelevant_class is not None
     supported_features: list[torch.Tensor] = [target_features]
     supported_labels: list[torch.Tensor] = [target_labels]
     supported_sample_ids: list[ArtifactDigest] = list(target_sample_ids)
-    is_supported: list[torch.Tensor] = [torch.zeros(target_features.shape[0], dtype=torch.bool)]
+    is_supported: list[torch.Tensor] = [
+        torch.full(
+            (target_features.shape[0],),
+            target_is_supported,
+            dtype=torch.bool,
+        )
+    ]
     for class_id in adapter.class_tokens:
-        if class_id == adapter.target_class_token:
+        if class_id == adapter.target_class_token or class_id == irrelevant_class:
             continue
         rows = adapter.load_rows(domain, class_id, Role.POST_REFERENCE_REPLAY)
         relabeled_mask: tuple[bool, ...] | None = None
@@ -476,6 +492,7 @@ def _train_post_reference_delta(
     backdoor_scope: BackdoorScope | None = None,
     heterogeneity_scope: HeterogeneityScope | None = None,
     verifier_aware: BooleanValue = False,
+    irrelevant_class: DatasetClassToken | None = None,
 ) -> torch.Tensor | None:
     combined = combined_post_reference_rows(
         adapter,
@@ -485,6 +502,7 @@ def _train_post_reference_delta(
         epistemic_failure_scope,
         backdoor_scope,
         heterogeneity_scope,
+        irrelevant_class,
     )
     if combined is None:
         return None
@@ -549,6 +567,56 @@ def _train_post_reference_delta(
             config.model.post_reference.local_epochs,
         )
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
+def irrelevant_source_class_by_anchor_cross_entropy(
+    adapter: DatasetAdapter,
+    anchor: RealAnchor,
+    source_domain: DomainId,
+) -> DatasetClassToken | None:
+    model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+    load_flat_trainable_parameters(model, anchor.flat_parameters)
+    selected: DatasetClassToken | None = None
+    selected_mean: TrainingLoss | None = None
+    for class_id in adapter.class_tokens:
+        if class_id in (adapter.target_class_token, adapter.benign_class_token):
+            continue
+        rows = adapter.load_rows(source_domain, class_id, Role.ANCHOR_VALIDATION)
+        tensor_rows = adapter.tensor_view(rows)
+        if tensor_rows is None:
+            continue
+        features, labels, _sample_ids = tensor_rows
+        losses = per_sample_cross_entropy(model, features, labels)
+        mean_loss = float(losses.mean().detach())
+        if selected_mean is None or mean_loss > selected_mean:
+            selected_mean = mean_loss
+            selected = class_id
+    return selected
+
+
+def train_irrelevant_source_improvement_delta(
+    adapter: DatasetAdapter,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    source_domain: DomainId,
+) -> torch.Tensor | None:
+    irrelevant = irrelevant_source_class_by_anchor_cross_entropy(adapter, anchor, source_domain)
+    if irrelevant is None:
+        return None
+    return _train_post_reference_delta(
+        adapter,
+        master_seed,
+        anchor,
+        source_domain,
+        Role.REPRODUCTION,
+        IRRELEVANT_SOURCE_IMPROVEMENT_TRAINING_ALGORITHM_TOKEN,
+        None,
+        None,
+        None,
+        None,
+        False,
+        irrelevant,
+    )
 
 
 def train_verifier_aware_reproduction_delta(
