@@ -101,6 +101,10 @@ reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
 
 [[tool.pyright.executionEnvironments]]
+root = "src/fedsira/learning/model.py"
+reportUnknownMemberType = "none"
+
+[[tool.pyright.executionEnvironments]]
 root = "src/fedsira/evaluation/statistics.py"
 reportMissingTypeStubs = "none"
 reportUnknownVariableType = "none"

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
-from typing import cast
 
 import pandas
 
@@ -42,6 +41,7 @@ from fedsira.domain.types import (
     MetricName,
     MetricValue,
     OverwriteExisting,
+    RelativePathText,
     RepetitionIndex,
     ReportVerificationFailure,
     RepositoryPath,
@@ -120,6 +120,10 @@ from fedsira.reporting.protocol_tables import (
     render_primary_domain_statistics_table,
     render_security_and_capability_contract_protocol_table,
 )
+from fedsira.reporting.publication import (
+    publish_table_figure_export,
+    publish_table_figure_source_data,
+)
 from fedsira.reporting.tables import (
     MANUSCRIPT_TABLE_NAMES,
     RenderedTable,
@@ -139,6 +143,7 @@ from fedsira.reporting.verification import (
     ExperimentLifecycleRecord,
     ExperimentTerminalCount,
     artifact_manifest_dependency_failures,
+    metric_artifact_is_semantically_complete,
     table_header,
     terminal_count_for_planned_experiment,
     verify_artifact_manifest_dependencies,
@@ -149,6 +154,7 @@ from fedsira.reporting.verification import (
     verify_mandatory_figure_source_data,
     verify_planned_cell_count_satisfied,
     verify_rendered_table,
+    verify_report_export_currency,
     verify_safe_dormancy,
 )
 from fedsira.runtime import (
@@ -254,81 +260,15 @@ def _write_table(root: Path, table: RenderedTable) -> Path:
     return destination
 
 
-def _metric_artifact_is_semantically_complete(
-    path: Path,
-    result: ExperimentExecutionResult,
-) -> BooleanValue:
-    if not path.is_file():
-        return False
-    frame = pandas.read_parquet(path)
-    if path.name == STATE_TRAJECTORY_PARQUET_NAME:
-        required_columns = frozenset(
-            (
-                "experiment",
-                "method",
-                "condition",
-                "master_seed",
-                "logical_evidence_cycle",
-                "admission_state",
-            )
-        )
-        if not required_columns.issubset(frame.columns) or frame.empty:
-            return False
-        experiment_rows = frame[frame["experiment"] == result.experiment]
-        expected_cells = frozenset(
-            (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
-            for outcome in result.outcomes
-        )
-        observed_cells = frozenset(
-            (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
-        )
-        return expected_cells.issubset(observed_cells) and bool(
-            experiment_rows["admission_state"].notna().all()
-        )
-    required_columns = (
-        frozenset(
-            ("experiment", "method", "condition", "metric", "observation_count", "mean_value")
-        )
-        if path.name == AGGREGATE_METRICS_PARQUET_NAME
-        else frozenset(("experiment", "method", "condition", "master_seed", "terminal_state"))
-    )
-    if not required_columns.issubset(frame.columns) or frame.empty:
-        return False
-    experiment_rows = frame[frame["experiment"] == result.experiment]
-    if experiment_rows.empty:
-        return False
-    if path.name == AGGREGATE_METRICS_PARQUET_NAME:
-        expected_conditions = frozenset(
-            (outcome.cell.method, outcome.cell.condition) for outcome in result.outcomes
-        )
-        observed_conditions = frozenset(
-            (row.method, row.condition) for row in experiment_rows.itertuples()
-        )
-        return expected_conditions.issubset(observed_conditions) and bool(
-            (experiment_rows["observation_count"] > 0).all()
-        )
-    terminal_state_values = cast(list[str], experiment_rows["terminal_state"].tolist())
-    recorded_terminal_states = frozenset(
-        ExperimentLifecycleState(state) for state in terminal_state_values
-    )
-    if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
-        return False
-    expected_cells = frozenset(
-        (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
-        for outcome in result.outcomes
-    )
-    observed_cells = frozenset(
-        (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
-    )
-    return expected_cells.issubset(observed_cells)
-
-
 def verify_experiment_artifacts(
     result: ExperimentExecutionResult,
     tables_root: Path,
     figures_root: Path,
     metrics_root: Path,
     summary_path: Path,
+    source_data_identity: ArtifactDigest,
+    experiment_root: Path,
+    exported_paths: tuple[RelativePathText, ...],
 ) -> CompletenessVerificationResult:
     specification = experiment_by_name(result.experiment).artifacts
     failures: list[ReportVerificationFailure] = []
@@ -351,7 +291,7 @@ def verify_experiment_artifacts(
                 failures.append(f"{result.experiment}: metric summary execution digest is stale")
     for filename in specification.required_metric_artifacts:
         path = metrics_root / filename
-        if not _metric_artifact_is_semantically_complete(path, result):
+        if not metric_artifact_is_semantically_complete(path, result):
             failures.append(
                 f"{result.experiment}: required metric artifact {filename} is missing or empty"
             )
@@ -394,6 +334,11 @@ def verify_experiment_artifacts(
     )
     if not result.outcomes or any(not outcome.completed for outcome in result.outcomes):
         failures.append(f"{result.experiment}: figures lack completed source evidence")
+    failures.extend(
+        verify_report_export_currency(
+            result.experiment, source_data_identity, experiment_root, exported_paths
+        )
+    )
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
 
@@ -426,19 +371,23 @@ def export_experiment_report(
         "report.table.started",
         ReportLogFields(report_scope=result.experiment),
     )
-    exported: list[Path] = [
-        _write_table(tables_root, render_experiment_cell_metrics_table(result.outcomes)),
-        *render_experiment_figures(
-            result,
-            figures_root,
-            outcome_evidence_trajectory(result.outcomes)
-            if result.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
-            else (),
-            project_efficiency_telemetry(result.outcomes)
-            if result.experiment == EFFICIENCY_MEASUREMENT_NAME
-            else (),
-        ),
-    ]
+    rendered_tables: list[RenderedTable] = [render_experiment_cell_metrics_table(result.outcomes)]
+    if result.comparison_results:
+        rendered_tables.append(
+            table_renderers.render_statistical_summary_table(result.comparison_results)
+        )
+    table_paths = tuple(_write_table(tables_root, table) for table in rendered_tables)
+    figure_paths = render_experiment_figures(
+        result,
+        figures_root,
+        outcome_evidence_trajectory(result.outcomes)
+        if result.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
+        else (),
+        project_efficiency_telemetry(result.outcomes)
+        if result.experiment == EFFICIENCY_MEASUREMENT_NAME
+        else (),
+    )
+    exported: list[Path] = [*table_paths, *figure_paths]
     log_structured_event(
         REPORT_LOGGER,
         "report.experiment.artifacts.rendered",
@@ -446,11 +395,14 @@ def export_experiment_report(
     )
     evidence = materialize_experiment_evidence(result, metrics_root, telemetry_root)
     exported.extend(Path(path) for path in evidence.paths)
-    if result.comparison_results:
-        statistical_table = table_renderers.render_statistical_summary_table(
-            result.comparison_results,
-        )
-        exported.append(_write_table(tables_root, statistical_table))
+    source_data_manifest, _source_data_reused = publish_table_figure_source_data(
+        result.experiment,
+        result.execution_digest,
+        tuple(rendered_tables),
+        tuple(str(path) for path in figure_paths),
+        tuple(str(path) for path in table_paths),
+        tuple(str(path) for path in evidence.paths),
+    )
 
     summary = ExperimentReportSummary(
         schema_version=EXPORT_SCHEMA_VERSION,
@@ -473,12 +425,22 @@ def export_experiment_report(
     )
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n")
     exported.append(manifest_path)
+    exported_relative = tuple(str(path.relative_to(experiment_root)) for path in exported)
+    publish_table_figure_export(
+        result.experiment,
+        source_data_manifest.identity,
+        experiment_root,
+        tuple(str(path) for path in exported),
+    )
     verification = verify_experiment_artifacts(
         result,
         tables_root,
         figures_root,
         metrics_root,
         summary_path,
+        source_data_manifest.identity,
+        experiment_root,
+        exported_relative,
     )
     return ReportExportResult(
         experiment=result.experiment,

@@ -19,11 +19,11 @@ from fedsira.datasets.common import (
     RootCauseScope,
     apply_attacker_induced_common_context,
     apply_heterogeneity_shift,
+    flat_parameters_identity,
     root_cause_for_sample,
     scope_and_shift_rows,
 )
 from fedsira.domain.enums import (
-    AdmissionOpeningMode,
     AdmissionState,
     RootCause,
 )
@@ -67,6 +67,12 @@ from fedsira.domain.types import (
     VerifierReportCount,
 )
 from fedsira.evaluation.comparisons import ComparisonMetric
+from fedsira.evaluation.scores import (
+    DEFAULT_SCORING_TRANSFORM,
+    DomainClassScore,
+    publish_model_score,
+    sample_ids_digest,
+)
 from fedsira.evaluation.statistics import (
     coefficient_of_variation,
     domain_disparity,
@@ -77,7 +83,6 @@ from fedsira.evaluation.statistics import (
     worst_domain_target_f1,
 )
 from fedsira.experiments.definitions import (
-    AblationVariant,
     DescriptiveScientificMetric,
 )
 from fedsira.learning.model import (
@@ -86,16 +91,10 @@ from fedsira.learning.model import (
     logits_for_samples,
     per_sample_cross_entropy,
 )
-from fedsira.protocol.capability_contract import screen_evidence_is_adequate
 from fedsira.protocol.proposal import (
-    ScreenDomainResult,
     ScreenLossObservation,
-    candidate_free_screen_domain_predicate,
-    raw_target_f1_screen_domain_decision_is_positive,
     run_proposal_screen_for_domain,
-    screen_domain_decision_is_positive,
     screen_fold_index,
-    unmatched_control_screen_domain_decision_is_positive,
 )
 from fedsira.runtime import (
     current_application_context,
@@ -766,6 +765,7 @@ def evaluate_domain(
 ) -> DomainTargetMetrics | None:
     true_labels: list[ClassLabel] = []
     predicted_labels: list[ClassLabel] = []
+    shards: list[DomainClassScore] = []
     model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
     load_flat_trainable_parameters(model, flat_parameters)
     model.eval()
@@ -788,7 +788,7 @@ def evaluate_domain(
             tensor_rows = adapter.tensor_view(rows)
             if tensor_rows is None:
                 continue
-            features, _labels, _sample_ids = tensor_rows
+            features, _labels, sample_ids = tensor_rows
             predictions = torch.argmax(logits_for_samples(model, features), dim=-1)
             predicted_cpu = predictions.detach().cpu()
             prediction_indices = tuple(
@@ -796,8 +796,25 @@ def evaluate_domain(
             )
             true_labels.extend(class_id for _ in range(features.shape[0]))
             predicted_labels.extend(adapter.class_tokens[index] for index in prediction_indices)
+            shards.append(
+                DomainClassScore(
+                    domain=domain,
+                    class_id=class_id,
+                    role=row_role,
+                    sample_count=len(prediction_indices),
+                    predicted_class_indices=",".join(str(index) for index in prediction_indices),
+                    sample_ids_digest=sample_ids_digest(tuple(sample_ids)),
+                )
+            )
     if not true_labels:
         return None
+    publish_model_score(
+        adapter.specification.dataset,
+        flat_parameters_identity(flat_parameters),
+        DEFAULT_SCORING_TRANSFORM,
+        tuple(adapter.class_tokens),
+        tuple(shards),
+    )
     class_tokens = tuple(adapter.class_tokens)
     counts_by_class = compute_confusion_counts_by_class(true_labels, predicted_labels, class_tokens)
     f1_by_class = OrderedDict(
@@ -1106,113 +1123,6 @@ def compute_screen_differential(
         )
     return run_proposal_screen_for_domain(
         fold_assignment, target_observations, control_observations, fold_count
-    )
-
-
-def evaluate_screen_domain(
-    adapter: DatasetAdapter,
-    master_seed: MasterSeed,
-    anchor: RealAnchor,
-    source_delta: torch.Tensor | None,
-    domain: DomainId,
-    opening_mode: AdmissionOpeningMode,
-    screen_predicate_variant: AblationVariant | None,
-) -> ScreenDomainResult:
-    config = current_application_context().scientific_config
-    target_rows = adapter.load_rows(domain, adapter.target_class_token, Role.CANDIDATE_SCREEN)
-    target_count = 0 if target_rows is None else target_rows.row_count
-    if not screen_evidence_is_adequate(target_count, config.capability_contract.evidence_minima):
-        return ScreenDomainResult(
-            domain=domain, is_evidence_adequate=False, meets_opening_predicate=False
-        )
-    if opening_mode is AdmissionOpeningMode.CANDIDATE_FREE:
-        anchor_screen = evaluate_domain(
-            adapter,
-            anchor,
-            anchor.flat_parameters,
-            domain,
-            role=Role.POST_REFERENCE_REPLAY,
-            target_role=Role.CANDIDATE_SCREEN,
-        )
-        predicate = candidate_free_screen_domain_predicate(
-            anchor_screen.target_f1
-            if anchor_screen is not None
-            else MetricResult(value=None, denominator=0),
-            config.capability_contract,
-        )
-        return ScreenDomainResult(
-            domain=domain, is_evidence_adequate=True, meets_opening_predicate=predicate
-        )
-    if source_delta is None:
-        return ScreenDomainResult(
-            domain=domain, is_evidence_adequate=True, meets_opening_predicate=False
-        )
-    candidate_flat = anchor.flat_parameters + source_delta
-    anchor_screen = evaluate_domain(
-        adapter,
-        anchor,
-        anchor.flat_parameters,
-        domain,
-        role=Role.POST_REFERENCE_REPLAY,
-        target_role=Role.CANDIDATE_SCREEN,
-    )
-    source_screen = evaluate_domain(
-        adapter,
-        anchor,
-        candidate_flat,
-        domain,
-        role=Role.POST_REFERENCE_REPLAY,
-        target_role=Role.CANDIDATE_SCREEN,
-    )
-    if anchor_screen is None or source_screen is None:
-        return ScreenDomainResult(
-            domain=domain, is_evidence_adequate=True, meets_opening_predicate=False
-        )
-    target_f1_gain = target_capability_gain(source_screen.target_f1, anchor_screen.target_f1)
-    supported_macro_f1_drop = supported_macro_f1_harm(
-        anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
-    )
-    benign_far_increase = (
-        MetricResult(
-            value=source_screen.benign_far.value - anchor_screen.benign_far.value,
-            denominator=1,
-        )
-        if source_screen.benign_far.value is not None and anchor_screen.benign_far.value is not None
-        else MetricResult(value=None, denominator=0)
-    )
-    if screen_predicate_variant is AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
-        predicate = raw_target_f1_screen_domain_decision_is_positive(
-            target_f1_gain,
-            supported_macro_f1_drop,
-            benign_far_increase,
-            config.capability_contract,
-        )
-    elif screen_predicate_variant is AblationVariant.NO_MATCHED_CONTROL:
-        unmatched_differential = compute_unmatched_screen_differential(
-            adapter, anchor, source_delta, domain
-        )
-        predicate = unmatched_control_screen_domain_decision_is_positive(
-            unmatched_differential,
-            target_f1_gain,
-            supported_macro_f1_drop,
-            benign_far_increase,
-            config.protocol.proposal_screen,
-            config.capability_contract,
-        )
-    else:
-        differential_a = compute_screen_differential(
-            adapter, master_seed, anchor, source_delta, domain
-        )
-        predicate = screen_domain_decision_is_positive(
-            differential_a,
-            target_f1_gain,
-            supported_macro_f1_drop,
-            benign_far_increase,
-            config.protocol.proposal_screen,
-            config.capability_contract,
-        )
-    return ScreenDomainResult(
-        domain=domain, is_evidence_adequate=True, meets_opening_predicate=predicate
     )
 
 

@@ -7,15 +7,25 @@ from rich.console import Console
 from fedsira.artifacts.paths import (
     artifact_slot_directory,
     manuscript_tables_root,
-    prepared_evidence_root,
     project_summary_root,
     smoke_record_path,
     workspace_root_for_family,
 )
 from fedsira.artifacts.store import ArtifactSlot
-from fedsira.datasets.common import dataset_specification
+from fedsira.datasets.layout import (
+    dataset_readiness,
+    prepared_dataset_present,
+    rar_archives_present,
+    validate_repository_layout,
+)
 from fedsira.datasets.preprocess import execute_preprocess
-from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    DatasetId,
+    EnvironmentReadinessEffect,
+    ExperimentLifecycleState,
+    ProjectStage,
+)
 from fedsira.domain.models import (
     ScientificCell,
 )
@@ -26,6 +36,7 @@ from fedsira.domain.types import (
     DeterministicExecutionReady,
     DoctorArtifactSummary,
     DoctorExperimentSummary,
+    EnvironmentText,
     ExperimentName,
     FailureMessage,
     FrozenDomainModel,
@@ -97,6 +108,8 @@ from fedsira.runtime import (
 )
 
 _LOGGER = get_structured_logger("doctor")
+REPOSITORY_LAYOUT_COMPONENT: EnvironmentText = "repository_layout"
+REPOSITORY_LAYOUT_EXPECTATION: EnvironmentText = "configured repository roots exist"
 _BOUNDARY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -154,17 +167,30 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             project_progress="doctor blocked by invalid configuration",
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
-    rar_archives_present = _rar_archives_present(context)
+    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+    raw_archives_present = rar_archives_present(raw_data_root)
     with bound_application_context(context):
-        environment_mismatches = collect_environment_mismatches(rar_archives_present)
+        environment_mismatches = collect_environment_mismatches(raw_archives_present)
         return _diagnose_bound(context, environment_mismatches)
+
+
+def _repository_layout_mismatches() -> tuple[EnvironmentMismatch, ...]:
+    return tuple(
+        EnvironmentMismatch(
+            component=REPOSITORY_LAYOUT_COMPONENT,
+            expected=REPOSITORY_LAYOUT_EXPECTATION,
+            actual=failure,
+            readiness_effect=EnvironmentReadinessEffect.BLOCKING,
+        )
+        for failure in validate_repository_layout()
+    )
 
 
 def _diagnose_bound(
     context: ApplicationContext,
     environment_mismatches: tuple[EnvironmentMismatch, ...],
 ) -> DoctorReport:
-    raw_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+    environment_mismatches = environment_mismatches + _repository_layout_mismatches()
     workspace = (
         REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.execution_workspace
     )
@@ -175,12 +201,12 @@ def _diagnose_bound(
         master_seeds=context.scientific_config.seeds_and_determinism.master_seeds,
         smoke_seed=context.scientific_config.seeds_and_determinism.smoke_seed,
     )
-    dataset_readiness = _dataset_readiness(raw_root)
-    artifact_summary = _artifact_summary(dataset_readiness, resolved_core is not None)
+    readiness = dataset_readiness()
+    artifact_summary = _artifact_summary(readiness, resolved_core is not None)
     experiment_summary = _experiment_summary(plan, store)
     project_stage = _project_stage(
         environment_mismatches=blocking_environment_mismatches(environment_mismatches),
-        dataset_readiness=dataset_readiness,
+        dataset_readiness=readiness,
         plan=plan,
         store=store,
         resolved_core_present=resolved_core is not None,
@@ -194,7 +220,7 @@ def _diagnose_bound(
         environment_mismatches=environment_mismatches,
         configuration_loadable=True,
         configuration_error=None,
-        dataset_readiness=dataset_readiness,
+        dataset_readiness=readiness,
         artifact_validity_summary=artifact_summary,
         experiment_summary=experiment_summary,
         project_stage=project_stage,
@@ -203,39 +229,13 @@ def _diagnose_bound(
     )
 
 
-def _rar_archives_present(context: ApplicationContext) -> BooleanValue:
-    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
-    return raw_data_root.exists() and any(raw_data_root.rglob("*.rar"))
-
-
-def _raw_present(raw_root: Path, dataset: DatasetId) -> BooleanValue:
-    return (raw_root / dataset_specification(dataset).raw_data_relative).is_dir()
-
-
-def _prepared_present(dataset: DatasetId) -> BooleanValue:
-    prepared = REPOSITORY_ROOT / prepared_evidence_root(dataset)
-    return prepared.is_dir() and any(prepared.rglob("*.parquet"))
-
-
-def _dataset_readiness(raw_root: Path) -> ExperimentLifecycleState:
-    raw_ready = all(_raw_present(raw_root, dataset) for dataset in DatasetId)
-    prepared_ready = all(_prepared_present(dataset) for dataset in DatasetId)
-    if prepared_ready:
-        return ExperimentLifecycleState.COMPLETED
-    if raw_ready:
-        return ExperimentLifecycleState.READY
-    if any(_raw_present(raw_root, dataset) for dataset in DatasetId):
-        return ExperimentLifecycleState.RUNNING
-    return ExperimentLifecycleState.NOT_STARTED
-
-
 def _artifact_summary(
     dataset_readiness: ExperimentLifecycleState,
     resolved_core_present: ResolvedCoreComplete,
 ) -> DoctorArtifactSummary:
     prepared_parts: list[str] = []
     for dataset in DatasetId:
-        status = "prepared" if _prepared_present(dataset) else "missing prepared views"
+        status = "prepared" if prepared_dataset_present(dataset) else "missing prepared views"
         prepared_parts.append(f"{dataset.value} {status}")
     core_status = "present" if resolved_core_present else "absent"
     return (
@@ -618,8 +618,11 @@ def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
 def execute_run(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
+        raw_data_root = (
+            REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+        )
         mismatches = blocking_environment_mismatches(
-            collect_environment_mismatches(_rar_archives_present(context))
+            collect_environment_mismatches(rar_archives_present(raw_data_root))
         )
         if mismatches:
             components = ", ".join(mismatch.component for mismatch in mismatches)
@@ -639,12 +642,8 @@ def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     )
     print(render_result(result))
     _export_completed_experiment(result)
-    if (
-        result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-        and (not overwrite)
-        and result.execution_digest
-    ):
-        print(f"already-completed: execution digest {result.execution_digest}")
+    if result.lifecycle_state is ExperimentLifecycleState.COMPLETED and not overwrite:
+        print(f"execution digest {result.execution_digest}")
     if result.lifecycle_state is ExperimentLifecycleState.COMPLETED:
         _materialize_core_if_complete(name)
     if result.lifecycle_state in (

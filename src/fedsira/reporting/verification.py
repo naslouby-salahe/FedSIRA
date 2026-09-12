@@ -3,6 +3,9 @@ from __future__ import annotations
 import csv
 from io import StringIO
 from pathlib import Path
+from typing import cast
+
+import pandas
 
 from fedsira.artifacts.store import ArtifactManifest, InvalidArtifactReport
 from fedsira.domain.enums import (
@@ -11,11 +14,14 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
 )
 from fedsira.domain.types import (
+    ArtifactDigest,
+    BooleanValue,
     CheckpointIdentity,
     ConditionName,
     DatasetColumnName,
     ExperimentName,
     FrozenDomainModel,
+    RelativePathText,
     ReportVerificationFailure,
     ScientificCellCount,
     TableName,
@@ -25,6 +31,7 @@ from fedsira.domain.types import (
 from fedsira.evaluation.comparison_evidence import comparison_evidence_failures
 from fedsira.evaluation.comparisons import ComparisonMetric
 from fedsira.experiments.definitions import (
+    AGGREGATE_METRICS_PARQUET_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
@@ -33,6 +40,7 @@ from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    STATE_TRAJECTORY_PARQUET_NAME,
     BoundCondition,
     DescriptiveScientificMetric,
     VerifierCondition,
@@ -49,6 +57,7 @@ from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
 )
+from fedsira.reporting.publication import read_table_figure_export
 from fedsira.runtime import current_application_context
 
 
@@ -136,6 +145,26 @@ def verify_safe_dormancy(
     if len(observed) > allowed:
         return CompletenessVerificationResult(passed=False, failures=tuple(observed))
     return CompletenessVerificationResult(passed=True, failures=())
+
+
+def verify_report_export_currency(
+    experiment: ExperimentName,
+    source_data_identity: ArtifactDigest,
+    experiment_root: Path,
+    exported_paths: tuple[RelativePathText, ...],
+) -> tuple[ReportVerificationFailure, ...]:
+    payload = read_table_figure_export(experiment)
+    if payload is None:
+        return (f"{experiment}: report export artifact is absent",)
+    failures: list[ReportVerificationFailure] = []
+    if payload.source_data_identity != source_data_identity:
+        failures.append(f"{experiment}: report export artifact is stale for its source data")
+    if payload.exported_paths != exported_paths:
+        failures.append(f"{experiment}: report export artifact does not name its own products")
+    for relative in payload.exported_paths:
+        if not (experiment_root / relative).is_file():
+            failures.append(f"{experiment}: exported report product is missing: {relative}")
+    return tuple(failures)
 
 
 def verify_comparison_evidence_current(
@@ -388,3 +417,72 @@ def verify_mandatory_figure_source_data(
     if result.experiment == SECONDARY_DATASET_GENERALIZATION_NAME and not result.comparison_results:
         failures.append(f"{result.experiment}: Secondary Generalization has no paired evidence")
     return tuple(failures)
+
+
+def metric_artifact_is_semantically_complete(
+    path: Path,
+    result: ExperimentExecutionResult,
+) -> BooleanValue:
+    if not path.is_file():
+        return False
+    frame = pandas.read_parquet(path)
+    if path.name == STATE_TRAJECTORY_PARQUET_NAME:
+        required_columns = frozenset(
+            (
+                "experiment",
+                "method",
+                "condition",
+                "master_seed",
+                "logical_evidence_cycle",
+                "admission_state",
+            )
+        )
+        if not required_columns.issubset(frame.columns) or frame.empty:
+            return False
+        experiment_rows = frame[frame["experiment"] == result.experiment]
+        expected_cells = frozenset(
+            (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
+            for outcome in result.outcomes
+        )
+        observed_cells = frozenset(
+            (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
+        )
+        return expected_cells.issubset(observed_cells) and all(
+            experiment_rows["admission_state"].notna().tolist()
+        )
+    required_columns = (
+        frozenset(
+            ("experiment", "method", "condition", "metric", "observation_count", "mean_value")
+        )
+        if path.name == AGGREGATE_METRICS_PARQUET_NAME
+        else frozenset(("experiment", "method", "condition", "master_seed", "terminal_state"))
+    )
+    if not required_columns.issubset(frame.columns) or frame.empty:
+        return False
+    experiment_rows = frame[frame["experiment"] == result.experiment]
+    if experiment_rows.empty:
+        return False
+    if path.name == AGGREGATE_METRICS_PARQUET_NAME:
+        expected_conditions = frozenset(
+            (outcome.cell.method, outcome.cell.condition) for outcome in result.outcomes
+        )
+        observed_conditions = frozenset(
+            (row.method, row.condition) for row in experiment_rows.itertuples()
+        )
+        return expected_conditions.issubset(observed_conditions) and all(
+            (experiment_rows["observation_count"] > 0).tolist()
+        )
+    terminal_state_values = cast(list[str], experiment_rows["terminal_state"].tolist())
+    recorded_terminal_states = frozenset(
+        ExperimentLifecycleState(state) for state in terminal_state_values
+    )
+    if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
+        return False
+    expected_cells = frozenset(
+        (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
+        for outcome in result.outcomes
+    )
+    observed_cells = frozenset(
+        (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
+    )
+    return expected_cells.issubset(observed_cells)

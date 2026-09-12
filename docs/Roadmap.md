@@ -2829,6 +2829,37 @@ An artifact's **identity** is `SHA256` over the framed tuple `(family, instance,
 
 A score artifact contains per-sample model outputs needed by downstream metrics, including logits/probabilities/predictions and losses when required by the screen/calibration definition. The implementation may shard large score artifacts deterministically; a complete score artifact is publishable only when every declared shard is complete and its aggregate manifest verifies.
 
+**Publication points and declared dependencies.** Each family in the table above is published through the single store entry point at the step that computes it, and declares exactly the material dependencies the table names, so the dependency resolution of Section 26.2 rejects an incomplete, stale, or unrelated upstream artifact.
+
+| Family | Publication point | Declared dependencies |
+| --- | --- | --- |
+| Role/split/sample manifest | N-BaIoT and CICIoT2023 preparation, once per dataset, before its role views | canonical dataset manifest digest; the payload records role intervals, guard-gap windows, target/support class mapping, domain partition, sampling caps, and the per-`(domain, class, role)` row counts the views were materialized from. Every prepared role view declares this manifest's identity, so a split change re-keys every view |
+| Anchor checkpoint and round checkpoints | anchor training, on first materialization of an anchor for a master seed, including each configured round start | prepared-evidence digest (dataset manifest hash) |
+| Source candidate checkpoint, reproduction checkpoint, baseline checkpoint | the source-training, reproduction-training, and baseline-training steps that produce the update | prepared-evidence digest; the baseline checkpoint is published from the final-gate funnel that every baseline production update passes through |
+| Model score artifact | domain scoring, per `(model, view)` pass | model identity, prepared view identity, output-class registry digest, scoring-transform digest; the payload records the shards actually scored by `(domain, class, role)` with per-shard sample-id digests |
+| Screen matching/differential artifact | domain screening, on every screen outcome including inadequate-evidence and candidate-free branches | anchor model identity, candidate model identity, prepared-evidence digest; the payload records the opening mode, screen-predicate variant, adequacy and predicate outcomes, and the screen differential metrics where defined |
+| Baseline calibration artifact | the calibrated baseline cells, before their baseline outcome is computed | prepared-evidence digest; the payload records the named baseline, the calibration rule, the anchor calibration population, and the configured percentile the calibration reads |
+| Verifier assignment/report and reproduction certificate | external reproduction verification, per committed reproduction row | commitment identity; the payload records the panel, per-verifier outcomes, panel size, required positive reports, and the certification outcome |
+| Krum synthesized update/model | every Krum synthesis that produces a production update | selected update identity; the payload records committee size, the maximum byzantine reproduction rows, and the selected update and checkpoint identities |
+| Final-gate evaluation/decision | every final-gate decision, for baseline and resolved-core paths alike | production model identity; the payload records the synthesis mode and the decision |
+| Table/figure source data | `report`, after the tables, figures, and metric artifacts are materialized | execution evidence digest plus the content digest of every materialized metric artifact; the payload records each table's row count and content digest and each figure's content digest and length |
+| Table/figure/report export | `report`, after every product is written | source-data identity; the payload records the exported products relative to the experiment result root, and export verification re-reads the published export artifact and checks that its source-data identity is current and that every named product is present |
+
+**Wired governed keys.** Every declared configuration key has a consumer in the execution path; the following keys are the ones whose consumer is not the section that declares them, so their wiring is recorded here.
+
+| Key | Consumer |
+| --- | --- |
+| `execution.repository_layout.source`, `.tests`, `.raw_data`, `.manuscript_results` | repository-layout validation, surfaced by `doctor` as blocking environment mismatches; `doctor` readiness uses the same configured roots for raw and prepared presence |
+| `execution.repository_layout.external_data` | second raw-data search root for every dataset, so an externally mounted dataset resolves without moving the primary tree |
+| `execution.repository_layout.execution_workspace`, `.manuscript_results` | artifact, execution, and manuscript path construction |
+| `protocol.resource_horizon.measurement_cycle_start`, `.measurement_cycle_end` | the logical measurement cycles a cell evaluates, so the measurement window is configuration rather than an implicit range |
+| `attacks_and_boundaries.capability_under_specification.contracts` | the contract scopes evaluated for contract-granularity false-same certification |
+| `attacks_and_boundaries.byzantine_reproduction.compromised_counts` and `byzantine_verifier.compromise_counts`, `.behaviors` | cross-checked against the condition vocabulary before any cell executes, so a declared count or behaviour with no condition (or a condition with no declared count) fails fast |
+| `execution.data_loader.workers`, `.pin_memory`, `.persistent_workers` | batch iteration for every training epoch |
+| `datasets.primary.role_intervals`, `.sampling_caps_per_domain` | role filtering and per-role sampling caps during preparation, and the recorded content of the role/split/sample manifest |
+| `datasets.secondary.acquisition` | which CICIoT2023 shard layout is acquired and parsed |
+| `metrics_and_statistics.publication_rounding.percentage_decimals` and friends | table and figure rendering |
+
 ## 26.4 Selective invalidation boundaries
 
 The following are the minimum invalidation rules. A change may invalidate a narrower subset when the artifact type declares a narrower true dependency, but it may never preserve an artifact whose material dependency changed.

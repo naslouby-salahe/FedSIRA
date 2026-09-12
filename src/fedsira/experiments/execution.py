@@ -93,6 +93,7 @@ from fedsira.evaluation.statistics import (
     holm_adjusted_p_values,
     quantile_type7,
 )
+from fedsira.experiments.byzantine import validate_byzantine_vocabulary
 from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
@@ -117,7 +118,6 @@ from fedsira.experiments.engine import (
     ablation_reference_slot,
     derive_experiment_lifecycle,
     execute_cell_with_retry,
-    execution_digest,
     log_execution_event,
     prerequisite_states_from_store,
 )
@@ -284,7 +284,9 @@ def execute_experiment(
     )
     if planned.lifecycle_state is ExperimentLifecycleState.BLOCKED:
         return ExperimentExecutionResult(
-            experiment=experiment, lifecycle_state=ExperimentLifecycleState.BLOCKED, outcomes=()
+            experiment=experiment,
+            lifecycle_state=ExperimentLifecycleState.BLOCKED,
+            outcomes=(),
         )
     store = ExecutionRecordStore(
         Path(resolved_config.execution.repository_layout.execution_workspace)
@@ -376,7 +378,6 @@ def execute_experiment(
         lifecycle_state=lifecycle_state,
         outcomes=outcome_tuple,
         comparison_results=comparisons,
-        execution_digest=execution_digest(experiment, lifecycle_state, outcome_tuple),
     )
     log_execution_event(
         "experiment.completed"
@@ -546,6 +547,7 @@ def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
 
 
 def validate_condition_vocabulary(plan: ExperimentPlan) -> None:
+    validate_byzantine_vocabulary()
     for planned in plan.experiments:
         allowed = _allowed_conditions(planned.definition.name)
         if allowed is not None:

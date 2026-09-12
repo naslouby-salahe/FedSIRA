@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from fedsira.artifacts.paths import artifact_slot_directory
+from fedsira.artifacts.store import read_current_artifact
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
@@ -13,6 +15,10 @@ from fedsira.domain.enums import (
 )
 from fedsira.domain.models import (
     ScientificCell,
+)
+from fedsira.domain.types import (
+    ArtifactDigest,
+    RelativePathText,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
@@ -67,6 +73,10 @@ from fedsira.reporting.figures import (
     validate_mandatory_figures_covered,
 )
 from fedsira.reporting.protocol_tables import render_experiment_plan_table
+from fedsira.reporting.publication import (
+    read_table_figure_export,
+    table_figure_source_data_slot,
+)
 from fedsira.reporting.tables import (
     format_byte_value,
     format_metric_value,
@@ -78,6 +88,7 @@ from fedsira.reporting.verification import (
     CompletenessVerificationResult,
     ExperimentLifecycleRecord,
 )
+from fedsira.runtime import REPOSITORY_ROOT
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 
@@ -123,6 +134,20 @@ def _with_primary_comparison_evidence(
             )
         }
     )
+
+
+def _published_source_data_identity(result: ExperimentExecutionResult) -> ArtifactDigest:
+    slot = table_figure_source_data_slot(result.experiment)
+    current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+    assert current is not None
+    manifest, _payload = current
+    return manifest.identity
+
+
+def _published_exported_paths(result: ExperimentExecutionResult) -> tuple[RelativePathText, ...]:
+    payload = read_table_figure_export(result.experiment)
+    assert payload is not None
+    return payload.exported_paths
 
 
 def test_format_metric_value_na_and_rounding() -> None:
@@ -249,6 +274,9 @@ def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_pa
         tmp_path / "figures" / "main",
         tmp_path / "metrics" / "primary",
         tmp_path / "metrics" / "primary" / "summary.json",
+        _published_source_data_identity(result),
+        tmp_path,
+        _published_exported_paths(result),
     )
     assert not verification.passed
     assert any(CELL_METRICS_PARQUET_NAME in failure for failure in verification.failures)
@@ -284,6 +312,9 @@ def test_experiment_evidence_verification_rejects_wrong_summary_identity(tmp_pat
         tmp_path / "figures" / "main",
         tmp_path / "metrics" / "primary",
         summary_path,
+        _published_source_data_identity(result),
+        tmp_path,
+        _published_exported_paths(result),
     )
     assert not verification.passed
     assert any("belongs to another experiment" in failure for failure in verification.failures)
@@ -319,6 +350,9 @@ def test_experiment_evidence_verification_rejects_stale_summary_digest(tmp_path:
         tmp_path / "figures" / "main",
         tmp_path / "metrics" / "primary",
         summary_path,
+        _published_source_data_identity(result),
+        tmp_path,
+        _published_exported_paths(result),
     )
     assert not verification.passed
     assert any("execution digest is stale" in failure for failure in verification.failures)
@@ -351,6 +385,9 @@ def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path:
         tmp_path / "figures" / "main",
         tmp_path / "metrics" / "primary",
         tmp_path / "metrics" / "primary" / "summary.json",
+        _published_source_data_identity(result),
+        tmp_path,
+        _published_exported_paths(result),
     )
     assert not verification.passed
     assert any(
@@ -385,6 +422,9 @@ def test_experiment_evidence_verification_rejects_empty_required_figure(tmp_path
         tmp_path / "figures" / "main",
         tmp_path / "metrics" / "primary",
         tmp_path / "metrics" / "primary" / "summary.json",
+        _published_source_data_identity(result),
+        tmp_path,
+        _published_exported_paths(result),
     )
     assert not verification.passed
     assert any(

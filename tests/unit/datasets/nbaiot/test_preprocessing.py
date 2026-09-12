@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import cast
 
 import duckdb
+import numpy
 import pandas
 import pytest
 
@@ -392,5 +393,5 @@ def test_materialization_standardized_features_are_finite_and_clipped(tmp_path: 
             "SELECT * EXCLUDE (sample_id, label) FROM read_parquet(?)",
             [view.parquet_path.as_posix()],
         ).fetch_df()
-        assert frame.to_numpy().min() >= scaling.clip_min
-        assert frame.to_numpy().max() <= scaling.clip_max
+        assert numpy.asarray(frame, dtype=float).min() >= scaling.clip_min
+        assert numpy.asarray(frame, dtype=float).max() <= scaling.clip_max

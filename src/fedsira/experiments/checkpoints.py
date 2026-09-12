@@ -1,3 +1,5 @@
+import torch
+
 from fedsira.artifacts.paths import artifact_slot_directory, artifact_staging_root
 from fedsira.artifacts.store import (
     ArtifactDependency,
@@ -12,6 +14,7 @@ from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInstanceToken,
     DatasetManifestDigest,
+    DomainId,
     FrozenDomainModel,
     MasterSeed,
     ModelInputWidth,
@@ -97,6 +100,47 @@ def publish_anchor_checkpoints(
         )
         published.append(manifest)
     return tuple(published)
+
+
+def publish_trained_update(
+    family: ArtifactFamily,
+    dataset: DatasetId,
+    master_seed: MasterSeed,
+    stage_identity: TextValue,
+    dataset_manifest_hash: DatasetManifestDigest,
+    update: torch.Tensor,
+    input_width: ModelInputWidth,
+    output_width: ModelOutputWidth,
+) -> ArtifactManifest:
+    detached = update.detach().cpu().reshape(-1)
+    slot = checkpoint_slot(family, checkpoint_stage_instance(master_seed, stage_identity))
+    payload = CheckpointPayload(
+        schema_version=CHECKPOINT_SCHEMA_VERSION,
+        dataset=dataset,
+        family=family,
+        master_seed=master_seed,
+        stage_identity=stage_identity,
+        dataset_manifest_hash=dataset_manifest_hash,
+        model_input_width=input_width,
+        model_output_width=output_width,
+        flat_parameters_identity=flat_parameters_identity(update),
+        parameters=tuple(float(detached[index].item()) for index in range(detached.numel())),
+    )
+    manifest, _reused = publish_checkpoint(
+        family,
+        slot,
+        payload,
+        (ArtifactDependency(dependency="prepared-evidence", digest=dataset_manifest_hash),),
+    )
+    return manifest
+
+
+def source_candidate_stage_identity(episode: TextValue, source_domain: DomainId) -> TextValue:
+    return f"source-candidate-{episode}-{source_domain}"
+
+
+def reproduction_stage_identity(domain: DomainId, condition: TextValue) -> TextValue:
+    return f"reproduction-{domain}-{condition}"
 
 
 def checkpoint_procedure_identity(family: ArtifactFamily) -> ProcedureIdentity:

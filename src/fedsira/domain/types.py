@@ -346,6 +346,7 @@ PlanRenderText = TextValue
 RunRenderText = TextValue
 StatusRenderText = TextValue
 TableCsvText = TextValue
+SampleScoreSequence = TextValue
 FormattedStatisticText = TextValue
 LogRecordText = TextValue
 ResolvedCoreIdentity = TextValue

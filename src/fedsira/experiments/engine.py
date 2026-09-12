@@ -230,7 +230,10 @@ class ExperimentExecutionResult(FrozenDomainModel):
     lifecycle_state: ExperimentLifecycleState
     outcomes: tuple[CellExecutionOutcome, ...]
     comparison_results: tuple[ComparisonFamilyResult, ...] = ()
-    execution_digest: ArtifactDigest | None = None
+
+    @property
+    def execution_digest(self) -> ArtifactDigest:
+        return experiment_execution_digest(self.experiment, self.lifecycle_state, self.outcomes)
 
     @property
     def cell_completion_count(self) -> ScientificCellCount:
@@ -247,7 +250,7 @@ class ExperimentExecutionDigestInput(FrozenDomainModel):
     semantic_keys: tuple[ScientificCellSemanticKey, ...]
 
 
-def execution_digest(
+def experiment_execution_digest(
     experiment: ExperimentName,
     lifecycle_state: ExperimentLifecycleState,
     outcomes: tuple[CellExecutionOutcome, ...],

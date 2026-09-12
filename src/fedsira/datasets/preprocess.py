@@ -38,10 +38,10 @@ from fedsira.datasets.common import (
     RawDatasetFileIdentity,
     RawDatasetIdentityPayload,
     ScalerMetadata,
-    dataset_specification,
     prepared_feature_names,
     role_hash_token,
 )
+from fedsira.datasets.layout import required_raw_dataset_root
 from fedsira.datasets.nbaiot.prepare import (
     classes_structurally_unavailable,
     compute_dataset_manifest_hash,
@@ -50,9 +50,15 @@ from fedsira.datasets.nbaiot.prepare import (
     validate_target_holder_feasibility,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
+from fedsira.datasets.role_split import (
+    ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY,
+    RoleSplitViewCount,
+    publish_role_split_sample_manifest,
+)
 from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId, Role
 from fedsira.domain.types import (
     ArtifactDependencyName,
+    ArtifactDigest,
     ArtifactReuseDecision,
     DatasetClassToken,
     DatasetManifestDigest,
@@ -169,12 +175,11 @@ def publish_scaler(
 
 
 PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|1"
-ROLE_SPLIT_ASSIGNMENT_DEPENDENCY: ArtifactDependencyName = "role-split-assignment"
 
 
 def publish_prepared_role_view(
     dataset: DatasetId,
-    manifest_hash: DatasetManifestDigest,
+    role_split_manifest_identity: ArtifactDigest,
     view_key: PreparedViewKey,
     role: Role,
     class_token: DatasetClassToken,
@@ -204,7 +209,10 @@ def publish_prepared_role_view(
         producer=ArtifactProducer.PREPROCESSING,
         payload=payload,
         dependencies=(
-            ArtifactDependency(dependency=ROLE_SPLIT_ASSIGNMENT_DEPENDENCY, digest=manifest_hash),
+            ArtifactDependency(
+                dependency=ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY,
+                digest=role_split_manifest_identity,
+            ),
         ),
         procedure_identity=PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY,
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
@@ -215,11 +223,7 @@ def publish_prepared_role_view(
 
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
-    raw_root = (
-        REPOSITORY_ROOT
-        / config.execution.repository_layout.raw_data
-        / dataset_specification(DatasetId.N_BAIOT).raw_data_relative
-    )
+    raw_root = required_raw_dataset_root(DatasetId.N_BAIOT)
     extraction_cache_root = preprocessing_extraction_cache_root(
         REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
     )
@@ -259,10 +263,23 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         overwrite,
         retain_materialized_views=False,
     )
+    role_split_manifest, _role_split_reused = publish_role_split_sample_manifest(
+        DatasetId.N_BAIOT,
+        manifest_hash,
+        tuple(
+            RoleSplitViewCount(
+                domain=view.domain.name,
+                class_id=view.class_id.value,
+                role=view.role,
+                row_count=view.row_count,
+            )
+            for view in nbaiot_views
+        ),
+    )
     for view in nbaiot_views:
         publish_prepared_role_view(
             DatasetId.N_BAIOT,
-            manifest_hash,
+            role_split_manifest.identity,
             f"{view.domain.name}_{view.class_id.name}_{role_hash_token(view.role)}",
             view.role,
             view.class_id,
@@ -297,11 +314,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
 
 def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
-    csv_root = (
-        REPOSITORY_ROOT
-        / config.execution.repository_layout.raw_data
-        / dataset_specification(DatasetId.CICIOT2023).raw_data_relative
-    )
+    csv_root = required_raw_dataset_root(DatasetId.CICIOT2023)
     log_structured_event(
         PREPROCESSING_LOGGER,
         "dataset.preprocessing.started",
@@ -327,10 +340,23 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         cache_root,
         overwrite,
     )
+    role_split_manifest, _role_split_reused = publish_role_split_sample_manifest(
+        DatasetId.CICIOT2023,
+        summary.dataset_manifest_hash,
+        tuple(
+            RoleSplitViewCount(
+                domain=view.pseudo_domain.display_token,
+                class_id=view.normalized_label,
+                role=view.role,
+                row_count=view.row_count,
+            )
+            for view in summary.views
+        ),
+    )
     for view in summary.views:
         publish_prepared_role_view(
             DatasetId.CICIOT2023,
-            summary.dataset_manifest_hash,
+            role_split_manifest.identity,
             f"{view.pseudo_domain.display_token}_{view.normalized_label}_"
             f"{role_hash_token(view.role)}",
             view.role,
