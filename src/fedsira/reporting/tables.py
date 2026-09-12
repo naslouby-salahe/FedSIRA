@@ -6,8 +6,9 @@ from collections.abc import Callable
 from io import StringIO
 
 from fedsira.config import PublicationRoundingConfig
-from fedsira.domain.enums import CoreMethodIdentity
+from fedsira.domain.enums import ByteUnit, CoreMethodIdentity
 from fedsira.domain.types import (
+    ByteCount,
     ExperimentName,
     FormattedStatisticText,
     FrozenDomainModel,
@@ -101,11 +102,37 @@ def _publication_rounding() -> PublicationRoundingConfig:
     return statistics.publication_rounding
 
 
-def format_metric_value(value: MetricValue | None) -> FormattedStatisticText:
+BYTE_VALUED_METRICS: tuple[MetricName, ...] = (
+    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+    DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
+    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
+)
+
+BYTE_UNIT_LABELS: tuple[tuple[ByteUnit, TextValue, ByteCount], ...] = (
+    (ByteUnit.IEC, "GiB", 1024**3),
+)
+
+
+def format_metric_value(
+    value: MetricValue | None, metric: MetricName | None = None
+) -> FormattedStatisticText:
+    if metric is not None and metric in BYTE_VALUED_METRICS:
+        return format_byte_value(value)
     rounding = _publication_rounding()
     if value is None:
         return "NA"
     return f"{value:.{rounding.f1_accuracy_rates_decimals}f}"
+
+
+def format_byte_value(value: MetricValue | None) -> FormattedStatisticText:
+    rounding = _publication_rounding()
+    if value is None:
+        return "NA"
+    for unit, label, scale in BYTE_UNIT_LABELS:
+        if unit is rounding.byte_units:
+            return f"{value / scale:.{rounding.byte_decimals}f} {label}"
+    raise ValueError(f"unsupported byte unit: {rounding.byte_units.value}")
 
 
 def format_p_value(value: PValue | None) -> FormattedStatisticText:
@@ -141,10 +168,11 @@ def _statistical_summary_row(
     comparison: ComparisonResult,
 ) -> tuple[TextValue, ...]:
     definition = comparison.definition
+    effect_decimals = _publication_rounding().effect_size_decimals
     effect = (
         "NA"
         if comparison.paired_standardized_effect is None
-        else f"{comparison.paired_standardized_effect:.3f}"
+        else f"{comparison.paired_standardized_effect:.{effect_decimals}f}"
     )
     confidence_interval = (
         "NA"
@@ -1180,7 +1208,8 @@ def render_delay_and_efficiency_table(
                     method,
                     scenario,
                     DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
-                )
+                ),
+                DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1189,7 +1218,8 @@ def render_delay_and_efficiency_table(
                     method,
                     scenario,
                     DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
-                )
+                ),
+                DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1198,7 +1228,8 @@ def render_delay_and_efficiency_table(
                     method,
                     scenario,
                     DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-                )
+                ),
+                DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1216,7 +1247,8 @@ def render_delay_and_efficiency_table(
                     method,
                     scenario,
                     DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
-                )
+                ),
+                DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
             ),
         )
         for experiment, method, scenario in rows_to_render

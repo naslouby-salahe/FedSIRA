@@ -67,6 +67,7 @@ from fedsira.reporting.figures import (
 )
 from fedsira.reporting.protocol_tables import render_experiment_plan_table
 from fedsira.reporting.tables import (
+    format_byte_value,
     format_metric_value,
     format_p_value,
     render_delay_and_efficiency_table,
@@ -699,7 +700,22 @@ def test_delay_and_efficiency_table_uses_unique_outcome_evidence_rows() -> None:
     row = next(csv.reader((table.csv_text.splitlines()[1],)))
     assert row[:3] == ["Efficiency Measurement", "Resolved FedSIRA Core", "Efficiency"]
     assert row[8] == "3.00 [3.00,3.00]"
-    assert row[10] == "10.000"
-    assert row[11] == "20.000"
-    assert row[12] == "30.000"
+    assert row[10] == "0.00 GiB"
+    assert row[11] == "0.00 GiB"
+    assert row[12] == "0.00 GiB"
     assert row[13] == "40.000"
+
+
+def test_byte_valued_metrics_render_in_the_declared_unit_and_decimals() -> None:
+    gibibyte = float(1024**3)
+    assert format_byte_value(gibibyte) == "1.00 GiB"
+    assert format_byte_value(2.5 * gibibyte) == "2.50 GiB"
+    assert format_byte_value(None) == "NA"
+
+
+def test_byte_valued_metrics_use_the_byte_formatter_by_metric_name() -> None:
+    from fedsira.experiments.definitions import DescriptiveScientificMetric
+
+    gpu_bytes = DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value
+    assert format_metric_value(float(1024**3), gpu_bytes) == "1.00 GiB"
+    assert format_metric_value(0.1234, "target-f1") == "0.123"
