@@ -51,9 +51,11 @@ def test_every_ablation_variant_has_a_declared_claim_metric_except_the_reference
 
 def test_feature_shift_magnitude_is_selected_by_condition_identity() -> None:
     assert feature_shift_magnitude(HeterogeneityRegime.NATURAL.value) is None
-    assert feature_shift_magnitude(
-        HeterogeneityRegime.FEATURE_SHIFT_0_5.value
-    ) < feature_shift_magnitude(HeterogeneityRegime.FEATURE_SHIFT_1_0.value)
+    half_shift = feature_shift_magnitude(HeterogeneityRegime.FEATURE_SHIFT_0_5.value)
+    full_shift = feature_shift_magnitude(HeterogeneityRegime.FEATURE_SHIFT_1_0.value)
+    assert half_shift is not None
+    assert full_shift is not None
+    assert half_shift < full_shift
     assert feature_shift_magnitude(
         AblationScenario.FEATURE_SHIFT_1_0.value
     ) == feature_shift_magnitude(HeterogeneityRegime.FEATURE_SHIFT_1_0.value)
