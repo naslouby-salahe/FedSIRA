@@ -12,6 +12,7 @@ from fedsira.domain.types import (
     ArtifactDigest,
     DerivedSeed,
     DomainId,
+    EvaluationCadenceReached,
     ExampleCount,
     FeatureCount,
     FederatedRoundCount,
@@ -21,9 +22,11 @@ from fedsira.domain.types import (
     MasterSeed,
     ModelInputWidth,
     ModelOutputWidth,
+    ModelParameterValue,
     RepositoryPath,
     RoundIndex,
     SampleId,
+    SeedDerivationLabel,
     TensorDomainModel,
     TrainableParameterCount,
     WallClockSeconds,
@@ -47,6 +50,8 @@ from fedsira.learning.training import (
 from fedsira.runtime import (
     ElapsedTimer,
     current_application_context,
+    derive_uint32,
+    deterministic_order,
     get_structured_logger,
     local_training_seed,
     namespace_seed,
@@ -166,7 +171,8 @@ def run_anchor_fedavg_training(
     load_model_state(validation_model, initial_state)
     state = initial_state
     round_checkpoints: list[ModelState] = []
-    for round_clients in clients_per_round:
+    for round_index, round_clients in enumerate(clients_per_round):
+        participating_clients = anchor_round_participants(round_clients, anchor_config, round_index)
         state = run_fedavg_round(
             state,
             input_width,
@@ -175,15 +181,74 @@ def run_anchor_fedavg_training(
             optimizer_config,
             training_config,
             anchor_config.local_epochs_per_round,
-            round_clients,
+            participating_clients,
         )
         round_checkpoints.append(state)
+        if anchor_round_is_evaluated(anchor_config, round_index):
+            validation_model = FedSIRAClassifier(input_width, output_width)
+            load_model_state(validation_model, state)
+            ANCHOR_LOGGER.info(
+                "anchor.round.evaluated",
+                extra=AnchorRoundEvaluationLogFields(
+                    round_index=round_index,
+                    validation_parameters=float(
+                        flatten_trainable_parameters(validation_model).sum()
+                    ),
+                ).model_dump(),
+            )
     return round_checkpoints[-1], tuple(round_checkpoints)
+
+
+def anchor_round_participants(
+    round_clients: tuple[LocalTrainingClient, ...],
+    anchor_config: AnchorFedAvgConfig,
+    round_index: RoundIndex,
+) -> tuple[LocalTrainingClient, ...]:
+    if anchor_config.client_dropout == 0.0:
+        return round_clients
+    if not round_clients:
+        raise ValueError("anchor round requires at least one client")
+    universe = tuple(
+        LocalTrainingClient(
+            features=client.features,
+            labels=client.labels,
+            sample_ids=client.sample_ids,
+            training_seed=client.training_seed,
+        )
+        for client in round_clients
+    )
+    drop_seed = derive_uint32(
+        ANCHOR_CLIENT_DROPOUT_SEPARATOR,
+        round_index,
+        repr(float(anchor_config.client_dropout)),
+    )
+    ordered = deterministic_order(
+        tuple(client.training_seed for client in universe),
+        ANCHOR_CLIENT_DROPOUT_SEPARATOR,
+        drop_seed,
+    )
+    retained_count = max(1, int(round(len(universe) * (1.0 - float(anchor_config.client_dropout)))))
+    retained_seeds = frozenset(ordered[:retained_count])
+    return tuple(client for client in universe if client.training_seed in retained_seeds)
+
+
+def anchor_round_is_evaluated(
+    anchor_config: AnchorFedAvgConfig, round_index: RoundIndex
+) -> EvaluationCadenceReached:
+    return (round_index + 1) % anchor_config.evaluation_cadence_rounds == 0
 
 
 ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
 ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 ANCHOR_LOGGER = get_structured_logger("anchor_training")
+
+
+ANCHOR_CLIENT_DROPOUT_SEPARATOR: SeedDerivationLabel = "ANCHOR_CLIENT_DROPOUT"
+
+
+class AnchorRoundEvaluationLogFields(FrozenDomainModel):
+    round_index: RoundIndex
+    validation_parameters: ModelParameterValue
 
 
 class AnchorTrainingLogFields(FrozenDomainModel):
@@ -278,6 +343,12 @@ def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor
     )
     model = FedSIRAClassifier(input_width, output_width)
     load_model_state(model, final_state)
+    checkpoint_cadence = config.model.anchor_fedavg.checkpoint_cadence_rounds
+    round_start_states = tuple(
+        state
+        for round_index, state in enumerate((initial_state, *round_checkpoints[:-1]))
+        if round_index % checkpoint_cadence == 0
+    )
     ANCHOR_LOGGER.info(
         "anchor.training.completed",
         extra=AnchorTrainingLogFields(
@@ -293,7 +364,6 @@ def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor
         flat_parameters=flatten_trainable_parameters(model),
         dataset_manifest_hash=manifest_hash,
         round_start_flat_parameters=tuple(
-            _flatten_model_state(state, input_width, output_width)
-            for state in (initial_state, *round_checkpoints[:-1])
+            _flatten_model_state(state, input_width, output_width) for state in round_start_states
         ),
     )

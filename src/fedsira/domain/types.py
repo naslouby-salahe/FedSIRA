@@ -252,6 +252,7 @@ ReproductionCertified = BooleanValue
 ExternalVerificationActive = BooleanValue
 ResolvedRowRequirementReached = BooleanValue
 MaterialityDecision = BooleanValue
+EvaluationCadenceReached = BooleanValue
 CapabilityContractSatisfied = BooleanValue
 SourceExcludedFromKrum = BooleanValue
 KrumCommitteeAdmissible = BooleanValue

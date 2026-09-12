@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Anchor training budgets and cadences
+
+`model.anchor_fedavg.rounds` and `.local_epochs_per_round` drive the anchor rounds and local epochs as before. `.client_dropout` is the per-round client participation probability: each round retains `max(1, round(clients × (1 − client_dropout)))` clients chosen by a deterministic order keyed on the round index and the declared dropout, so participation is reproducible and no client is ever dropped in a way that depends on wall-clock or scheduling. `.checkpoint_cadence_rounds` selects which round-start states become the anchor's round checkpoints, and `.evaluation_cadence_rounds` selects which rounds receive a mid-training evaluation record; both are consumed directly rather than assumed to be one.
+
 ### Root-cause partition
 
 Root-cause A/B membership is `HASH_TO_INDEX(domain_separator="CAPABILITY_ROOT_CAUSE", values=(stable_row_id,), modulus=attacks_and_boundaries.capability_under_specification.root_cause_hash_modulus)`; index `0` is root cause A and every other index is root cause B. The modulus is therefore the authoritative partition width and is never hardcoded.
