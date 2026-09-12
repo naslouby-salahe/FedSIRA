@@ -24,6 +24,7 @@ from fedsira.domain.types import (
     ProcedureIdentity,
     RelativePathText,
     SchemaVersion,
+    SupersededPublication,
     TextValue,
 )
 from fedsira.runtime import (
@@ -163,6 +164,30 @@ def _write_text_atomically(path: Path, text: TextValue) -> None:
     os.replace(temporary_path, path)
 
 
+def reported_manifest_path(path: Path) -> RelativePathText:
+    try:
+        return str(path.relative_to(REPOSITORY_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _manifest_identity_from_path(path: Path) -> ArtifactDigest:
+    return path.name.removesuffix(ARTIFACT_MANIFEST_SUFFIX)
+
+
+def _is_superseded_history(path: Path) -> SupersededPublication:
+    pointer_path = current_pointer_path(path.parent)
+    if not pointer_path.exists():
+        return False
+    try:
+        pointer = ArtifactCurrentPointer.model_validate_json(
+            pointer_path.read_text(encoding="utf-8")
+        )
+    except ValueError:
+        return False
+    return pointer.identity != _manifest_identity_from_path(path)
+
+
 def load_published_manifests(
     roots: tuple[Path, ...],
 ) -> tuple[tuple[ArtifactManifest, ...], tuple[InvalidArtifactReport, ...]]:
@@ -177,9 +202,12 @@ def load_published_manifests(
                     ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
                 )
             except ValueError as error:
+                if _is_superseded_history(path):
+                    _log_unreadable_manifest(path, error)
+                    continue
                 invalid.append(
                     InvalidArtifactReport(
-                        manifest_path=str(path.relative_to(REPOSITORY_ROOT)),
+                        manifest_path=reported_manifest_path(path),
                         failure=str(error),
                     )
                 )

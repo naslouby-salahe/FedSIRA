@@ -163,6 +163,7 @@ ConfigFormatVersion = PositiveInt
 CompleteSeedCount = NonNegativeInt
 ByteCount = NonNegativeInt
 ModificationTimestamp = NonNegativeInt
+SupersededPublication = bool
 ModelTransmissionCount = NonNegativeInt
 CommunicationMessageCount = NonNegativeInt
 AdequateFinalGateDomainCount = NonNegativeInt
