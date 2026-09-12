@@ -272,6 +272,7 @@ NewlyAdequateEvidenceExists = BooleanValue
 UnderlyingVoteIsPositive = BooleanValue
 AllowSourceAsVerifier = BooleanValue
 AdmissionIndicator = BooleanValue
+LegitimateAdmissionEligible = BooleanValue
 ModelInputWidth = PositiveInt
 ModelOutputWidth = PositiveInt
 TrainableParameterCount = PositiveInt

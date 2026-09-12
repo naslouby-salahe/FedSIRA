@@ -50,6 +50,7 @@ from fedsira.domain.types import (
     FeatureIndex,
     FeatureName,
     FoldIndex,
+    LegitimateAdmissionEligible,
     MasterSeed,
     MetricName,
     MetricObservation,
@@ -942,11 +943,18 @@ def metrics_from_state(
     state: AdmissionState,
     real_report: RealReportSummary | None = None,
     attack_success_rate: MetricResult | None = None,
+    *,
+    legitimate_admission_eligible: LegitimateAdmissionEligible,
 ) -> tuple[MetricObservation, ...]:
     is_admitted = state is AdmissionState.ADMITTED
     is_dormant = state is AdmissionState.DORMANT
     undefined = undefined_metric()
     asr = attack_success_rate if attack_success_rate is not None else undefined
+    legitimate_admission_value = (
+        legitimate_admission_rate([is_admitted]).value
+        if legitimate_admission_eligible
+        else undefined.value
+    )
     if real_report is None:
         target_f1 = undefined
         supported_macro_f1_harm_value = undefined
@@ -969,7 +977,7 @@ def metrics_from_state(
         equal_weight_mean = real_report.target_f1
     return (
         ("terminal-state", _state_encoding(state)),
-        (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_admission_rate([is_admitted]).value),
+        (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_admission_value),
         (ComparisonMetric.TARGET_F1, target_f1.value),
         ("target-f1-gain", undefined.value),
         (ComparisonMetric.SUPPORTED_MACRO_F1_HARM, supported_macro_f1_harm_value.value),

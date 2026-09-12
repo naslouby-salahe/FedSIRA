@@ -1,4 +1,5 @@
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.domain.enums import AdmissionState, ComparisonMetric
 from fedsira.domain.models import FalseSameCapabilityReason, MetricResult, ProposalOracleLabel
 from fedsira.evaluation.metrics import (
     accuracy,
@@ -21,6 +22,7 @@ from fedsira.evaluation.metrics import (
     legitimate_admission_rate,
     macro_f1,
     malicious_admission_rate,
+    metrics_from_state,
     precision_for_class,
     reproduction_abstention_rate,
     reproduction_attempt_count,
@@ -309,3 +311,16 @@ def test_clean_oracle_degradation_is_material_na_metrics_are_not_material() -> N
         materiality_config,
     )
     assert not result
+
+
+def test_metrics_from_state_reports_legitimate_admission_only_for_capability_bearing_episodes() -> (
+    None
+):
+    eligible = dict(metrics_from_state(AdmissionState.ADMITTED, legitimate_admission_eligible=True))
+    ineligible = dict(
+        metrics_from_state(AdmissionState.ADMITTED, legitimate_admission_eligible=False)
+    )
+    rejected = dict(metrics_from_state(AdmissionState.REJECTED, legitimate_admission_eligible=True))
+    assert eligible[ComparisonMetric.LEGITIMATE_ADMISSION] == 1.0
+    assert rejected[ComparisonMetric.LEGITIMATE_ADMISSION] == 0.0
+    assert ineligible[ComparisonMetric.LEGITIMATE_ADMISSION] is None

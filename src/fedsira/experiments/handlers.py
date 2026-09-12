@@ -78,6 +78,7 @@ from fedsira.domain.types import (
     FrozenDomainModel,
     MasterSeed,
     MetricObservation,
+    MetricValue,
     RequiredReproductionRowCount,
 )
 from fedsira.evaluation.comparisons import (
@@ -92,7 +93,6 @@ from fedsira.evaluation.metrics import (
     evaluate_domain,
     evaluate_screen_domain,
     false_launch_rate,
-    legitimate_admission_rate,
     malicious_admission_rate,
     metrics_from_state,
     non_source_domains,
@@ -374,10 +374,20 @@ class ProtocolCellDispatch:
             return self._execute_verifier_robustness_cell(verifier_cell, evidence)
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW:
             state = self.client_review_outcome(cell)
-            return (state, metrics_from_state(state, self._pending_real_report))
+            return (
+                state,
+                metrics_from_state(
+                    state, self._pending_real_report, legitimate_admission_eligible=True
+                ),
+            )
         if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK:
             state = self._source_release_after_full_external_check_outcome(cell, evidence)
-            return (state, metrics_from_state(state, self._pending_real_report))
+            return (
+                state,
+                metrics_from_state(
+                    state, self._pending_real_report, legitimate_admission_eligible=True
+                ),
+            )
         if variant in (
             AblationVariant.RAW_TARGET_F1_SCREEN_ONLY,
             AblationVariant.NO_MATCHED_CONTROL,
@@ -391,7 +401,9 @@ class ProtocolCellDispatch:
                 opening_cell, evidence, screen_predicate_variant=AblationVariant(variant)
             )
         state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         extra: list[MetricObservation] = []
         if variant == AblationVariant.PARAMETER_SIMILARITY_CERTIFICATION:
             domain_without_target_view_may_participate(True)
@@ -515,7 +527,9 @@ class ProtocolCellDispatch:
             state = self._krum_reference_outcome(cell, evidence)
         else:
             state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         is_scoped_contract = cell.method != CapabilityContractScope.BROAD_TARGET_ONLY
         boundary_metrics = boundary_metric_set(
             true_labels=(),
@@ -823,7 +837,11 @@ class ProtocolCellDispatch:
             )
         if state is AdmissionState.ADMISSION_OPEN:
             state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state,
+            self._pending_real_report,
+            legitimate_admission_eligible=episode_is_legitimate,
+        )
         false_launch_result = false_launch_rate(
             false_launch_count=1
             if state is AdmissionState.ADMITTED and (not episode_is_legitimate)
@@ -884,10 +902,12 @@ class ProtocolCellDispatch:
                     ComparisonMetric.MALICIOUS_ADMISSION,
                     malicious_admission_rate(
                         [
-                            episode == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                            and state is AdmissionState.ADMITTED
+                            state is AdmissionState.ADMITTED
+                            and episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
                         ]
-                    ).value,
+                    ).value
+                    if episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+                    else None,
                 ),
             ),
         )
@@ -1155,25 +1175,22 @@ class ProtocolCellDispatch:
         state = self._advance_protocol(cell, evidence)
         condition = cell.condition
         source_copy_condition = PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER
-        has_legitimate = condition != source_copy_condition
-        metrics = metrics_from_state(state, self._pending_real_report)
-        legitimate_result = legitimate_admission_rate(
-            [has_legitimate and state is AdmissionState.ADMITTED]
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
         )
-        is_source_copy_admitted = (
-            condition == source_copy_condition and state is AdmissionState.ADMITTED
+        malicious_value: MetricValue | None = (
+            malicious_admission_rate(
+                [
+                    state is AdmissionState.ADMITTED
+                    and cell.method != CoreMethodIdentity.FULL_PLURALITY_PATH
+                ]
+            ).value
+            if condition is source_copy_condition
+            else None
         )
-        malicious_indicator = (
-            is_source_copy_admitted and cell.method != CoreMethodIdentity.FULL_PLURALITY_PATH
-        )
-        malicious_result = malicious_admission_rate([malicious_indicator])
         return (
             state,
-            (
-                *metrics,
-                (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_result.value),
-                (ComparisonMetric.MALICIOUS_ADMISSION, malicious_result.value),
-            ),
+            (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_value)),
         )
 
     def _execute_source_exclusion_cell(
@@ -1226,7 +1243,9 @@ class ProtocolCellDispatch:
                         backdoor_scope.trigger_value,
                     )
                     extra.append(("source-backdoor-asr", asr.value))
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         malicious_admission = 0.0
         if method != full_fedsira and state is AdmissionState.ADMITTED:
             malicious_admission = 1.0
@@ -1239,16 +1258,23 @@ class ProtocolCellDispatch:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         condition = cell.condition
         has_malicious = condition in (
             ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
             ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
         )
-        malicious_admission = 0.0
-        full_fedsira = SourceExclusionMethod.FULL_FEDSIRA
-        if has_malicious and state is AdmissionState.ADMITTED and (cell.method != full_fedsira):
-            malicious_admission = 1.0
+        malicious_admission: MetricValue | None = (
+            1.0
+            if has_malicious
+            and state is AdmissionState.ADMITTED
+            and cell.method != SourceExclusionMethod.FULL_FEDSIRA
+            else 0.0
+            if has_malicious
+            else None
+        )
         return (
             state,
             (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission)),
@@ -1259,7 +1285,9 @@ class ProtocolCellDispatch:
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             state = self._advance_protocol(cell, evidence)
-            metrics = metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(
+                state, self._pending_real_report, legitimate_admission_eligible=True
+            )
             return (state, metrics)
         return self._execute_baseline_cell(cell, evidence)
 
@@ -1343,7 +1371,9 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         else:
             state = AdmissionState.DORMANT
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         return (state, metrics)
 
     def _execute_reproducer_robustness_cell(
@@ -1441,7 +1471,9 @@ class ProtocolCellDispatch:
             else:
                 state = AdmissionState.DORMANT
                 self._pending_real_report = None
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         return (state, metrics)
 
     def _execute_verifier_robustness_cell(
@@ -1558,7 +1590,9 @@ class ProtocolCellDispatch:
                     and (honest_positive_bound >= 1)
                     else AdmissionState.DORMANT
                 )
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         return (state, metrics)
 
     def _execute_byzantine_bound_cell(
@@ -1593,7 +1627,9 @@ class ProtocolCellDispatch:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         return (state, metrics)
 
     def _execute_evidence_scarcity_cell(
@@ -1623,16 +1659,22 @@ class ProtocolCellDispatch:
         )
         if tau_k is None:
             state = resume_dormant_admission(DormantOrigin.REPRODUCTION_PENDING, False)
-            metrics = metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(
+                state, self._pending_real_report, legitimate_admission_eligible=True
+            )
             return (state, (*metrics, ("evidence-arrival-cycle", None)))
         try:
             validate_no_safety_completion_before_tau_k(0, tau_k)
         except ValueError:
             state = resume_dormant_admission(DormantOrigin.REPRODUCTION_PENDING, False)
-            metrics = metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(
+                state, self._pending_real_report, legitimate_admission_eligible=True
+            )
             return (state, (*metrics, ("evidence-arrival-cycle", float(tau_k))))
         state = self._advance_protocol(cell, evidence)
-        metrics = metrics_from_state(state, self._pending_real_report)
+        metrics = metrics_from_state(
+            state, self._pending_real_report, legitimate_admission_eligible=True
+        )
         delay_decomposition = AdmissionDelayDecomposition(
             logical_information_arrival_cycles=tau_k,
             assignment_seconds=0.0,
@@ -1685,7 +1727,9 @@ class ProtocolCellDispatch:
         if cell.method == RESOLVED_FEDSIRA_CORE_METHOD:
             state = self._advance_protocol(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
-            metrics = metrics_from_state(state, self._pending_real_report)
+            metrics = metrics_from_state(
+                state, self._pending_real_report, legitimate_admission_eligible=True
+            )
         else:
             state, metrics = self._execute_baseline_cell(cell, evidence)
             post_evidence_wall_clock_seconds = timer.elapsed_seconds()
@@ -2244,13 +2288,19 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             evidence.reproduction_supported_count,
             evidence.final_gate_adequate_domain_count,
         )
-        return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
+        return (
+            AdmissionState.ADMITTED,
+            metrics_from_state(AdmissionState.ADMITTED, legitimate_admission_eligible=False),
+        )
 
     def _execute_protocol_invariant_validation_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         run_protocol_invariant_validation()
-        return (AdmissionState.ADMITTED, metrics_from_state(AdmissionState.ADMITTED))
+        return (
+            AdmissionState.ADMITTED,
+            metrics_from_state(AdmissionState.ADMITTED, legitimate_admission_eligible=False),
+        )
 
     def _execute_cell_protocol(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
