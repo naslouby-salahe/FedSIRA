@@ -21,6 +21,7 @@ from fedsira.datasets.common import (
     poison_backdoor_rows,
     relabel_shared_label_error_rows_for_scope,
     scope_and_shift_rows,
+    select_source_backdoor_poison_rows,
 )
 from fedsira.domain.enums import (
     EpistemicFailureType,
@@ -29,6 +30,7 @@ from fedsira.domain.enums import (
 from fedsira.domain.types import (
     AlgorithmName,
     ArtifactDigest,
+    BooleanValue,
     DerivedSeed,
     DomainId,
     LocalEpochCount,
@@ -358,6 +360,7 @@ def train_centralized_reference_checkpoint(
 
 SOURCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SOURCE_CANDIDATE"
 REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "REPRODUCTION"
+VERIFIER_AWARE_REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "VERIFIER_AWARE_REPRODUCTION"
 GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
     "GENERIC_HARD_SUPPORTED_EXAMPLES"
 )
@@ -439,6 +442,28 @@ def combined_post_reference_rows(
     )
 
 
+def verifier_aware_carrier_mask(
+    adapter: DatasetAdapter,
+    domain: DomainId,
+    backdoor_scope: BackdoorScope,
+    sample_ids: tuple[SampleId, ...],
+) -> torch.Tensor:
+    carrier_rows = adapter.load_rows(
+        domain, adapter.attack_carrier_class_token(), Role.POST_REFERENCE_REPLAY
+    )
+    if carrier_rows is None:
+        return torch.zeros(len(sample_ids), dtype=torch.bool)
+    selected = select_source_backdoor_poison_rows(
+        carrier_rows.sample_ids,
+        backdoor_scope.poison_fraction,
+        backdoor_scope.attack_generation_seed,
+    )
+    if selected is None:
+        return torch.zeros(len(sample_ids), dtype=torch.bool)
+    poisoned_ids = frozenset(selected)
+    return torch.tensor([sample_id in poisoned_ids for sample_id in sample_ids], dtype=torch.bool)
+
+
 def _train_post_reference_delta(
     adapter: DatasetAdapter,
     master_seed: MasterSeed,
@@ -450,6 +475,7 @@ def _train_post_reference_delta(
     epistemic_failure_scope: EpistemicFailureScope | None = None,
     backdoor_scope: BackdoorScope | None = None,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    verifier_aware: BooleanValue = False,
 ) -> torch.Tensor | None:
     combined = combined_post_reference_rows(
         adapter,
@@ -484,21 +510,68 @@ def _train_post_reference_delta(
         eps=config.model.optimizer.epsilon,
         weight_decay=config.model.optimizer.weight_decay,
     )
-    run_post_reference_training(
-        anchor_model,
-        current_model,
-        optimizer,
-        torch.nn.CrossEntropyLoss(),
-        config.model.training,
-        config.model.post_reference,
-        features,
-        labels,
-        is_supported,
-        sample_ids,
-        derived_seed,
-        config.model.post_reference.local_epochs,
-    )
+    if verifier_aware and backdoor_scope is not None:
+        run_post_reference_training(
+            anchor_model,
+            current_model,
+            optimizer,
+            torch.nn.CrossEntropyLoss(),
+            config.model.training,
+            config.model.post_reference,
+            features,
+            labels,
+            is_supported,
+            sample_ids,
+            derived_seed,
+            config.model.verifier_aware_backdoor_override.local_epochs,
+            triggered_features=features,
+            triggered_labels=labels,
+            carrier_row_mask=verifier_aware_carrier_mask(
+                adapter, domain, backdoor_scope, sample_ids
+            ),
+            triggered_backdoor_loss_weight=(
+                config.model.verifier_aware_backdoor_override.triggered_backdoor_loss_weight
+            ),
+        )
+    else:
+        run_post_reference_training(
+            anchor_model,
+            current_model,
+            optimizer,
+            torch.nn.CrossEntropyLoss(),
+            config.model.training,
+            config.model.post_reference,
+            features,
+            labels,
+            is_supported,
+            sample_ids,
+            derived_seed,
+            config.model.post_reference.local_epochs,
+        )
     return flatten_trainable_parameters(current_model) - anchor.flat_parameters
+
+
+def train_verifier_aware_reproduction_delta(
+    adapter: DatasetAdapter,
+    master_seed: MasterSeed,
+    anchor: RealAnchor,
+    domain: DomainId,
+    backdoor_scope: BackdoorScope,
+    heterogeneity_scope: HeterogeneityScope | None = None,
+) -> torch.Tensor | None:
+    return _train_post_reference_delta(
+        adapter,
+        master_seed,
+        anchor,
+        domain,
+        Role.REPRODUCTION,
+        VERIFIER_AWARE_REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
+        None,
+        None,
+        backdoor_scope,
+        heterogeneity_scope,
+        verifier_aware=True,
+    )
 
 
 def train_domain_reproduction_delta(

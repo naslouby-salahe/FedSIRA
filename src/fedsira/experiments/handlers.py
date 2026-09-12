@@ -38,6 +38,7 @@ from fedsira.datasets.nbaiot.schema import (
     nbaiot_adapter,
 )
 from fedsira.domain.enums import (
+    AblationReproducerStrategy,
     AdmissionOpeningMode,
     AdmissionState,
     ByzantineVerifierBehavior,
@@ -71,6 +72,7 @@ from fedsira.domain.types import (
     ByzantineDomainCount,
     CellHandlerName,
     CommunicationMessageCount,
+    CompromisedProductionAncestry,
     CompromisedReproducerCount,
     ConditionName,
     DomainId,
@@ -83,6 +85,7 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
+    ablation_metric,
 )
 from fedsira.evaluation.metrics import (
     RealReportSummary,
@@ -130,6 +133,7 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    AblationScenario,
     AblationVariant,
     BoundCondition,
     DescriptiveScientificMetric,
@@ -145,7 +149,9 @@ from fedsira.experiments.definitions import (
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
+    ablation_reproducer_strategy,
     experiment_by_name,
+    feature_shift_magnitude,
 )
 from fedsira.experiments.engine import (
     AdmissionStateObservation,
@@ -168,9 +174,11 @@ from fedsira.learning.post_reference import (
     train_domain_reproduction_delta,
     train_generic_hard_supported_examples_delta,
     train_source_candidate_delta,
+    train_verifier_aware_reproduction_delta,
 )
 from fedsira.protocol.admission import (
     final_gate_decision,
+    production_committee,
 )
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
@@ -264,6 +272,7 @@ from fedsira.protocol.rules import (
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,
     krum_input_excludes_source,
+    select_krum_update,
 )
 from fedsira.protocol.verification import (
     byzantine_selection_order,
@@ -293,6 +302,9 @@ class ProtocolCellDispatch:
     _resolved_core: ResolvedCore | None
     _pending_real_report: RealReportSummary | None
     _last_protocol_phase_durations: ProtocolPhaseDurations
+    _last_committee_deltas: OrderedDict[DomainId, torch.Tensor]
+    _last_compromised_reproducers: frozenset[DomainId]
+    _last_ablation_strategy: AblationReproducerStrategy
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None: ...
 
@@ -365,6 +377,7 @@ class ProtocolCellDispatch:
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         config = current_application_context().scientific_config
         variant = cell.method
+        claim_metrics: tuple[MetricObservation, ...] = ()
         if variant == AblationVariant.RANDOM_COMMITTEE_PROFILE:
             verifier_cell = replace(
                 cell,
@@ -401,6 +414,7 @@ class ProtocolCellDispatch:
                 opening_cell, evidence, screen_predicate_variant=AblationVariant(variant)
             )
         state = self._advance_protocol(cell, evidence)
+        claim_metrics = self._ablation_claim_metrics(cell, state)
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
         )
@@ -514,7 +528,7 @@ class ProtocolCellDispatch:
                         else None,
                     )
                 )
-        return (state, (*metrics, *extra))
+        return (state, (*metrics, *claim_metrics, *extra))
 
     def _execute_boundary_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -912,10 +926,139 @@ class ProtocolCellDispatch:
             ),
         )
 
+    def _ablation_production_is_compromised(
+        self, cell: ScientificCell
+    ) -> CompromisedProductionAncestry:
+        compromised = self._last_compromised_reproducers
+        if not compromised:
+            return False
+        strategy = self._last_ablation_strategy
+        if strategy is AblationReproducerStrategy.MODEL_REPLACEMENT and not (
+            self._last_committee_deltas
+        ):
+            return False
+        if not self._last_committee_deltas:
+            return True
+        config = current_application_context().scientific_config
+        committee = production_committee(
+            self._last_committee_deltas,
+            tuple(self._last_committee_deltas),
+        )
+        if krum_committee_is_admissible(
+            len(committee), config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ):
+            selected = select_krum_update(
+                committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+            )
+            return selected.reproducer_domain in compromised
+        return bool(compromised & frozenset(self._last_committee_deltas))
+
+    def _ablation_claim_metrics(
+        self, cell: ScientificCell, state: AdmissionState
+    ) -> tuple[MetricObservation, ...]:
+        variant = AblationVariant(cell.method)
+        scenario = AblationScenario(cell.condition)
+        admitted = state is AdmissionState.ADMITTED
+        observations: list[MetricObservation] = []
+        asr_metric = (
+            ablation_metric(variant)[0]
+            if variant is not AblationVariant.FULL_FEDSIRA
+            else ComparisonMetric.ATTACK_SUCCESS_RATE
+        )
+        if asr_metric is ComparisonMetric.ATTACK_SUCCESS_RATE:
+            observations.append(
+                (ComparisonMetric.ATTACK_SUCCESS_RATE, self._ablation_production_asr(cell))
+            )
+        if asr_metric is ComparisonMetric.MALICIOUS_ADMISSION or scenario in (
+            AblationScenario.ONE_MALICIOUS_REPRODUCER,
+            AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
+            AblationScenario.ONE_COMPROMISED_VERIFIER,
+        ):
+            observations.append(
+                (
+                    ComparisonMetric.MALICIOUS_ADMISSION,
+                    None
+                    if not self._last_compromised_reproducers
+                    else float(admitted and self._ablation_production_is_compromised(cell)),
+                )
+            )
+        if asr_metric is ComparisonMetric.REPRODUCTION_ATTEMPTS:
+            observations.append(
+                (
+                    ComparisonMetric.REPRODUCTION_ATTEMPTS,
+                    float(len(self._last_committee_deltas)),
+                )
+            )
+        if asr_metric is ComparisonMetric.POST_EVIDENCE_OVERHEAD:
+            durations = self._last_protocol_phase_durations
+            observations.append(
+                (
+                    ComparisonMetric.POST_EVIDENCE_OVERHEAD,
+                    durations.reproduce_seconds
+                    + durations.verify_seconds
+                    + durations.synthesize_seconds
+                    + durations.assignment_seconds,
+                )
+            )
+        return tuple(observations)
+
+    def _ablation_production_asr(self, cell: ScientificCell) -> MetricValue | None:
+        backdoor_scope = self.backdoor_scope_for_cell(cell)
+        if backdoor_scope is None:
+            return None
+        real_anchor = self.real_anchor(cell.master_seed)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
+        if real_anchor is None or source_domain is None:
+            return None
+        if not self._last_committee_deltas:
+            return None
+        config = current_application_context().scientific_config
+        committee = production_committee(
+            self._last_committee_deltas,
+            tuple(self._last_committee_deltas),
+        )
+        if not committee:
+            return None
+        if krum_committee_is_admissible(
+            len(committee), config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        ):
+            selected = select_krum_update(
+                committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
+            )
+            production_update = selected.update_vector
+        else:
+            production_update = next(iter(self._last_committee_deltas.values()))
+        asr = compute_source_backdoor_asr(
+            nbaiot_adapter(self._primary_adapter.prepared_root),
+            real_anchor,
+            real_anchor.flat_parameters + production_update,
+            source_domain,
+            backdoor_scope.trigger_feature_indices,
+            backdoor_scope.trigger_value,
+        )
+        return asr.value
+
+    def _ablation_compromised_reproducers(
+        self, cell: ScientificCell, strategy: AblationReproducerStrategy
+    ) -> frozenset[DomainId]:
+        if strategy is AblationReproducerStrategy.NONE:
+            return frozenset()
+        selected = select_compromised_reproducers(
+            reproducer_order_for_cell(self._primary_adapter, cell),
+            frozenset(self._primary_adapter.domain_ids),
+            1,
+        )
+        if selected is None:
+            return frozenset()
+        return frozenset(NBaiotDomain(domain) for domain in selected)
+
     def _advance_protocol(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
+        self._last_committee_deltas = OrderedDict()
+        self._last_compromised_reproducers = frozenset()
+        self._last_ablation_strategy = AblationReproducerStrategy.NONE
         config = current_application_context().scientific_config
         self._pending_real_report = None
         evidence_minima = config.capability_contract.evidence_minima
@@ -1033,6 +1176,12 @@ class ProtocolCellDispatch:
         )
         heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
         backdoor_scope = self.backdoor_scope_for_cell(cell)
+        ablation_strategy = (
+            ablation_reproducer_strategy(AblationScenario(cell.condition))
+            if cell.experiment == MECHANISM_ABLATION_NAME
+            else AblationReproducerStrategy.NONE
+        )
+        compromised_reproducers = self._ablation_compromised_reproducers(cell, ablation_strategy)
         if single_verifier_active:
             reproduction_timer = ElapsedTimer()
             progression_state, attempts, commitment_hashes, updates = single_verifier_progression(
@@ -1052,9 +1201,10 @@ class ProtocolCellDispatch:
                 evidence,
                 external_verification_active,
                 required_row_count,
-                frozenset(),
+                compromised_reproducers,
                 self._primary_adapter,
                 real_anchor,
+                strategy=ablation_strategy,
                 include_source_as_first_reproducer=no_origin_exclusion_active,
                 heterogeneity_scope=heterogeneity_scope,
                 backdoor_scope=backdoor_scope,
@@ -1063,6 +1213,7 @@ class ProtocolCellDispatch:
             self._last_protocol_phase_durations = ProtocolPhaseDurations(
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
             )
+            self._last_committee_deltas = updates
             if progression_state is AdmissionState.VERIFICATION_PENDING:
                 verification_timer = ElapsedTimer()
                 certified_positive_report_count = 0
@@ -2178,15 +2329,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
 
     def heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None:
         config = current_application_context().scientific_config
-        if cell.experiment != HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
-            return None
-        regime = HeterogeneityRegime(cell.condition)
-        magnitudes = config.attacks_and_boundaries.heterogeneity.feature_shift_magnitudes
-        if regime is HeterogeneityRegime.FEATURE_SHIFT_0_5:
-            shift_magnitude = magnitudes[0]
-        elif regime is HeterogeneityRegime.FEATURE_SHIFT_1_0:
-            shift_magnitude = magnitudes[1]
-        else:
+        shift_magnitude = feature_shift_magnitude(cell.condition)
+        if shift_magnitude is None:
             return None
         real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
@@ -2375,6 +2519,7 @@ def _train_reproduction_update(
     compromised_reproducers: frozenset[DomainId],
     heterogeneity_scope: HeterogeneityScope | None,
     backdoor_scope: BackdoorScope | None,
+    strategy: AblationReproducerStrategy,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
@@ -2385,6 +2530,32 @@ def _train_reproduction_update(
             anchor,
             domain,
             heterogeneity_scope=heterogeneity_scope,
+        )
+    if strategy is AblationReproducerStrategy.VERIFIER_AWARE:
+        if backdoor_scope is None:
+            return None
+        return train_verifier_aware_reproduction_delta(
+            adapter,
+            cell.master_seed,
+            anchor,
+            domain,
+            backdoor_scope,
+            heterogeneity_scope,
+        )
+    if strategy is AblationReproducerStrategy.MODEL_REPLACEMENT:
+        trained = train_domain_reproduction_delta(
+            adapter,
+            cell.master_seed,
+            anchor,
+            domain,
+            heterogeneity_scope=heterogeneity_scope,
+            backdoor_scope=backdoor_scope,
+        )
+        if trained is None:
+            return None
+        return scale_model_replacement_delta(
+            trained,
+            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
         )
     condition = cell.condition
     if condition in (
@@ -2428,6 +2599,7 @@ def reproduction_progression(
     compromised_reproducers: frozenset[DomainId],
     adapter: DatasetAdapter,
     anchor: RealAnchor | None,
+    strategy: AblationReproducerStrategy = AblationReproducerStrategy.NONE,
     include_source_as_first_reproducer: BooleanValue = False,
     heterogeneity_scope: HeterogeneityScope | None = None,
     backdoor_scope: BackdoorScope | None = None,
@@ -2498,6 +2670,7 @@ def reproduction_progression(
             compromised_reproducers,
             heterogeneity_scope,
             backdoor_scope,
+            strategy,
         )
         if update is None:
             state = handle_inadequate_domain()

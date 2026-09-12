@@ -130,6 +130,12 @@ class ArtifactFamily(StrEnum):
     TABLE_FIGURE_REPORT_EXPORT = "Table/figure/report export"
 
 
+class AblationReproducerStrategy(StrEnum):
+    NONE = "None"
+    MODEL_REPLACEMENT = "Model replacement"
+    VERIFIER_AWARE = "Verifier-aware"
+
+
 class ArtifactProducer(StrEnum):
     RAW_ACQUISITION = "Raw acquisition"
     DATASET_PREPARATION = "Dataset preparation"

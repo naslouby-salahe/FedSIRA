@@ -280,6 +280,7 @@ UnderlyingVoteIsPositive = BooleanValue
 AllowSourceAsVerifier = BooleanValue
 AdmissionIndicator = BooleanValue
 LegitimateAdmissionEligible = BooleanValue
+CompromisedProductionAncestry = BooleanValue
 ModelInputWidth = PositiveInt
 ModelOutputWidth = PositiveInt
 TrainableParameterCount = PositiveInt

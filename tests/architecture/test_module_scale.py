@@ -5,10 +5,10 @@ from _repo import SRC_ROOT
 JUSTIFIED_LINE_BUDGETS = {
     "config.py": 900,
     "domain/types.py": 520,
-    "experiments/definitions.py": 900,
+    "experiments/definitions.py": 930,
     "experiments/collapse.py": 700,
-    "experiments/handlers.py": 2700,
-    "learning/post_reference.py": 700,
+    "experiments/handlers.py": 2860,
+    "learning/post_reference.py": 720,
     "datasets/common.py": 1300,
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 1300,

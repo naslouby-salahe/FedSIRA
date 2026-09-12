@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import torch
 
@@ -60,6 +60,20 @@ def apply_production_update(
     anchor_flat_parameters: torch.Tensor, production_update: torch.Tensor
 ) -> torch.Tensor:
     return anchor_flat_parameters + production_update
+
+
+def production_committee(
+    committee_deltas: Mapping[DomainId, torch.Tensor],
+    reproducer_order: Sequence[DomainId],
+) -> tuple[CertifiedReproductionRow, ...]:
+    return tuple(
+        CertifiedReproductionRow(
+            reproducer_domain=domain,
+            update_vector=committee_deltas[domain],
+        )
+        for domain in reproducer_order
+        if domain in committee_deltas
+    )
 
 
 def resolve_production_update(
@@ -253,14 +267,7 @@ def final_gate_decision(
         )
     krum_selected_update: torch.Tensor | None = None
     if is_plurality_active:
-        committee = tuple(
-            CertifiedReproductionRow(
-                reproducer_domain=domain,
-                update_vector=committee_deltas[domain],
-            )
-            for domain in reproducer_order
-            if domain in committee_deltas
-        )
+        committee = production_committee(committee_deltas, reproducer_order)
         if not committee:
             return (AdmissionState.DORMANT, None)
         krum_selected_update = select_krum_update(

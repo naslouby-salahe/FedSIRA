@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TypeAlias
 
 from fedsira.domain.enums import (
+    AblationReproducerStrategy,
     ComparisonMetric,
     CoreMethodIdentity,
     DatasetId,
@@ -17,6 +18,7 @@ from fedsira.domain.types import (
     BooleanValue,
     ConditionName,
     ExperimentName,
+    FeatureShiftMagnitude,
     FigureName,
     FrozenDomainModel,
     MethodName,
@@ -480,6 +482,41 @@ def epistemic_strength_tokens(failure_type: EpistemicFailureType) -> tuple[Condi
     else:
         raise ValueError(f"unsupported epistemic failure type: {failure_type.value}")
     return tuple(f"{strength:.2f}" for strength in strengths)
+
+
+FEATURE_SHIFT_1_0_CONDITIONS: tuple[ConditionName, ...] = (
+    HeterogeneityRegime.FEATURE_SHIFT_1_0.value,
+    PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+    ExternalVerificationCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+    AblationScenario.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0.value,
+    AblationScenario.FEATURE_SHIFT_1_0.value,
+)
+
+FEATURE_SHIFT_0_5_CONDITIONS: tuple[ConditionName, ...] = (
+    HeterogeneityRegime.FEATURE_SHIFT_0_5.value,
+)
+
+
+def feature_shift_magnitude(condition: ConditionName) -> FeatureShiftMagnitude | None:
+    heterogeneity = (
+        current_application_context().scientific_config.attacks_and_boundaries.heterogeneity
+    )
+    magnitudes = heterogeneity.feature_shift_magnitudes
+    if condition in FEATURE_SHIFT_0_5_CONDITIONS:
+        return magnitudes[0]
+    if condition in FEATURE_SHIFT_1_0_CONDITIONS:
+        return magnitudes[1]
+    return None
+
+
+def ablation_reproducer_strategy(scenario: AblationScenario) -> AblationReproducerStrategy:
+    if scenario is AblationScenario.ONE_MALICIOUS_REPRODUCER:
+        return AblationReproducerStrategy.MODEL_REPLACEMENT
+    if scenario is AblationScenario.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER:
+        return AblationReproducerStrategy.VERIFIER_AWARE
+    if scenario is AblationScenario.ONE_COMPROMISED_VERIFIER:
+        return AblationReproducerStrategy.MODEL_REPLACEMENT
+    return AblationReproducerStrategy.NONE
 
 
 def ablation_scenario_for_variant(variant: AblationVariant) -> AblationScenario:
