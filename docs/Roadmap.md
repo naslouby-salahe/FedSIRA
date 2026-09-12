@@ -3489,6 +3489,14 @@ Matched `Full FedSIRA` prerequisite artifacts required by Section 30.10 are comp
 
 If a baseline is `Invalid` during validation, its downstream planned cells remain part of the nominal plan as invalid rather than disappearing after outcomes are visible. `plan` must distinguish nominal, executable-valid, completed, failed/invalid, and scientifically evidence-insufficient counts.
 
+## 31.1 Execution staging and concurrency
+
+The declared prerequisites induce four execution stages, and experiments within a stage have no mutual dependency: only `Data and Domain Evidence Validation` and `Protocol Invariant Validation` are prerequisite-free; `Baseline Implementation Validation`, `Proposal-Assisted Opening Necessity`, `Single-Reproduction Necessity`, `Source-Artifact Exclusion Necessity`, and `External Verification Necessity` follow the data/domain stage; `Primary Confirmatory Evaluation` follows the proposal stage; and every remaining post-core experiment follows primary confirmatory evaluation. A stage may therefore be executed by concurrent processes, and this requires no change to scientific identity: each cell's result depends only on its own scenario and master seed and on read-only shared inputs, artifacts are dependency-keyed with atomic publication, execution records are per-cell, and the experiment lifecycle is derived from the persisted record set rather than from process completion.
+
+Two constraints bound that concurrency. Cell-level timing evidence — `Efficiency Measurement` and the measured wall-clock segments of `Admission-Delay Decomposition` — must not run concurrently with other work, because concurrent load is itself a timing condition; those cells run alone. And a prepared role view must have published provenance before any cell may consume it, so `preprocess` runs to completion (including view publication) before the first scientific cell starts.
+
+The longest dependency chain is `Data and Domain Evidence Validation` → `Proposal-Assisted Opening Necessity` → `Primary Confirmatory Evaluation` → the largest post-core experiment, 781 cells of the 1,989-cell plan, so achievable wall-clock speed-up from concurrency alone is bounded by roughly 2.5×; reducing it further requires sharding cells inside `Primary Confirmatory Evaluation`.
+
 # 32. Scientific authority and no-post-hoc-selection boundaries
 
 The roadmap, its configuration values, deterministic derivation rules, experiment matrices, collapse actions, statistical comparisons, reporting products, and claim rules are the study's scientific authority. Execution does not create a second mechanism-selection or parameter-selection stage.
