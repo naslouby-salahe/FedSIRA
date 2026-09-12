@@ -79,6 +79,8 @@ from fedsira.protocol.baselines.registry import (
     fedavg_reference_post_reference_participants,
     fedavg_reference_post_reference_rounds,
     post_reference_retrain_maximum_local_epochs,
+    recovery_after_source_admission_rounds,
+    update_reconstruction_local_epochs,
 )
 from fedsira.protocol.synthesis import CertifiedReproductionRow, select_krum_update
 from fedsira.runtime import current_application_context
@@ -227,7 +229,7 @@ def train_recovery_after_source_admission_delta(
         master_seed,
         anchor,
         source_domain,
-        post_reference_retrain_maximum_local_epochs(),
+        recovery_after_source_admission_rounds(),
         RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
         exclude_source_from_participants=True,
     )
@@ -344,7 +346,7 @@ def train_density_cluster_trimmed_mean_delta(
     load_flat_trainable_parameters(model, anchor.flat_parameters)
     state = model_state_from_classifier(model)
     any_round_trained = False
-    for round_index in range(post_reference_retrain_maximum_local_epochs()):
+    for round_index in range(update_reconstruction_local_epochs()):
         current_flat = _flatten_model_state(anchor, state)
         contributing_domains: list[DomainId] = []
         raw_updates: list[torch.Tensor] = []

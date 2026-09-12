@@ -541,6 +541,20 @@ def post_reference_retrain_maximum_local_epochs() -> LocalEpochCount:
     return current_application_context().scientific_config.model.post_reference.local_epochs
 
 
+def update_reconstruction_local_epochs() -> LocalEpochCount:
+    reconstruction_filter = (
+        current_application_context().scientific_config.baselines.reconstruction_filter
+    )
+    return reconstruction_filter.reconstruction_local_epochs
+
+
+def recovery_after_source_admission_rounds() -> FederatedRoundCount:
+    recovery = (
+        current_application_context().scientific_config.baselines.recovery_after_source_admission
+    )
+    return recovery.recovery_rounds
+
+
 def fedavg_reference_post_reference_participants(
     domain_order: Sequence[Domain],
     post_reference_eligible_domains: Sequence[Domain],
