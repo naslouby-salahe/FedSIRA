@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Checkpoint artifacts
+
+Anchor checkpoints are published as `Anchor checkpoint and round checkpoints` artifacts: one `final` artifact per master seed plus one `round-start-<n>` artifact per anchor round, in the slot `(family, seed-<master seed>-<stage>, )` under procedure identity `fedsira|anchor_checkpoint|1`. The payload is a typed record carrying the dataset, the master seed, the stage identity, the prepared-evidence digest, the model input and output widths, the flat-parameter identity, and the flat parameter values themselves as finite floats, so a downstream consumer can load the checkpoint without retraining and can verify it against the recorded identity. The family's declared dependency is the prepared evidence digest, so a change to the prepared data yields a new identity and the previous checkpoint becomes diagnostic history. Source candidate, reproduction and baseline checkpoints use the same payload through `fedsira|source_candidate_checkpoint|1`, `fedsira|reproduction_checkpoint|1` and `fedsira|baseline_checkpoint|1`.
+
 ### Sampling caps on supported replay
 
 `datasets.primary.sampling_caps_per_domain.source_proposal_supported_replay_per_supported_class` and `.reproduction_supported_replay_per_supported_class` cap the per-supported-class `Post-Reference Replay` rows drawn into the Source Proposal and Reproduction training populations respectively. The retained subset is a deterministic function of the prepared dataset digest, the domain, and the class; it does not depend on the master seed, matching the prepared-view cap convention. Other target roles draw their supported replay without a cap.

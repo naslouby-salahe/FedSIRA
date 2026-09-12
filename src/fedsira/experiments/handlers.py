@@ -114,6 +114,7 @@ from fedsira.evaluation.service import (
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
 )
+from fedsira.experiments.checkpoints import publish_anchor_checkpoints
 from fedsira.experiments.collapse import ResolvedCore
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -2345,11 +2346,14 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
         if master_seed not in self.real_anchor_cache:
-            self.real_anchor_cache[master_seed] = (
+            anchor = (
                 train_anchor(self._primary_adapter, master_seed)
                 if self._primary_adapter.evidence_available()
                 else None
             )
+            if anchor is not None:
+                publish_anchor_checkpoints(self._primary_adapter.dataset, master_seed, anchor)
+            self.real_anchor_cache[master_seed] = anchor
         return self.real_anchor_cache[master_seed]
 
     def _same_context_verifier_panel(
