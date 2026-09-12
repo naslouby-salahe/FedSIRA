@@ -167,7 +167,9 @@ from fedsira.runtime import (
 )
 
 
-def _reference_cell(scientific_scenario: ScenarioName, master_seed: MasterSeed) -> ScientificCell:
+def ablation_reference_cell(
+    scientific_scenario: ScenarioName, master_seed: MasterSeed
+) -> ScientificCell:
     return ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
         method=AblationVariant.FULL_FEDSIRA.value,
@@ -203,7 +205,7 @@ def materialize_ablation_references(
                     ),
                 )
                 continue
-            reference_cell = _reference_cell(scientific_scenario, master_seed)
+            reference_cell = ablation_reference_cell(scientific_scenario, master_seed)
             outcome = execute_cell_with_retry(reference_cell, executor)
             reference = PersistedAblationReference(
                 schema_version=ABLATION_REFERENCE_SCHEMA_VERSION,

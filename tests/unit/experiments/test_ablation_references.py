@@ -1,15 +1,23 @@
 from fedsira.artifacts.store import ArtifactDependency, artifact_identity
 from fedsira.domain.enums import AblationReproducerStrategy, ArtifactDependencyKind, ArtifactFamily
-from fedsira.evaluation.comparisons import ComparisonMetric
+from fedsira.evaluation.comparisons import (
+    ComparisonFamily,
+    ComparisonMetric,
+    ablation_metric,
+    build_comparison_registry,
+)
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
     AblationScenario,
     AblationVariant,
     HeterogeneityRegime,
     ablation_reproducer_strategy,
+    ablation_scenario_for_condition,
     feature_shift_magnitude,
 )
 from fedsira.experiments.engine import ablation_reference_slot
+from fedsira.experiments.execution import ablation_reference_cell
+from fedsira.experiments.planning import build_plan
 
 
 def test_ablation_reference_slot_is_deterministic_and_keyed_by_scenario_and_seed() -> None:
@@ -128,3 +136,37 @@ def test_comparison_metric_enum_carries_the_canonical_metric_names() -> None:
         == "false-same-capability-certification-rate"
     )
     assert ComparisonMetric.MALICIOUS_ADMISSION.value == "malicious-admission"
+
+
+def test_mechanism_ablation_declares_every_scenario_and_variant() -> None:
+    plan = build_plan(resolved_core_complete=True)
+    planned = next(
+        item for item in plan.experiments if item.definition.name == MECHANISM_ABLATION_NAME
+    )
+    assert len(planned.cells) == 180
+    assert {cell.condition for cell in planned.cells} == {
+        scenario.value for scenario in AblationScenario
+    }
+    assert {cell.method for cell in planned.cells} == {variant.value for variant in AblationVariant}
+    for cell in planned.cells:
+        assert ablation_scenario_for_condition(cell.condition) is not None
+        reference = ablation_reference_cell(cell.condition, cell.master_seed)
+        assert reference.method == AblationVariant.FULL_FEDSIRA.value
+        assert reference.condition == cell.condition
+        assert reference.master_seed == cell.master_seed
+
+
+def test_every_ablation_variant_pairs_against_the_matched_full_reference() -> None:
+    definitions = tuple(
+        definition
+        for definition in build_comparison_registry()
+        if definition.family is ComparisonFamily.MECHANISM_ABLATION
+    )
+    assert len(definitions) == len(tuple(AblationVariant)) - 1
+    for definition in definitions:
+        assert definition.experiment == MECHANISM_ABLATION_NAME
+        assert definition.reference_experiment == MECHANISM_ABLATION_NAME
+        assert definition.reference_method == AblationVariant.FULL_FEDSIRA.value
+        assert definition.reference_scenario == definition.scientific_scenario
+        assert definition.metric is ablation_metric(AblationVariant(definition.method))[0]
+        assert definition.material_threshold is not None
