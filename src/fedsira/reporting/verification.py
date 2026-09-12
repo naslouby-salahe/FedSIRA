@@ -12,6 +12,7 @@ from fedsira.domain.enums import (
 )
 from fedsira.domain.types import (
     CheckpointIdentity,
+    ConditionName,
     DatasetColumnName,
     ExperimentName,
     FrozenDomainModel,
@@ -21,7 +22,9 @@ from fedsira.domain.types import (
     TextValue,
     VerificationPassed,
 )
+from fedsira.evaluation.comparisons import ComparisonMetric
 from fedsira.experiments.definitions import (
+    BYZANTINE_BOUND_VIOLATION_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
@@ -29,6 +32,7 @@ from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    BoundCondition,
     DescriptiveScientificMetric,
     VerifierCondition,
 )
@@ -43,6 +47,7 @@ from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
 )
+from fedsira.runtime import current_application_context
 
 
 class ExperimentTerminalCount(FrozenDomainModel):
@@ -102,6 +107,36 @@ def verify_planned_cell_count_satisfied(
                 f"found {observed}"
             )
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
+
+
+BOUND_WITHIN_CONDITIONS: tuple[ConditionName, ...] = (
+    BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND.value,
+    BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND.value,
+)
+
+
+def verify_byzantine_operating_region(
+    records: tuple[PersistedExecutionRecord, ...],
+) -> CompletenessVerificationResult:
+    evidence_thresholds = current_application_context().scientific_config.evidence_thresholds
+    thresholds = evidence_thresholds.byzantine_operating_region
+    max_admissions = thresholds.maximum_malicious_admissions_within_bound
+    admissions: list[CheckpointIdentity] = []
+    for record in records:
+        if record.experiment != BYZANTINE_BOUND_VIOLATION_NAME:
+            continue
+        if record.condition not in BOUND_WITHIN_CONDITIONS:
+            continue
+        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
+            continue
+        for metric_name, metric_value in record.metrics:
+            if metric_name != str(ComparisonMetric.MALICIOUS_ADMISSION):
+                continue
+            if metric_value == 1.0:
+                admissions.append(f"{record.semantic_key}: malicious admission within bound")
+    if len(admissions) > max_admissions:
+        return CompletenessVerificationResult(passed=False, failures=tuple(admissions))
+    return CompletenessVerificationResult(passed=True, failures=())
 
 
 def verify_experiments_completed(

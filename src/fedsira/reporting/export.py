@@ -141,6 +141,7 @@ from fedsira.reporting.verification import (
     table_header,
     terminal_count_for_planned_experiment,
     verify_artifact_manifest_dependencies,
+    verify_byzantine_operating_region,
     verify_experiments_completed,
     verify_experiments_reached_terminal_state,
     verify_mandatory_figure_source_data,
@@ -717,6 +718,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         completion_verification,
         terminal_verification,
         manifest_dependency_verification,
+        byzantine_bound_verification,
     ) = run_bounded(
         "final_export_verification",
         verification_timeout,
@@ -727,6 +729,9 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
             verify_artifact_manifest_dependencies(
                 artifact_manifest_dependency_failures(*load_published_manifests(artifact_roots))
             ),
+            verify_byzantine_operating_region(
+                store.read_all_outcomes(BYZANTINE_BOUND_VIOLATION_NAME)
+            ),
         ),
     )
     failures = (
@@ -734,6 +739,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         *completion_verification.failures,
         *terminal_verification.failures,
         *manifest_dependency_verification.failures,
+        *byzantine_bound_verification.failures,
     )
     verification = CompletenessVerificationResult(passed=not failures, failures=failures)
     collapse_decisions = _load_collapse_decisions(store)

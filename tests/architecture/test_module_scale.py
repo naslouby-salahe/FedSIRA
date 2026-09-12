@@ -35,7 +35,7 @@ JUSTIFIED_BYTE_BUDGETS = {
     "evaluation/service.py": 30_000,
     "reporting/tables.py": 55_000,
     "reporting/figures.py": 55_000,
-    "reporting/export.py": 45_000,
+    "reporting/export.py": 46_000,
     "datasets/ciciot2023/prepare.py": 40_000,
     "evaluation/comparisons.py": 45_000,
     "experiments/definitions.py": 45_000,
