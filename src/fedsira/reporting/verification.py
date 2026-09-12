@@ -54,7 +54,7 @@ from fedsira.experiments.engine import (
     PersistedExecutionRecord,
 )
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
-from fedsira.reporting.figures import (
+from fedsira.reporting.figure_observations import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
 )
@@ -141,7 +141,7 @@ def verify_safe_dormancy(
         for metric_name, metric_value in record.metrics:
             if metric_name != str(DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION):
                 continue
-            if metric_value == 1.0:  # TODO: should be constant
+            if metric_value == 1.0:
                 observed.append(f"{record.semantic_key}: permanent singleton admission")
     if len(observed) > allowed:
         return CompletenessVerificationResult(passed=False, failures=tuple(observed))
@@ -197,7 +197,7 @@ def verify_byzantine_operating_region(
         for metric_name, metric_value in record.metrics:
             if metric_name != str(ComparisonMetric.MALICIOUS_ADMISSION):
                 continue
-            if metric_value == 1.0:  # TODO: should be constant
+            if metric_value == 1.0:
                 admissions.append(f"{record.semantic_key}: malicious admission within bound")
     if len(admissions) > max_admissions:
         return CompletenessVerificationResult(passed=False, failures=tuple(admissions))

@@ -100,17 +100,19 @@ from fedsira.experiments.planning import (
     validate_planned_cell_count_invariant,
 )
 from fedsira.reporting import tables as table_renderers
-from fedsira.reporting.figures import (
+from fedsira.reporting.figure_observations import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
+)
+from fedsira.reporting.figures import efficiency_telemetry as project_efficiency_telemetry
+from fedsira.reporting.figures import evidence_trajectory as project_evidence_trajectory
+from fedsira.reporting.figures import (
     outcome_evidence_trajectory,
     project_result_evidence,
     render_experiment_figures,
     render_mandatory_figures,
     validate_mandatory_figures_covered,
 )
-from fedsira.reporting.figures import efficiency_telemetry as project_efficiency_telemetry
-from fedsira.reporting.figures import evidence_trajectory as project_evidence_trajectory
 from fedsira.reporting.protocol_tables import (
     render_baseline_protocol_table,
     render_dataset_and_domain_protocol_table,
@@ -169,11 +171,11 @@ from fedsira.runtime import (
     run_bounded,
 )
 
-EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"  # TODO: should be enum
+EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
 
 REPORT_LOGGER = get_structured_logger("reporting")
 
-PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"  # TODO: should be enum
+PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"
 
 
 class ReportLogFields(FrozenDomainModel):
@@ -412,10 +414,10 @@ def export_experiment_report(
         planned_cell_count=len(result.outcomes),
         execution_digest=result.execution_digest,
     )
-    summary_path = metrics_root / "summary.json"  # TODO: should be enum
+    summary_path = metrics_root / "summary.json"
     summary_path.write_text(summary.model_dump_json(indent=2) + "\n")
     exported.append(summary_path)
-    manifest_path = experiment_root / "manifest.json"  # TODO: should be enum
+    manifest_path = experiment_root / "manifest.json"
     manifest = ExperimentArtifactManifest(
         schema_version=EXPORT_SCHEMA_VERSION,
         experiment=result.experiment,
@@ -605,7 +607,7 @@ def export_project_summary(
         pending_mandatory_tables=pending_tables,
         pending_mandatory_figures=pending_figures,
     )
-    reproducibility_path = reproducibility_root / "execution_summary.json"  # TODO: should be enum
+    reproducibility_path = reproducibility_root / "execution_summary.json"
     reproducibility_path.write_text(reproducibility_summary.model_dump_json(indent=2) + "\n")
     exported.append(reproducibility_path)
 
@@ -841,20 +843,16 @@ def _load_collapse_decisions(store: ExecutionRecordStore) -> tuple[CollapseDecis
     return tuple(decisions)
 
 
-COMPARISONS_PARQUET_NAME = "comparisons.parquet"  # TODO: should be enum
-TIMINGS_PARQUET_NAME = "timings.parquet"  # TODO: should be enum
-RESOURCES_PARQUET_NAME = "resources.parquet"  # TODO: should be enum
+COMPARISONS_PARQUET_NAME = "comparisons.parquet"
+TIMINGS_PARQUET_NAME = "timings.parquet"
+RESOURCES_PARQUET_NAME = "resources.parquet"
 
 _TIMING_METRICS: frozenset[MetricName] = frozenset(
     (
-        "assignment-seconds"  # TODO: should be enum
-,
-        "reproduce-seconds"  # TODO: should be enum
-,
-        "verify-seconds"  # TODO: should be enum
-,
-        "synthesize-seconds"  # TODO: should be enum
-,
+        "assignment-seconds",
+        "reproduce-seconds",
+        "verify-seconds",
+        "synthesize-seconds",
         DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
     )
 )

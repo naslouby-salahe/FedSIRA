@@ -122,9 +122,9 @@ RATE_VALUED_METRICS: tuple[MetricName, ...] = (
     ComparisonMetric.FALSE_LAUNCH.value,
     ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE.value,
     DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
-    "verifier-abstention-rate",  # TODO: should be enum
-    "reproduction-abstention-rate",  # TODO: should be enum
-    "defined-domain-fraction",  # TODO: should be enum
+    "verifier-abstention-rate",
+    "reproduction-abstention-rate",
+    "defined-domain-fraction",
 )
 
 
@@ -928,11 +928,7 @@ class ByzantineBoundaryRow(FrozenDomainModel):
 
 
 def _condition_compromised_count(condition: ScenarioName) -> RowCount:
-    if condition.startswith("Two"):
-        return 2
-    if condition.startswith("One"):
-        return 1
-    return 0
+    return 2 if condition.startswith("Two") else 1 if condition.startswith("One") else 0
 
 
 def _byzantine_boundary(
@@ -951,18 +947,18 @@ def _byzantine_boundary(
                     strategy=condition,
                 )
     elif experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
-        within_bound_maximum = config.protocol.synthesis.maximum_byzantine_reproduction_rows
+        limit = config.protocol.synthesis.maximum_byzantine_reproduction_rows
         compromised = _condition_compromised_count(condition)
         return ByzantineBoundaryRow(
-            bound_status="Within Bound" if compromised <= within_bound_maximum else "Above Bound",
+            bound_status="Within Bound" if compromised <= limit else "Above Bound",
             compromised_count=compromised,
             strategy=condition,
         )
     elif experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-        within_bound_maximum = config.protocol.verification.maximum_byzantine_verifiers_per_panel
+        limit = config.protocol.verification.maximum_byzantine_verifiers_per_panel
         compromised = _condition_compromised_count(condition)
         return ByzantineBoundaryRow(
-            bound_status="Within Bound" if compromised <= within_bound_maximum else "Above Bound",
+            bound_status="Within Bound" if compromised <= limit else "Above Bound",
             compromised_count=compromised,
             strategy=condition,
         )
@@ -1307,7 +1303,7 @@ def render_delay_and_efficiency_table(
     )
 
 
-GENERALIZATION_SCOPE_LABEL: TextValue = "Data/Attack Generalization Only"  # TODO: should be enum
+GENERALIZATION_SCOPE_LABEL: TextValue = "Data/Attack Generalization Only"
 
 
 def _generalization_references(

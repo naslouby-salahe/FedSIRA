@@ -113,8 +113,7 @@ EVIDENCE_ROLES: frozenset[Role] = frozenset(
 )
 PREPROCESSING_SAMPLE_ORDER_SEED: DerivedSeed = (
     int.from_bytes(
-        hashlib.sha256(b"FedSIRA|preprocess_sample_order|1"  # TODO: should be enum
-).digest()[0:8], byteorder="big"
+        hashlib.sha256(b"FedSIRA|preprocess_sample_order|1").digest()[0:8], byteorder="big"
     )
     % UINT32_MODULUS
 )
@@ -122,9 +121,9 @@ FILE_DIGEST_CHUNK_BYTES = 1_048_576
 
 
 class DatasetExclusionReason(StrEnum):
-    NON_FINITE_PREDICTOR = "non_finite_predictor"  # TODO: should be enum
-    UNPARSEABLE_PREDICTOR = "unparseable_predictor"  # TODO: should be enum
-    ROW_WIDTH_MISMATCH = "row_width_mismatch"  # TODO: should be enum
+    NON_FINITE_PREDICTOR = "non_finite_predictor"
+    UNPARSEABLE_PREDICTOR = "unparseable_predictor"
+    ROW_WIDTH_MISMATCH = "row_width_mismatch"
 
 
 class RoleWindow(FrozenDomainModel):
@@ -177,7 +176,7 @@ class RawDatasetIdentityPayload(FrozenDomainModel):
     files: tuple[RawDatasetFileIdentity, ...]
 
 
-PREPARED_ROLE_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|prepared_role_view_manifest|1"  # TODO: should be enum
+PREPARED_ROLE_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|prepared_role_view_manifest|1"
 
 
 class PreparedRoleViewManifest(FrozenDomainModel):
@@ -200,7 +199,7 @@ class PreparedViewSidecar(FrozenDomainModel):
     schema_version: SchemaVersion
 
 
-SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"  # TODO: should be enum
+SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"
 
 
 class ScalerMetadata(FrozenDomainModel):
@@ -332,7 +331,7 @@ def apply_sampling_cap(
     return tuple(ordered[:cap])
 
 
-REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"  # TODO: should be enum
+REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"
 
 
 def supported_replay_cap_for_target_role(role: Role) -> SamplingCap | None:
@@ -973,7 +972,7 @@ def relabel_triggered_rows_as_benign(
     return relabeled
 
 
-ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"  # TODO: should be enum
+ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
 
 
 def root_cause_for_sample(sample_id: SampleId) -> RootCause:
@@ -1093,10 +1092,10 @@ def apply_attacker_induced_common_context(
 QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY.value
 
 
-HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"  # TODO: should be enum
+HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"
 
 
-HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"  # TODO: should be enum
+HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"
 
 
 class DomainQuantitySkew(FrozenDomainModel):

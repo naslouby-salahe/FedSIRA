@@ -90,17 +90,17 @@ from fedsira.runtime import (
 
 PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
 
-RAW_DATASET_IDENTITY_SCHEMA_VERSION: SchemaVersion = "fedsira|raw_dataset_identity|1"  # TODO: should be enum
-RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|raw_dataset_identity|1"  # TODO: should be enum
-SCALER_ARTIFACT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|scaler|1"  # TODO: should be enum
-RAW_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "raw-file-manifest"  # TODO: should be enum
-PREPARED_EVIDENCE_DEPENDENCY: ArtifactDependencyName = "prepared-evidence"  # TODO: should be enum
+RAW_DATASET_IDENTITY_SCHEMA_VERSION: SchemaVersion = "fedsira|raw_dataset_identity|1"
+RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|raw_dataset_identity|1"
+SCALER_ARTIFACT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|scaler|1"
+RAW_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "raw-file-manifest"
+PREPARED_EVIDENCE_DEPENDENCY: ArtifactDependencyName = "prepared-evidence"
 
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
 
-DATASET_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "dataset-file-manifest"  # TODO: should be enum
-DATASET_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|dataset_manifest|1"  # TODO: should be enum
+DATASET_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "dataset-file-manifest"
+DATASET_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|dataset_manifest|1"
 
 
 def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseDecision:
@@ -189,7 +189,7 @@ def publish_scaler(
     return reused
 
 
-PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|1"  # TODO: should be enum
+PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|1"
 
 
 def publish_prepared_role_view(

@@ -63,9 +63,9 @@ from fedsira.reporting.export import (
     project_evidence_trajectory,
     verify_experiment_artifacts,
 )
+from fedsira.reporting.figure_observations import EvidenceStateFraction
 from fedsira.reporting.figures import (
     MANDATORY_FIGURE_NAMES,
-    EvidenceStateFraction,
     render_capability_granularity_boundary,
     render_protocol_schematic,
     render_security_utility_tradeoff,

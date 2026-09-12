@@ -25,21 +25,21 @@ from fedsira.runtime import framed_bytes
 
 
 class CICIoTSpecialLabel(StrEnum):
-    BENIGN = "BENIGN"  # TODO: should be enum
-    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"  # TODO: should be enum
+    BENIGN = "BENIGN"
+    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"
 
 
 class _CICIoTBenignAlias(StrEnum):
-    BENIGNTRAFFIC = "BENIGNTRAFFIC"  # TODO: should be enum
-    BENIGN_TRAFFIC = "BENIGN_TRAFFIC"  # TODO: should be enum
-    BENIGN_FINAL = "BENIGN_FINAL"  # TODO: should be enum
+    BENIGNTRAFFIC = "BENIGNTRAFFIC"
+    BENIGN_TRAFFIC = "BENIGN_TRAFFIC"
+    BENIGN_FINAL = "BENIGN_FINAL"
 
 
 class CICIoT2023TargetFamilyMember(StrEnum):
-    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"  # TODO: should be enum
-    MIRAI_GREETH_FLOOD = "MIRAI_GREETH_FLOOD"  # TODO: should be enum
-    MIRAI_GREIP_FLOOD = "MIRAI_GREIP_FLOOD"  # TODO: should be enum
-    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"  # TODO: should be enum
+    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"
+    MIRAI_GREETH_FLOOD = "MIRAI_GREETH_FLOOD"
+    MIRAI_GREIP_FLOOD = "MIRAI_GREIP_FLOOD"
+    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"
 
     @property
     def raw_token(self) -> ClassLabel:
@@ -47,10 +47,10 @@ class CICIoT2023TargetFamilyMember(StrEnum):
 
 
 class CICIoTRowIdentifierToken(StrEnum):
-    INDEX = "INDEX"  # TODO: should be enum
-    ROW_ID = "ROW_ID"  # TODO: should be enum
-    ROWID = "ROWID"  # TODO: should be enum
-    UNNAMED_0 = "UNNAMED_0"  # TODO: should be enum
+    INDEX = "INDEX"
+    ROW_ID = "ROW_ID"
+    ROWID = "ROWID"
+    UNNAMED_0 = "UNNAMED_0"
 
 
 class CICIoT2023PseudoDomain(IntEnum):
@@ -73,7 +73,7 @@ TARGET_LABEL = CICIoTSpecialLabel.BACKDOOR_MALWARE
 BENIGN_LABEL = CICIoTSpecialLabel.BENIGN
 OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
 PSEUDO_DOMAIN_COUNT: DomainCount = len(CICIoT2023PseudoDomain)
-PSEUDO_DOMAIN_HASH_SEPARATOR: SeedDerivationLabel = "CIC_IOT_2023_PSEUDO_DOMAIN"  # TODO: should be enum
+PSEUDO_DOMAIN_HASH_SEPARATOR: SeedDerivationLabel = "CIC_IOT_2023_PSEUDO_DOMAIN"
 _NON_ALPHANUMERIC_RUN = re.compile(r"[^0-9A-Za-z]+")
 
 

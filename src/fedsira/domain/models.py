@@ -36,11 +36,11 @@ from fedsira.domain.types import (
     WallClockSeconds,
 )
 
-COMMUNICATION_SCHEMA: SchemaVersion = "FEDSIRA_COMM_V1"  # TODO: should be enum
-SERVER_ID: MessageEndpoint = "SERVER"  # TODO: should be enum
+COMMUNICATION_SCHEMA: SchemaVersion = "FEDSIRA_COMM_V1"
+SERVER_ID: MessageEndpoint = "SERVER"
 METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
 TENSOR_METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
-TENSOR_DTYPE: SchemaVersion = "float32"  # TODO: should be enum
+TENSOR_DTYPE: SchemaVersion = "float32"
 
 EncodedBytes = Annotated[bytes, Field()]
 
@@ -58,13 +58,13 @@ class ConfusionCounts(FrozenDomainModel):
 
 
 class ProposalOracleLabel(StrEnum):
-    ORACLE_VALID = "ORACLE_VALID"  # TODO: should be enum
-    ORACLE_INVALID = "ORACLE_INVALID"  # TODO: should be enum
-    NA = "NA"  # TODO: should be enum
+    ORACLE_VALID = "ORACLE_VALID"
+    ORACLE_INVALID = "ORACLE_INVALID"
+    NA = "NA"
 
 
 class FalseSameCapabilityReason(StrEnum):
-    NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION = "No Cross-Root-Cause Equivalence Assertion"  # TODO: should be enum
+    NO_CROSS_ROOT_CAUSE_EQUIVALENCE_ASSERTION = "No Cross-Root-Cause Equivalence Assertion"
 
 
 class AdmissionDelayDecomposition(FrozenDomainModel):
@@ -85,22 +85,22 @@ class AdmissionDelayDecomposition(FrozenDomainModel):
 
 
 class CommunicationMessageType(StrEnum):
-    SOURCE_COMMITMENT = "SOURCE_COMMITMENT"  # TODO: should be enum
-    MODEL_DISTRIBUTION = "MODEL_DISTRIBUTION"  # TODO: should be enum
-    UPDATE_SUBMISSION = "UPDATE_SUBMISSION"  # TODO: should be enum
-    CAPABILITY_CONTRACT = "CAPABILITY_CONTRACT"  # TODO: should be enum
-    REVIEW_ASSIGNMENT = "REVIEW_ASSIGNMENT"  # TODO: should be enum
-    REVIEW_REPORT = "REVIEW_REPORT"  # TODO: should be enum
-    VERIFIER_ASSIGNMENT = "VERIFIER_ASSIGNMENT"  # TODO: should be enum
-    VERIFIER_REPORT = "VERIFIER_REPORT"  # TODO: should be enum
-    FINAL_GATE_ASSIGNMENT = "FINAL_GATE_ASSIGNMENT"  # TODO: should be enum
-    FINAL_GATE_REPORT = "FINAL_GATE_REPORT"  # TODO: should be enum
-    DECISION = "DECISION"  # TODO: should be enum
+    SOURCE_COMMITMENT = "SOURCE_COMMITMENT"
+    MODEL_DISTRIBUTION = "MODEL_DISTRIBUTION"
+    UPDATE_SUBMISSION = "UPDATE_SUBMISSION"
+    CAPABILITY_CONTRACT = "CAPABILITY_CONTRACT"
+    REVIEW_ASSIGNMENT = "REVIEW_ASSIGNMENT"
+    REVIEW_REPORT = "REVIEW_REPORT"
+    VERIFIER_ASSIGNMENT = "VERIFIER_ASSIGNMENT"
+    VERIFIER_REPORT = "VERIFIER_REPORT"
+    FINAL_GATE_ASSIGNMENT = "FINAL_GATE_ASSIGNMENT"
+    FINAL_GATE_REPORT = "FINAL_GATE_REPORT"
+    DECISION = "DECISION"
 
 
 class TensorParameterKind(StrEnum):
-    MODEL = "model"  # TODO: should be enum
-    UPDATE = "update"  # TODO: should be enum
+    MODEL = "model"
+    UPDATE = "update"
 
 
 class CommunicationMessageMetadata(FrozenDomainModel):

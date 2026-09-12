@@ -37,203 +37,203 @@ from fedsira.runtime import current_application_context
 
 
 class ComparisonFamily(StrEnum):
-    PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"  # TODO: should be enum
-    PLURALITY_NECESSITY = "plurality necessity"  # TODO: should be enum
-    SOURCE_EXCLUSION_CENTRAL_EFFECT = "source-exclusion central effect"  # TODO: should be enum
-    EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"  # TODO: should be enum
-    PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"  # TODO: should be enum
-    REPRODUCER_ROBUSTNESS = "reproducer robustness"  # TODO: should be enum
-    VERIFIER_ROBUSTNESS = "verifier robustness"  # TODO: should be enum
-    MECHANISM_ABLATION = "mechanism ablation"  # TODO: should be enum
+    PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"
+    PLURALITY_NECESSITY = "plurality necessity"
+    SOURCE_EXCLUSION_CENTRAL_EFFECT = "source-exclusion central effect"
+    EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"
+    PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"
+    REPRODUCER_ROBUSTNESS = "reproducer robustness"
+    VERIFIER_ROBUSTNESS = "verifier robustness"
+    MECHANISM_ABLATION = "mechanism ablation"
     HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY = (
         "heterogeneity/failure-boundary secondary comparisons"
     )
-    SECONDARY_GENERALIZATION = "secondary generalization"  # TODO: should be enum
+    SECONDARY_GENERALIZATION = "secondary generalization"
 
 
 class ExperimentClass(StrEnum):
-    VALIDATION = "Validation"  # TODO: should be enum
-    EXPLORATORY = "Exploratory"  # TODO: should be enum
-    CONFIRMATORY = "Confirmatory"  # TODO: should be enum
-    ABLATION = "Ablation"  # TODO: should be enum
-    ROBUSTNESS = "Robustness"  # TODO: should be enum
-    FAILURE_BOUNDARY = "Failure Boundary"  # TODO: should be enum
-    DIAGNOSTIC = "Diagnostic"  # TODO: should be enum
-    GENERALIZATION = "Generalization"  # TODO: should be enum
+    VALIDATION = "Validation"
+    EXPLORATORY = "Exploratory"
+    CONFIRMATORY = "Confirmatory"
+    ABLATION = "Ablation"
+    ROBUSTNESS = "Robustness"
+    FAILURE_BOUNDARY = "Failure Boundary"
+    DIAGNOSTIC = "Diagnostic"
+    GENERALIZATION = "Generalization"
 
 
 class EfficiencyCondition(StrEnum):
-    TIMED = "timed"  # TODO: should be enum
+    TIMED = "timed"
 
 
 class TrainingProtocolStage(StrEnum):
-    ANCHOR = "anchor"  # TODO: should be enum
-    SOURCE_CANDIDATE = "source candidate"  # TODO: should be enum
-    HONEST_REPRODUCTION = "honest reproduction"  # TODO: should be enum
+    ANCHOR = "anchor"
+    SOURCE_CANDIDATE = "source candidate"
+    HONEST_REPRODUCTION = "honest reproduction"
 
 
 class DescriptiveScientificMetric(StrEnum):
-    VALIDATION_GATE = "validation gate"  # TODO: should be enum
-    LOGICAL_STATE_BY_CYCLE = "state-by-logical-cycle"  # TODO: should be enum
-    TIME_TO_FIRST_REPRODUCTION = "time-to-first-reproduction"  # TODO: should be enum
-    T_EVIDENCE = "t-evidence"  # TODO: should be enum
-    TIME_TO_CERTIFICATE = "time-to-certificate"  # TODO: should be enum
-    TERMINAL_PROTOCOL_OUTCOME = "terminal-protocol-outcome"  # TODO: should be enum
-    CROSS_DOMAIN_VERIFIER_AGREEMENT = "cross-domain-verifier-agreement"  # TODO: should be enum
-    CERTIFIED_ROW_YIELD = "certified-row-yield"  # TODO: should be enum
-    ROOT_CAUSE_TARGET_F1 = "root-cause-target-f1"  # TODO: should be enum
-    CERTIFICATE_ADMISSION_RATE = "certificate-admission-rate-under-corrupted-operational-evidence"  # TODO: should be enum
-    WALL_CLOCK_SECONDS = "post-evidence-wall-clock-seconds"  # TODO: should be enum
-    GPU_SECONDS = "gpu-seconds"  # TODO: should be enum
-    PEAK_GPU_MEMORY_BYTES = "peak-gpu-memory-bytes"  # TODO: should be enum
-    PEAK_HOST_RSS_BYTES = "peak-host-rss-bytes"  # TODO: should be enum
-    COMMUNICATION_BYTES = "communication-bytes"  # TODO: should be enum
-    MODEL_TRANSMISSIONS = "model-transmissions"  # TODO: should be enum
-    PERSISTENT_STORAGE_BYTES = "persistent-storage-bytes"  # TODO: should be enum
-    TOTAL_ATTEMPTS = "total-attempts"  # TODO: should be enum
-    DORMANT_ADMISSION_RATE = "dormant-admission-rate"  # TODO: should be enum
-    PERMANENT_SINGLETON_ADMISSION = "permanent-singleton-admission"  # TODO: should be enum
+    VALIDATION_GATE = "validation gate"
+    LOGICAL_STATE_BY_CYCLE = "state-by-logical-cycle"
+    TIME_TO_FIRST_REPRODUCTION = "time-to-first-reproduction"
+    T_EVIDENCE = "t-evidence"
+    TIME_TO_CERTIFICATE = "time-to-certificate"
+    TERMINAL_PROTOCOL_OUTCOME = "terminal-protocol-outcome"
+    CROSS_DOMAIN_VERIFIER_AGREEMENT = "cross-domain-verifier-agreement"
+    CERTIFIED_ROW_YIELD = "certified-row-yield"
+    ROOT_CAUSE_TARGET_F1 = "root-cause-target-f1"
+    CERTIFICATE_ADMISSION_RATE = "certificate-admission-rate-under-corrupted-operational-evidence"
+    WALL_CLOCK_SECONDS = "post-evidence-wall-clock-seconds"
+    GPU_SECONDS = "gpu-seconds"
+    PEAK_GPU_MEMORY_BYTES = "peak-gpu-memory-bytes"
+    PEAK_HOST_RSS_BYTES = "peak-host-rss-bytes"
+    COMMUNICATION_BYTES = "communication-bytes"
+    MODEL_TRANSMISSIONS = "model-transmissions"
+    PERSISTENT_STORAGE_BYTES = "persistent-storage-bytes"
+    TOTAL_ATTEMPTS = "total-attempts"
+    DORMANT_ADMISSION_RATE = "dormant-admission-rate"
+    PERMANENT_SINGLETON_ADMISSION = "permanent-singleton-admission"
 
 
 ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric
 
 
 class OpeningMode(StrEnum):
-    PROPOSAL_ASSISTED = "Proposal-Assisted"  # TODO: should be enum
-    CANDIDATE_FREE = "Candidate-Free"  # TODO: should be enum
+    PROPOSAL_ASSISTED = "Proposal-Assisted"
+    CANDIDATE_FREE = "Candidate-Free"
 
 
 class PluralityCondition(StrEnum):
-    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"  # TODO: should be enum
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"  # TODO: should be enum
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"  # TODO: should be enum
+    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"
+    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
+    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
 
 
 class ExternalVerificationCondition(StrEnum):
-    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"  # TODO: should be enum
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"  # TODO: should be enum
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"  # TODO: should be enum
-    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"  # TODO: should be enum
+    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"
+    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
+    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
+    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"
 
 
 class PrimaryScenario(StrEnum):
-    LEGITIMATE_UNSUPPORTED_CAPABILITY = "Legitimate Unsupported Capability"  # TODO: should be enum
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"  # TODO: should be enum
-    ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT = "One Byzantine Post-Reference Participant"  # TODO: should be enum
+    LEGITIMATE_UNSUPPORTED_CAPABILITY = "Legitimate Unsupported Capability"
+    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
+    ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT = "One Byzantine Post-Reference Participant"
 
 
 class SourceExclusionMethod(StrEnum):
-    FULL_FEDSIRA = "Full FedSIRA"  # TODO: should be enum
-    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"  # TODO: should be enum
-    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"  # TODO: should be enum
-    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"  # TODO: should be enum
-    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"  # TODO: should be enum
-    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"  # TODO: should be enum
+    FULL_FEDSIRA = "Full FedSIRA"
+    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"
+    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"
+    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"
+    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"
+    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"
 
 
 class AblationVariant(StrEnum):
-    FULL_FEDSIRA = "Full FedSIRA"  # TODO: should be enum
-    NO_PROPOSAL_SCREEN = "No Proposal Screen"  # TODO: should be enum
-    RAW_TARGET_F1_SCREEN_ONLY = "Raw Target-F1 Screen Only"  # TODO: should be enum
-    NO_MATCHED_CONTROL = "No Matched Control"  # TODO: should be enum
-    SOURCE_RELEASE_AFTER_PEER_REVIEW = "Source Release after Peer Review"  # TODO: should be enum
-    SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK = "Source Release after Full External Check"  # TODO: should be enum
-    ONE_INDEPENDENT_REPRODUCTION = "One Independent Reproduction"  # TODO: should be enum
+    FULL_FEDSIRA = "Full FedSIRA"
+    NO_PROPOSAL_SCREEN = "No Proposal Screen"
+    RAW_TARGET_F1_SCREEN_ONLY = "Raw Target-F1 Screen Only"
+    NO_MATCHED_CONTROL = "No Matched Control"
+    SOURCE_RELEASE_AFTER_PEER_REVIEW = "Source Release after Peer Review"
+    SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK = "Source Release after Full External Check"
+    ONE_INDEPENDENT_REPRODUCTION = "One Independent Reproduction"
     MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION = (
         "Multiple Reproductions without Cross-Verification"
     )
-    SAME_CONTEXT_VERIFICATION_ONLY = "Same-Context Verification Only"  # TODO: should be enum
-    NO_ORIGIN_EXCLUSION = "No Origin Exclusion"  # TODO: should be enum
-    PARAMETER_SIMILARITY_CERTIFICATION = "Parameter-Similarity Certification"  # TODO: should be enum
-    CANDIDATE_FREE_REPRODUCTION = "Candidate-Free Reproduction"  # TODO: should be enum
-    DIRECT_KRUM_OF_RETRAINS = "Direct Krum of Retrains"  # TODO: should be enum
-    GENERIC_THREE_ROW_THRESHOLD = "Generic Three-Row Threshold"  # TODO: should be enum
-    RANDOM_COMMITTEE_PROFILE = "Random Committee Profile"  # TODO: should be enum
-    NO_FINAL_SYNTHESIS_GATE = "No Final Synthesis Gate"  # TODO: should be enum
-    BYZANTINE_REPRODUCER_COPIES_SOURCE = "Byzantine Reproducer Copies Source"  # TODO: should be enum
-    CAPABILITY_CONTRACT_GRANULARITY = "Capability-Contract Granularity"  # TODO: should be enum
+    SAME_CONTEXT_VERIFICATION_ONLY = "Same-Context Verification Only"
+    NO_ORIGIN_EXCLUSION = "No Origin Exclusion"
+    PARAMETER_SIMILARITY_CERTIFICATION = "Parameter-Similarity Certification"
+    CANDIDATE_FREE_REPRODUCTION = "Candidate-Free Reproduction"
+    DIRECT_KRUM_OF_RETRAINS = "Direct Krum of Retrains"
+    GENERIC_THREE_ROW_THRESHOLD = "Generic Three-Row Threshold"
+    RANDOM_COMMITTEE_PROFILE = "Random Committee Profile"
+    NO_FINAL_SYNTHESIS_GATE = "No Final Synthesis Gate"
+    BYZANTINE_REPRODUCER_COPIES_SOURCE = "Byzantine Reproducer Copies Source"
+    CAPABILITY_CONTRACT_GRANULARITY = "Capability-Contract Granularity"
 
 
 class AblationScenario(StrEnum):
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"  # TODO: should be enum
+    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
     MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL = "Mixed Legitimate/Irrelevant Proposal Episode"
-    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"  # TODO: should be enum
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"  # TODO: should be enum
-    ONE_MALICIOUS_REPRODUCER = "One Malicious Reproducer"  # TODO: should be enum
-    NATURAL = "Natural"  # TODO: should be enum
-    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"  # TODO: should be enum
-    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"  # TODO: should be enum
-    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"  # TODO: should be enum
-    ONE_COMPROMISED_VERIFIER = "One Compromised Verifier"  # TODO: should be enum
-    UNDER_SPECIFICATION_FIXTURE = "Under-Specification Fixture"  # TODO: should be enum
+    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"
+    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
+    ONE_MALICIOUS_REPRODUCER = "One Malicious Reproducer"
+    NATURAL = "Natural"
+    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"
+    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
+    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"
+    ONE_COMPROMISED_VERIFIER = "One Compromised Verifier"
+    UNDER_SPECIFICATION_FIXTURE = "Under-Specification Fixture"
 
 
 class ReproducerCondition(StrEnum):
-    CLEAN = "CLEAN"  # TODO: should be enum
-    ONE_SOURCE_COPY = "One Source Copy"  # TODO: should be enum
-    ONE_MODEL_REPLACEMENT_BACKDOOR = "One Model-Replacement Backdoor"  # TODO: should be enum
-    ONE_VERIFIER_AWARE_BACKDOOR = "One Verifier-Aware Backdoor"  # TODO: should be enum
-    TWO_SOURCE_COPIES = "Two Source Copies"  # TODO: should be enum
-    TWO_MODEL_REPLACEMENT_BACKDOORS = "Two Model-Replacement Backdoors"  # TODO: should be enum
-    TWO_VERIFIER_AWARE_BACKDOORS = "Two Verifier-Aware Backdoors"  # TODO: should be enum
+    CLEAN = "CLEAN"
+    ONE_SOURCE_COPY = "One Source Copy"
+    ONE_MODEL_REPLACEMENT_BACKDOOR = "One Model-Replacement Backdoor"
+    ONE_VERIFIER_AWARE_BACKDOOR = "One Verifier-Aware Backdoor"
+    TWO_SOURCE_COPIES = "Two Source Copies"
+    TWO_MODEL_REPLACEMENT_BACKDOORS = "Two Model-Replacement Backdoors"
+    TWO_VERIFIER_AWARE_BACKDOORS = "Two Verifier-Aware Backdoors"
 
 
 class VerifierProfile(StrEnum):
-    DETERMINISTIC_BOUND = "Deterministic Bound"  # TODO: should be enum
-    RANDOM_COMMITTEE_DIAGNOSTIC = "Random-Committee Diagnostic"  # TODO: should be enum
+    DETERMINISTIC_BOUND = "Deterministic Bound"
+    RANDOM_COMMITTEE_DIAGNOSTIC = "Random-Committee Diagnostic"
 
 
 class VerifierCondition(StrEnum):
-    ALL_HONEST = "All Honest"  # TODO: should be enum
-    ONE_FALSE_POSITIVE = "One False Positive"  # TODO: should be enum
-    TWO_FALSE_POSITIVES = "Two False Positives"  # TODO: should be enum
-    ONE_FALSE_NEGATIVE = "One False Negative"  # TODO: should be enum
-    TWO_FALSE_NEGATIVES = "Two False Negatives"  # TODO: should be enum
+    ALL_HONEST = "All Honest"
+    ONE_FALSE_POSITIVE = "One False Positive"
+    TWO_FALSE_POSITIVES = "Two False Positives"
+    ONE_FALSE_NEGATIVE = "One False Negative"
+    TWO_FALSE_NEGATIVES = "Two False Negatives"
 
 
 class BoundCondition(StrEnum):
-    ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND = "One Byzantine Reproducer — Within Bound"  # TODO: should be enum
-    TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND = "Two Byzantine Reproducers — Above Bound"  # TODO: should be enum
-    ONE_BYZANTINE_VERIFIER_WITHIN_BOUND = "One Byzantine Verifier — Within Bound"  # TODO: should be enum
-    TWO_BYZANTINE_VERIFIERS_ABOVE_BOUND = "Two Byzantine Verifiers — Above Bound"  # TODO: should be enum
+    ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND = "One Byzantine Reproducer — Within Bound"
+    TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND = "Two Byzantine Reproducers — Above Bound"
+    ONE_BYZANTINE_VERIFIER_WITHIN_BOUND = "One Byzantine Verifier — Within Bound"
+    TWO_BYZANTINE_VERIFIERS_ABOVE_BOUND = "Two Byzantine Verifiers — Above Bound"
 
 
 class CapabilityContractGranularity(StrEnum):
-    BROAD_TARGET_ONLY = "Broad Target Only"  # TODO: should be enum
-    ROOT_CAUSE_A_SCOPED = "Root-Cause A Scoped"  # TODO: should be enum
-    ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"  # TODO: should be enum
+    BROAD_TARGET_ONLY = "Broad Target Only"
+    ROOT_CAUSE_A_SCOPED = "Root-Cause A Scoped"
+    ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"
 
 
 class HeterogeneityRegime(StrEnum):
-    NATURAL = "Natural"  # TODO: should be enum
-    QUANTITY_SKEW = "Quantity Skew"  # TODO: should be enum
-    FEATURE_SHIFT_0_5 = "Feature Shift ±0.5"  # TODO: should be enum
-    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"  # TODO: should be enum
+    NATURAL = "Natural"
+    QUANTITY_SKEW = "Quantity Skew"
+    FEATURE_SHIFT_0_5 = "Feature Shift ±0.5"
+    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"
 
 
 class SecondaryScenario(StrEnum):
-    LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY = "Legitimate Backdoor-Malware Capability"  # TODO: should be enum
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"  # TODO: should be enum
+    LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY = "Legitimate Backdoor-Malware Capability"
+    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
 
 
-CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"  # TODO: should be enum
-CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"  # TODO: should be enum
-SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"  # TODO: should be enum
-AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"  # TODO: should be enum
-STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"  # TODO: should be enum
-PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"  # TODO: should be enum
-PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"  # TODO: should be enum
-USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"  # TODO: should be enum
-COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"  # TODO: should be enum
-COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"  # TODO: should be enum
-COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"  # TODO: should be enum
-SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"  # TODO: should be enum
-CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"  # TODO: should be enum
-HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"  # TODO: should be enum
-ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"  # TODO: should be enum
-EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"  # TODO: should be enum
-EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"  # TODO: should be enum
-SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"  # TODO: should be enum
+CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
+CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
+SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
+AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
+STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"
+PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
+PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
+USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
+COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"
+COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"
+COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"
+SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"
+CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"
+HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"
+ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"
+EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"
+EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"
+SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
 
 
 class ExperimentArtifactSpecification(FrozenDomainModel):
@@ -274,27 +274,27 @@ class ExperimentDefinition(FrozenDomainModel):
     artifacts: ExperimentArtifactSpecification
 
 
-DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"  # TODO: should be enum
-PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"  # TODO: should be enum
-BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"  # TODO: should be enum
-PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"  # TODO: should be enum
-SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"  # TODO: should be enum
-SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"  # TODO: should be enum
-EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"  # TODO: should be enum
-PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"  # TODO: should be enum
-MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"  # TODO: should be enum
-COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"  # TODO: should be enum
-COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"  # TODO: should be enum
-BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"  # TODO: should be enum
-EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"  # TODO: should be enum
-SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"  # TODO: should be enum
+DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
+PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"
+BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"
+PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"
+SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"
+SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"
+EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"
+PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"
+MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"
+COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"
+COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"
+BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"
+EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"
+SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"
 CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: ExperimentName = (
     "Capability Under-Specification Boundary"
-)  # TODO: should be enum
-HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"  # TODO: should be enum
-ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"  # TODO: should be enum
-EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"  # TODO: should be enum
-SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"  # TODO: should be enum
+)
+HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"
+ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"
+EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
+SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
 
 REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,

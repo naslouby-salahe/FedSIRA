@@ -131,10 +131,10 @@ def reproduction_update_vector(
 
 
 class EvidenceArrivalSchedule(StrEnum):
-    PERMANENT_SINGLETON = "Permanent Singleton"  # TODO: should be enum
-    ONE_HONEST_HOLDER = "One Honest Holder"  # TODO: should be enum
-    GRADUAL_TO_QUORUM = "Gradual to Quorum"  # TODO: should be enum
-    IMMEDIATE_QUORUM = "Immediate Quorum"  # TODO: should be enum
+    PERMANENT_SINGLETON = "Permanent Singleton"
+    ONE_HONEST_HOLDER = "One Honest Holder"
+    GRADUAL_TO_QUORUM = "Gradual to Quorum"
+    IMMEDIATE_QUORUM = "Immediate Quorum"
 
 
 TERMINAL_ADMISSION_STATES = frozenset(

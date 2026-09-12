@@ -80,7 +80,6 @@ from fedsira.domain.types import (
     MetricObservation,
     MetricValue,
     ReproductionAttemptCount,
-    RequiredReproductionRowCount,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonMetric,
@@ -123,7 +122,6 @@ from fedsira.experiments.cell_parameters import (
 from fedsira.experiments.checkpoints import (
     publish_anchor_checkpoints,
     publish_trained_update,
-    reproduction_stage_identity,
     source_candidate_stage_identity,
 )
 from fedsira.experiments.collapse import ResolvedCore
@@ -161,7 +159,6 @@ from fedsira.experiments.definitions import (
     PluralityCondition,
     ProposalEpisode,
     ReproducerCondition,
-    SecondaryScenario,
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
@@ -208,6 +205,10 @@ from fedsira.experiments.protocol_evidence import (
     record_production_evidence,
     record_verification_evidence,
 )
+from fedsira.experiments.reproduction_progression import (
+    BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
+    reproduction_progression,
+)
 from fedsira.learning.federated import train_anchor
 from fedsira.learning.post_reference import (
     certified_domain_delta_committee,
@@ -215,7 +216,6 @@ from fedsira.learning.post_reference import (
     train_generic_hard_supported_examples_delta,
     train_irrelevant_source_improvement_delta,
     train_source_candidate_delta,
-    train_verifier_aware_reproduction_delta,
 )
 from fedsira.protocol.admission import (
     final_gate_decision,
@@ -223,7 +223,6 @@ from fedsira.protocol.admission import (
 )
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
-    scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
     validate_declared_source_backdoor_poison_fraction,
@@ -283,15 +282,8 @@ from fedsira.protocol.proposal import (
 from fedsira.protocol.reproduction import (
     ReproductionAttempt,
     commitment_digest,
-    consumed_domains,
-    handle_adequate_domain_trained,
-    handle_inadequate_domain,
-    handle_no_adequate_unconsumed_domain,
-    next_reproducer_domain,
     select_compromised_reproducers,
     validate_commitment_exists_before_verifier_assignment,
-    validate_reproduction_start_checkpoint,
-    validate_reproduction_starts_from_anchor,
 )
 from fedsira.protocol.rules import (
     apply_logical_cycle_expiry,
@@ -305,7 +297,6 @@ from fedsira.protocol.rules import (
     minimum_honest_positive_count,
     report_for_domain,
     reproducer_order_for_cell,
-    reproduction_update_vector,
     resolve_ternary_outcome,
     resume_dormant_admission,
     validate_no_safety_completion_before_tau_k,
@@ -502,10 +493,8 @@ class ProtocolCellDispatch:
                     )
                 except ValueError:
                     row_results = ()
-                extra.append(("parameter-similarity-committed-rows"  # TODO: should be enum
-, float(len(committed_rows))))
-                extra.append(("parameter-similarity-certified-rows"  # TODO: should be enum
-, float(sum(row_results))))
+                extra.append(("parameter-similarity-committed-rows", float(len(committed_rows))))
+                extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD:
             validate_three_row_coordinate_median_committee_size(
                 row_requirement(cell, self._resolved_core),
@@ -515,7 +504,7 @@ class ProtocolCellDispatch:
                 raise ValueError(
                     "Generic Three-Row Threshold requires the Krum n=3,f=1 branch to be Invalid"
                 )
-            extra.append(("krum-n3-f1-invalid", 1.0))  # TODO: should be enum
+            extra.append(("krum-n3-f1-invalid", 1.0))
         elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
@@ -574,8 +563,8 @@ class ProtocolCellDispatch:
                         false_same_count += 1
                 extra.append(
                     (
-                        "capability-contract-granularity-broad-certified-rows"  # TODO: should be enum
-,                        float(broad_certified_count),
+                        "capability-contract-granularity-broad-certified-rows",
+                        float(broad_certified_count),
                     )
                 )
                 extra.append(
@@ -624,10 +613,10 @@ class ProtocolCellDispatch:
         false_same_equivalence = boundary_metrics.false_same_equivalence_check
         false_same_rate = boundary_metrics.false_same_capability_rate
         extra: list[MetricObservation] = [
-            ("macro-auroc", macro_auroc.value),  # TODO: should be enum
-            ("macro-auprc", macro_auprc.value),  # TODO: should be enum
-            ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),  # TODO: should be enum
-            ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),  # TODO: should be enum
+            ("macro-auroc", macro_auroc.value),
+            ("macro-auprc", macro_auprc.value),
+            ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),
+            ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),
             (ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, false_same_rate.value),
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
@@ -687,7 +676,7 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
             extra.append(
-                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID))  # TODO: should be enum
+                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID))
             )
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
@@ -708,7 +697,7 @@ class ProtocolCellDispatch:
             validate_excluded_root_cause_not_supported(
                 scope, supported_ids, root_cause_a_ids, root_cause_b_ids
             )
-            extra.append(("target-row-ids", float(len(target_row_ids))))  # TODO: should be enum
+            extra.append(("target-row-ids", float(len(target_row_ids))))
         if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
             failure_type_token, strength_token = cell.condition.split("|")
             failure_type = EpistemicFailureType(failure_type_token)
@@ -749,11 +738,11 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
                 extra.append(
-                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))  # TODO: should be enum
+                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))
                 )
-                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))  # TODO: should be enum
+                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))
                 extra.append(
-                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)  # TODO: should be enum
+                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)
                 )
                 extra.append(
                     (
@@ -761,27 +750,27 @@ class ProtocolCellDispatch:
                         epistemic_summary.benign_far_increase.value,
                     )
                 )
-                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))  # TODO: should be enum
+                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))
                 extra.append(
                     (
-                        "diagnostic-marker-insufficient",  # TODO: should be enum
+                        "diagnostic-marker-insufficient",
                         1.0 if epistemic_summary.diagnostic_marker.value is None else 0.0,
                     )
                 )
                 extra.append(
                     (
-                        "proposal-oracle-label",  # TODO: should be enum
+                        "proposal-oracle-label",
                         float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
                     )
                 )
             else:
-                extra.append(("defined-domain-count", 0.0))  # TODO: should be enum
-                extra.append(("target-f1-gain", None))  # TODO: should be enum
-                extra.append(("supported-macro-f1-drop", None))  # TODO: should be enum
+                extra.append(("defined-domain-count", 0.0))
+                extra.append(("target-f1-gain", None))
+                extra.append(("supported-macro-f1-drop", None))
                 extra.append((ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, None))
-                extra.append(("diagnostic-marker-value", None))  # TODO: should be enum
-                extra.append(("diagnostic-marker-insufficient", 1.0))  # TODO: should be enum
-                extra.append(("proposal-oracle-label", 0.0))  # TODO: should be enum
+                extra.append(("diagnostic-marker-value", None))
+                extra.append(("diagnostic-marker-insufficient", 1.0))
+                extra.append(("proposal-oracle-label", 0.0))
         if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             regime = cell.condition
             heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
@@ -802,7 +791,7 @@ class ProtocolCellDispatch:
                     evidence.reproduction_target_count,
                     quantity_skew_multiplier_for_domain(excluded, NBAIOT_DOMAIN_ORDER[0]),
                 )
-                extra.append(("quantity-skew-cap", float(applied_cap)))  # TODO: should be enum
+                extra.append(("quantity-skew-cap", float(applied_cap)))
             else:
                 heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
                 if heterogeneity_scope is not None:
@@ -811,16 +800,16 @@ class ProtocolCellDispatch:
                         heterogeneity_scope.selected_feature_names[0],
                         heterogeneity_seed,
                     )
-                    extra.append(("feature-shift-sign", float(feature_sign)))  # TODO: should be enum
+                    extra.append(("feature-shift-sign", float(feature_sign)))
                     extra.append(
                         (
-                            "feature-shift-count",  # TODO: should be enum
+                            "feature-shift-count",
                             float(len(heterogeneity_scope.selected_feature_names)),
                         )
                     )
                 else:
-                    extra.append(("feature-shift-sign", None))  # TODO: should be enum
-                    extra.append(("feature-shift-count", 0.0))  # TODO: should be enum
+                    extra.append(("feature-shift-sign", None))
+                    extra.append(("feature-shift-count", 0.0))
         return (state, (*metrics, *extra))
 
     def _run_opening_stage(
@@ -996,9 +985,9 @@ class ProtocolCellDispatch:
             ),
         )
         return (
-            ("capability-contract-passes", stage.capability_contract_passes),  # TODO: should be enum
-            ("screen-fold-index", stage.screen_fold_index),  # TODO: should be enum
-            ("screen-differential-a", stage.screen_differential_a),  # TODO: should be enum
+            ("capability-contract-passes", stage.capability_contract_passes),
+            ("screen-fold-index", stage.screen_fold_index),
+            ("screen-differential-a", stage.screen_differential_a),
             (ComparisonMetric.FALSE_LAUNCH, false_launch_result.value),
             (ComparisonMetric.REPRODUCTION_ATTEMPTS, float(attempts)),
             (
@@ -1663,9 +1652,9 @@ class ProtocolCellDispatch:
             source_backdoor_asr,
             legitimate_admission_eligible=True,
         )
-        malicious_admission = 0.0  # TODO: should be constant
+        malicious_admission = 0.0
         if method != full_fedsira and state is AdmissionState.ADMITTED:
-            malicious_admission = 1.0  # TODO: should be constant
+            malicious_admission = 1.0
         return (
             state,
             (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission), *extra),
@@ -2099,7 +2088,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", None),  # TODO: should be enum
+                    ("evidence-arrival-cycle", None),
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2114,7 +2103,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", float(tau_k)),  # TODO: should be enum
+                    ("evidence-arrival-cycle", float(tau_k)),
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2133,16 +2122,16 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k)),  # TODO: should be enum
+                ("evidence-arrival-cycle", float(tau_k)),
                 (
-                    "logical-information-arrival-cycles",  # TODO: should be enum
+                    "logical-information-arrival-cycles",
                     float(delay_decomposition.logical_information_arrival_cycles),
                 ),
                 (
                     DescriptiveScientificMetric.T_EVIDENCE.value,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
-                ("first-holder-cycle", float(first_holder) if first_holder is not None else None),  # TODO: should be enum
+                ("first-holder-cycle", float(first_holder) if first_holder is not None else None),
                 (DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value, None),
                 permanent_singleton_admission(state, holder_counts),
             ),
@@ -2185,15 +2174,15 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),  # TODO: should be enum
+                ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
                 (
                     DescriptiveScientificMetric.T_EVIDENCE.value,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
-                ("assignment-seconds", phase_durations.assignment_seconds),  # TODO: should be enum
-                ("reproduce-seconds", phase_durations.reproduce_seconds),  # TODO: should be enum
-                ("verify-seconds", phase_durations.verify_seconds),  # TODO: should be enum
-                ("synthesize-seconds", phase_durations.synthesize_seconds),  # TODO: should be enum
+                ("assignment-seconds", phase_durations.assignment_seconds),
+                ("reproduce-seconds", phase_durations.reproduce_seconds),
+                ("verify-seconds", phase_durations.verify_seconds),
+                ("synthesize-seconds", phase_durations.synthesize_seconds),
                 (
                     DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
                     post_evidence_wall_clock_seconds,
@@ -2709,7 +2698,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         terminal_state: AdmissionState,
     ) -> tuple[AdmissionStateObservation, ...]:
         arrival_cycle = next(
-            (value for name, value in metrics if name == "evidence-arrival-cycle"), None  # TODO: should be enum
+            (value for name, value in metrics if name == "evidence-arrival-cycle"), None
         )
         scientific_config = current_application_context().scientific_config
         horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles
@@ -2794,211 +2783,6 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             decision=state,
         )
         return state
-
-
-BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"  # TODO: should be enum
-
-
-ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"  # TODO: should be enum
-
-
-SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"  # TODO: should be enum
-
-
-def _train_reproduction_update(
-    adapter: DatasetAdapter,
-    cell: ScientificCell,
-    anchor: RealAnchor,
-    domain: DomainId,
-    source_delta: torch.Tensor | None,
-    compromised_reproducers: frozenset[DomainId],
-    heterogeneity_scope: HeterogeneityScope | None,
-    backdoor_scope: BackdoorScope | None,
-    strategy: AblationReproducerStrategy,
-) -> torch.Tensor | None:
-    config = current_application_context().scientific_config
-    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
-    if domain not in compromised_reproducers:
-        return train_domain_reproduction_delta(
-            adapter,
-            cell.master_seed,
-            anchor,
-            domain,
-            heterogeneity_scope=heterogeneity_scope,
-        )
-    if strategy is AblationReproducerStrategy.VERIFIER_AWARE:
-        if backdoor_scope is None:
-            return None
-        return train_verifier_aware_reproduction_delta(
-            adapter,
-            cell.master_seed,
-            anchor,
-            domain,
-            backdoor_scope,
-            heterogeneity_scope,
-        )
-    if strategy is AblationReproducerStrategy.MODEL_REPLACEMENT:
-        trained = train_domain_reproduction_delta(
-            adapter,
-            cell.master_seed,
-            anchor,
-            domain,
-            heterogeneity_scope=heterogeneity_scope,
-            backdoor_scope=backdoor_scope,
-        )
-        if trained is None:
-            return None
-        return scale_model_replacement_delta(
-            trained,
-            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
-        )
-    condition = cell.condition
-    if condition in (
-        ReproducerCondition.ONE_SOURCE_COPY,
-        ReproducerCondition.TWO_SOURCE_COPIES,
-        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
-        ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
-        SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
-    ):
-        if source_delta is None:
-            return None
-        return reproduction_update_vector(
-            anchor.flat_parameters, anchor.flat_parameters + source_delta
-        )
-    trained = train_domain_reproduction_delta(
-        adapter,
-        cell.master_seed,
-        anchor,
-        domain,
-        heterogeneity_scope=heterogeneity_scope,
-        backdoor_scope=backdoor_scope,
-    )
-    if trained is None:
-        return None
-    if condition in (
-        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
-        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
-    ):
-        return scale_model_replacement_delta(
-            trained,
-            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
-        )
-    return trained
-
-
-def reproduction_progression(
-    cell: ScientificCell,
-    evidence: PreparedEvidenceCounts,
-    external_verification_active: BooleanValue,
-    row_requirement: RequiredReproductionRowCount,
-    compromised_reproducers: frozenset[DomainId],
-    adapter: DatasetAdapter,
-    anchor: RealAnchor | None,
-    strategy: AblationReproducerStrategy = AblationReproducerStrategy.NONE,
-    include_source_as_first_reproducer: BooleanValue = False,
-    heterogeneity_scope: HeterogeneityScope | None = None,
-    backdoor_scope: BackdoorScope | None = None,
-    source_delta: torch.Tensor | None = None,
-) -> tuple[
-    AdmissionState,
-    tuple[ReproductionAttempt, ...],
-    tuple[ArtifactDigest, ...],
-    OrderedDict[DomainId, torch.Tensor],
-]:
-    del evidence
-    if anchor is None:
-        return (AdmissionState.DORMANT, (), (), OrderedDict())
-    reproducer_order = reproducer_order_for_cell(adapter, cell)
-    source_domain = source_domain_for_cell(adapter, cell)
-    validate_reproduction_start_checkpoint(
-        ANCHOR_CHECKPOINT_IDENTITY, frozenset({SOURCE_CHECKPOINT_IDENTITY})
-    )
-    validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
-    capability_identity = compute_capability_identity(
-        capability_contract_for_digest(adapter, anchor.dataset_manifest_hash)
-    )
-    adequate_domains = frozenset(
-        domain
-        for domain in adapter.domain_ids
-        if domain != source_domain and domain_is_reproduction_adequate(adapter, domain)
-    )
-    attempts: list[ReproductionAttempt] = []
-    commitment_hashes: list[ArtifactDigest] = []
-    updates: OrderedDict[DomainId, torch.Tensor] = OrderedDict()
-    certified_count = 0
-    state = AdmissionState.REPRODUCTION_PENDING
-    if (
-        include_source_as_first_reproducer
-        and source_domain is not None
-        and source_delta is not None
-    ):
-        reproduced = anchor.flat_parameters + source_delta
-        commitment_hash = commitment_digest(
-            source_domain, cell.master_seed, capability_identity, reproduced
-        )
-        commitment_hashes.append(commitment_hash)
-        validate_commitment_exists_before_verifier_assignment(commitment_hash)
-        updates[source_domain] = source_delta
-        attempts.append(
-            ReproductionAttempt(domain=source_domain, was_trained=True, is_certified=True)
-        )
-        certified_count += 1
-        state = handle_adequate_domain_trained(
-            external_verification_active, certified_count >= row_requirement
-        )
-        if state is AdmissionState.SYNTHESIS_PENDING:
-            return (state, tuple(attempts), tuple(commitment_hashes), updates)
-    for _row_index in range(len(reproducer_order)):
-        next_domain = next_reproducer_domain(
-            reproducer_order, consumed_domains(attempts), adequate_domains
-        )
-        if next_domain is None:
-            state = handle_no_adequate_unconsumed_domain(certified_count >= row_requirement)
-            break
-        domain = NBaiotDomain(next_domain)
-        update = _train_reproduction_update(
-            adapter,
-            cell,
-            anchor,
-            domain,
-            source_delta,
-            compromised_reproducers,
-            heterogeneity_scope,
-            backdoor_scope,
-            strategy,
-        )
-        if update is None:
-            state = handle_inadequate_domain()
-            continue
-        reproduced = anchor.flat_parameters + update
-        commitment_hash = commitment_digest(
-            domain, cell.master_seed, capability_identity, reproduced
-        )
-        commitment_hashes.append(commitment_hash)
-        validate_commitment_exists_before_verifier_assignment(commitment_hash)
-        updates[domain] = update
-        publish_trained_update(
-            ArtifactFamily.REPRODUCTION_CHECKPOINT,
-            adapter.dataset,
-            cell.master_seed,
-            reproduction_stage_identity(domain, cell.condition),
-            anchor.dataset_manifest_hash,
-            update,
-            anchor.input_width,
-            anchor.output_width,
-        )
-        is_certified = domain not in compromised_reproducers or not external_verification_active
-        attempts.append(
-            ReproductionAttempt(domain=domain, was_trained=True, is_certified=is_certified)
-        )
-        if is_certified:
-            certified_count += 1
-        state = handle_adequate_domain_trained(
-            external_verification_active, certified_count >= row_requirement
-        )
-        if state is AdmissionState.SYNTHESIS_PENDING:
-            break
-    return (state, tuple(attempts), tuple(commitment_hashes), updates)
 
 
 def single_verifier_progression(

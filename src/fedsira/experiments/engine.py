@@ -65,9 +65,9 @@ from fedsira.runtime import (
 if TYPE_CHECKING:
     from fedsira.experiments.execution import ExperimentPrerequisiteState
 
-EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"  # TODO: should be enum
-ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"  # TODO: should be enum
-ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"  # TODO: should be enum
+EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"
+ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
+ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
 
 

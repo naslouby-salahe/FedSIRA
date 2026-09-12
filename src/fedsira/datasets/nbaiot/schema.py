@@ -22,46 +22,46 @@ from fedsira.runtime import deterministic_order
 
 
 class NBaiotDomain(StrEnum):
-    DANMINI_DOORBELL = "Danmini Doorbell"  # TODO: should be enum
-    ENNIO_DOORBELL = "Ennio Doorbell"  # TODO: should be enum
-    ECOBEE_THERMOSTAT = "Ecobee Thermostat"  # TODO: should be enum
-    PHILIPS_BABY_MONITOR = "Philips Baby Monitor"  # TODO: should be enum
-    PROVISION_PT737E_CAMERA = "Provision PT-737E Camera"  # TODO: should be enum
-    PROVISION_PT838_CAMERA = "Provision PT-838 Camera"  # TODO: should be enum
-    SIMPLEHOME_1002_CAMERA = "SimpleHome 1002 Camera"  # TODO: should be enum
-    SIMPLEHOME_1003_CAMERA = "SimpleHome 1003 Camera"  # TODO: should be enum
-    SAMSUNG_WEBCAM = "Samsung Webcam"  # TODO: should be enum
+    DANMINI_DOORBELL = "Danmini Doorbell"
+    ENNIO_DOORBELL = "Ennio Doorbell"
+    ECOBEE_THERMOSTAT = "Ecobee Thermostat"
+    PHILIPS_BABY_MONITOR = "Philips Baby Monitor"
+    PROVISION_PT737E_CAMERA = "Provision PT-737E Camera"
+    PROVISION_PT838_CAMERA = "Provision PT-838 Camera"
+    SIMPLEHOME_1002_CAMERA = "SimpleHome 1002 Camera"
+    SIMPLEHOME_1003_CAMERA = "SimpleHome 1003 Camera"
+    SAMSUNG_WEBCAM = "Samsung Webcam"
 
 
 class _NBaiotDirectory(StrEnum):
-    DANMINI_DOORBELL = "Danmini_Doorbell"  # TODO: should be enum
-    ENNIO_DOORBELL = "Ennio_Doorbell"  # TODO: should be enum
-    ECOBEE_THERMOSTAT = "Ecobee_Thermostat"  # TODO: should be enum
-    PHILIPS_BABY_MONITOR = "Philips_B120N10_Baby_Monitor"  # TODO: should be enum
-    PROVISION_PT737E_CAMERA = "Provision_PT_737E_Security_Camera"  # TODO: should be enum
-    PROVISION_PT838_CAMERA = "Provision_PT_838_Security_Camera"  # TODO: should be enum
-    SIMPLEHOME_1002_CAMERA = "SimpleHome_XCS7_1002_WHT_Security_Camera"  # TODO: should be enum
-    SIMPLEHOME_1003_CAMERA = "SimpleHome_XCS7_1003_WHT_Security_Camera"  # TODO: should be enum
-    SAMSUNG_WEBCAM = "Samsung_SNH_1011_N_Webcam"  # TODO: should be enum
+    DANMINI_DOORBELL = "Danmini_Doorbell"
+    ENNIO_DOORBELL = "Ennio_Doorbell"
+    ECOBEE_THERMOSTAT = "Ecobee_Thermostat"
+    PHILIPS_BABY_MONITOR = "Philips_B120N10_Baby_Monitor"
+    PROVISION_PT737E_CAMERA = "Provision_PT_737E_Security_Camera"
+    PROVISION_PT838_CAMERA = "Provision_PT_838_Security_Camera"
+    SIMPLEHOME_1002_CAMERA = "SimpleHome_XCS7_1002_WHT_Security_Camera"
+    SIMPLEHOME_1003_CAMERA = "SimpleHome_XCS7_1003_WHT_Security_Camera"
+    SAMSUNG_WEBCAM = "Samsung_SNH_1011_N_Webcam"
 
 
 class NBaiotAttackFamily(StrEnum):
-    GAFGYT = "gafgyt"  # TODO: should be enum
-    MIRAI = "mirai"  # TODO: should be enum
+    GAFGYT = "gafgyt"
+    MIRAI = "mirai"
 
 
 class NBaiotClass(StrEnum):
-    BENIGN = "BENIGN"  # TODO: should be enum
-    GAFGYT_COMBO = "GAFGYT_COMBO"  # TODO: should be enum
-    GAFGYT_JUNK = "GAFGYT_JUNK"  # TODO: should be enum
-    GAFGYT_SCAN = "GAFGYT_SCAN"  # TODO: should be enum
-    GAFGYT_TCP = "GAFGYT_TCP"  # TODO: should be enum
-    GAFGYT_UDP = "GAFGYT_UDP"  # TODO: should be enum
-    MIRAI_ACK = "MIRAI_ACK"  # TODO: should be enum
-    MIRAI_SCAN = "MIRAI_SCAN"  # TODO: should be enum
-    MIRAI_SYN = "MIRAI_SYN"  # TODO: should be enum
-    MIRAI_UDP = "MIRAI_UDP"  # TODO: should be enum
-    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"  # TODO: should be enum
+    BENIGN = "BENIGN"
+    GAFGYT_COMBO = "GAFGYT_COMBO"
+    GAFGYT_JUNK = "GAFGYT_JUNK"
+    GAFGYT_SCAN = "GAFGYT_SCAN"
+    GAFGYT_TCP = "GAFGYT_TCP"
+    GAFGYT_UDP = "GAFGYT_UDP"
+    MIRAI_ACK = "MIRAI_ACK"
+    MIRAI_SCAN = "MIRAI_SCAN"
+    MIRAI_SYN = "MIRAI_SYN"
+    MIRAI_UDP = "MIRAI_UDP"
+    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"
 
 
 NBAIOT_DOMAIN_ORDER: tuple[NBaiotDomain, ...] = tuple(NBaiotDomain)

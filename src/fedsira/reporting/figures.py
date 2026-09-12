@@ -17,10 +17,8 @@ from fedsira.domain.enums import (
 )
 from fedsira.domain.types import (
     AttackStrength,
-    EvidenceCycleIndex,
     ExperimentName,
     FigureName,
-    FrozenDomainModel,
     MethodName,
     MetricName,
     MetricValue,
@@ -74,6 +72,12 @@ from fedsira.experiments.engine import (
     ExperimentExecutionResult,
 )
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.reporting.figure_observations import (
+    EfficiencyMetricObservation,
+    EvidenceStateFraction,
+    efficiency_observation,
+    state_fraction,
+)
 from fedsira.runtime import current_application_context
 
 BoundarySeries: TypeAlias = tuple[
@@ -98,22 +102,6 @@ MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     "Secondary Generalization",
 )
 FIGURE_ANNOTATION_INSET: Probability = 1 / 100
-
-
-class EvidenceStateFraction(FrozenDomainModel):
-    condition: ScenarioName
-    cycle: EvidenceCycleIndex
-    state: AdmissionState
-    fraction: Probability
-
-
-class EfficiencyMetricObservation(FrozenDomainModel):
-    method: MethodName
-    metric: MetricName
-    median: MetricValue
-    first_quartile: MetricValue
-    third_quartile: MetricValue
-    seed_count: ScientificCellCount
 
 
 def validate_mandatory_figures_covered(
@@ -200,22 +188,6 @@ def render_security_utility_tradeoff(
     return destination
 
 
-def _state_fraction(
-    observations: tuple[EvidenceStateFraction, ...],
-    condition: ScenarioName,
-    cycle: EvidenceCycleIndex,
-    state: AdmissionState,
-) -> Probability:
-    for observation in observations:
-        if (
-            observation.condition == condition
-            and observation.cycle == cycle
-            and observation.state is state
-        ):
-            return observation.fraction
-    return 0.0
-
-
 def render_evidence_arrival_trajectory(
     state_fractions: tuple[EvidenceStateFraction, ...],
     destination: Path,
@@ -243,7 +215,7 @@ def render_evidence_arrival_trajectory(
         )
         for state in states:
             fractions = tuple(
-                _state_fraction(state_fractions, schedule, cycle, state) for cycle in cycles
+                state_fraction(state_fractions, schedule, cycle, state) for cycle in cycles
             )
             axis.step(cycles, fractions, where="post", marker="o", label=state.value)
         axis.set_title(schedule)
@@ -254,17 +226,6 @@ def render_evidence_arrival_trajectory(
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
-
-
-def _efficiency_observation(
-    observations: tuple[EfficiencyMetricObservation, ...],
-    method: MethodName,
-    metric: MetricName,
-) -> EfficiencyMetricObservation:
-    for observation in observations:
-        if observation.method == method and observation.metric == metric:
-            return observation
-    raise ValueError(f"missing efficiency telemetry for {method} / {metric}")
 
 
 EFFICIENCY_PROFILE_METRICS: tuple[MetricName, ...] = (
@@ -301,7 +262,7 @@ def render_efficiency_profile(
             )
         )
         observations = tuple(
-            _efficiency_observation(metric_values, method, selected_metric) for method in methods
+            efficiency_observation(metric_values, method, selected_metric) for method in methods
         )
         medians = tuple(observation.median for observation in observations)
         lower_errors = tuple(
@@ -1104,10 +1065,10 @@ def render_admission_delay_decomposition(
         )
     )
     phases: tuple[tuple[MetricName, TextValue], ...] = (
-        ("assignment-seconds", "assignment"),  # TODO: should be enum
-        ("reproduce-seconds", "reproduce"),  # TODO: should be enum
-        ("verify-seconds", "verify"),  # TODO: should be enum
-        ("synthesize-seconds", "synthesize"),  # TODO: should be enum
+        ("assignment-seconds", "assignment"),
+        ("reproduce-seconds", "reproduce"),
+        ("verify-seconds", "verify"),
+        ("synthesize-seconds", "synthesize"),
     )
     bottoms = [0.0] * len(cells)
     for metric, label in phases:

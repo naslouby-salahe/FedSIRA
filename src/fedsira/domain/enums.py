@@ -2,8 +2,8 @@ from enum import StrEnum
 
 
 class DatasetId(StrEnum):
-    N_BAIOT = "N-BaIoT"  # TODO: should be enum
-    CICIOT2023 = "CICIoT2023"  # TODO: should be enum
+    N_BAIOT = "N-BaIoT"
+    CICIOT2023 = "CICIoT2023"
 
 
 class Role(StrEnum):

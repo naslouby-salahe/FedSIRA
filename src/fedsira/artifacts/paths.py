@@ -63,27 +63,27 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
 RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,))
 
 ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[tuple[ArtifactFamily, TextValue], ...] = (
-    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),  # TODO: should be enum
-    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),  # TODO: should be enum
-    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),  # TODO: should be enum
-    (ArtifactFamily.SCALER, "scaler"),  # TODO: should be enum
-    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),  # TODO: should be enum
-    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),  # TODO: should be enum
-    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),  # TODO: should be enum
-    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),  # TODO: should be enum
-    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),  # TODO: should be enum
-    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),  # TODO: should be enum
-    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),  # TODO: should be enum
-    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),  # TODO: should be enum
-    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),  # TODO: should be enum
-    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),  # TODO: should be enum
-    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),  # TODO: should be enum
-    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),  # TODO: should be enum
-    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),  # TODO: should be enum
-    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),  # TODO: should be enum
-    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),  # TODO: should be enum
-    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),  # TODO: should be enum
-    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),  # TODO: should be enum
+    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),
+    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),
+    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),
+    (ArtifactFamily.SCALER, "scaler"),
+    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),
+    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),
+    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),
+    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),
+    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),
+    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),
+    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),
+    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),
+    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),
+    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),
+    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),
+    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),
+    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),
+    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),
+    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),
+    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),
+    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),
 )
 
 

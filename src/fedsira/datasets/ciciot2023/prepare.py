@@ -81,13 +81,13 @@ from fedsira.runtime import (
     log_structured_event,
 )
 
-_ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"  # TODO: should be enum
-DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"  # TODO: should be enum
-STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"  # TODO: should be enum
-PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"  # TODO: should be enum
-SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"  # TODO: should be enum
-ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"  # TODO: should be enum
-EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"  # TODO: should be enum
+_ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
+DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"
+STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"
+PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"
+SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
+ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"
+EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
 _WHITESPACE_HYPHEN_UNDERSCORE = re.compile(r"[\s\-_]+")
 
 CICIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")

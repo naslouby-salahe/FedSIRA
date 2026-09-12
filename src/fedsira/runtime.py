@@ -123,9 +123,9 @@ def automatic_recovery_permitted(
     return attempts_used < automatic_infrastructure_retries_per_cell_phase
 
 
-NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"  # TODO: should be enum
-LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"  # TODO: should be enum
-LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"  # TODO: should be enum
+NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"
+LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"
+LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"
 
 FramedBytes = Annotated[bytes, Field()]
 DigestBytes = Annotated[bytes, Field(min_length=32, max_length=32)]
@@ -222,7 +222,7 @@ def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
     _TORCH_CUDA_MANUAL_SEED_ALL(seed)
 
 
-REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"  # TODO: should be enum
+REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
 
 
 class EnvironmentMismatch(FrozenDomainModel):
@@ -292,7 +292,7 @@ def configure_deterministic_backend() -> None:
     cudnn_conv.fp32_precision = "ieee"
 
 
-NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"  # TODO: should be enum
+NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"
 
 
 def numerical_runtime_identity() -> ArtifactDigest:
@@ -325,7 +325,7 @@ def blocking_environment_mismatches(
     )
 
 
-LOGGER_NAME_PREFIX = "fedsira"  # TODO: should be enum
+LOGGER_NAME_PREFIX = "fedsira"
 
 
 class StructuredJsonFormatter(logging.Formatter):

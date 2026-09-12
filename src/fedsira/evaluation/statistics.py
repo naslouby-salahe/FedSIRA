@@ -119,7 +119,7 @@ def decile_boundaries(
     boundary_values: tuple[MetricValue, ...],
 ) -> tuple[MetricValue, ...]:
     sorted_values = tuple(sorted(boundary_values))
-    return tuple(quantile_type7(sorted_values, decile / 10.0) for decile in range(1, 10))  # TODO: should be constant
+    return tuple(quantile_type7(sorted_values, decile / 10.0) for decile in range(1, 10))
 
 
 def decile_bin(
@@ -259,8 +259,8 @@ def bootstrap_percentile_confidence_interval(
     )
     resampled_means = values[indices].mean(axis=1)
     sorted_means = tuple(float(value) for value in numpy.sort(resampled_means))
-    lower_probability = (1.0 - bootstrap_config.confidence_level) / 2.0  # TODO: should be constant
-    upper_probability = 1.0 - lower_probability  # TODO: should be constant
+    lower_probability = (1.0 - bootstrap_config.confidence_level) / 2.0
+    upper_probability = 1.0 - lower_probability
     return (
         quantile_type7(sorted_means, lower_probability),
         quantile_type7(sorted_means, upper_probability),

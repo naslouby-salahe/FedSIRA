@@ -108,8 +108,8 @@ from fedsira.runtime import (
 )
 
 _LOGGER = get_structured_logger("doctor")
-REPOSITORY_LAYOUT_COMPONENT: EnvironmentText = "repository_layout"  # TODO: should be enum
-REPOSITORY_LAYOUT_EXPECTATION: EnvironmentText = "configured repository roots exist"  # TODO: should be enum
+REPOSITORY_LAYOUT_COMPONENT: EnvironmentText = "repository_layout"
+REPOSITORY_LAYOUT_EXPECTATION: EnvironmentText = "configured repository roots exist"
 _BOUNDARY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,

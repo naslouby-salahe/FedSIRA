@@ -41,8 +41,6 @@ packages = ["src/fedsira"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not slow'"
-markers = ["slow: fixture-based model-training integration coverage"]
 
 [tool.ruff]
 line-length = 100

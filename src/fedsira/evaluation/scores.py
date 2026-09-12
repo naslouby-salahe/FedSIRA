@@ -32,14 +32,14 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import REPOSITORY_ROOT, framed_bytes, numerical_runtime_identity
 
-MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"  # TODO: should be enum
-MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"  # TODO: should be enum
-MODEL_SCORE_MODEL_DEPENDENCY = "model-checkpoint"  # TODO: should be enum
-MODEL_SCORE_VIEW_DEPENDENCY = "prepared-role-view"  # TODO: should be enum
-MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"  # TODO: should be enum
-MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"  # TODO: should be enum
-MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"  # TODO: should be enum
-DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"  # TODO: should be enum
+MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"
+MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"
+MODEL_SCORE_MODEL_DEPENDENCY = "model-checkpoint"
+MODEL_SCORE_VIEW_DEPENDENCY = "prepared-role-view"
+MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"
+MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"
+MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"
+DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"
 
 
 class DomainClassScore(FrozenDomainModel):

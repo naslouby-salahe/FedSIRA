@@ -23,7 +23,7 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import derive_uint32, framed_bytes
 
-REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"  # TODO: should be enum
+REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
 
 
 class _ListConvertibleTensor(Protocol):
@@ -128,7 +128,7 @@ def select_compromised_reproducers(
     return tuple(feasible_in_order[:requested_compromised_count])
 
 
-COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"  # TODO: should be enum
+COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
 
 
 def commitment_digest(
