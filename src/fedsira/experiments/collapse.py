@@ -82,7 +82,7 @@ class ReproductionRowRequirement(StrEnum):
     FIVE_COMMITTED_NON_SOURCE_ROWS = "first 5 adequate committed non-source rows"  # TODO: should be enum
     FIRST_FRESH_VERIFIED_NON_SOURCE_ROW = (
         "first adequate non-source row that passes one fresh verifier"
-    )
+    )  # TODO: should be enum
     FIRST_COMMITTED_NON_SOURCE_ROW = "first adequate committed non-source row"  # TODO: should be enum
 
 
@@ -91,7 +91,7 @@ class RowVerificationMode(StrEnum):
     ONE_FRESH_POSITIVE = (
         "one verifier: first adequate eligible verifier in post-commitment Verifier Assignment "
         "order; Positive required"
-    )
+    )  # TODO: should be enum
     NONE = "none"  # TODO: should be enum
 
 

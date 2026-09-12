@@ -173,7 +173,7 @@ EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"  # TODO: should
 
 REPORT_LOGGER = get_structured_logger("reporting")
 
-PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"
+PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"  # TODO: should be enum
 
 
 class ReportLogFields(FrozenDomainModel):

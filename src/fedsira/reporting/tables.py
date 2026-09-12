@@ -1307,7 +1307,7 @@ def render_delay_and_efficiency_table(
     )
 
 
-GENERALIZATION_SCOPE_LABEL: TextValue = "Data/Attack Generalization Only"
+GENERALIZATION_SCOPE_LABEL: TextValue = "Data/Attack Generalization Only"  # TODO: should be enum
 
 
 def _generalization_references(

@@ -58,7 +58,7 @@ SCREEN_MATCHING_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|screen_matching
 SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY = "anchor-model"  # TODO: should be enum
 SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY = "source-candidate-model"  # TODO: should be enum
 SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY = "prepared-evidence"  # TODO: should be enum
-NO_CANDIDATE_MODEL_IDENTITY: ArtifactDigest = "0" * 64
+NO_CANDIDATE_MODEL_IDENTITY: ArtifactDigest = "0" * 64  # TODO: should be enum
 
 
 class ScreenMatchingPayload(FrozenDomainModel):

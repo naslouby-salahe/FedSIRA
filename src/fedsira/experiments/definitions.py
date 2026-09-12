@@ -216,24 +216,24 @@ class SecondaryScenario(StrEnum):
     ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"  # TODO: should be enum
 
 
-CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
-CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
-SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
-AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
-STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"
-PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
-PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
-USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
-COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"
-COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"
-COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"
-SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"
-CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"
-HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"
-ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"
-EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"
-EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"
-SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
+CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"  # TODO: should be enum
+CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"  # TODO: should be enum
+SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"  # TODO: should be enum
+AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"  # TODO: should be enum
+STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"  # TODO: should be enum
+PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"  # TODO: should be enum
+PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"  # TODO: should be enum
+USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"  # TODO: should be enum
+COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"  # TODO: should be enum
+COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"  # TODO: should be enum
+COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"  # TODO: should be enum
+SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"  # TODO: should be enum
+CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"  # TODO: should be enum
+HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"  # TODO: should be enum
+ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"  # TODO: should be enum
+EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"  # TODO: should be enum
+EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"  # TODO: should be enum
+SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"  # TODO: should be enum
 
 
 class ExperimentArtifactSpecification(FrozenDomainModel):
@@ -274,27 +274,27 @@ class ExperimentDefinition(FrozenDomainModel):
     artifacts: ExperimentArtifactSpecification
 
 
-DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
-PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"
-BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"
-PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"
-SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"
-SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"
-EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"
-PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"
-MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"
-COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"
-COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"
-BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"
-EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"
-SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"
+DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"  # TODO: should be enum
+PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"  # TODO: should be enum
+BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"  # TODO: should be enum
+PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"  # TODO: should be enum
+SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"  # TODO: should be enum
+SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"  # TODO: should be enum
+EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"  # TODO: should be enum
+PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"  # TODO: should be enum
+MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"  # TODO: should be enum
+COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"  # TODO: should be enum
+COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"  # TODO: should be enum
+BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"  # TODO: should be enum
+EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"  # TODO: should be enum
+SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"  # TODO: should be enum
 CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: ExperimentName = (
     "Capability Under-Specification Boundary"
-)
-HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"
-ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"
-EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
-SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
+)  # TODO: should be enum
+HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"  # TODO: should be enum
+ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"  # TODO: should be enum
+EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"  # TODO: should be enum
+SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"  # TODO: should be enum
 
 REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,

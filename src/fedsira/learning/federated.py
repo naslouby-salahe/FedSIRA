@@ -238,12 +238,12 @@ def anchor_round_is_evaluated(
     return (round_index + 1) % anchor_config.evaluation_cadence_rounds == 0
 
 
-ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
+ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"  # TODO: should be enum
 ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
 ANCHOR_LOGGER = get_structured_logger("anchor_training")
 
 
-ANCHOR_CLIENT_DROPOUT_SEPARATOR: SeedDerivationLabel = "ANCHOR_CLIENT_DROPOUT"
+ANCHOR_CLIENT_DROPOUT_SEPARATOR: SeedDerivationLabel = "ANCHOR_CLIENT_DROPOUT"  # TODO: should be enum
 
 
 class AnchorRoundEvaluationLogFields(FrozenDomainModel):

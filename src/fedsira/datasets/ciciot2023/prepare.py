@@ -81,7 +81,7 @@ from fedsira.runtime import (
     log_structured_event,
 )
 
-_ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
+_ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"  # TODO: should be enum
 DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"  # TODO: should be enum
 STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"  # TODO: should be enum
 PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"  # TODO: should be enum

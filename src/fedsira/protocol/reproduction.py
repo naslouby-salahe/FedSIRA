@@ -23,7 +23,7 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import derive_uint32, framed_bytes
 
-REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
+REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"  # TODO: should be enum
 
 
 class _ListConvertibleTensor(Protocol):

@@ -124,8 +124,8 @@ def automatic_recovery_permitted(
 
 
 NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"  # TODO: should be enum
-LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"
-LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"
+LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"  # TODO: should be enum
+LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"  # TODO: should be enum
 
 FramedBytes = Annotated[bytes, Field()]
 DigestBytes = Annotated[bytes, Field(min_length=32, max_length=32)]
@@ -222,7 +222,7 @@ def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
     _TORCH_CUDA_MANUAL_SEED_ALL(seed)
 
 
-REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
+REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"  # TODO: should be enum
 
 
 class EnvironmentMismatch(FrozenDomainModel):

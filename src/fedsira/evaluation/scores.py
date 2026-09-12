@@ -39,7 +39,7 @@ MODEL_SCORE_VIEW_DEPENDENCY = "prepared-role-view"  # TODO: should be enum
 MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"  # TODO: should be enum
 MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"  # TODO: should be enum
 MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"  # TODO: should be enum
-DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"
+DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"  # TODO: should be enum
 
 
 class DomainClassScore(FrozenDomainModel):

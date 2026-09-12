@@ -30,7 +30,7 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import current_application_context, framed_bytes
 
-CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
+CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"  # TODO: should be enum
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0
 
 

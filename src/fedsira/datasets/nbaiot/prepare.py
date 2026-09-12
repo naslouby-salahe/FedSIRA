@@ -82,7 +82,7 @@ from fedsira.runtime import (
 NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"  # TODO: should be enum
 PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|1"  # TODO: should be enum
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"  # TODO: should be enum
-BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"
+BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"  # TODO: should be enum
 
 NBAIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")
 

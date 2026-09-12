@@ -332,7 +332,7 @@ def apply_sampling_cap(
     return tuple(ordered[:cap])
 
 
-REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"
+REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"  # TODO: should be enum
 
 
 def supported_replay_cap_for_target_role(role: Role) -> SamplingCap | None:
@@ -973,7 +973,7 @@ def relabel_triggered_rows_as_benign(
     return relabeled
 
 
-ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
+ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"  # TODO: should be enum
 
 
 def root_cause_for_sample(sample_id: SampleId) -> RootCause:
@@ -1093,10 +1093,10 @@ def apply_attacker_induced_common_context(
 QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY.value
 
 
-HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"
+HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"  # TODO: should be enum
 
 
-HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"
+HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"  # TODO: should be enum
 
 
 class DomainQuantitySkew(FrozenDomainModel):

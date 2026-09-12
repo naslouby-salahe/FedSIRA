@@ -103,11 +103,11 @@ def validate_candidate_free_full_path_opening_mode(mode: AdmissionOpeningMode) -
 
 Domain = TypeVar("Domain", bound=Hashable)
 
-FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"
-SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SECURE_CONTINUAL_ASSESSMENT"
+FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"  # TODO: should be enum
+SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SECURE_CONTINUAL_ASSESSMENT"  # TODO: should be enum
 RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
     "RECOVERY_AFTER_SOURCE_ADMISSION"
-)
+)  # TODO: should be enum
 
 
 def train_ordinary_fedavg_delta(
@@ -410,10 +410,10 @@ def train_density_cluster_trimmed_mean_delta(
     )
 
 
-CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION"
+CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION"  # TODO: should be enum
 UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
     "UPDATE_RECONSTRUCTION_FILTER"
-)
+)  # TODO: should be enum
 
 
 def _client_delta_from_role(

@@ -488,9 +488,9 @@ SMOKE_DELAY_REPRODUCE_SECONDS: WallClockSeconds = 2.0
 SMOKE_DELAY_VERIFY_SECONDS: WallClockSeconds = 3.0
 SMOKE_DELAY_SYNTHESIZE_SECONDS: WallClockSeconds = 4.0
 SMOKE_BOOTSTRAP_VALUES: tuple[MetricValue, ...] = (1.0, 2.0, 3.0)
-SMOKE_CONFUSION_TRUE_LABELS: tuple[DatasetClassToken, ...] = ("a", "b", "a", "a")
-SMOKE_CONFUSION_PREDICTED_LABELS: tuple[DatasetClassToken, ...] = ("a", "a", "a", "b")
-SMOKE_CONFUSION_CLASS_TOKEN: DatasetClassToken = "a"
+SMOKE_CONFUSION_TRUE_LABELS: tuple[DatasetClassToken, ...] = ("a", "b", "a", "a")  # TODO: should be enum
+SMOKE_CONFUSION_PREDICTED_LABELS: tuple[DatasetClassToken, ...] = ("a", "a", "a", "b")  # TODO: should be enum
+SMOKE_CONFUSION_CLASS_TOKEN: DatasetClassToken = "a"  # TODO: should be enum
 SMOKE_CONFUSION_TRUE_POSITIVE = 2
 SMOKE_CONFUSION_FALSE_POSITIVE = 1
 SMOKE_CONFUSION_FALSE_NEGATIVE = 1
@@ -504,23 +504,23 @@ class ExperimentPrerequisiteState(FrozenDomainModel):
 
 
 def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] | None:
-    if experiment == "Byzantine-Bound Violation":
+    if experiment == "Byzantine-Bound Violation":  # TODO: should be enum
         return frozenset(condition.value for condition in BoundCondition)
-    if experiment == "Shared Epistemic-Failure Boundary":
+    if experiment == "Shared Epistemic-Failure Boundary":  # TODO: should be enum
         return frozenset(
             f"{failure_type.value}|{strength}"
             for failure_type in EpistemicFailureType
             for strength in epistemic_strength_tokens(failure_type)
         )
-    if experiment == "Capability Under-Specification Boundary":
+    if experiment == "Capability Under-Specification Boundary":  # TODO: should be enum
         return frozenset(mixture.value for mixture in RootCauseMixture)
     return None
 
 
 def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
-    if experiment == "Capability Under-Specification Boundary":
+    if experiment == "Capability Under-Specification Boundary":  # TODO: should be enum
         return frozenset(granularity.value for granularity in CapabilityContractGranularity)
-    if experiment == "Mechanism Ablation":
+    if experiment == "Mechanism Ablation":  # TODO: should be enum
         return frozenset(variant.value for variant in AblationVariant)
     return None
 

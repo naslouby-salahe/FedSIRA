@@ -39,11 +39,11 @@ ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"  # TODO: 
 
 ARTIFACT_LOGGER = get_structured_logger("artifacts")
 
-ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
-ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
-ARTIFACT_CURRENT_FILE_NAME = "current.json"
+ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"  # TODO: should be enum
+ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"  # TODO: should be enum
+ARTIFACT_CURRENT_FILE_NAME = "current.json"  # TODO: should be enum
 
-ARTIFACT_LOG_NAME = "artifacts.log"
+ARTIFACT_LOG_NAME = "artifacts.log"  # TODO: should be enum
 
 
 class ArtifactDependency(FrozenDomainModel):
