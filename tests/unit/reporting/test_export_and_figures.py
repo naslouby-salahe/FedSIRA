@@ -40,6 +40,7 @@ from fedsira.experiments.definitions import (
 from fedsira.experiments.engine import (
     AdmissionStateObservation,
     CellExecutionOutcome,
+    ExecutionProvenance,
     ExecutionRecordStore,
     ExperimentExecutionResult,
 )
@@ -622,6 +623,14 @@ def test_validate_mandatory_figures_covered() -> None:
     assert set(all_missing) == set(MANDATORY_FIGURE_NAMES)
 
 
+def _record_provenance() -> ExecutionProvenance:
+    return ExecutionProvenance(
+        configuration_digest="a" * 64,
+        code_revision=None,
+        dataset_manifest_hash="b" * 64,
+    )
+
+
 def test_project_evidence_trajectory_uses_persisted_cycle_and_terminal_state(
     tmp_path: Path,
 ) -> None:
@@ -640,7 +649,8 @@ def test_project_evidence_trajectory_uses_persisted_cycle_and_terminal_state(
                 AdmissionStateObservation(cycle=0, state=AdmissionState.DORMANT),
                 AdmissionStateObservation(cycle=2, state=AdmissionState.ADMITTED),
             ),
-        )
+        ),
+        _record_provenance(),
     )
     trajectory = project_evidence_trajectory(store)
     assert {(item.cycle, item.state.value, item.fraction) for item in trajectory} >= {

@@ -109,6 +109,7 @@ from fedsira.experiments.engine import (
     CellExecutor,
     ComparisonResultBuilder,
     ExecutionLogFields,
+    ExecutionProvenance,
     ExecutionRecordStore,
     ExperimentExecutionResult,
     PersistedAblationReference,
@@ -302,6 +303,13 @@ def execute_experiment(
     log_execution_event(
         "experiment.prerequisites.validated", ExecutionLogFields(experiment=experiment)
     )
+    provenance = ExecutionProvenance(
+        configuration_digest=configuration_digest(),
+        code_revision=repository_revision(),
+        dataset_manifest_hash=dataset_manifest_hash(
+            REPOSITORY_ROOT / prepared_evidence_root(definition.dataset)
+        ),
+    )
     outcomes: list[CellExecutionOutcome] = []
     for cell in planned.cells:
         fields = ExecutionLogFields(
@@ -313,12 +321,10 @@ def execute_experiment(
             master_seed=cell.master_seed,
             total_cells=len(planned.cells),
         )
-        existing = store.read_outcome(experiment, cell.semantic_key)
-        if (
-            existing is not None
-            and not overwrite
-            and existing.terminal_state is ExperimentLifecycleState.COMPLETED
-        ):
+        existing = (
+            None if overwrite else store.reusable_outcome(experiment, cell.semantic_key, provenance)
+        )
+        if existing is not None:
             log_execution_event(
                 "cell.reused",
                 fields,
@@ -335,7 +341,7 @@ def execute_experiment(
             continue
         log_execution_event("cell.started", fields)
         outcome = execute_cell_with_retry(cell, executor)
-        store.write_outcome(outcome)
+        store.write_outcome(outcome, provenance)
         completed_cells = len(outcomes) + 1
         completed_fields = fields.with_cell_terminal_state(outcome.terminal_state, completed_cells)
         log_execution_event("cell.record.persisted", completed_fields)

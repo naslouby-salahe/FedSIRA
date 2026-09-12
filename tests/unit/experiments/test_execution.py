@@ -10,6 +10,7 @@ from fedsira.domain.models import (
 from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
+    ExecutionProvenance,
     ExecutionRecordStore,
     PersistedExecutionRecord,
     derive_experiment_lifecycle,
@@ -77,11 +78,19 @@ def test_derive_experiment_lifecycle_empty_post_core_experiment_is_blocked() -> 
     assert derive_experiment_lifecycle(planned, ()) is ExperimentLifecycleState.BLOCKED
 
 
+def _provenance() -> ExecutionProvenance:
+    return ExecutionProvenance(
+        configuration_digest="a" * 64,
+        code_revision=None,
+        dataset_manifest_hash="b" * 64,
+    )
+
+
 def test_record_store_round_trip(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
     cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
     outcome = _completed_outcome(cell)
-    store.write_outcome(outcome)
+    store.write_outcome(outcome, _provenance())
     restored = store.read_outcome(cell.experiment, cell.semantic_key)
     assert restored is not None
     assert isinstance(restored, PersistedExecutionRecord)
@@ -99,7 +108,7 @@ def test_record_store_read_missing_returns_none(tmp_path: Path) -> None:
 def test_record_store_read_malformed_record_is_rejected(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
     cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
-    store.write_outcome(_completed_outcome(cell))
+    store.write_outcome(_completed_outcome(cell), _provenance())
     record_dir = tmp_path / "experiments" / cell.experiment / "records"
     next(record_dir.glob("*.json")).write_text("{not valid json")
     with pytest.raises(pydantic.ValidationError):
@@ -232,3 +241,31 @@ def test_execute_experiment_failed_outcome_yields_failed_lifecycle(
     _override_workspace_root(tmp_path, monkeypatch)
     result = execute_experiment("Protocol Invariant Validation", FailedExecutor())
     assert result.lifecycle_state is ExperimentLifecycleState.FAILED
+
+
+def test_record_store_rejects_reuse_when_provenance_changed(tmp_path: Path) -> None:
+    store = ExecutionRecordStore(tmp_path)
+    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    store.write_outcome(_completed_outcome(cell), _provenance())
+    provenance = _provenance()
+    assert store.reusable_outcome(cell.experiment, cell.semantic_key, provenance) is not None
+    changed = provenance.model_copy(update={"configuration_digest": "c" * 64})
+    assert store.reusable_outcome(cell.experiment, cell.semantic_key, changed) is None
+    changed_revision = provenance.model_copy(update={"code_revision": "deadbeef"})
+    assert store.reusable_outcome(cell.experiment, cell.semantic_key, changed_revision) is None
+    changed_dataset = provenance.model_copy(update={"dataset_manifest_hash": "d" * 64})
+    assert store.reusable_outcome(cell.experiment, cell.semantic_key, changed_dataset) is None
+
+
+def test_record_store_does_not_reuse_an_incomplete_record(tmp_path: Path) -> None:
+    store = ExecutionRecordStore(tmp_path)
+    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    store.write_outcome(
+        CellExecutionOutcome(
+            cell=cell,
+            terminal_state=ExperimentLifecycleState.FAILED,
+            failure=None,
+        ),
+        _provenance(),
+    )
+    assert store.reusable_outcome(cell.experiment, cell.semantic_key, _provenance()) is None

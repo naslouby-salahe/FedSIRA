@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Persisted cell evidence and reuse
+
+A persisted cell record carries the configuration digest, the repository revision, and the dataset's prepared-evidence digest under which it was produced. A cell is reused only when its semantic key matches, its terminal state is `Completed`, and all three provenance values still match the current run; otherwise the cell is recomputed and the rejected reuse is logged as `cell.reuse.rejected`. A record written under a superseded record schema is not reusable. Cell completion is therefore never asserted from file existence alone, and changing the configuration, the code, or the prepared dataset invalidates the affected cells automatically.
+
 ### Publication rendering
 
 Rendered byte-valued metrics (`Peak GPU Memory`, `Peak Host RSS`, `Communication Bytes`, `Persistent Storage Bytes`) use `metrics_and_statistics.publication_rounding.byte_units` and `.byte_decimals`; the `IEC` unit renders gibibytes. Paired standardized effects use `.effect_size_decimals`, p-values use `.p_value_significant_digits` with `.p_value_display_floor`, and F1/accuracy rates use `.f1_accuracy_rates_decimals`. Reporting never substitutes a different precision for these.

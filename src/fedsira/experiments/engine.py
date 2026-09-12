@@ -45,6 +45,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     ScientificCellCount,
     ScientificCellSemanticKey,
+    TextValue,
     TimeoutSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
@@ -66,7 +67,7 @@ from fedsira.runtime import (
 if TYPE_CHECKING:
     from fedsira.experiments.execution import ExperimentPrerequisiteState
 
-EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
+EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"
 ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
 ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
@@ -88,6 +89,12 @@ class AdmissionStateObservation(FrozenDomainModel):
     state: AdmissionState
 
 
+class ExecutionProvenance(FrozenDomainModel):
+    configuration_digest: ArtifactDigest
+    code_revision: TextValue | None
+    dataset_manifest_hash: ArtifactDigest
+
+
 class PersistedExecutionRecord(FrozenDomainModel):
     schema_version: ExecutionSchemaVersion
     semantic_key: ScientificCellSemanticKey
@@ -100,6 +107,7 @@ class PersistedExecutionRecord(FrozenDomainModel):
     metrics: tuple[MetricObservation, ...]
     state_trajectory: tuple[AdmissionStateObservation, ...] = ()
     failure: PersistedFailureDetail | None
+    provenance: ExecutionProvenance | None = None
 
 
 def ablation_reference_slot(
@@ -384,7 +392,7 @@ class ExecutionRecordStore:
     def _record_directory(self, experiment: ExperimentName) -> Path:
         return self._workspace_root / "experiments" / experiment / "records"
 
-    def write_outcome(self, outcome: CellExecutionOutcome) -> None:
+    def write_outcome(self, outcome: CellExecutionOutcome, provenance: ExecutionProvenance) -> None:
         directory = self._record_directory(outcome.cell.experiment)
         directory.mkdir(parents=True, exist_ok=True)
         failure = (
@@ -408,6 +416,7 @@ class ExecutionRecordStore:
             metrics=outcome.metrics,
             state_trajectory=outcome.state_trajectory,
             failure=failure,
+            provenance=provenance,
         )
         digest = hashlib.sha256(framed_bytes(outcome.cell.semantic_key)).hexdigest()
         (directory / f"{digest}.json").write_text(
@@ -424,6 +433,25 @@ class ExecutionRecordStore:
         record = PersistedExecutionRecord.model_validate_json(path.read_text(encoding="utf-8"))
         if record.semantic_key != semantic_key or record.experiment != experiment:
             raise ValueError("persisted execution record identity mismatch")
+        return record
+
+    def reusable_outcome(
+        self,
+        experiment: ExperimentName,
+        semantic_key: ScientificCellSemanticKey,
+        provenance: ExecutionProvenance,
+    ) -> PersistedExecutionRecord | None:
+        record = self.read_outcome(experiment, semantic_key)
+        if record is None:
+            return None
+        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
+            return None
+        if record.provenance != provenance:
+            log_execution_event(
+                "cell.reuse.rejected",
+                ExecutionLogFields(experiment=experiment, cell=semantic_key),
+            )
+            return None
         return record
 
     def read_all_outcomes(self, experiment: ExperimentName) -> tuple[PersistedExecutionRecord, ...]:
