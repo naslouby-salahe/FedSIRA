@@ -66,15 +66,7 @@ max-statements = 80
 "tests/unit/config/test_loading.py" = ["B010"]
 "tests/unit/artifacts/test_records.py" = ["B010"]
 "src/fedsira/cli.py" = ["B008"]
-"src/fedsira/experiments/handlers.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"src/fedsira/datasets/nbaiot/cell_support.py" = ["C901", "PLR0911", "PLR0912", "PLR0915"]
-"src/fedsira/application.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/reporting/export.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/reporting/tables.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/reporting/figures.py" = ["C901", "PLR0912"]
-"src/fedsira/evaluation/comparisons.py" = ["C901", "PLR0912", "PLR0915"]
-"src/fedsira/datasets/nbaiot/prepare.py" = ["C901", "PLR0915"]
-"src/fedsira/datasets/ciciot2023/prepare.py" = ["C901", "PLR0912", "PLR0915"]
+"src/fedsira/experiments/handlers.py" = ["C901", "PLR0912", "PLR0915"]
 
 [tool.vulture]
 ignore_decorators = ["@model_validator", "@field_validator", "@app.command"]
@@ -103,26 +95,6 @@ reportUnknownMemberType = "none"
 reportAttributeAccessIssue = "none"
 
 [[tool.pyright.executionEnvironments]]
-root = "src/fedsira/learning/model.py"
-reportUnknownMemberType = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/cell_support.py"
-reportUnusedFunction = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/executor.py"
-reportPrivateUsage = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/datasets/nbaiot/cells.py"
-reportUnknownMemberType = "none"
-reportAttributeAccessIssue = "none"
-reportPrivateUsage = "none"
-reportUnknownVariableType = "none"
-reportUnknownArgumentType = "none"
-
-[[tool.pyright.executionEnvironments]]
 root = "src/fedsira/evaluation/metrics.py"
 reportMissingTypeStubs = "none"
 reportUnknownVariableType = "none"
@@ -133,15 +105,6 @@ root = "src/fedsira/evaluation/statistics.py"
 reportMissingTypeStubs = "none"
 reportUnknownVariableType = "none"
 reportUnknownArgumentType = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "src/fedsira/reporting/export.py"
-reportUnknownMemberType = "none"
-reportUnknownArgumentType = "none"
-
-[[tool.pyright.executionEnvironments]]
-root = "tests/unit/datasets/nbaiot/test_preprocessing.py"
-reportUnknownMemberType = "none"
 
 [tool.deptry]
 known_first_party = ["fedsira"]
