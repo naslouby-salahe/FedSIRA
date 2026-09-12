@@ -11,6 +11,7 @@ from fedsira.domain.enums import (
     ByteUnit,
     ByzantineVerifierBehavior,
     CapabilityContractScope,
+    CICIoT2023Acquisition,
     DatasetId,
     Role,
     RootCauseMixture,
@@ -213,6 +214,7 @@ class PrimaryDatasetConfig(FrozenConfigModel):
 class SecondaryDatasetConfig(FrozenConfigModel):
     name: DatasetId
     target_class: DatasetClassToken
+    acquisition: CICIoT2023Acquisition
     pseudo_domain_partition_salt: PartitionSalt
 
 

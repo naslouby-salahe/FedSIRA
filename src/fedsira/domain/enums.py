@@ -22,6 +22,11 @@ class ByteUnit(StrEnum):
     IEC = "IEC"
 
 
+class CICIoT2023Acquisition(StrEnum):
+    LABELED_SHARDS = "Labeled shards"
+    PER_ATTACK_SHARDS = "Per-attack shards"
+
+
 class SeedNamespace(StrEnum):
     DATA_SPLIT = "DATA_SPLIT"
     DOMAIN_PARTITION = "DOMAIN_PARTITION"

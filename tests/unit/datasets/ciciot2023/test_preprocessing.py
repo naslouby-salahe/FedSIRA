@@ -11,7 +11,7 @@ from fedsira.datasets.ciciot2023.prepare import (
     resolve_predictor_columns,
     resolve_row_identifier_columns,
 )
-from fedsira.datasets.ciciot2023.schema import TARGET_LABEL, CICIoT2023PseudoDomain
+from fedsira.datasets.ciciot2023.schema import BENIGN_LABEL, TARGET_LABEL, CICIoT2023PseudoDomain
 from fedsira.datasets.common import DatasetExclusionReason, Role
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -72,8 +72,22 @@ def _write_csv(path: Path, header: tuple[str, ...], rows: tuple[tuple[str, ...],
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _secondary_csv_file(path: Path) -> SecondaryCsvFile:
-    return SecondaryCsvFile(absolute_path=path, relative_path=path.name, file_sha256="a" * 64)
+def _secondary_csv_file(path: Path, label_column: str = "Label") -> SecondaryCsvFile:
+    return SecondaryCsvFile(
+        absolute_path=path,
+        relative_path=path.name,
+        file_sha256="a" * 64,
+        label_column=label_column,
+    )
+
+
+def _per_attack_csv_file(path: Path, shard_class: str) -> SecondaryCsvFile:
+    return SecondaryCsvFile(
+        absolute_path=path,
+        relative_path=f"{path.parent.name}/{path.name}",
+        file_sha256="a" * 64,
+        shard_class=shard_class,
+    )
 
 
 def test_complete_case_parsing_records_unparseable_and_nonfinite_rows(tmp_path: Path) -> None:
@@ -109,6 +123,64 @@ def test_complete_case_parsing_records_unparseable_and_nonfinite_rows(tmp_path: 
         DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
         DatasetExclusionReason.NON_FINITE_PREDICTOR,
     )
+
+
+def test_per_attack_shard_takes_its_class_from_the_directory_token(tmp_path: Path) -> None:
+    target_directory = tmp_path / "Backdoor_Malware"
+    benign_directory = tmp_path / "Benign_Final"
+    target_directory.mkdir()
+    benign_directory.mkdir()
+    target_csv = target_directory / "part.csv"
+    benign_csv = benign_directory / "part.csv"
+    _write_csv(
+        target_csv,
+        ("feature_a", "feature_b"),
+        (("1.0", "2.0"), ("3.0", "4.0"), ("5.0", "6.0"), ("7.0", "8.0")),
+    )
+    _write_csv(
+        benign_csv,
+        ("feature_a", "feature_b"),
+        tuple((f"{index}.0", f"{index + 1}.0") for index in range(200)),
+    )
+    summary = materialize_ciciot2023_prepared_views(
+        (
+            _per_attack_csv_file(target_csv, TARGET_LABEL),
+            _per_attack_csv_file(benign_csv, "BENIGN"),
+        ),
+        tmp_path / "prepared",
+        tmp_path / "scaler",
+        tmp_path / "metadata",
+        tmp_path / "cache",
+        overwrite=True,
+    )
+    assert summary.raw_row_count == 204
+    assert summary.retained_row_count == 204
+    assert summary.class_registry == (BENIGN_LABEL, TARGET_LABEL)
+    assert summary.predictor_columns == ("feature_a", "feature_b")
+
+
+def test_shard_without_any_class_label_source_is_rejected(tmp_path: Path) -> None:
+    csv_path = tmp_path / "part.csv"
+    _write_csv(csv_path, ("feature_a", "Label"), (("1.0", "BENIGN"),))
+    try:
+        materialize_ciciot2023_prepared_views(
+            (
+                SecondaryCsvFile(
+                    absolute_path=csv_path,
+                    relative_path=csv_path.name,
+                    file_sha256="a" * 64,
+                ),
+            ),
+            tmp_path / "prepared",
+            tmp_path / "scaler",
+            tmp_path / "metadata",
+            tmp_path / "cache",
+            overwrite=True,
+        )
+    except ValueError as error:
+        assert "no class label source" in str(error)
+    else:
+        raise AssertionError("a CIC shard without a class label source was accepted")
 
 
 def test_complete_case_parsing_rejects_mismatched_row_width(tmp_path: Path) -> None:

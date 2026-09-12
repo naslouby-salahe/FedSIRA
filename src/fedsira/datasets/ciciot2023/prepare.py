@@ -47,7 +47,7 @@ from fedsira.datasets.common import (
     view_parquet_path,
     write_json_payload,
 )
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import CICIoT2023Acquisition, DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -95,6 +95,8 @@ class SecondaryCsvFile(FrozenDomainModel):
     absolute_path: Path
     relative_path: RelativePathText
     file_sha256: DatasetFileDigest
+    shard_class: ClassLabel | None = None
+    label_column: DatasetColumnName | None = None
 
 
 class SecondaryPreparedViewSummary(FrozenDomainModel):
@@ -165,18 +167,48 @@ def secondary_sampling_selection_key(
     return digest, stable_row_id
 
 
-def discover_secondary_csv_files(csv_root: Path) -> tuple[SecondaryCsvFile, ...]:
+def resolve_label_column(header: tuple[DatasetColumnName, ...]) -> DatasetColumnName | None:
+    label_columns = tuple(column for column in header if normalize_label_token(column) == "LABEL")
+    if len(label_columns) > 1:
+        raise ValueError(
+            "expected at most one column named 'label' (case-insensitive), "
+            f"found {len(label_columns)}: {label_columns}"
+        )
+    return label_columns[0] if label_columns else None
+
+
+def discover_secondary_csv_files(
+    csv_root: Path, acquisition: CICIoT2023Acquisition
+) -> tuple[SecondaryCsvFile, ...]:
     paths = sorted(csv_root.rglob("*.csv"), key=lambda path: path.relative_to(csv_root).as_posix())
     if not paths:
         raise ValueError(f"no CICIoT2023 CSV shards found beneath {csv_root}")
-    return tuple(
-        SecondaryCsvFile(
-            absolute_path=path,
-            relative_path=path.relative_to(csv_root).as_posix(),
-            file_sha256=compute_file_checksum(path),
+    discovered: list[SecondaryCsvFile] = []
+    for path in paths:
+        label_column = resolve_label_column(read_csv_header(path))
+        selected = (
+            label_column is not None
+            if acquisition is CICIoT2023Acquisition.LABELED_SHARDS
+            else label_column is None
         )
-        for path in paths
-    )
+        if not selected:
+            continue
+        shard_class = None if label_column is not None else normalize_label(path.parent.name)
+        discovered.append(
+            SecondaryCsvFile(
+                absolute_path=path,
+                relative_path=path.relative_to(csv_root).as_posix(),
+                file_sha256=compute_file_checksum(path),
+                shard_class=shard_class,
+                label_column=label_column,
+            )
+        )
+    if not discovered:
+        raise ValueError(
+            f"no CICIoT2023 CSV shards match the configured {acquisition.value} acquisition "
+            f"beneath {csv_root}"
+        )
+    return tuple(discovered)
 
 
 def compute_dataset_manifest_hash(
@@ -200,16 +232,6 @@ def read_csv_header(path: Path) -> tuple[DatasetColumnName, ...]:
     return tuple(name.strip(_ASCII_HEADER_WHITESPACE) for name in raw_header)
 
 
-def resolve_label_column(header: tuple[DatasetColumnName, ...]) -> DatasetColumnName:
-    label_columns = tuple(column for column in header if normalize_label_token(column) == "LABEL")
-    if len(label_columns) != 1:
-        raise ValueError(
-            "expected exactly one column named 'label' (case-insensitive), "
-            f"found {len(label_columns)}: {label_columns}"
-        )
-    return label_columns[0]
-
-
 def validate_consistent_header(
     reference_header: tuple[DatasetColumnName, ...],
     observed_header: tuple[DatasetColumnName, ...],
@@ -220,7 +242,7 @@ def validate_consistent_header(
 
 def resolve_predictor_columns(
     header: tuple[DatasetColumnName, ...],
-    label_column: DatasetColumnName,
+    label_column: DatasetColumnName | None,
     row_identifier_columns: frozenset[DatasetColumnName] = frozenset(),
 ) -> tuple[DatasetColumnName, ...]:
     predictors = tuple(
@@ -267,7 +289,7 @@ def _is_physical_row_identifier(
 def resolve_row_identifier_columns(
     discovered: tuple[SecondaryCsvFile, ...],
     header: tuple[DatasetColumnName, ...],
-    label_column: DatasetColumnName,
+    label_column: DatasetColumnName | None,
 ) -> frozenset[DatasetColumnName]:
     connection = open_tabular_engine()
     try:
@@ -401,7 +423,6 @@ def _ingest_shard(
     connection: duckdb.DuckDBPyConnection,
     item: SecondaryCsvFile,
     header: tuple[DatasetColumnName, ...],
-    label_column: DatasetColumnName,
     predictor_columns: tuple[DatasetColumnName, ...],
     dataset_manifest_hash: DatasetManifestDigest,
     partition_salt: PartitionSalt,
@@ -428,10 +449,16 @@ def _ingest_shard(
     if not isinstance(raw_count, int) or isinstance(raw_count, bool) or raw_count < 0:
         raise TypeError("CICIoT2023 shard row count must be a non-negative integer")
     reason_sql = _exclusion_reason_sql(predictor_columns)
+    if item.label_column is not None:
+        raw_label_sql: TextValue = sql_ident(item.label_column)
+    elif item.shard_class is not None:
+        raw_label_sql = sql_string(item.shard_class)
+    else:
+        raise ValueError(f"CICIoT2023 shard has no class label source: {item.relative_path}")
     connection.execute(
         "CREATE OR REPLACE TABLE classified AS "
         "SELECT original_row_index, "
-        f"{sql_ident(label_column)} AS raw_label, "
+        f"{raw_label_sql} AS raw_label, "
         f"{reason_sql} AS reason, "
         + ", ".join(
             f"try_cast({sql_ident(name)} AS DOUBLE) AS {sql_ident(name)}"
@@ -645,9 +672,13 @@ def materialize_ciciot2023_prepared_views(
     reference_header = read_csv_header(discovered[0].absolute_path)
     if len(set(reference_header)) != len(reference_header):
         raise ValueError("CICIoT2023 fixed header contains duplicate names")
-    label_column = resolve_label_column(reference_header)
+    label_column = discovered[0].label_column
     for item in discovered[1:]:
         validate_consistent_header(reference_header, read_csv_header(item.absolute_path))
+        if item.label_column != label_column:
+            raise ValueError("CICIoT2023 shards disagree on the in-file class label column")
+        if (item.shard_class is None) is not (discovered[0].shard_class is None):
+            raise ValueError("CICIoT2023 shards disagree on the class label source")
     row_identifier_columns = resolve_row_identifier_columns(
         discovered, reference_header, label_column
     )
@@ -669,7 +700,6 @@ def materialize_ciciot2023_prepared_views(
                 connection,
                 item,
                 reference_header,
-                label_column,
                 predictor_columns,
                 dataset_manifest_hash,
                 config.datasets.secondary.pseudo_domain_partition_salt,

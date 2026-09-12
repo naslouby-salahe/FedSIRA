@@ -31,6 +31,7 @@ class CICIoTSpecialLabel(StrEnum):
 class _CICIoTBenignAlias(StrEnum):
     BENIGNTRAFFIC = "BENIGNTRAFFIC"
     BENIGN_TRAFFIC = "BENIGN_TRAFFIC"
+    BENIGN_FINAL = "BENIGN_FINAL"
 
 
 class CICIoTRowIdentifierToken(StrEnum):

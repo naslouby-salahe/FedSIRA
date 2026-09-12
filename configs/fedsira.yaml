@@ -67,6 +67,7 @@ datasets:
   secondary:
     name: CICIoT2023
     target_class: BACKDOOR_MALWARE
+    acquisition: Per-attack shards
     pseudo_domain_partition_salt: 730201
 capability_contract:
   target_f1_minimum: 0.8

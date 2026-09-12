@@ -129,7 +129,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         "dataset.preprocessing.started",
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023),
     )
-    discovered = discover_secondary_csv_files(csv_root)
+    discovered = discover_secondary_csv_files(csv_root, config.datasets.secondary.acquisition)
     cache_root = preprocessing_extraction_cache_root(
         REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
     )
