@@ -1663,9 +1663,9 @@ class ProtocolCellDispatch:
             source_backdoor_asr,
             legitimate_admission_eligible=True,
         )
-        malicious_admission = 0.0
+        malicious_admission = 0.0  # TODO: should be constant
         if method != full_fedsira and state is AdmissionState.ADMITTED:
-            malicious_admission = 1.0
+            malicious_admission = 1.0  # TODO: should be constant
         return (
             state,
             (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission), *extra),
