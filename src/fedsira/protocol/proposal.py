@@ -48,7 +48,12 @@ from fedsira.protocol.capability_contract import (
     compute_capability_identity,
 )
 from fedsira.protocol.rules import validate_exactly_one_source_domain
-from fedsira.runtime import derive_uint32, deterministic_order, framed_bytes
+from fedsira.runtime import (
+    current_application_context,
+    derive_uint32,
+    deterministic_order,
+    framed_bytes,
+)
 
 SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
 SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
@@ -148,6 +153,7 @@ def match_held_out_fold(
             (observation.sample_id, observation.anchor_loss) for observation in held_out_controls
         ),
         tuple(observation.anchor_loss for observation in other_fold_controls),
+        current_application_context().scientific_config.protocol.proposal_screen.matched_controls_per_target,
     )
     if matched_ids is None:
         return None

@@ -156,7 +156,7 @@ def test_match_nearest_within_decile_matches_by_closest_value() -> None:
     boundary_values = tuple(float(v) for v in range(1, 11))
     targets = (("t1", 1.0),)
     candidates = (("c1", 0.9), *((f"c{i}", float(i)) for i in range(2, 11)))
-    matched = match_nearest_within_decile(targets, candidates, boundary_values)
+    matched = match_nearest_within_decile(targets, candidates, boundary_values, 1)
     assert matched == (("t1", "c1"),)
 
 
@@ -164,11 +164,31 @@ def test_match_nearest_within_decile_returns_none_without_replacement_when_bin_i
     targets = (("t1", 100.0),)
     candidates = (("c1", 1.0),)
     assert (
-        match_nearest_within_decile(targets, candidates, tuple(float(v) for v in range(1, 11)))
+        match_nearest_within_decile(targets, candidates, tuple(float(v) for v in range(1, 11)), 1)
         is None
     )
 
 
 def test_match_nearest_within_decile_returns_none_for_empty_boundary_values() -> None:
-    assert match_nearest_within_decile((), (), ()) is None
-    assert match_nearest_within_decile((("t1", 1.0),), (("c1", 1.0),), ()) is None
+    assert match_nearest_within_decile((), (), (), 1) is None
+    assert match_nearest_within_decile((("t1", 1.0),), (("c1", 1.0),), (), 1) is None
+
+
+def test_match_nearest_within_decile_selects_the_declared_controls_per_target() -> None:
+    boundary_values = tuple(float(v) for v in range(1, 11))
+    targets = (("t1", 1.0),)
+    candidates = (
+        ("c1", 0.9),
+        ("c2", 1.1),
+        ("c3", 1.2),
+        *((f"c{i}", float(i)) for i in range(2, 11)),
+    )
+    assert match_nearest_within_decile(targets, candidates, boundary_values, 2) == (
+        ("t1", "c1"),
+        ("t1", "c2"),
+    )
+
+
+def test_match_nearest_within_decile_returns_none_when_the_bin_is_too_small() -> None:
+    boundary_values = tuple(float(v) for v in range(1, 11))
+    assert match_nearest_within_decile((("t1", 1.0),), (("c1", 0.9),), boundary_values, 2) is None

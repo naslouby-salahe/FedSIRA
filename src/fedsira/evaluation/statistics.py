@@ -19,6 +19,7 @@ from fedsira.domain.types import (
     DecileBinIndex,
     DomainCount,
     MasterSeed,
+    MatchedControlCount,
     MetricValue,
     MinimumDefinedDomainCount,
     PairedDifference,
@@ -29,6 +30,7 @@ from fedsira.domain.types import (
     Sign,
     SignFlipSampleCount,
 )
+from fedsira.runtime import current_application_context
 
 SignFlipSign: TypeAlias = Sign
 SignFlipAssignment: TypeAlias = tuple[SignFlipSign, ...]
@@ -147,6 +149,7 @@ def match_nearest_within_decile(
     targets: tuple[tuple[SampleId, MetricValue], ...],
     candidates: tuple[tuple[SampleId, MetricValue], ...],
     boundary_values: tuple[MetricValue, ...],
+    matched_controls_per_target: MatchedControlCount,
 ) -> tuple[tuple[SampleId, SampleId], ...] | None:
     if not boundary_values:
         return None
@@ -155,11 +158,17 @@ def match_nearest_within_decile(
     matches: list[tuple[SampleId, SampleId]] = []
     for target_id, target_loss in sorted(targets, key=lambda item: item[0]):
         pool = _candidate_pool(remaining, boundaries, target_loss)
-        if not pool:
+        if len(pool) < matched_controls_per_target:
             return None
-        best = min(pool, key=lambda item: (abs(item[1] - target_loss), item[0]))
-        remaining = tuple(candidate for candidate in remaining if candidate != best)
-        matches.append((target_id, best[0]))
+        nearest = sorted(pool, key=lambda item: (abs(item[1] - target_loss), item[0]))[
+            :matched_controls_per_target
+        ]
+        matched_ids = frozenset(candidate[0] for candidate in nearest)
+        remaining = tuple(candidate for candidate in remaining if candidate[0] not in matched_ids)
+        matches.extend(
+            (target_id, control_id)
+            for _loss, control_id in ((candidate[1], candidate[0]) for candidate in nearest)
+        )
     return tuple(matches)
 
 
@@ -264,7 +273,10 @@ def match_diagnostic_benign_report_test_rows(
 ) -> tuple[tuple[ArtifactDigest, ArtifactDigest], ...] | None:
     boundary_values = tuple(loss for _, loss in benign_report_test_losses)
     return match_nearest_within_decile(
-        tuple(target_report_losses), tuple(benign_report_test_losses), boundary_values
+        tuple(target_report_losses),
+        tuple(benign_report_test_losses),
+        boundary_values,
+        current_application_context().scientific_config.protocol.proposal_screen.matched_controls_per_target,
     )
 
 
