@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Persisted statistical comparison evidence
+
+Each experiment publishes its `Statistical comparison/gate artifact` through the artifact store after its comparisons are computed, in the slot `(Statistical comparison/gate artifact, comparisons, <experiment>)` under procedure identity `fedsira|statistical_comparison|1`. The artifact records the experiment, every comparison family result, and the digest of the metric evidence it was derived from, and it declares that evidence digest as its material dependency, so any change to a metric value yields a new identity and the previous artifact becomes diagnostic history. Final export verification requires each published comparison artifact to still match the current metric-evidence digest and fails with a stale-evidence message otherwise; it never silently recomputes a reported statistic.
+
 ### Persisted cell evidence and reuse
 
 A persisted cell record carries the configuration digest, the repository revision, and the dataset's prepared-evidence digest under which it was produced. A cell is reused only when its semantic key matches, its terminal state is `Completed`, and all three provenance values still match the current run; otherwise the cell is recomputed and the rejected reuse is logged as `cell.reuse.rejected`. A record written under a superseded record schema is not reusable. Cell completion is therefore never asserted from file existence alone, and changing the configuration, the code, or the prepared dataset invalidates the affected cells automatically.

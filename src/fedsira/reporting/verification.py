@@ -22,6 +22,7 @@ from fedsira.domain.types import (
     TextValue,
     VerificationPassed,
 )
+from fedsira.evaluation.comparison_evidence import comparison_evidence_failures
 from fedsira.evaluation.comparisons import ComparisonMetric
 from fedsira.experiments.definitions import (
     BYZANTINE_BOUND_VIOLATION_NAME,
@@ -39,6 +40,7 @@ from fedsira.experiments.definitions import (
 from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
+    ExecutionRecordStore,
     ExperimentExecutionResult,
     PersistedExecutionRecord,
 )
@@ -113,6 +115,18 @@ BOUND_WITHIN_CONDITIONS: tuple[ConditionName, ...] = (
     BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND.value,
     BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND.value,
 )
+
+
+def verify_comparison_evidence_current(
+    experiment_names: tuple[ExperimentName, ...],
+    store: ExecutionRecordStore,
+) -> CompletenessVerificationResult:
+    failures: list[ReportVerificationFailure] = []
+    for experiment in experiment_names:
+        failures.extend(
+            comparison_evidence_failures(experiment, store.read_all_outcomes(experiment))
+        )
+    return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
 
 def verify_byzantine_operating_region(

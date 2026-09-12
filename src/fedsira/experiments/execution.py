@@ -82,6 +82,7 @@ from fedsira.domain.types import (
     TextValue,
     WallClockSeconds,
 )
+from fedsira.evaluation.comparison_evidence import publish_comparison_evidence
 from fedsira.evaluation.metrics import (
     accuracy,
     compute_confusion_counts,
@@ -361,6 +362,15 @@ def execute_experiment(
         log_execution_event("comparison.started", ExecutionLogFields(experiment=experiment))
         comparisons = comparison_builder(experiment, definition.dataset, outcome_tuple, store)
         log_execution_event("comparison.completed", ExecutionLogFields(experiment=experiment))
+        if comparisons:
+            publish_comparison_evidence(
+                experiment,
+                store.read_planned_outcomes(planned),
+                comparisons,
+            )
+            log_execution_event(
+                "comparison.evidence.persisted", ExecutionLogFields(experiment=experiment)
+            )
     result = ExperimentExecutionResult(
         experiment=experiment,
         lifecycle_state=lifecycle_state,
