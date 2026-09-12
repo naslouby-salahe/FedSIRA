@@ -934,9 +934,11 @@ ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
 
 
 def root_cause_for_sample(sample_id: SampleId) -> RootCause:
+    attacks = current_application_context().scientific_config.attacks_and_boundaries
+    modulus = attacks.capability_under_specification.root_cause_hash_modulus
     digest = hashlib.sha256(framed_bytes(ROOT_CAUSE_SEPARATOR, sample_id)).digest()
-    parity = int.from_bytes(digest[0:8], byteorder="big", signed=False) % 2
-    return RootCause.A if parity == 0 else RootCause.B
+    index = int.from_bytes(digest[0:8], byteorder="big", signed=False) % modulus
+    return RootCause.A if index == 0 else RootCause.B
 
 
 def apply_root_cause_feature_shift(

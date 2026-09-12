@@ -1661,6 +1661,10 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Root-cause partition
+
+Root-cause A/B membership is `HASH_TO_INDEX(domain_separator="CAPABILITY_ROOT_CAUSE", values=(stable_row_id,), modulus=attacks_and_boundaries.capability_under_specification.root_cause_hash_modulus)`; index `0` is root cause A and every other index is root cause B. The modulus is therefore the authoritative partition width and is never hardcoded.
+
 ### Checkpoint artifacts
 
 Anchor checkpoints are published as `Anchor checkpoint and round checkpoints` artifacts: one `final` artifact per master seed plus one `round-start-<n>` artifact per anchor round, in the slot `(family, seed-<master seed>-<stage>, )` under procedure identity `fedsira|anchor_checkpoint|1`. The payload is a typed record carrying the dataset, the master seed, the stage identity, the prepared-evidence digest, the model input and output widths, the flat-parameter identity, and the flat parameter values themselves as finite floats, so a downstream consumer can load the checkpoint without retraining and can verify it against the recorded identity. The family's declared dependency is the prepared evidence digest, so a change to the prepared data yields a new identity and the previous checkpoint becomes diagnostic history. Source candidate, reproduction and baseline checkpoints use the same payload through `fedsira|source_candidate_checkpoint|1`, `fedsira|reproduction_checkpoint|1` and `fedsira|baseline_checkpoint|1`.
