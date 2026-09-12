@@ -18,6 +18,7 @@ from fedsira.datasets.ciciot2023.schema import (
     hash_to_pseudo_domain,
     normalize_label,
     normalize_label_token,
+    target_family_collision_is_declared,
 )
 from fedsira.datasets.common import (
     PREPROCESSING_SAMPLE_ORDER_SEED,
@@ -318,6 +319,8 @@ def validate_label_collisions(raw_labels: frozenset[ClassLabel]) -> None:
         for second in ordered[first_index + 1 :]:
             normalized = normalize_label(first)
             if normalize_label(second) != normalized:
+                continue
+            if target_family_collision_is_declared(first, second):
                 continue
             if _comparison_token(first) != _comparison_token(second):
                 raise ValueError(

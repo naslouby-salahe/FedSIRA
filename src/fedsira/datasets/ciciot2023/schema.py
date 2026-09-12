@@ -6,6 +6,7 @@ from enum import IntEnum, StrEnum
 from fedsira.datasets.common import DatasetSpecification
 from fedsira.domain.enums import DatasetId
 from fedsira.domain.types import (
+    BooleanValue,
     ClassLabel,
     DatasetClassToken,
     DatasetManifestDigest,
@@ -32,6 +33,17 @@ class _CICIoTBenignAlias(StrEnum):
     BENIGNTRAFFIC = "BENIGNTRAFFIC"
     BENIGN_TRAFFIC = "BENIGN_TRAFFIC"
     BENIGN_FINAL = "BENIGN_FINAL"
+
+
+class CICIoT2023TargetFamilyMember(StrEnum):
+    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"
+    MIRAI_GREETH_FLOOD = "MIRAI_GREETH_FLOOD"
+    MIRAI_GREIP_FLOOD = "MIRAI_GREIP_FLOOD"
+    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"
+
+    @property
+    def raw_token(self) -> ClassLabel:
+        return self.value
 
 
 class CICIoTRowIdentifierToken(StrEnum):
@@ -73,11 +85,20 @@ def normalize_label_token(raw_label: ClassLabel) -> ClassLabel:
 
 def normalize_label(raw_label: ClassLabel) -> ClassLabel:
     normalized = normalize_label_token(raw_label)
+    if normalized in CICIoT2023TargetFamilyMember.__members__:
+        return TARGET_LABEL
     try:
         _CICIoTBenignAlias[normalized]
     except KeyError:
         return normalized
     return BENIGN_LABEL
+
+
+def target_family_collision_is_declared(first: ClassLabel, second: ClassLabel) -> BooleanValue:
+    return (
+        normalize_label_token(first) in CICIoT2023TargetFamilyMember.__members__
+        and normalize_label_token(second) in CICIoT2023TargetFamilyMember.__members__
+    )
 
 
 def build_class_registry(observed_labels: frozenset[ClassLabel]) -> tuple[ClassLabel, ...]:

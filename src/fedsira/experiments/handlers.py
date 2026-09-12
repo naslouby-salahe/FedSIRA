@@ -156,6 +156,7 @@ from fedsira.experiments.definitions import (
     ablation_reproducer_strategy,
     ablation_scenario_episode,
     ablation_scenario_for_condition,
+    core_opening_episode,
     experiment_by_name,
     feature_shift_magnitude,
 )
@@ -1211,6 +1212,14 @@ class ProtocolCellDispatch:
         if not opening_resolved:
             self._last_opening_stage = None
             stage = self._ablation_opening_stage(cell)
+            if stage is None and (
+                cell.method == RESOLVED_FEDSIRA_CORE_METHOD and self._resolved_core is not None
+            ):
+                stage = self._run_opening_stage(
+                    cell,
+                    core_opening_episode(cell.condition),
+                    self._resolved_core.opening_mode,
+                )
             if stage is not None:
                 self._last_opening_stage = stage
                 if stage.state is not AdmissionState.ADMISSION_OPEN:

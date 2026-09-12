@@ -554,6 +554,23 @@ ABLATION_CANDIDATE_FREE_VARIANTS: tuple[AblationVariant, ...] = (
 )
 
 
+BACKDOORED_SOURCE_CONDITIONS: tuple[ConditionName, ...] = (
+    PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
+    ReproducerCondition.ONE_SOURCE_COPY.value,
+    ReproducerCondition.TWO_SOURCE_COPIES.value,
+    PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+    ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER.value,
+    BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND.value,
+    BoundCondition.TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND.value,
+)
+
+
+def core_opening_episode(condition: ConditionName) -> ProposalEpisode:
+    if condition in BACKDOORED_SOURCE_CONDITIONS:
+        return ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    return ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY
+
+
 def ablation_scenario_for_condition(condition: ConditionName) -> AblationScenario | None:
     for scenario in AblationScenario:
         if scenario.value == condition:

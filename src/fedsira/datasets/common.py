@@ -30,6 +30,7 @@ from fedsira.domain.types import (
     ArtifactReuseDecision,
     AttackCount,
     BooleanValue,
+    ByteCount,
     ClassCount,
     ClassLabel,
     DatasetClassToken,
@@ -167,6 +168,21 @@ class RawDatasetIdentityPayload(FrozenDomainModel):
     schema_version: SchemaVersion
     dataset: DatasetId
     files: tuple[RawDatasetFileIdentity, ...]
+
+
+PREPARED_ROLE_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|prepared_role_view_manifest|1"
+
+
+class PreparedRoleViewManifest(FrozenDomainModel):
+    schema_version: SchemaVersion
+    dataset: DatasetId
+    view_key: PreparedViewKey
+    role: Role
+    class_token: DatasetClassToken
+    domain_token: DomainId
+    row_count: RowCount
+    parquet_sha256: DatasetFileDigest
+    parquet_bytes: ByteCount
 
 
 SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"

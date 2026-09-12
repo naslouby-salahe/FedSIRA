@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fedsira.artifacts.paths import (
     artifact_log_path,
     artifact_slot_directory,
@@ -11,6 +13,7 @@ from fedsira.artifacts.paths import (
 from fedsira.artifacts.store import (
     ArtifactDependency,
     ArtifactSlot,
+    compute_checksum,
     configure_artifact_logging,
     publish_artifact,
 )
@@ -27,13 +30,16 @@ from fedsira.datasets.ciciot2023.schema import (
     CICIoT2023DatasetManifestPayload,
 )
 from fedsira.datasets.common import (
+    PREPARED_ROLE_VIEW_SCHEMA_VERSION,
     SCALER_METADATA_SCHEMA_VERSION,
     DatasetPreparationLogFields,
+    PreparedRoleViewManifest,
     RawDatasetFileIdentity,
     RawDatasetIdentityPayload,
     ScalerMetadata,
     dataset_specification,
     prepared_feature_names,
+    role_hash_token,
 )
 from fedsira.datasets.nbaiot.prepare import (
     classes_structurally_unavailable,
@@ -43,15 +49,18 @@ from fedsira.datasets.nbaiot.prepare import (
     validate_target_holder_feasibility,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId
+from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId, Role
 from fedsira.domain.types import (
     ArtifactDependencyName,
     ArtifactReuseDecision,
     DatasetClassToken,
     DatasetManifestDigest,
+    DomainId,
     OverwriteExisting,
+    PreparedViewKey,
     Probability,
     ProcedureIdentity,
+    RowCount,
     SchemaVersion,
 )
 from fedsira.runtime import (
@@ -158,6 +167,51 @@ def publish_scaler(
     return reused
 
 
+PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|1"
+ROLE_SPLIT_ASSIGNMENT_DEPENDENCY: ArtifactDependencyName = "role-split-assignment"
+
+
+def publish_prepared_role_view(
+    dataset: DatasetId,
+    manifest_hash: DatasetManifestDigest,
+    view_key: PreparedViewKey,
+    role: Role,
+    class_token: DatasetClassToken,
+    domain_token: DomainId,
+    row_count: RowCount,
+    parquet_path: Path,
+) -> ArtifactReuseDecision:
+    parquet_payload = parquet_path.read_bytes()
+    slot = ArtifactSlot(family=ArtifactFamily.PREPARED_ROLE_VIEW, instance=view_key)
+    payload = (
+        PreparedRoleViewManifest(
+            schema_version=PREPARED_ROLE_VIEW_SCHEMA_VERSION,
+            dataset=dataset,
+            view_key=view_key,
+            role=role,
+            class_token=class_token,
+            domain_token=domain_token,
+            row_count=row_count,
+            parquet_sha256=compute_checksum(parquet_payload),
+            parquet_bytes=len(parquet_payload),
+        )
+        .model_dump_json()
+        .encode("utf-8")
+    )
+    _, reused = publish_artifact(
+        slot=slot,
+        producer=ArtifactProducer.PREPROCESSING,
+        payload=payload,
+        dependencies=(
+            ArtifactDependency(dependency=ROLE_SPLIT_ASSIGNMENT_DEPENDENCY, digest=manifest_hash),
+        ),
+        procedure_identity=PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY,
+        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
+        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+    )
+    return reused
+
+
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     raw_root = (
@@ -197,13 +251,24 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         manifest_hash,
     )
     prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
-    _views, moments = materialize_nbaiot_prepared_views(
+    nbaiot_views, moments = materialize_nbaiot_prepared_views(
         discovered,
         prepared_root,
         REPOSITORY_ROOT / prepared_feature_root(),
         overwrite,
         retain_materialized_views=False,
     )
+    for view in nbaiot_views:
+        publish_prepared_role_view(
+            DatasetId.N_BAIOT,
+            manifest_hash,
+            f"{view.domain.name}_{view.class_id.name}_{role_hash_token(view.role)}",
+            view.role,
+            view.class_id,
+            view.domain.name,
+            view.row_count,
+            view.parquet_path,
+        )
     publish_scaler(
         DatasetId.N_BAIOT,
         ScalerMetadata(
@@ -261,6 +326,18 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         cache_root,
         overwrite,
     )
+    for view in summary.views:
+        publish_prepared_role_view(
+            DatasetId.CICIOT2023,
+            summary.dataset_manifest_hash,
+            f"{view.pseudo_domain.display_token}_{view.normalized_label}_"
+            f"{role_hash_token(view.role)}",
+            view.role,
+            view.normalized_label,
+            view.pseudo_domain.display_token,
+            view.row_count,
+            view.parquet_path,
+        )
     publish_scaler(
         DatasetId.CICIOT2023,
         ScalerMetadata(
