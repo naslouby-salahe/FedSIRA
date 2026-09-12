@@ -928,12 +928,11 @@ class ProtocolCellDispatch:
             self._pending_real_report,
             legitimate_admission_eligible=stage.legitimate_admission_eligible,
         )
-        return (state, (*metrics, *self._opening_stage_observations(state)))
+        return (state, (*metrics, *self._opening_stage_observations(stage, state)))
 
-    def _opening_stage_observations(self, state: AdmissionState) -> tuple[MetricObservation, ...]:
-        stage = self._last_opening_stage
-        if stage is None:
-            return ()
+    def _opening_stage_observations(
+        self, stage: OpeningStageOutcome, state: AdmissionState
+    ) -> tuple[MetricObservation, ...]:
         false_launch_result = false_launch_rate(
             false_launch_count=1
             if state is AdmissionState.ADMITTED and (not stage.legitimate_admission_eligible)
@@ -1209,8 +1208,8 @@ class ProtocolCellDispatch:
         self._last_compromised_reproducers = frozenset()
         self._last_ablation_strategy = AblationReproducerStrategy.NONE
         self._last_reproduction_attempts = 0
-        self._last_opening_stage = None
         if not opening_resolved:
+            self._last_opening_stage = None
             stage = self._ablation_opening_stage(cell)
             if stage is not None:
                 self._last_opening_stage = stage

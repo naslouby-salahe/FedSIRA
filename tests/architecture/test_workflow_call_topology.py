@@ -98,3 +98,41 @@ def test_application_wires_every_cli_command() -> None:
         )
     )
     assert expected <= calls, f"application missing CLI workflow: {expected - calls}"
+
+
+def _method_node(path: Path, method_name: str) -> ast.FunctionDef:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == method_name:
+            return node
+    raise AssertionError(f"method {method_name} not found in {path.name}")
+
+
+def test_opening_stage_observations_consume_the_callers_stage() -> None:
+    handlers = REPO_ROOT / "src" / "fedsira" / "experiments" / "handlers.py"
+    node = _method_node(handlers, "_opening_stage_observations")
+    argument_names = tuple(argument.arg for argument in node.args.args)
+    assert "stage" in argument_names, (
+        "opening-stage observations must take the resolved stage explicitly rather than "
+        "reading shared protocol state"
+    )
+    shared_state_reads = tuple(
+        attribute.attr
+        for attribute in ast.walk(node)
+        if isinstance(attribute, ast.Attribute) and attribute.attr == "_last_opening_stage"
+    )
+    assert not shared_state_reads, (
+        "opening-stage observations must not read _last_opening_stage, which the downstream "
+        "protocol advance resets"
+    )
+    observation_calls = tuple(
+        call
+        for call in ast.walk(ast.parse(handlers.read_text(encoding="utf-8")))
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Attribute)
+        and call.func.attr == "_opening_stage_observations"
+    )
+    assert observation_calls, "the opening cell must emit its opening-stage observations"
+    assert all(
+        len(call.args) == 2 for call in observation_calls
+    ), "every opening-stage observation call must pass the stage and the state"
