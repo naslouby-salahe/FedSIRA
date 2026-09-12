@@ -1,15 +1,19 @@
+import hashlib
+import re
 from pathlib import Path
 
 from fedsira.artifacts.store import ArtifactSlot
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
 from fedsira.domain.types import (
+    ArtifactInstanceToken,
     ExperimentName,
+    FramingField,
     MasterSeed,
     MethodName,
     RepetitionIndex,
     TextValue,
 )
-from fedsira.runtime import current_application_context
+from fedsira.runtime import current_application_context, framed_bytes
 
 
 def execution_workspace_root() -> Path:
@@ -218,3 +222,9 @@ def artifact_slot_directory(slot: ArtifactSlot) -> Path:
         / artifact_family_directory_token(slot.family)
         / slot.instance
     )
+
+
+def artifact_instance_token(label: TextValue, *fields: FramingField) -> ArtifactInstanceToken:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", label).strip("-").lower()[:80].strip("-")
+    digest = hashlib.sha256(framed_bytes(label, *fields)).hexdigest()[:12]
+    return f"{slug}-{digest}"

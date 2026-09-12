@@ -8,6 +8,8 @@ from typing import TypeAlias
 
 import torch
 
+from fedsira.artifacts.paths import artifact_slot_directory
+from fedsira.artifacts.store import read_current_artifact
 from fedsira.datasets.common import (
     DatasetAdapter,
     EpistemicFailureScope,
@@ -71,11 +73,19 @@ from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
     match_diagnostic_benign_report_test_rows,
 )
-from fedsira.experiments.definitions import ComparisonFamily, experiment_by_name
+from fedsira.experiments.definitions import (
+    MECHANISM_ABLATION_NAME,
+    AblationScenario,
+    AblationVariant,
+    ComparisonFamily,
+    experiment_by_name,
+)
 from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
+    PersistedAblationReference,
     PersistedExecutionRecord,
+    ablation_reference_slot,
 )
 from fedsira.learning.model import (
     FedSIRAClassifier,
@@ -85,6 +95,7 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.post_reference import train_domain_reproduction_delta
 from fedsira.runtime import (
+    REPOSITORY_ROOT,
     CudaIntervalTimer,
     ElapsedTimer,
     current_application_context,
@@ -151,6 +162,35 @@ def _comparison_pairs(
     return tuple(paired)
 
 
+def ablation_reference_records(
+    dataset: DatasetId,
+    master_seeds: tuple[MasterSeed, ...],
+) -> tuple[MetricCellRecord, ...]:
+    records: tuple[MetricCellRecord, ...] = ()
+    for scientific_scenario in AblationScenario:
+        for master_seed in master_seeds:
+            slot = ablation_reference_slot(scientific_scenario, master_seed)
+            current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+            if current is None:
+                continue
+            _manifest, payload = current
+            reference = PersistedAblationReference.model_validate_json(payload)
+            records = merge_metric_record(
+                records,
+                MetricCellRecord(
+                    key=MetricCellKey(
+                        dataset=dataset,
+                        experiment=MECHANISM_ABLATION_NAME,
+                        scientific_scenario=reference.scientific_scenario,
+                        master_seed=reference.master_seed,
+                        method=AblationVariant.FULL_FEDSIRA.value,
+                    ),
+                    metrics=reference.metrics,
+                ),
+            )
+    return records
+
+
 def comparison_results_for_experiment(
     experiment: ExperimentName,
     dataset: DatasetId,
@@ -169,6 +209,11 @@ def comparison_results_for_experiment(
         Path(config.execution.repository_layout.execution_workspace)
     )
     metric_index = metric_index_from_outcomes(dataset, outcomes)
+    if experiment == MECHANISM_ABLATION_NAME:
+        metric_index = merge_metric_records(
+            metric_index,
+            ablation_reference_records(dataset, config.seeds_and_determinism.master_seeds),
+        )
     reference_experiments = frozenset(
         definition.reference_experiment
         for definition in definitions
@@ -258,6 +303,15 @@ def merge_metric_record(
 ) -> tuple[MetricCellRecord, ...]:
     retained = tuple(record for record in records if record.key != incoming.key)
     return (*retained, incoming)
+
+
+def merge_metric_records(
+    records: tuple[MetricCellRecord, ...], incoming: tuple[MetricCellRecord, ...]
+) -> tuple[MetricCellRecord, ...]:
+    merged = records
+    for record in incoming:
+        merged = merge_metric_record(merged, record)
+    return merged
 
 
 def metric_value(

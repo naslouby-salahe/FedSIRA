@@ -5,9 +5,12 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from fedsira.artifacts.paths import artifact_instance_token
+from fedsira.artifacts.store import ArtifactSlot
 from fedsira.datasets.common import Role
 from fedsira.domain.enums import (
     AdmissionState,
+    ArtifactFamily,
     DatasetId,
     ExperimentLifecycleState,
     FailureClass,
@@ -35,6 +38,7 @@ from fedsira.domain.types import (
     MetricObservation,
     MetricValue,
     OverwriteExisting,
+    ProcedureIdentity,
     RepetitionIndex,
     RowCount,
     ScenarioName,
@@ -44,7 +48,7 @@ from fedsira.domain.types import (
     TimeoutSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
-from fedsira.experiments.definitions import experiment_by_name
+from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, experiment_by_name
 from fedsira.experiments.planning import (
     ExperimentPlan,
     PlannedExperiment,
@@ -63,6 +67,8 @@ if TYPE_CHECKING:
     from fedsira.experiments.execution import ExperimentPrerequisiteState
 
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|1"
+ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
+ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
 EXECUTION_LOGGER = get_structured_logger("execution")
 
 
@@ -94,6 +100,24 @@ class PersistedExecutionRecord(FrozenDomainModel):
     metrics: tuple[MetricObservation, ...]
     state_trajectory: tuple[AdmissionStateObservation, ...] = ()
     failure: PersistedFailureDetail | None
+
+
+def ablation_reference_slot(
+    scientific_scenario: ScenarioName, master_seed: MasterSeed
+) -> ArtifactSlot:
+    return ArtifactSlot(
+        family=ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
+        instance=artifact_instance_token(scientific_scenario, master_seed),
+        experiment=MECHANISM_ABLATION_NAME,
+    )
+
+
+class PersistedAblationReference(FrozenDomainModel):
+    schema_version: ExecutionSchemaVersion
+    scientific_scenario: ScenarioName
+    master_seed: MasterSeed
+    metrics: tuple[MetricObservation, ...]
+    state_trajectory: tuple[AdmissionStateObservation, ...] = ()
 
 
 class CellExecutionOutcome(FrozenDomainModel):

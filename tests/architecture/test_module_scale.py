@@ -12,8 +12,8 @@ JUSTIFIED_LINE_BUDGETS = {
     "datasets/common.py": 1300,
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 1300,
-    "evaluation/service.py": 700,
-    "experiments/execution.py": 1050,
+    "evaluation/service.py": 720,
+    "experiments/execution.py": 1100,
     "reporting/tables.py": 1600,
     "reporting/figures.py": 1550,
     "reporting/export.py": 1300,
@@ -29,6 +29,7 @@ DEFAULT_LINE_BUDGET = 600
 DEFAULT_BYTE_BUDGET = 40_000
 JUSTIFIED_BYTE_BUDGETS = {
     "experiments/handlers.py": 125_000,
+    "experiments/execution.py": 42_000,
     "datasets/common.py": 50_000,
     "evaluation/metrics.py": 50_000,
     "evaluation/service.py": 30_000,

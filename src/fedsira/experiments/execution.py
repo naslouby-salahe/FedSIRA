@@ -10,20 +10,27 @@ import torch
 
 from fedsira.artifacts.paths import (
     artifact_log_path,
+    artifact_slot_directory,
+    artifact_staging_root,
     experiment_log_path,
+    prepared_evidence_root,
     smoke_record_path,
     workspace_root_for_family,
 )
 from fedsira.artifacts.store import (
     ARTIFACT_SCHEMA_VERSION,
+    ArtifactDependency,
     ArtifactManifest,
     ArtifactSlot,
     configure_artifact_logging,
+    publish_artifact,
+    read_current_artifact,
     validate_artifact_lifecycle_readable,
 )
 from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
     Role,
+    dataset_manifest_hash,
 )
 from fedsira.datasets.nbaiot.prepare import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import (
@@ -53,6 +60,7 @@ from fedsira.domain.types import (
     ExperimentName,
     FrozenDomainModel,
     InvariantChecksPassed,
+    MasterSeed,
     MetricValue,
     ModelInputWidth,
     ModelOutputWidth,
@@ -82,6 +90,7 @@ from fedsira.evaluation.statistics import (
 )
 from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.definitions import (
+    MECHANISM_ABLATION_NAME,
     AblationVariant,
     BoundCondition,
     CapabilityContractGranularity,
@@ -89,6 +98,8 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.engine import (
+    ABLATION_REFERENCE_PROCEDURE_IDENTITY,
+    ABLATION_REFERENCE_SCHEMA_VERSION,
     EXECUTION_LOGGER,
     CellExecutionOutcome,
     CellExecutor,
@@ -96,13 +107,15 @@ from fedsira.experiments.engine import (
     ExecutionLogFields,
     ExecutionRecordStore,
     ExperimentExecutionResult,
+    PersistedAblationReference,
+    ablation_reference_slot,
     derive_experiment_lifecycle,
     execute_cell_with_retry,
     execution_digest,
     log_execution_event,
     prerequisite_states_from_store,
 )
-from fedsira.experiments.planning import ExperimentPlan, build_plan
+from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment, build_plan
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
@@ -147,6 +160,80 @@ from fedsira.runtime import (
     configure_structured_file_logging,
     current_application_context,
 )
+
+
+def _reference_cell(scientific_scenario: ScenarioName, master_seed: MasterSeed) -> ScientificCell:
+    return ScientificCell(
+        experiment=MECHANISM_ABLATION_NAME,
+        method=AblationVariant.FULL_FEDSIRA.value,
+        condition=scientific_scenario,
+        master_seed=master_seed,
+    )
+
+
+def materialize_ablation_references(
+    planned: PlannedExperiment,
+    executor: CellExecutor,
+    master_seeds: tuple[MasterSeed, ...],
+) -> tuple[PersistedAblationReference, ...]:
+    references: list[PersistedAblationReference] = []
+    scenarios: list[ScenarioName] = []
+    for cell in planned.cells:
+        if cell.condition not in scenarios:
+            scenarios.append(cell.condition)
+    for scientific_scenario in scenarios:
+        for master_seed in master_seeds:
+            slot = ablation_reference_slot(scientific_scenario, master_seed)
+            slot_directory = REPOSITORY_ROOT / artifact_slot_directory(slot)
+            current = read_current_artifact(slot_directory)
+            if current is not None:
+                _manifest, payload = current
+                references.append(PersistedAblationReference.model_validate_json(payload))
+                log_execution_event(
+                    "ablation.reference.reused",
+                    ExecutionLogFields(
+                        experiment=MECHANISM_ABLATION_NAME,
+                        condition=scientific_scenario,
+                        master_seed=master_seed,
+                    ),
+                )
+                continue
+            reference_cell = _reference_cell(scientific_scenario, master_seed)
+            outcome = execute_cell_with_retry(reference_cell, executor)
+            reference = PersistedAblationReference(
+                schema_version=ABLATION_REFERENCE_SCHEMA_VERSION,
+                scientific_scenario=scientific_scenario,
+                master_seed=master_seed,
+                metrics=outcome.metrics,
+                state_trajectory=outcome.state_trajectory,
+            )
+            payload = reference.model_dump_json().encode("utf-8")
+            publish_artifact(
+                slot=slot,
+                producer=ArtifactProducer.EVALUATION_PRODUCER,
+                payload=payload,
+                dependencies=(
+                    ArtifactDependency(
+                        dependency="prepared-evidence",
+                        digest=dataset_manifest_hash(
+                            REPOSITORY_ROOT / prepared_evidence_root(planned.definition.dataset)
+                        ),
+                    ),
+                ),
+                procedure_identity=ABLATION_REFERENCE_PROCEDURE_IDENTITY,
+                slot_directory=slot_directory,
+                staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+            )
+            references.append(reference)
+            log_execution_event(
+                "ablation.reference.published",
+                ExecutionLogFields(
+                    experiment=MECHANISM_ABLATION_NAME,
+                    condition=scientific_scenario,
+                    master_seed=master_seed,
+                ),
+            )
+    return tuple(references)
 
 
 def execute_experiment(
@@ -198,6 +285,16 @@ def execute_experiment(
     )
     states = prerequisite_states or prerequisite_states_from_store(plan, experiment, store)
     validate_experiment_prerequisites_met(experiment, states)
+    if experiment == MECHANISM_ABLATION_NAME:
+        references = materialize_ablation_references(
+            planned,
+            executor,
+            resolved_config.seeds_and_determinism.master_seeds,
+        )
+        log_execution_event(
+            "ablation.references.materialized",
+            ExecutionLogFields(experiment=experiment, total_cells=len(references)),
+        )
     log_execution_event(
         "experiment.prerequisites.validated", ExecutionLogFields(experiment=experiment)
     )
