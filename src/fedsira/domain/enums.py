@@ -130,6 +130,28 @@ class ArtifactFamily(StrEnum):
     TABLE_FIGURE_REPORT_EXPORT = "Table/figure/report export"
 
 
+class ArtifactProducer(StrEnum):
+    RAW_ACQUISITION = "Raw acquisition"
+    DATASET_PREPARATION = "Dataset preparation"
+    PREPROCESSING = "Preprocessing"
+    ANCHOR_TRAINING = "Anchor training"
+    SOURCE_TRAINING = "Source training"
+    REPRODUCTION_PRODUCER = "Reproduction producer"
+    BASELINE_TRAINER = "Baseline trainer"
+    SCORING_PRODUCER = "Scoring producer"
+    PROPOSAL_SCREEN_CALIBRATION = "Proposal-screen calibration"
+    BASELINE_CALIBRATION = "Baseline calibration"
+    CONFIGURATION = "Configuration"
+    EXTERNAL_VERIFICATION = "External verification"
+    CERTIFICATE_PRODUCER = "Certificate producer"
+    SYNTHESIS_PRODUCER = "Synthesis producer"
+    FINAL_GATE_EVALUATOR = "Final-gate evaluator"
+    METRIC_REGISTRY = "Metric registry"
+    EVALUATION_PRODUCER = "Evaluation producer"
+    REPORTING_SOURCE_DATA = "Reporting source data"
+    REPORT_EXPORT = "Report export"
+
+
 class ArtifactPathScope(StrEnum):
     PREPROCESSING = "preprocessing"
     PROJECT_ARTIFACT = "project_artifact"

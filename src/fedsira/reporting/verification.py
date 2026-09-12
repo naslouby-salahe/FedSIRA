@@ -4,7 +4,7 @@ import csv
 from io import StringIO
 from pathlib import Path
 
-from fedsira.artifacts.store import ArtifactManifest
+from fedsira.artifacts.store import ArtifactManifest, InvalidArtifactReport
 from fedsira.domain.enums import (
     AdmissionState,
     ArtifactLifecycleState,
@@ -145,16 +145,20 @@ def verify_artifact_manifest_dependencies(
 
 def artifact_manifest_dependency_failures(
     manifests: tuple[ArtifactManifest, ...],
+    invalid_manifests: tuple[InvalidArtifactReport, ...] = (),
 ) -> tuple[CheckpointIdentity, ...]:
     identities = frozenset(manifest.identity for manifest in manifests)
-    return tuple(
-        manifest.identity
+    unreadable = tuple(f"{report.manifest_path}: {report.failure}" for report in invalid_manifests)
+    unresolved = tuple(
+        f"{manifest.slot.family.value}/{manifest.slot.instance}: {manifest.identity} is "
+        f"{manifest.lifecycle_state.value}"
+        if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
+        else manifest.identity
         for manifest in manifests
-        if (
-            manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-            or any(upstream not in identities for upstream in manifest.upstream_identities)
-        )
+        if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
+        or any(dependency.digest not in identities for dependency in manifest.dependencies)
     )
+    return (*unreadable, *unresolved)
 
 
 TABLE_HEADERS: tuple[tuple[TableName, tuple[DatasetColumnName, ...]], ...] = (

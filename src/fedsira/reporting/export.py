@@ -720,7 +720,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
             verify_experiments_completed(lifecycle_records, experiment_names),
             verify_experiments_reached_terminal_state(lifecycle_records, experiment_names),
             verify_artifact_manifest_dependencies(
-                artifact_manifest_dependency_failures(load_published_manifests(artifact_roots))
+                artifact_manifest_dependency_failures(*load_published_manifests(artifact_roots))
             ),
         ),
     )

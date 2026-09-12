@@ -14,7 +14,9 @@ from fedsira.artifacts.paths import (
     workspace_root_for_family,
 )
 from fedsira.artifacts.store import (
+    ARTIFACT_SCHEMA_VERSION,
     ArtifactManifest,
+    ArtifactSlot,
     validate_artifact_lifecycle_readable,
 )
 from fedsira.datasets.common import (
@@ -30,6 +32,7 @@ from fedsira.domain.enums import (
     AdmissionState,
     ArtifactFamily,
     ArtifactLifecycleState,
+    ArtifactProducer,
     EpistemicFailureType,
     ExperimentLifecycleState,
     RootCauseMixture,
@@ -864,11 +867,17 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
 
 def _artifact_invariants() -> tuple[SmokeCheckResult, ...]:
     manifest = ArtifactManifest(
-        family=ArtifactFamily.SCALER,
+        schema_version=ARTIFACT_SCHEMA_VERSION,
+        slot=ArtifactSlot(family=ArtifactFamily.SCALER, instance="smoke-invariant"),
+        producer=ArtifactProducer.PREPROCESSING,
         identity="a" * 64,
         checksum="b" * 64,
+        payload_bytes=0,
         lifecycle_state=ArtifactLifecycleState.COMPLETE,
-        upstream_identities=(),
+        dependencies=(),
+        procedure_identity="fedsira|smoke_artifact|1",
+        configuration_digest="c" * 64,
+        code_revision=None,
     )
     try:
         validate_artifact_lifecycle_readable(manifest)

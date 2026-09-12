@@ -2,62 +2,139 @@ import hashlib
 import os
 import uuid
 from pathlib import Path
-from typing import TypeAlias
 
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState
+from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ArtifactProducer
 from fedsira.domain.types import (
     ArtifactComplete,
+    ArtifactDependencyName,
     ArtifactDigest,
+    ArtifactInstanceToken,
+    ArtifactPayloadBytes,
     ArtifactReuseDecision,
+    ByteCount,
+    ExperimentName,
+    FailureMessage,
     FrozenDomainModel,
     LogRecordText,
+    ProcedureIdentity,
+    RelativePathText,
+    SchemaVersion,
+    TextValue,
 )
-from fedsira.runtime import get_structured_logger
+from fedsira.runtime import (
+    REPOSITORY_ROOT,
+    current_application_context,
+    framed_bytes,
+    get_structured_logger,
+)
 
-ArtifactPayloadBytes: TypeAlias = bytes
+ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
 
 ARTIFACT_LOGGER = get_structured_logger("artifacts")
 
 ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
 ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
+ARTIFACT_CURRENT_FILE_NAME = "current.json"
+
+ARTIFACT_LOG_NAME = "artifacts.log"
+
+
+class ArtifactDependency(FrozenDomainModel):
+    dependency: ArtifactDependencyName
+    digest: ArtifactDigest
+
+
+class ArtifactSlot(FrozenDomainModel):
+    family: ArtifactFamily
+    instance: ArtifactInstanceToken
+    experiment: ExperimentName | None = None
 
 
 class ArtifactManifest(FrozenDomainModel):
-    family: ArtifactFamily
+    schema_version: SchemaVersion
+    slot: ArtifactSlot
+    producer: ArtifactProducer
     identity: ArtifactDigest
     checksum: ArtifactDigest
+    payload_bytes: ByteCount
     lifecycle_state: ArtifactLifecycleState
-    upstream_identities: tuple[ArtifactDigest, ...]
+    dependencies: tuple[ArtifactDependency, ...]
+    procedure_identity: ProcedureIdentity
+    configuration_digest: ArtifactDigest
+    code_revision: TextValue | None
 
-    def with_lifecycle_state(
-        self,
-        lifecycle_state: ArtifactLifecycleState,
-    ) -> "ArtifactManifest":
+    @property
+    def family(self) -> ArtifactFamily:
+        return self.slot.family
+
+    def with_lifecycle_state(self, lifecycle_state: ArtifactLifecycleState) -> "ArtifactManifest":
         return ArtifactManifest(
-            family=self.family,
+            schema_version=self.schema_version,
+            slot=self.slot,
+            producer=self.producer,
             identity=self.identity,
             checksum=self.checksum,
+            payload_bytes=self.payload_bytes,
             lifecycle_state=lifecycle_state,
-            upstream_identities=self.upstream_identities,
+            dependencies=self.dependencies,
+            procedure_identity=self.procedure_identity,
+            configuration_digest=self.configuration_digest,
+            code_revision=self.code_revision,
         )
 
 
-def load_published_manifests(roots: tuple[Path, ...]) -> tuple[ArtifactManifest, ...]:
-    manifests: list[ArtifactManifest] = []
-    for root in roots:
-        if not root.exists():
-            continue
-        for path in sorted(root.rglob(f"*{ARTIFACT_MANIFEST_SUFFIX}")):
-            manifests.append(ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8")))
-    return tuple(manifests)
+class ArtifactCurrentPointer(FrozenDomainModel):
+    schema_version: SchemaVersion
+    slot: ArtifactSlot
+    identity: ArtifactDigest
 
 
-def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:
-    if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
-        raise ValueError(
-            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state.value}); "
-            "it is never a valid input to downstream science"
+class InvalidArtifactReport(FrozenDomainModel):
+    manifest_path: RelativePathText
+    failure: FailureMessage
+
+
+def repository_revision() -> TextValue | None:
+    git_root = REPOSITORY_ROOT / ".git"
+    head_path = git_root / "HEAD"
+    try:
+        head = head_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not head.startswith("ref: "):
+        return head
+    try:
+        return (git_root / head.removeprefix("ref: ")).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+
+def configuration_digest() -> ArtifactDigest:
+    config = current_application_context().scientific_config
+    payload = config.model_dump_json().encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def artifact_identity(
+    slot: ArtifactSlot,
+    dependencies: tuple[ArtifactDependency, ...],
+    procedure_identity: ProcedureIdentity,
+) -> ArtifactDigest:
+    labelled = tuple(
+        field
+        for dependency in sorted(dependencies, key=lambda item: item.dependency)
+        for field in (dependency.dependency, dependency.digest)
+    )
+    return hashlib.sha256(
+        framed_bytes(
+            slot.family.value,
+            slot.instance,
+            slot.experiment or "",
+            ARTIFACT_SCHEMA_VERSION,
+            procedure_identity,
+            *labelled,
         )
+    ).hexdigest()
 
 
 def compute_checksum(payload: ArtifactPayloadBytes) -> ArtifactDigest:
@@ -69,25 +146,66 @@ def verify_checksum(payload: ArtifactPayloadBytes, manifest: ArtifactManifest) -
         raise ValueError(f"checksum mismatch for artifact {manifest.identity}")
 
 
-def stage_payload(cache_staging_root: Path, payload: ArtifactPayloadBytes) -> Path:
-    cache_staging_root.mkdir(parents=True, exist_ok=True)
-    staged_path = cache_staging_root / f"{uuid.uuid4().hex}.staged"
+def _write_text_atomically(path: Path, text: TextValue) -> None:
+    temporary_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.partial")
+    temporary_path.write_text(text, encoding="utf-8")
+    os.replace(temporary_path, path)
+
+
+def load_published_manifests(
+    roots: tuple[Path, ...],
+) -> tuple[tuple[ArtifactManifest, ...], tuple[InvalidArtifactReport, ...]]:
+    manifests: list[ArtifactManifest] = []
+    invalid: list[InvalidArtifactReport] = []
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob(f"*{ARTIFACT_MANIFEST_SUFFIX}")):
+            try:
+                manifests.append(
+                    ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
+                )
+            except ValueError as error:
+                invalid.append(
+                    InvalidArtifactReport(
+                        manifest_path=str(path.relative_to(REPOSITORY_ROOT)),
+                        failure=str(error),
+                    )
+                )
+    return tuple(manifests), tuple(invalid)
+
+
+def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:
+    if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
+        raise ValueError(
+            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state.value}); "
+            "it is never a valid input to downstream science"
+        )
+
+
+def published_artifact_paths(
+    slot_directory: Path,
+    identity: ArtifactDigest,
+) -> tuple[Path, Path]:
+    payload_path = slot_directory / f"{identity}{ARTIFACT_PAYLOAD_SUFFIX}"
+    manifest_path = slot_directory / f"{identity}{ARTIFACT_MANIFEST_SUFFIX}"
+    return payload_path, manifest_path
+
+
+def current_pointer_path(slot_directory: Path) -> Path:
+    return slot_directory / ARTIFACT_CURRENT_FILE_NAME
+
+
+def stage_payload(staging_root: Path, payload: ArtifactPayloadBytes) -> Path:
+    staging_root.mkdir(parents=True, exist_ok=True)
+    staged_path = staging_root / f"{uuid.uuid4().hex}.staged"
     staged_path.write_bytes(payload)
     return staged_path
 
 
-def published_artifact_paths(
-    published_directory: Path,
-    identity: ArtifactDigest,
-) -> tuple[Path, Path]:
-    payload_path = published_directory / f"{identity}{ARTIFACT_PAYLOAD_SUFFIX}"
-    manifest_path = published_directory / f"{identity}{ARTIFACT_MANIFEST_SUFFIX}"
-    return payload_path, manifest_path
-
-
 def publish_artifact_to_disk(
     staged_path: Path,
-    published_directory: Path,
+    slot_directory: Path,
     staged_manifest: ArtifactManifest,
     payload: ArtifactPayloadBytes,
 ) -> ArtifactManifest:
@@ -95,34 +213,42 @@ def publish_artifact_to_disk(
         raise ValueError("only a staged manifest may be published")
     verify_checksum(payload, staged_manifest)
     completed = staged_manifest.with_lifecycle_state(ArtifactLifecycleState.COMPLETE)
-    published_directory.mkdir(parents=True, exist_ok=True)
+    slot_directory.mkdir(parents=True, exist_ok=True)
     payload_path, manifest_path = published_artifact_paths(
-        published_directory,
+        slot_directory,
         staged_manifest.identity,
     )
     os.replace(staged_path, payload_path)
-    manifest_path.write_text(completed.model_dump_json(), encoding="utf-8")
+    _write_text_atomically(manifest_path, completed.model_dump_json())
+    _write_text_atomically(
+        current_pointer_path(slot_directory),
+        ArtifactCurrentPointer(
+            schema_version=ARTIFACT_SCHEMA_VERSION,
+            slot=completed.slot,
+            identity=completed.identity,
+        ).model_dump_json(),
+    )
     return completed
 
 
 def read_published_manifest(
-    published_directory: Path,
+    slot_directory: Path,
     identity: ArtifactDigest,
 ) -> ArtifactManifest | None:
-    _, manifest_path = published_artifact_paths(published_directory, identity)
+    _, manifest_path = published_artifact_paths(slot_directory, identity)
     if not manifest_path.exists():
         return None
     return ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
 
 
 def is_artifact_complete_and_valid(
-    published_directory: Path,
+    slot_directory: Path,
     identity: ArtifactDigest,
 ) -> ArtifactComplete:
-    manifest = read_published_manifest(published_directory, identity)
+    manifest = read_published_manifest(slot_directory, identity)
     if manifest is None or manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
         return False
-    payload_path, _ = published_artifact_paths(published_directory, identity)
+    payload_path, _ = published_artifact_paths(slot_directory, identity)
     if not payload_path.exists():
         return False
     try:
@@ -132,48 +258,102 @@ def is_artifact_complete_and_valid(
     return True
 
 
+def read_validated_artifact_payload(
+    slot_directory: Path,
+    identity: ArtifactDigest,
+) -> ArtifactPayloadBytes:
+    manifest = read_published_manifest(slot_directory, identity)
+    if manifest is None:
+        raise ValueError(f"artifact {identity} has no published manifest")
+    if manifest.schema_version != ARTIFACT_SCHEMA_VERSION:
+        raise ValueError(
+            f"artifact {identity} uses schema {manifest.schema_version}, "
+            f"expected {ARTIFACT_SCHEMA_VERSION}"
+        )
+    validate_artifact_lifecycle_readable(manifest)
+    payload_path, _ = published_artifact_paths(slot_directory, identity)
+    if not payload_path.exists():
+        raise ValueError(f"artifact {identity} is Complete but its payload is absent")
+    payload = payload_path.read_bytes()
+    verify_checksum(payload, manifest)
+    if len(payload) != manifest.payload_bytes:
+        raise ValueError(f"artifact {identity} payload length does not match its manifest")
+    return payload
+
+
+def read_current_artifact(
+    slot_directory: Path,
+) -> tuple[ArtifactManifest, ArtifactPayloadBytes] | None:
+    pointer_path = current_pointer_path(slot_directory)
+    if not pointer_path.exists():
+        return None
+    pointer = ArtifactCurrentPointer.model_validate_json(pointer_path.read_text(encoding="utf-8"))
+    manifest = read_published_manifest(slot_directory, pointer.identity)
+    if manifest is None or manifest.slot != pointer.slot:
+        return None
+    return manifest, read_validated_artifact_payload(slot_directory, pointer.identity)
+
+
 class ArtifactLogFields(FrozenDomainModel):
     artifact_family: ArtifactFamily
+    artifact_instance: ArtifactInstanceToken
     artifact_identity: ArtifactDigest
 
 
-def _log_artifact_event(
-    event: LogRecordText, family: ArtifactFamily, identity: ArtifactDigest
-) -> None:
+def _log_artifact_event(event: LogRecordText, slot: ArtifactSlot, identity: ArtifactDigest) -> None:
     ARTIFACT_LOGGER.info(
         event,
-        extra=ArtifactLogFields(artifact_family=family, artifact_identity=identity).model_dump(),
+        extra=ArtifactLogFields(
+            artifact_family=slot.family,
+            artifact_instance=slot.instance,
+            artifact_identity=identity,
+        ).model_dump(),
     )
 
 
-def publish_or_reuse_artifact_payload(
+def publish_artifact(
     *,
-    family: ArtifactFamily,
-    identity: ArtifactDigest,
+    slot: ArtifactSlot,
+    producer: ArtifactProducer,
     payload: ArtifactPayloadBytes,
-    published_directory: Path,
+    dependencies: tuple[ArtifactDependency, ...],
+    procedure_identity: ProcedureIdentity,
+    slot_directory: Path,
     staging_root: Path,
-    upstream_identities: tuple[ArtifactDigest, ...] = (),
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
-    if is_artifact_complete_and_valid(published_directory, identity):
-        existing = read_published_manifest(published_directory, identity)
+    identity = artifact_identity(slot, dependencies, procedure_identity)
+    if is_artifact_complete_and_valid(slot_directory, identity):
+        existing = read_published_manifest(slot_directory, identity)
         if existing is not None:
-            _log_artifact_event("artifact.reused", family, identity)
+            _write_text_atomically(
+                current_pointer_path(slot_directory),
+                ArtifactCurrentPointer(
+                    schema_version=ARTIFACT_SCHEMA_VERSION,
+                    slot=slot,
+                    identity=identity,
+                ).model_dump_json(),
+            )
+            _log_artifact_event("artifact.reused", slot, identity)
             return existing, True
-
     staged_manifest = ArtifactManifest(
-        family=family,
+        schema_version=ARTIFACT_SCHEMA_VERSION,
+        slot=slot,
+        producer=producer,
         identity=identity,
         checksum=compute_checksum(payload),
+        payload_bytes=len(payload),
         lifecycle_state=ArtifactLifecycleState.STAGING,
-        upstream_identities=upstream_identities,
+        dependencies=dependencies,
+        procedure_identity=procedure_identity,
+        configuration_digest=configuration_digest(),
+        code_revision=repository_revision(),
     )
     staged_path = stage_payload(staging_root, payload)
     published = publish_artifact_to_disk(
         staged_path,
-        published_directory,
+        slot_directory,
         staged_manifest,
         payload,
     )
-    _log_artifact_event("artifact.published", family, identity)
+    _log_artifact_event("artifact.published", slot, identity)
     return (published, False)

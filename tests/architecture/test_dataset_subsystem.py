@@ -84,7 +84,7 @@ def test_preprocess_workflow_calls_materialize_functions() -> None:
     expected = {
         "materialize_nbaiot_prepared_views",
         "materialize_ciciot2023_prepared_views",
-        "publish_or_reuse_artifact_payload",
+        "publish_artifact",
     }
     assert expected <= names, f"preprocess missing {expected - names}"
 

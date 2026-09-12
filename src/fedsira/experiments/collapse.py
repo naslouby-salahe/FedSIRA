@@ -4,27 +4,26 @@ from enum import StrEnum
 from pathlib import Path
 
 from fedsira.artifacts.store import (
+    ArtifactDependency,
     ArtifactManifest,
     ArtifactPayloadBytes,
+    ArtifactReuseDecision,
+    ArtifactSlot,
     compute_checksum,
-    is_artifact_complete_and_valid,
-    publish_artifact_to_disk,
-    published_artifact_paths,
-    read_published_manifest,
-    stage_payload,
-    validate_artifact_lifecycle_readable,
+    publish_artifact,
+    read_current_artifact,
 )
 from fedsira.config import MaterialityConfig
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
     ArtifactFamily,
-    ArtifactLifecycleState,
+    ArtifactProducer,
     CoreMethodIdentity,
     ExperimentLifecycleState,
     ProposalEpisode,
 )
 from fedsira.domain.types import (
-    ArtifactDigest,
+    ArtifactInstanceToken,
     BooleanValue,
     CollapseDecisionPassed,
     CollapseReason,
@@ -38,6 +37,7 @@ from fedsira.domain.types import (
     MetricName,
     MetricValue,
     MinimumCompletePairCount,
+    ProcedureIdentity,
     PValue,
     ResolvedCoreIdentity,
     ScenarioName,
@@ -649,46 +649,48 @@ def materialize_resolved_core(
 
 
 RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
-RESOLVED_CORE_IDENTITY_PAYLOAD: ArtifactPayloadBytes = b"RESOLVED_FEDSIRA_CORE_SECTION_18_7"
-RESOLVED_CORE_ARTIFACT_IDENTITY: ArtifactDigest = compute_checksum(RESOLVED_CORE_IDENTITY_PAYLOAD)
+RESOLVED_CORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|resolved_core|1"
+
+
+RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = "resolved-fedsira-core"
+
+
+def resolved_core_artifact_slot() -> ArtifactSlot:
+    return ArtifactSlot(family=RESOLVED_CORE_ARTIFACT_FAMILY, instance=RESOLVED_CORE_INSTANCE)
+
+
+def resolved_core_dependencies(
+    decisions: tuple[CollapseDecision, ...],
+) -> tuple[ArtifactDependency, ...]:
+    return tuple(
+        ArtifactDependency(
+            dependency=f"collapse-decision:{decision.kind.value}",
+            digest=compute_checksum(decision.model_dump_json().encode("utf-8")),
+        )
+        for decision in sorted(decisions, key=lambda item: item.kind.value)
+    )
 
 
 def publish_resolved_core(
-    published_directory: Path,
+    slot_directory: Path,
     core: ResolvedCore,
-) -> ArtifactManifest:
+    decisions: tuple[CollapseDecision, ...],
+) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     payload: ArtifactPayloadBytes = core.model_dump_json().encode("utf-8")
-    staged_manifest = ArtifactManifest(
-        family=RESOLVED_CORE_ARTIFACT_FAMILY,
-        identity=RESOLVED_CORE_ARTIFACT_IDENTITY,
-        checksum=compute_checksum(payload),
-        lifecycle_state=ArtifactLifecycleState.STAGING,
-        upstream_identities=(),
-    )
-    staged_path = stage_payload(published_directory / "staging", payload)
-    return publish_artifact_to_disk(
-        staged_path,
-        published_directory,
-        staged_manifest,
-        payload,
+    return publish_artifact(
+        slot=resolved_core_artifact_slot(),
+        producer=ArtifactProducer.CONFIGURATION,
+        payload=payload,
+        dependencies=resolved_core_dependencies(decisions),
+        procedure_identity=RESOLVED_CORE_PROCEDURE_IDENTITY,
+        slot_directory=slot_directory,
+        staging_root=slot_directory / "staging",
     )
 
 
-def read_resolved_core(published_directory: Path) -> ResolvedCore | None:
-    if not is_artifact_complete_and_valid(
-        published_directory,
-        RESOLVED_CORE_ARTIFACT_IDENTITY,
-    ):
+def read_resolved_core(slot_directory: Path) -> ResolvedCore | None:
+    current = read_current_artifact(slot_directory)
+    if current is None:
         return None
-    manifest = read_published_manifest(
-        published_directory,
-        RESOLVED_CORE_ARTIFACT_IDENTITY,
-    )
-    if manifest is None:
-        return None
-    validate_artifact_lifecycle_readable(manifest)
-    payload_path, _manifest_path = published_artifact_paths(
-        published_directory,
-        manifest.identity,
-    )
-    return ResolvedCore.model_validate_json(payload_path.read_text())
+    _manifest, payload = current
+    return ResolvedCore.model_validate_json(payload)

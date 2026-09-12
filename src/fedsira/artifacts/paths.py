@@ -1,7 +1,14 @@
 from pathlib import Path
 
+from fedsira.artifacts.store import ArtifactSlot
 from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
-from fedsira.domain.types import ExperimentName, MasterSeed, MethodName, RepetitionIndex
+from fedsira.domain.types import (
+    ExperimentName,
+    MasterSeed,
+    MethodName,
+    RepetitionIndex,
+    TextValue,
+)
 from fedsira.runtime import current_application_context
 
 
@@ -51,6 +58,37 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
 )
 RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,))
 
+ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[tuple[ArtifactFamily, TextValue], ...] = (
+    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),
+    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),
+    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),
+    (ArtifactFamily.SCALER, "scaler"),
+    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),
+    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),
+    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),
+    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),
+    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),
+    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),
+    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),
+    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),
+    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),
+    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),
+    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),
+    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),
+    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),
+    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),
+    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),
+    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),
+    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),
+)
+
+
+def artifact_family_directory_token(family: ArtifactFamily) -> TextValue:
+    for candidate, token in ARTIFACT_FAMILY_DIRECTORY_TOKENS:
+        if candidate is family:
+            return token
+    raise ValueError(f"artifact family has no directory token: {family.value}")
+
 
 def preprocessing_root() -> Path:
     return execution_workspace_root() / "preprocessing"
@@ -70,6 +108,10 @@ def artifact_staging_root() -> Path:
 
 def artifact_publication_root() -> Path:
     return execution_workspace_root() / "artifacts"
+
+
+def artifact_log_path() -> Path:
+    return artifact_publication_root() / "logs" / "artifacts.log"
 
 
 def execution_outputs_root() -> Path:
@@ -168,3 +210,11 @@ def workspace_root_for_family(
     if experiment is None:
         raise ValueError(f"artifact family {family.value} requires an owning experiment name")
     return manuscript_results_root() / "experiments" / experiment
+
+
+def artifact_slot_directory(slot: ArtifactSlot) -> Path:
+    return (
+        workspace_root_for_family(slot.family, slot.experiment)
+        / artifact_family_directory_token(slot.family)
+        / slot.instance
+    )

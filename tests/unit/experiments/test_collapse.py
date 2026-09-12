@@ -260,9 +260,17 @@ def test_materialize_resolved_core_preserves_source_exclusion_decision() -> None
     assert not core.direct_source_exclusion_survives
 
 
+_CORE_DECISIONS = (
+    _decision(CollapseDecisionKind.PROPOSAL_ASSISTANCE, True),
+    _decision(CollapseDecisionKind.PLURALITY, False),
+    _decision(CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION, True),
+    _decision(CollapseDecisionKind.EXTERNAL_VERIFICATION, True),
+)
+
+
 def test_publish_and_read_resolved_core_round_trips(tmp_path: Path) -> None:
     core = resolve_core_mapping(True, False, True)
-    publish_resolved_core(tmp_path, core)
+    publish_resolved_core(tmp_path, core, _CORE_DECISIONS)
     reloaded = read_resolved_core(tmp_path)
     assert reloaded is not None
     assert reloaded.decision_identity == core.decision_identity
@@ -276,9 +284,23 @@ def test_read_resolved_core_returns_none_without_a_published_artifact(tmp_path: 
     assert read_resolved_core(tmp_path) is None
 
 
-def test_publish_resolved_core_overwrites_a_prior_publish(tmp_path: Path) -> None:
-    publish_resolved_core(tmp_path, resolve_core_mapping(True, True, True))
-    publish_resolved_core(tmp_path, resolve_core_mapping(False, False, False))
+def test_publish_resolved_core_replaces_the_current_pointer_on_a_new_derivation(
+    tmp_path: Path,
+) -> None:
+    publish_resolved_core(tmp_path, resolve_core_mapping(True, True, True), _CORE_DECISIONS)
+    publish_resolved_core(
+        tmp_path,
+        resolve_core_mapping(False, False, False),
+        tuple(
+            _decision(kind, False)
+            for kind in (
+                CollapseDecisionKind.PROPOSAL_ASSISTANCE,
+                CollapseDecisionKind.PLURALITY,
+                CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
+                CollapseDecisionKind.EXTERNAL_VERIFICATION,
+            )
+        ),
+    )
     reloaded = read_resolved_core(tmp_path)
     assert reloaded is not None
     assert reloaded.decision_identity == "candidate-free|single-reproduction|unverified-row"

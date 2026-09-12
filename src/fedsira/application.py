@@ -5,12 +5,14 @@ from pathlib import Path
 from rich.console import Console
 
 from fedsira.artifacts.paths import (
+    artifact_slot_directory,
     manuscript_tables_root,
     prepared_evidence_root,
     project_summary_root,
     smoke_record_path,
     workspace_root_for_family,
 )
+from fedsira.artifacts.store import ArtifactSlot
 from fedsira.datasets.common import dataset_specification
 from fedsira.datasets.preprocess import execute_preprocess
 from fedsira.domain.enums import ArtifactFamily, DatasetId, ExperimentLifecycleState, ProjectStage
@@ -35,6 +37,7 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
+    RESOLVED_CORE_INSTANCE,
     CollapseDecision,
     collapse_decision_from_comparison_families,
     collapse_evaluation_from_records,
@@ -583,7 +586,16 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if len(decisions) != len(COLLAPSE_EXPERIMENT_NAMES):
         return
     core = materialize_resolved_core(tuple(decisions))
-    publish_resolved_core(resolved_core_directory(), core)
+    publish_resolved_core(
+        artifact_slot_directory(
+            ArtifactSlot(
+                family=ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
+                instance=RESOLVED_CORE_INSTANCE,
+            )
+        ),
+        core,
+        tuple(decisions),
+    )
     print(f"Resolved FedSIRA Core materialized: {core.decision_identity}")
 
 

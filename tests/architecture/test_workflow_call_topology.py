@@ -72,7 +72,7 @@ def test_preprocess_workflow_reaches_dataset_materialization() -> None:
         (
             "materialize_nbaiot_prepared_views",
             "materialize_ciciot2023_prepared_views",
-            "publish_or_reuse_artifact_payload",
+            "publish_artifact",
         )
     )
     assert expected <= calls, f"preprocess bypasses dataset artifacts: {expected - calls}"

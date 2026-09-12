@@ -1,13 +1,13 @@
 from fedsira.artifacts.paths import (
+    artifact_slot_directory,
     artifact_staging_root,
     prepared_evidence_root,
     prepared_feature_root,
     preprocessing_extraction_cache_root,
     preprocessing_log_path,
     preprocessing_metadata_root,
-    workspace_root_for_family,
 )
-from fedsira.artifacts.store import compute_checksum, publish_or_reuse_artifact_payload
+from fedsira.artifacts.store import ArtifactDependency, ArtifactSlot, publish_artifact
 from fedsira.datasets.ciciot2023.prepare import (
     discover_secondary_csv_files,
     materialize_ciciot2023_prepared_views,
@@ -26,13 +26,14 @@ from fedsira.datasets.nbaiot.prepare import (
     validate_target_holder_feasibility,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
-from fedsira.domain.enums import ArtifactFamily, DatasetId
+from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId
 from fedsira.domain.types import (
-    ArtifactDigest,
+    ArtifactDependencyName,
     ArtifactReuseDecision,
     DatasetClassToken,
     OverwriteExisting,
     Probability,
+    ProcedureIdentity,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -51,15 +52,32 @@ PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
 
+DATASET_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "dataset-file-manifest"
+DATASET_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|dataset_manifest|1"
+
+
 def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseDecision:
     serialized_payload = payload.model_dump_json().encode("utf-8")
-    identity: ArtifactDigest = compute_checksum(serialized_payload)
-    _, reused = publish_or_reuse_artifact_payload(
-        family=ArtifactFamily.DATASET_MANIFEST,
-        identity=identity,
+    _, reused = publish_artifact(
+        slot=ArtifactSlot(
+            family=ArtifactFamily.DATASET_MANIFEST,
+            instance=payload.dataset_file_manifest_hash,
+        ),
+        producer=ArtifactProducer.DATASET_PREPARATION,
         payload=serialized_payload,
-        published_directory=REPOSITORY_ROOT
-        / workspace_root_for_family(ArtifactFamily.DATASET_MANIFEST),
+        dependencies=(
+            ArtifactDependency(
+                dependency=DATASET_FILE_MANIFEST_DEPENDENCY,
+                digest=payload.dataset_file_manifest_hash,
+            ),
+        ),
+        procedure_identity=DATASET_MANIFEST_PROCEDURE_IDENTITY,
+        slot_directory=artifact_slot_directory(
+            ArtifactSlot(
+                family=ArtifactFamily.DATASET_MANIFEST,
+                instance=payload.dataset_file_manifest_hash,
+            )
+        ),
         staging_root=REPOSITORY_ROOT / artifact_staging_root(),
     )
     return reused

@@ -26,6 +26,13 @@ ExperimentSlug = Annotated[
     str,
     StringConstraints(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9-]*$"),
 ]
+ArtifactPayloadBytes: TypeAlias = bytes
+ArtifactDependencyName = TextValue
+ProcedureIdentity = TextValue
+ArtifactInstanceToken = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$"),
+]
 ArtifactDigest = Annotated[
     str,
     StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
