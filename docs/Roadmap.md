@@ -1659,6 +1659,12 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Metric adequacy minima
+
+A supported metric is defined only where every supported class present in the scored population has at least `datasets.primary.supported_metric_minimum_report_examples_per_class` examples of true support; below that the supported metric is `NA` and the insufficiency is recorded rather than reported as a low value. The primary and secondary programs share this rule.
+
+The proposal screen matches exactly `protocol.proposal_screen.matched_controls_per_target` controls to each target within the target's anchor-loss decile, without replacement; when a target's decile holds fewer remaining controls than the declared count, the fold cannot be matched and the screen differential is undefined for that fold.
+
 ## 17.3 Security and admission metrics
 
 ### Attack Success Rate
