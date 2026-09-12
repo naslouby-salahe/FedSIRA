@@ -22,9 +22,12 @@ from fedsira.artifacts.store import (
     ArtifactDependency,
     ArtifactManifest,
     ArtifactSlot,
+    artifact_identity,
+    configuration_digest,
     configure_artifact_logging,
     publish_artifact,
     read_current_artifact,
+    repository_revision,
     validate_artifact_lifecycle_readable,
 )
 from fedsira.datasets.common import (
@@ -54,6 +57,7 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
+    ArtifactDigest,
     ComparisonName,
     DatasetClassToken,
     ExampleCount,
@@ -416,7 +420,7 @@ def execute_smoke(overwrite: OverwriteExisting) -> None:
 SmokeCheckName = TextValue
 SmokeCheckDetail = TextValue
 SmokeRenderText = TextValue
-SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|1"
+SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"
 
 _DANMINI = NBaiotDomain.DANMINI_DOORBELL
 _ENNIO = NBaiotDomain.ENNIO_DOORBELL
@@ -494,6 +498,8 @@ class PersistedSmokeRecord(FrozenDomainModel):
     schema_version: SchemaVersion
     passed: InvariantChecksPassed
     checks: tuple[SmokeCheckResult, ...]
+    configuration_digest: ArtifactDigest
+    code_revision: TextValue | None
 
 
 class ExperimentPrerequisiteState(FrozenDomainModel):
@@ -984,10 +990,40 @@ def _artifact_invariants() -> tuple[SmokeCheckResult, ...]:
         lifecycle_is_readable = True
     except ValueError:
         lifecycle_is_readable = False
+    parent_slot = ArtifactSlot(family=ArtifactFamily.SCALER, instance="smoke-parent")
+    child_slot = ArtifactSlot(family=ArtifactFamily.PREPARED_ROLE_VIEW, instance="smoke-descendant")
+    parent_identity = artifact_identity(
+        parent_slot,
+        (ArtifactDependency(dependency="raw-dataset", digest="a" * 64),),
+        "fedsira|smoke_parent|1",
+    )
+    changed_parent_identity = artifact_identity(
+        parent_slot,
+        (ArtifactDependency(dependency="raw-dataset", digest="d" * 64),),
+        "fedsira|smoke_parent|1",
+    )
+    child_identity = artifact_identity(
+        child_slot,
+        (ArtifactDependency(dependency="parent", digest=parent_identity),),
+        "fedsira|smoke_child|1",
+    )
+    changed_child_identity = artifact_identity(
+        child_slot,
+        (ArtifactDependency(dependency="parent", digest=changed_parent_identity),),
+        "fedsira|smoke_child|1",
+    )
     return (
         SmokeCheckResult(
             name="complete artifact manifest is readable",
             passed=lifecycle_is_readable,
+        ),
+        SmokeCheckResult(
+            name="changing one parent identity marks transitive descendants stale",
+            passed=(
+                parent_identity != changed_parent_identity
+                and child_identity != changed_child_identity
+                and child_identity != parent_identity
+            ),
         ),
     )
 
@@ -1039,7 +1075,14 @@ def _load_persisted_smoke_record() -> PersistedSmokeRecord | None:
 
 def run_smoke_suite(overwrite: OverwriteExisting) -> SmokeSuiteResult:
     existing = None if overwrite else _load_persisted_smoke_record()
-    if existing is not None and existing.passed:
+    current_digest = configuration_digest()
+    current_revision = repository_revision()
+    if (
+        existing is not None
+        and existing.passed
+        and existing.configuration_digest == current_digest
+        and existing.code_revision == current_revision
+    ):
         return SmokeSuiteResult(checks=existing.checks)
     checks = (
         *_data_invariants(),
@@ -1062,6 +1105,8 @@ def _persist_smoke_record(result: SmokeSuiteResult, overwrite: OverwriteExisting
     record_path.parent.mkdir(parents=True, exist_ok=True)
     record = PersistedSmokeRecord(
         schema_version=SMOKE_RECORD_SCHEMA_VERSION,
+        configuration_digest=configuration_digest(),
+        code_revision=repository_revision(),
         passed=result.passed,
         checks=result.checks,
     )

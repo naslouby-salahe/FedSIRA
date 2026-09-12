@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from fedsira.artifacts.store import configuration_digest, repository_revision
 from fedsira.experiments.execution import (
     SMOKE_RECORD_SCHEMA_VERSION,
     PersistedSmokeRecord,
@@ -69,6 +70,8 @@ def test_run_smoke_suite_reuses_an_exact_valid_record_without_overwrite(
         schema_version=SMOKE_RECORD_SCHEMA_VERSION,
         passed=True,
         checks=(SmokeCheckResult(name="fixture check", passed=True),),
+        configuration_digest=configuration_digest(),
+        code_revision=repository_revision(),
     )
     original = persisted.model_dump_json(indent=2)
     record_path.write_text(original)
@@ -89,3 +92,42 @@ def test_run_smoke_suite_recomputes_and_rewrites_an_invalid_or_failed_record(
     payload = json.loads(record_path.read_text())
     assert payload["schema_version"] == SMOKE_RECORD_SCHEMA_VERSION
     assert payload["passed"] is True
+
+
+def test_run_smoke_suite_recomputes_when_the_configuration_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record_path = tmp_path / "smoke_record.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    stale = PersistedSmokeRecord(
+        schema_version=SMOKE_RECORD_SCHEMA_VERSION,
+        passed=True,
+        checks=(SmokeCheckResult(name="stale check", passed=True),),
+        configuration_digest="0" * 64,
+        code_revision=repository_revision(),
+    )
+    record_path.write_text(stale.model_dump_json(indent=2))
+    monkeypatch.setattr("fedsira.experiments.execution.smoke_record_path", lambda: record_path)
+    result = run_smoke_suite(overwrite=False)
+    assert "stale check" not in {check.name for check in result.checks}
+    assert "changing one parent identity marks transitive descendants stale" in {
+        check.name for check in result.checks
+    }
+
+
+def test_run_smoke_suite_recomputes_when_the_code_revision_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record_path = tmp_path / "smoke_record.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    stale = PersistedSmokeRecord(
+        schema_version=SMOKE_RECORD_SCHEMA_VERSION,
+        passed=True,
+        checks=(SmokeCheckResult(name="stale check", passed=True),),
+        configuration_digest=configuration_digest(),
+        code_revision="deadbeef",
+    )
+    record_path.write_text(stale.model_dump_json(indent=2))
+    monkeypatch.setattr("fedsira.experiments.execution.smoke_record_path", lambda: record_path)
+    result = run_smoke_suite(overwrite=False)
+    assert "stale check" not in {check.name for check in result.checks}
