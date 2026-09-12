@@ -23,6 +23,7 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
+    configure_structured_file_logging,
     current_application_context,
     framed_bytes,
     get_structured_logger,
@@ -92,6 +93,10 @@ class ArtifactCurrentPointer(FrozenDomainModel):
 class InvalidArtifactReport(FrozenDomainModel):
     manifest_path: RelativePathText
     failure: FailureMessage
+
+
+def configure_artifact_logging(log_path: Path) -> None:
+    configure_structured_file_logging(ARTIFACT_LOGGER, log_path)
 
 
 def repository_revision() -> TextValue | None:

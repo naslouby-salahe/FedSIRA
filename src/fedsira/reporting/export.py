@@ -7,6 +7,7 @@ from typing import cast
 import pandas
 
 from fedsira.artifacts.paths import (
+    artifact_log_path,
     artifact_publication_root,
     execution_outputs_root,
     experiment_metrics_root,
@@ -20,7 +21,10 @@ from fedsira.artifacts.paths import (
     project_summary_root,
     workspace_root_for_family,
 )
-from fedsira.artifacts.store import load_published_manifests
+from fedsira.artifacts.store import (
+    configure_artifact_logging,
+    load_published_manifests,
+)
 from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
 from fedsira.domain.models import (
     ScientificCell,
@@ -651,6 +655,7 @@ def execute_report(name: ExperimentName | None, overwrite: OverwriteExisting) ->
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
         configure_structured_file_logging(REPORT_LOGGER, REPOSITORY_ROOT / preprocessing_log_path())
+        configure_artifact_logging(REPOSITORY_ROOT / artifact_log_path())
         scope = name if name is not None else PROJECT_SUMMARY_EXPORT_NAME
         fields = ReportLogFields(report_scope=scope)
         log_structured_event(REPORT_LOGGER, "report.started", fields)

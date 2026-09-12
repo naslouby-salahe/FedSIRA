@@ -9,6 +9,7 @@ import numpy
 import torch
 
 from fedsira.artifacts.paths import (
+    artifact_log_path,
     experiment_log_path,
     smoke_record_path,
     workspace_root_for_family,
@@ -17,6 +18,7 @@ from fedsira.artifacts.store import (
     ARTIFACT_SCHEMA_VERSION,
     ArtifactManifest,
     ArtifactSlot,
+    configure_artifact_logging,
     validate_artifact_lifecycle_readable,
 )
 from fedsira.datasets.common import (
@@ -161,6 +163,7 @@ def execute_experiment(
         EXECUTION_LOGGER,
         current_application_context().repository_root / experiment_log_path(experiment),
     )
+    configure_artifact_logging(current_application_context().repository_root / artifact_log_path())
     timer = ElapsedTimer()
     log_execution_event(
         "experiment.started",

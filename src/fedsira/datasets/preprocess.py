@@ -1,4 +1,5 @@
 from fedsira.artifacts.paths import (
+    artifact_log_path,
     artifact_slot_directory,
     artifact_staging_root,
     prepared_evidence_root,
@@ -7,7 +8,12 @@ from fedsira.artifacts.paths import (
     preprocessing_log_path,
     preprocessing_metadata_root,
 )
-from fedsira.artifacts.store import ArtifactDependency, ArtifactSlot, publish_artifact
+from fedsira.artifacts.store import (
+    ArtifactDependency,
+    ArtifactSlot,
+    configure_artifact_logging,
+    publish_artifact,
+)
 from fedsira.datasets.ciciot2023.prepare import (
     discover_secondary_csv_files,
     materialize_ciciot2023_prepared_views,
@@ -207,6 +213,7 @@ def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> N
     configure_structured_file_logging(
         PREPROCESSING_LOGGER, REPOSITORY_ROOT / preprocessing_log_path()
     )
+    configure_artifact_logging(REPOSITORY_ROOT / artifact_log_path())
     mirror_structured_logging_to_console(PREPROCESSING_LOGGER)
     selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
     for selected_dataset in selected_datasets:

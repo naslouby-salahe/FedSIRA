@@ -508,7 +508,7 @@ class ProtocolCellDispatch:
                 )
                 extra.append(
                     (
-                        "capability-contract-granularity-false-same-rate",
+                        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
                         false_same_count / broad_certified_count
                         if broad_certified_count > 0
                         else None,
@@ -556,7 +556,7 @@ class ProtocolCellDispatch:
             ("macro-auprc", macro_auprc.value),
             ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),
             ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),
-            ("false-same-capability-rate", false_same_rate.value),
+            (ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, false_same_rate.value),
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
             scope = CapabilityContractScope(cell.method)
@@ -1217,6 +1217,7 @@ class ProtocolCellDispatch:
         else:
             state = self._advance_protocol(cell, evidence)
         extra: list[MetricObservation] = []
+        source_backdoor_asr: MetricResult | None = None
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             real_anchor = self.real_anchor(cell.master_seed)
             source_domain = source_domain_for_cell(self._primary_adapter, cell)
@@ -1242,9 +1243,12 @@ class ProtocolCellDispatch:
                         backdoor_scope.trigger_feature_indices,
                         backdoor_scope.trigger_value,
                     )
-                    extra.append(("source-backdoor-asr", asr.value))
+                    source_backdoor_asr = asr
         metrics = metrics_from_state(
-            state, self._pending_real_report, legitimate_admission_eligible=True
+            state,
+            self._pending_real_report,
+            source_backdoor_asr,
+            legitimate_admission_eligible=True,
         )
         malicious_admission = 0.0
         if method != full_fedsira and state is AdmissionState.ADMITTED:

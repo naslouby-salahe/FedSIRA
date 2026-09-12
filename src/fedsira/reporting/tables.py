@@ -777,7 +777,10 @@ def render_ablation_results_table(
     rows: list[tuple[TextValue, ...]] = []
     for variant in AblationVariant:
         scenario = ablation_scenario_for_variant(variant)
-        metric, _orientation = ablation_metric(variant)
+        is_reference = variant is AblationVariant.FULL_FEDSIRA
+        metric = (
+            ComparisonMetric.ATTACK_SUCCESS_RATE if is_reference else ablation_metric(variant)[0]
+        )
         comparison = _comparison_result(
             comparison_results,
             MECHANISM_ABLATION_NAME,
@@ -785,7 +788,6 @@ def render_ablation_results_table(
             scenario,
             metric,
         )
-        is_reference = variant is AblationVariant.FULL_FEDSIRA
         rows.append(
             (
                 variant.value,
