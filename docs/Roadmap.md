@@ -1681,6 +1681,10 @@ Anchor checkpoints are published as `Anchor checkpoint and round checkpoints` ar
 
 A **permanent singleton admission** is a cell that reaches `Admitted` while the schedule provides exactly one eligible evidence holder and never provides a second holder anywhere in the horizon. The `Evidence Scarcity and Dormancy` cells report it as `permanent-singleton-admission`; final export verification requires the total across the experiment to be at most `evidence_thresholds.safe_dormancy.maximum_permanent_singleton_admissions`.
 
+### Training-population indexing
+
+Batch construction maps sample identities to population row positions through a single position map built once per epoch, and duplicate sample identities in a training population are rejected rather than silently resolved. Measured on a 40,000-row population, building one epoch of batches takes about 0.1 s; the previous per-sample linear scan made this step quadratic and dominated every cell's runtime.
+
 ### Data loading
 
 Training batches are drawn through a `torch` `DataLoader` whose batch sampler yields exactly the index batches the deterministic sample-id ordering defines, so the batch sequence is identical for any configured worker count. `execution.data_loader.workers`, `.pin_memory` and `.persistent_workers` therefore govern how the training data is loaded without changing which examples are trained on in which order. A trailing partial batch is retained, as `drop_last` is never set.

@@ -1,4 +1,5 @@
-from collections.abc import Iterable, Iterator
+from collections import OrderedDict
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Protocol, cast
 
 import torch
@@ -83,8 +84,9 @@ def ordered_batch_row_indices(
     epoch: EpochIndex,
     batch_size: BatchSize,
 ) -> BatchRowIndexSequence:
+    positions = sample_positions(sample_ids)
     return tuple(
-        tuple(_sample_index(sample_ids, sample_id) for sample_id in batch)
+        tuple(_sample_index(positions, sample_id) for sample_id in batch)
         for batch in ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
     )
 
@@ -136,11 +138,22 @@ def train_one_epoch(
     return total_loss / batch_count
 
 
-def _sample_index(sample_ids: tuple[SampleId, ...], selected: SampleId) -> EpochIndex:
+def sample_positions(sample_ids: tuple[SampleId, ...]) -> Mapping[SampleId, EpochIndex]:
+    positions: OrderedDict[SampleId, EpochIndex] = OrderedDict()
     for index, sample_id in enumerate(sample_ids):
-        if sample_id == selected:
-            return index
-    raise ValueError(f"ordered sample {selected} is absent from the training population")
+        if sample_id in positions:
+            raise ValueError("training population contains duplicate sample ids")
+        positions[sample_id] = index
+    return positions
+
+
+def _sample_index(positions: Mapping[SampleId, EpochIndex], selected: SampleId) -> EpochIndex:
+    try:
+        return positions[selected]
+    except KeyError as error:
+        raise ValueError(
+            f"ordered sample {selected} is absent from the training population"
+        ) from error
 
 
 def ordered_batch_indices(
@@ -150,9 +163,10 @@ def ordered_batch_indices(
     batch_size: BatchSize,
 ) -> tuple[torch.Tensor, ...]:
     ordered_batches = ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
+    positions = sample_positions(sample_ids)
     return tuple(
         torch.tensor(
-            tuple(_sample_index(sample_ids, sample_id) for sample_id in batch_sample_ids),
+            tuple(_sample_index(positions, sample_id) for sample_id in batch_sample_ids),
             dtype=torch.long,
         )
         for batch_sample_ids in ordered_batches
