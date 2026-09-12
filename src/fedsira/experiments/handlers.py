@@ -933,6 +933,10 @@ class ProtocolCellDispatch:
             AblationVariant.NO_PROPOSAL_SCREEN,
             AblationVariant.CANDIDATE_FREE_REPRODUCTION,
         )
+        full_reference_ablation_active = (
+            cell.experiment == MECHANISM_ABLATION_NAME
+            and cell.method == AblationVariant.FULL_FEDSIRA
+        )
         one_independent_reproduction_active = (
             cell.experiment == MECHANISM_ABLATION_NAME
             and cell.method == AblationVariant.ONE_INDEPENDENT_REPRODUCTION
@@ -978,6 +982,7 @@ class ProtocolCellDispatch:
         elif (
             same_context_verification_active
             or full_path_ablation_active
+            or full_reference_ablation_active
             or no_origin_exclusion_active
             or byzantine_reproducer_copies_source_active
         ):

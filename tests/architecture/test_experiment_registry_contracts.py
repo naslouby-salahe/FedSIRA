@@ -170,3 +170,26 @@ def test_every_registered_experiment_maps_to_a_live_cell_handler() -> None:
         if not callable(getattr(ProtocolCellExecutor, registration.handler, None))
     ]
     assert not missing, f"registered cell handlers without a live implementation: {sorted(missing)}"
+
+
+def test_every_ablation_variant_is_dispatched_explicitly() -> None:
+    from _repo import SRC_ROOT, parse
+
+    handlers = SRC_ROOT / "experiments" / "handlers.py"
+    definitions = SRC_ROOT / "experiments" / "definitions.py"
+
+    variants: list[str] = []
+    for node in parse(definitions).body:
+        if isinstance(node, ast.ClassDef) and node.name == "AblationVariant":
+            variants = [
+                target.id
+                for member in node.body
+                if isinstance(member, ast.Assign)
+                for target in member.targets
+                if isinstance(target, ast.Name)
+            ]
+    assert variants, "AblationVariant must declare the Section 30.10 variant set"
+
+    source = handlers.read_text(encoding="utf-8")
+    missing = [variant for variant in variants if f"AblationVariant.{variant}" not in source]
+    assert not missing, f"ablation variants without an explicit dispatch branch: {missing}"
