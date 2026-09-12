@@ -27,103 +27,103 @@ Domain = TypeVar("Domain", bound=Hashable)
 
 
 class BaselineIdentity(StrEnum):
-    LOCAL_ONLY_REFERENCE = "Local-Only Reference"
-    CENTRALIZED_REFERENCE = "Centralized Reference"
-    FEDAVG_REFERENCE = "FedAvg Reference"
-    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"
-    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"
-    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"
-    CANDIDATE_FREE_FULL_PATH = "Candidate-Free Full Path"
-    MULTIPLE_RETRAINS_WITH_DIRECT_KRUM = "Multiple Retrains with Direct Krum"
-    THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE = "Three-Row Coordinate-Median Alternative"
-    MULTIPLE_MODEL_CERTIFIED_ENSEMBLE = "Multiple-Model Certified Ensemble"
+    LOCAL_ONLY_REFERENCE = "Local-Only Reference"  # TODO: should be enum
+    CENTRALIZED_REFERENCE = "Centralized Reference"  # TODO: should be enum
+    FEDAVG_REFERENCE = "FedAvg Reference"  # TODO: should be enum
+    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"  # TODO: should be enum
+    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"  # TODO: should be enum
+    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"  # TODO: should be enum
+    CANDIDATE_FREE_FULL_PATH = "Candidate-Free Full Path"  # TODO: should be enum
+    MULTIPLE_RETRAINS_WITH_DIRECT_KRUM = "Multiple Retrains with Direct Krum"  # TODO: should be enum
+    THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE = "Three-Row Coordinate-Median Alternative"  # TODO: should be enum
+    MULTIPLE_MODEL_CERTIFIED_ENSEMBLE = "Multiple-Model Certified Ensemble"  # TODO: should be enum
     INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION = (
         "Independent Local Reference with Source Admission"
     )
-    UPDATE_RECONSTRUCTION_FILTER = "Update Reconstruction Filter"
-    DENSITY_CLUSTER_TRIMMED_MEAN = "Density-Cluster Trimmed Mean"
-    SECURE_CONTINUAL_ASSESSMENT_REFERENCE = "Secure Continual Assessment Reference"
-    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"
-    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"
-    KRUM_ROBUST_AGGREGATION_REFERENCE = "Krum Robust Aggregation Reference"
+    UPDATE_RECONSTRUCTION_FILTER = "Update Reconstruction Filter"  # TODO: should be enum
+    DENSITY_CLUSTER_TRIMMED_MEAN = "Density-Cluster Trimmed Mean"  # TODO: should be enum
+    SECURE_CONTINUAL_ASSESSMENT_REFERENCE = "Secure Continual Assessment Reference"  # TODO: should be enum
+    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"  # TODO: should be enum
+    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"  # TODO: should be enum
+    KRUM_ROBUST_AGGREGATION_REFERENCE = "Krum Robust Aggregation Reference"  # TODO: should be enum
 
 
 class BaselineValidationFixture(StrEnum):
-    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
-    MODEL_REPLACEMENT_BACKDOOR = "Model-Replacement Backdoor"
+    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"  # TODO: should be enum
+    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"  # TODO: should be enum
+    MODEL_REPLACEMENT_BACKDOOR = "Model-Replacement Backdoor"  # TODO: should be enum
 
 
 class BaselineMechanismFamily(StrEnum):
-    LOCAL_REFERENCE = "local reference"
-    CENTRALIZED_REFERENCE = "centralized reference"
-    FEDERATED_AVERAGING = "federated averaging"
-    SOURCE_REVIEW = "source review"
-    SOURCE_REVIEW_THEN_RETRAIN = "source review then independent retrain"
-    INDEPENDENT_RETRAIN = "independent retrain"
-    CANDIDATE_FREE_FULL_PATH = "candidate-free full FedSIRA path"
-    RETRAIN_WITH_DIRECT_KRUM = "multiple retrains with direct Krum"
-    COORDINATE_MEDIAN = "coordinate-median synthesis"
-    CERTIFIED_ENSEMBLE = "certified ensemble"
-    INDEPENDENT_LOCAL_REFERENCE = "independent local reference"
-    RECONSTRUCTION_FILTER = "update reconstruction filter"
-    DENSITY_CLUSTER_TRIMMED_MEAN = "density-cluster trimmed mean"
-    SECURE_CONTINUAL_ASSESSMENT = "secure continual assessment"
-    RECOVERY_AFTER_SOURCE_ADMISSION = "recovery after source admission"
-    SOURCE_UPDATE_SANITIZATION = "source-update sanitization"
-    ROBUST_AGGREGATION = "robust round-level aggregation"
+    LOCAL_REFERENCE = "local reference"  # TODO: should be enum
+    CENTRALIZED_REFERENCE = "centralized reference"  # TODO: should be enum
+    FEDERATED_AVERAGING = "federated averaging"  # TODO: should be enum
+    SOURCE_REVIEW = "source review"  # TODO: should be enum
+    SOURCE_REVIEW_THEN_RETRAIN = "source review then independent retrain"  # TODO: should be enum
+    INDEPENDENT_RETRAIN = "independent retrain"  # TODO: should be enum
+    CANDIDATE_FREE_FULL_PATH = "candidate-free full FedSIRA path"  # TODO: should be enum
+    RETRAIN_WITH_DIRECT_KRUM = "multiple retrains with direct Krum"  # TODO: should be enum
+    COORDINATE_MEDIAN = "coordinate-median synthesis"  # TODO: should be enum
+    CERTIFIED_ENSEMBLE = "certified ensemble"  # TODO: should be enum
+    INDEPENDENT_LOCAL_REFERENCE = "independent local reference"  # TODO: should be enum
+    RECONSTRUCTION_FILTER = "update reconstruction filter"  # TODO: should be enum
+    DENSITY_CLUSTER_TRIMMED_MEAN = "density-cluster trimmed mean"  # TODO: should be enum
+    SECURE_CONTINUAL_ASSESSMENT = "secure continual assessment"  # TODO: should be enum
+    RECOVERY_AFTER_SOURCE_ADMISSION = "recovery after source admission"  # TODO: should be enum
+    SOURCE_UPDATE_SANITIZATION = "source-update sanitization"  # TODO: should be enum
+    ROBUST_AGGREGATION = "robust round-level aggregation"  # TODO: should be enum
 
 
 class BaselineExternalVerification(StrEnum):
-    NONE = "none"
-    THREE_REVIEWER_CAPABILITY_CONTRACT = "three-reviewer Capability Contract"
+    NONE = "none"  # TODO: should be enum
+    THREE_REVIEWER_CAPABILITY_CONTRACT = "three-reviewer Capability Contract"  # TODO: should be enum
     THREE_REVIEWER_LOCAL_REFERENCE_NONINFERIORITY = (
         "three-reviewer Capability Contract with local-reference non-inferiority"
     )
-    SINGLE_FRESH_VERIFIER = "single fresh verifier"
-    FIVE_ROW_EXTERNAL_REPRODUCTION_CERTIFICATE = "five-row external reproduction certificate"
-    THREE_MODEL_MAJORITY_VOTE = "three-model majority-vote certification"
+    SINGLE_FRESH_VERIFIER = "single fresh verifier"  # TODO: should be enum
+    FIVE_ROW_EXTERNAL_REPRODUCTION_CERTIFICATE = "five-row external reproduction certificate"  # TODO: should be enum
+    THREE_MODEL_MAJORITY_VOTE = "three-model majority-vote certification"  # TODO: should be enum
 
 
 class BaselineAggregationSynthesis(StrEnum):
-    NONE = "none"
-    FEDERATED_AVERAGING = "FedAvg"
-    GROUP_FEDERATED_AVERAGING = "group FedAvg"
-    KRUM = "Krum n=5,f=1"
-    COORDINATE_MEDIAN = "coordinate-wise median"
-    MAJORITY_VOTE_ENSEMBLE = "three-model majority vote"
-    RECONSTRUCTION_ERROR_FILTER = "reconstruction-error filter then weighted FedAvg"
-    DENSITY_CLUSTER_TRIMMED_MEAN = "DBSCAN cluster selection then coordinate-wise trimmed mean"
-    COORDINATE_CLIPPING_THEN_APPLICATION = "coordinate-wise clipping then anchor application"
+    NONE = "none"  # TODO: should be enum
+    FEDERATED_AVERAGING = "FedAvg"  # TODO: should be enum
+    GROUP_FEDERATED_AVERAGING = "group FedAvg"  # TODO: should be enum
+    KRUM = "Krum n=5,f=1"  # TODO: should be enum
+    COORDINATE_MEDIAN = "coordinate-wise median"  # TODO: should be enum
+    MAJORITY_VOTE_ENSEMBLE = "three-model majority vote"  # TODO: should be enum
+    RECONSTRUCTION_ERROR_FILTER = "reconstruction-error filter then weighted FedAvg"  # TODO: should be enum
+    DENSITY_CLUSTER_TRIMMED_MEAN = "DBSCAN cluster selection then coordinate-wise trimmed mean"  # TODO: should be enum
+    COORDINATE_CLIPPING_THEN_APPLICATION = "coordinate-wise clipping then anchor application"  # TODO: should be enum
 
 
 class BaselineTrainingBudget(StrEnum):
-    CENTRALIZED_EPOCHS = "centralized epochs"
-    DOMAIN_LOCAL_EPOCHS = "domain-local epochs"
-    ANCHOR_FEDAVG_ROUNDS = "anchor FedAvg rounds"
-    GROUP_FEDAVG_ROUNDS = "group FedAvg rounds"
-    POST_REFERENCE_LOCAL_EPOCHS = "post-reference local epochs"
-    POST_REFERENCE_FEDAVG_ROUNDS = "post-reference FedAvg rounds"
-    ROUND_LEVEL_KRUM_ROUNDS = "round-level Krum rounds"
+    CENTRALIZED_EPOCHS = "centralized epochs"  # TODO: should be enum
+    DOMAIN_LOCAL_EPOCHS = "domain-local epochs"  # TODO: should be enum
+    ANCHOR_FEDAVG_ROUNDS = "anchor FedAvg rounds"  # TODO: should be enum
+    GROUP_FEDAVG_ROUNDS = "group FedAvg rounds"  # TODO: should be enum
+    POST_REFERENCE_LOCAL_EPOCHS = "post-reference local epochs"  # TODO: should be enum
+    POST_REFERENCE_FEDAVG_ROUNDS = "post-reference FedAvg rounds"  # TODO: should be enum
+    ROUND_LEVEL_KRUM_ROUNDS = "round-level Krum rounds"  # TODO: should be enum
 
 
 class BaselineProductionObject(StrEnum):
-    LOCAL_CHECKPOINT = "local checkpoint"
-    CENTRALIZED_MODEL = "centralized model"
-    FEDERATED_GLOBAL_MODEL = "federated global model"
-    SOURCE_CANDIDATE = "source candidate"
-    SINGLE_REPRODUCTION = "single reproduction"
-    KRUM_SYNTHESIZED_UPDATE = "Krum-synthesized update"
-    COORDINATE_MEDIAN_UPDATE = "coordinate-median update"
-    CERTIFIED_ENSEMBLE = "three-model certified ensemble"
-    CLIPPED_SOURCE_UPDATE = "clipped source update applied to anchor"
-    RECOVERED_FEDERATED_MODEL = "recovered federated model"
-    FINAL_ROUND_CHECKPOINT = "final-round checkpoint"
+    LOCAL_CHECKPOINT = "local checkpoint"  # TODO: should be enum
+    CENTRALIZED_MODEL = "centralized model"  # TODO: should be enum
+    FEDERATED_GLOBAL_MODEL = "federated global model"  # TODO: should be enum
+    SOURCE_CANDIDATE = "source candidate"  # TODO: should be enum
+    SINGLE_REPRODUCTION = "single reproduction"  # TODO: should be enum
+    KRUM_SYNTHESIZED_UPDATE = "Krum-synthesized update"  # TODO: should be enum
+    COORDINATE_MEDIAN_UPDATE = "coordinate-median update"  # TODO: should be enum
+    CERTIFIED_ENSEMBLE = "three-model certified ensemble"  # TODO: should be enum
+    CLIPPED_SOURCE_UPDATE = "clipped source update applied to anchor"  # TODO: should be enum
+    RECOVERED_FEDERATED_MODEL = "recovered federated model"  # TODO: should be enum
+    FINAL_ROUND_CHECKPOINT = "final-round checkpoint"  # TODO: should be enum
 
 
 class BaselineImplementationStatus(StrEnum):
-    REGISTERED = "registered"
-    INVALID = "invalid"
+    REGISTERED = "registered"  # TODO: should be enum
+    INVALID = "invalid"  # TODO: should be enum
 
 
 class BaselineContract(FrozenDomainModel):

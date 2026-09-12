@@ -71,34 +71,34 @@ from fedsira.runtime import current_application_context
 
 
 class CollapseDecisionKind(StrEnum):
-    PROPOSAL_ASSISTANCE = "proposal assistance"
-    PLURALITY = "plurality"
-    DIRECT_SOURCE_EXCLUSION = "direct source exclusion"
-    EXTERNAL_VERIFICATION = "external reproduction verification"
+    PROPOSAL_ASSISTANCE = "proposal assistance"  # TODO: should be enum
+    PLURALITY = "plurality"  # TODO: should be enum
+    DIRECT_SOURCE_EXCLUSION = "direct source exclusion"  # TODO: should be enum
+    EXTERNAL_VERIFICATION = "external reproduction verification"  # TODO: should be enum
 
 
 class ReproductionRowRequirement(StrEnum):
-    FIVE_CERTIFIED_NON_SOURCE_ROWS = "first 5 certified non-source rows"
-    FIVE_COMMITTED_NON_SOURCE_ROWS = "first 5 adequate committed non-source rows"
+    FIVE_CERTIFIED_NON_SOURCE_ROWS = "first 5 certified non-source rows"  # TODO: should be enum
+    FIVE_COMMITTED_NON_SOURCE_ROWS = "first 5 adequate committed non-source rows"  # TODO: should be enum
     FIRST_FRESH_VERIFIED_NON_SOURCE_ROW = (
         "first adequate non-source row that passes one fresh verifier"
     )
-    FIRST_COMMITTED_NON_SOURCE_ROW = "first adequate committed non-source row"
+    FIRST_COMMITTED_NON_SOURCE_ROW = "first adequate committed non-source row"  # TODO: should be enum
 
 
 class RowVerificationMode(StrEnum):
-    THREE_VERIFIER_TWO_OF_THREE = "ordinary 3-verifier 2-of-3 certification for each row"
+    THREE_VERIFIER_TWO_OF_THREE = "ordinary 3-verifier 2-of-3 certification for each row"  # TODO: should be enum
     ONE_FRESH_POSITIVE = (
         "one verifier: first adequate eligible verifier in post-commitment Verifier Assignment "
         "order; Positive required"
     )
-    NONE = "none"
+    NONE = "none"  # TODO: should be enum
 
 
 class ProductionUpdateRule(StrEnum):
-    KRUM_CERTIFIED_ROWS = "Krum over first 5 certified rows"
-    KRUM_COMMITTED_ROWS = "Krum over first 5 committed rows"
-    DIRECT_REPRODUCTION_UPDATE = "that reproduction update directly"
+    KRUM_CERTIFIED_ROWS = "Krum over first 5 certified rows"  # TODO: should be enum
+    KRUM_COMMITTED_ROWS = "Krum over first 5 committed rows"  # TODO: should be enum
+    DIRECT_REPRODUCTION_UPDATE = "that reproduction update directly"  # TODO: should be enum
 
 
 class CollapseDecision(FrozenDomainModel):
@@ -650,10 +650,10 @@ def materialize_resolved_core(
 
 
 RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
-RESOLVED_CORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|resolved_core|1"
+RESOLVED_CORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|resolved_core|1"  # TODO: should be enum
 
 
-RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = "resolved-fedsira-core"
+RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = "resolved-fedsira-core"  # TODO: should be enum
 
 
 def resolved_core_artifact_slot() -> ArtifactSlot:

@@ -26,12 +26,12 @@ from fedsira.domain.types import (
 )
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
-ROLE_SPLIT_SAMPLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|role_split_sample_manifest|1"
+ROLE_SPLIT_SAMPLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|role_split_sample_manifest|1"  # TODO: should be enum
 ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = (
-    "fedsira|role_split_sample_manifest|1"
+    "fedsira|role_split_sample_manifest|1"  # TODO: should be enum
 )
-ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY = "role-split-manifest"
-ROLE_SPLIT_MANIFEST_INSTANCE: ArtifactInstanceToken = "role-split"
+ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY = "role-split-manifest"  # TODO: should be enum
+ROLE_SPLIT_MANIFEST_INSTANCE: ArtifactInstanceToken = "role-split"  # TODO: should be enum
 
 
 class RoleSplitViewCount(FrozenDomainModel):
@@ -98,7 +98,8 @@ def publish_role_split_sample_manifest(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="dataset-manifest",
+                dependency="dataset-manifest"  # TODO: should be enum
+,
                 digest=dataset_manifest_hash,
             ),
         ),

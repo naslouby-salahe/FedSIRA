@@ -113,7 +113,8 @@ EVIDENCE_ROLES: frozenset[Role] = frozenset(
 )
 PREPROCESSING_SAMPLE_ORDER_SEED: DerivedSeed = (
     int.from_bytes(
-        hashlib.sha256(b"FedSIRA|preprocess_sample_order|1").digest()[0:8], byteorder="big"
+        hashlib.sha256(b"FedSIRA|preprocess_sample_order|1"  # TODO: should be enum
+).digest()[0:8], byteorder="big"
     )
     % UINT32_MODULUS
 )
@@ -121,9 +122,9 @@ FILE_DIGEST_CHUNK_BYTES = 1_048_576
 
 
 class DatasetExclusionReason(StrEnum):
-    NON_FINITE_PREDICTOR = "non_finite_predictor"
-    UNPARSEABLE_PREDICTOR = "unparseable_predictor"
-    ROW_WIDTH_MISMATCH = "row_width_mismatch"
+    NON_FINITE_PREDICTOR = "non_finite_predictor"  # TODO: should be enum
+    UNPARSEABLE_PREDICTOR = "unparseable_predictor"  # TODO: should be enum
+    ROW_WIDTH_MISMATCH = "row_width_mismatch"  # TODO: should be enum
 
 
 class RoleWindow(FrozenDomainModel):
@@ -176,7 +177,7 @@ class RawDatasetIdentityPayload(FrozenDomainModel):
     files: tuple[RawDatasetFileIdentity, ...]
 
 
-PREPARED_ROLE_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|prepared_role_view_manifest|1"
+PREPARED_ROLE_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|prepared_role_view_manifest|1"  # TODO: should be enum
 
 
 class PreparedRoleViewManifest(FrozenDomainModel):
@@ -199,7 +200,7 @@ class PreparedViewSidecar(FrozenDomainModel):
     schema_version: SchemaVersion
 
 
-SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"
+SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"  # TODO: should be enum
 
 
 class ScalerMetadata(FrozenDomainModel):

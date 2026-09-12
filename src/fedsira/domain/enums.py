@@ -2,7 +2,7 @@ from enum import StrEnum
 
 
 class DatasetId(StrEnum):
-    N_BAIOT = "N-BaIoT"
+    N_BAIOT = "N-BaIoT"  # TODO: should be enum
     CICIOT2023 = "CICIoT2023"
 
 

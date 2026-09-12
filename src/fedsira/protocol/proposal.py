@@ -325,7 +325,7 @@ def candidate_screen_transition(
     return AdmissionState.REJECTED
 
 
-SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
+SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"  # TODO: should be enum
 
 
 class OpeningIdentity(FrozenDomainModel):

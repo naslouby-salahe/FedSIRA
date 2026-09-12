@@ -58,7 +58,7 @@ class ConfusionCounts(FrozenDomainModel):
 
 
 class ProposalOracleLabel(StrEnum):
-    ORACLE_VALID = "ORACLE_VALID"
+    ORACLE_VALID = "ORACLE_VALID"  # TODO: should be enum
     ORACLE_INVALID = "ORACLE_INVALID"
     NA = "NA"
 

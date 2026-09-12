@@ -122,9 +122,9 @@ RATE_VALUED_METRICS: tuple[MetricName, ...] = (
     ComparisonMetric.FALSE_LAUNCH.value,
     ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE.value,
     DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
-    "verifier-abstention-rate",
-    "reproduction-abstention-rate",
-    "defined-domain-fraction",
+    "verifier-abstention-rate",  # TODO: should be enum
+    "reproduction-abstention-rate",  # TODO: should be enum
+    "defined-domain-fraction",  # TODO: should be enum
 )
 
 

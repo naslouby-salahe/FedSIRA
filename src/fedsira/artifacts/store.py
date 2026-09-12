@@ -35,7 +35,7 @@ from fedsira.runtime import (
     get_structured_logger,
 )
 
-ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
+ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"  # TODO: should be enum
 
 ARTIFACT_LOGGER = get_structured_logger("artifacts")
 

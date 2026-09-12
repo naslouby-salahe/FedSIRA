@@ -40,23 +40,23 @@ from fedsira.domain.types import (
 from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
-PROTOCOL_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|protocol_evidence|1"
+PROTOCOL_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|protocol_evidence|1"  # TODO: should be enum
 
-VERIFIER_ASSIGNMENT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|verifier_assignment_report|1"
+VERIFIER_ASSIGNMENT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|verifier_assignment_report|1"  # TODO: should be enum
 REPRODUCTION_CERTIFICATE_PROCEDURE_IDENTITY: ProcedureIdentity = (
-    "fedsira|reproduction_certificate|1"
+    "fedsira|reproduction_certificate|1"  # TODO: should be enum
 )
-KRUM_SYNTHESIS_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|krum_synthesized_update|1"
-FINAL_GATE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|final_gate_decision|1"
-BASELINE_CALIBRATION_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|baseline_calibration|1"
+KRUM_SYNTHESIS_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|krum_synthesized_update|1"  # TODO: should be enum
+FINAL_GATE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|final_gate_decision|1"  # TODO: should be enum
+BASELINE_CALIBRATION_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|baseline_calibration|1"  # TODO: should be enum
 
-VERIFIER_ASSIGNMENT_DEPENDENCY = "commitment-identity"
-REPRODUCTION_CERTIFICATE_DEPENDENCY = "certified-row-reports"
-KRUM_SYNTHESIS_DEPENDENCY = "certified-reproduction-rows"
-FINAL_GATE_DEPENDENCY = "production-model"
-BASELINE_CALIBRATION_DEPENDENCY = "prepared-evidence"
+VERIFIER_ASSIGNMENT_DEPENDENCY = "commitment-identity"  # TODO: should be enum
+REPRODUCTION_CERTIFICATE_DEPENDENCY = "certified-row-reports"  # TODO: should be enum
+KRUM_SYNTHESIS_DEPENDENCY = "certified-reproduction-rows"  # TODO: should be enum
+FINAL_GATE_DEPENDENCY = "production-model"  # TODO: should be enum
+BASELINE_CALIBRATION_DEPENDENCY = "prepared-evidence"  # TODO: should be enum
 
-CORRECTNESS_BY_REQUIRED_REPORTS_CERTIFICATE_RULE: TextValue = "required-positive-reports"
+CORRECTNESS_BY_REQUIRED_REPORTS_CERTIFICATE_RULE: TextValue = "required-positive-reports"  # TODO: should be enum
 
 
 class VerifierReportOutcome(FrozenDomainModel):

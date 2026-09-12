@@ -502,8 +502,10 @@ class ProtocolCellDispatch:
                     )
                 except ValueError:
                     row_results = ()
-                extra.append(("parameter-similarity-committed-rows", float(len(committed_rows))))
-                extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
+                extra.append(("parameter-similarity-committed-rows"  # TODO: should be enum
+, float(len(committed_rows))))
+                extra.append(("parameter-similarity-certified-rows"  # TODO: should be enum
+, float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD:
             validate_three_row_coordinate_median_committee_size(
                 row_requirement(cell, self._resolved_core),
@@ -513,7 +515,7 @@ class ProtocolCellDispatch:
                 raise ValueError(
                     "Generic Three-Row Threshold requires the Krum n=3,f=1 branch to be Invalid"
                 )
-            extra.append(("krum-n3-f1-invalid", 1.0))
+            extra.append(("krum-n3-f1-invalid", 1.0))  # TODO: should be enum
         elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
@@ -572,8 +574,8 @@ class ProtocolCellDispatch:
                         false_same_count += 1
                 extra.append(
                     (
-                        "capability-contract-granularity-broad-certified-rows",
-                        float(broad_certified_count),
+                        "capability-contract-granularity-broad-certified-rows"  # TODO: should be enum
+,                        float(broad_certified_count),
                     )
                 )
                 extra.append(
@@ -622,10 +624,10 @@ class ProtocolCellDispatch:
         false_same_equivalence = boundary_metrics.false_same_equivalence_check
         false_same_rate = boundary_metrics.false_same_capability_rate
         extra: list[MetricObservation] = [
-            ("macro-auroc", macro_auroc.value),
-            ("macro-auprc", macro_auprc.value),
-            ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),
-            ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),
+            ("macro-auroc", macro_auroc.value),  # TODO: should be enum
+            ("macro-auprc", macro_auprc.value),  # TODO: should be enum
+            ("clean-oracle-material-degradation", 1.0 if material_degradation is True else 0.0),  # TODO: should be enum
+            ("false-same-equivalence", 1.0 if false_same_equivalence else 0.0),  # TODO: should be enum
             (ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, false_same_rate.value),
         ]
         if cell.experiment == CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME:
@@ -685,7 +687,7 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
             extra.append(
-                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID))
+                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID))  # TODO: should be enum
             )
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
@@ -706,7 +708,7 @@ class ProtocolCellDispatch:
             validate_excluded_root_cause_not_supported(
                 scope, supported_ids, root_cause_a_ids, root_cause_b_ids
             )
-            extra.append(("target-row-ids", float(len(target_row_ids))))
+            extra.append(("target-row-ids", float(len(target_row_ids))))  # TODO: should be enum
         if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
             failure_type_token, strength_token = cell.condition.split("|")
             failure_type = EpistemicFailureType(failure_type_token)
@@ -747,11 +749,11 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
                 extra.append(
-                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))
+                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))  # TODO: should be enum
                 )
-                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))
+                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))  # TODO: should be enum
                 extra.append(
-                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)
+                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)  # TODO: should be enum
                 )
                 extra.append(
                     (
@@ -759,27 +761,27 @@ class ProtocolCellDispatch:
                         epistemic_summary.benign_far_increase.value,
                     )
                 )
-                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))
+                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))  # TODO: should be enum
                 extra.append(
                     (
-                        "diagnostic-marker-insufficient",
+                        "diagnostic-marker-insufficient",  # TODO: should be enum
                         1.0 if epistemic_summary.diagnostic_marker.value is None else 0.0,
                     )
                 )
                 extra.append(
                     (
-                        "proposal-oracle-label",
+                        "proposal-oracle-label",  # TODO: should be enum
                         float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
                     )
                 )
             else:
-                extra.append(("defined-domain-count", 0.0))
-                extra.append(("target-f1-gain", None))
-                extra.append(("supported-macro-f1-drop", None))
+                extra.append(("defined-domain-count", 0.0))  # TODO: should be enum
+                extra.append(("target-f1-gain", None))  # TODO: should be enum
+                extra.append(("supported-macro-f1-drop", None))  # TODO: should be enum
                 extra.append((ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, None))
-                extra.append(("diagnostic-marker-value", None))
-                extra.append(("diagnostic-marker-insufficient", 1.0))
-                extra.append(("proposal-oracle-label", 0.0))
+                extra.append(("diagnostic-marker-value", None))  # TODO: should be enum
+                extra.append(("diagnostic-marker-insufficient", 1.0))  # TODO: should be enum
+                extra.append(("proposal-oracle-label", 0.0))  # TODO: should be enum
         if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             regime = cell.condition
             heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
@@ -800,7 +802,7 @@ class ProtocolCellDispatch:
                     evidence.reproduction_target_count,
                     quantity_skew_multiplier_for_domain(excluded, NBAIOT_DOMAIN_ORDER[0]),
                 )
-                extra.append(("quantity-skew-cap", float(applied_cap)))
+                extra.append(("quantity-skew-cap", float(applied_cap)))  # TODO: should be enum
             else:
                 heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
                 if heterogeneity_scope is not None:
@@ -809,16 +811,16 @@ class ProtocolCellDispatch:
                         heterogeneity_scope.selected_feature_names[0],
                         heterogeneity_seed,
                     )
-                    extra.append(("feature-shift-sign", float(feature_sign)))
+                    extra.append(("feature-shift-sign", float(feature_sign)))  # TODO: should be enum
                     extra.append(
                         (
-                            "feature-shift-count",
+                            "feature-shift-count",  # TODO: should be enum
                             float(len(heterogeneity_scope.selected_feature_names)),
                         )
                     )
                 else:
-                    extra.append(("feature-shift-sign", None))
-                    extra.append(("feature-shift-count", 0.0))
+                    extra.append(("feature-shift-sign", None))  # TODO: should be enum
+                    extra.append(("feature-shift-count", 0.0))  # TODO: should be enum
         return (state, (*metrics, *extra))
 
     def _run_opening_stage(
@@ -994,9 +996,9 @@ class ProtocolCellDispatch:
             ),
         )
         return (
-            ("capability-contract-passes", stage.capability_contract_passes),
-            ("screen-fold-index", stage.screen_fold_index),
-            ("screen-differential-a", stage.screen_differential_a),
+            ("capability-contract-passes", stage.capability_contract_passes),  # TODO: should be enum
+            ("screen-fold-index", stage.screen_fold_index),  # TODO: should be enum
+            ("screen-differential-a", stage.screen_differential_a),  # TODO: should be enum
             (ComparisonMetric.FALSE_LAUNCH, false_launch_result.value),
             (ComparisonMetric.REPRODUCTION_ATTEMPTS, float(attempts)),
             (
@@ -2097,7 +2099,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", None),
+                    ("evidence-arrival-cycle", None),  # TODO: should be enum
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2112,7 +2114,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", float(tau_k)),
+                    ("evidence-arrival-cycle", float(tau_k)),  # TODO: should be enum
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2131,16 +2133,16 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k)),
+                ("evidence-arrival-cycle", float(tau_k)),  # TODO: should be enum
                 (
-                    "logical-information-arrival-cycles",
+                    "logical-information-arrival-cycles",  # TODO: should be enum
                     float(delay_decomposition.logical_information_arrival_cycles),
                 ),
                 (
                     DescriptiveScientificMetric.T_EVIDENCE.value,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
-                ("first-holder-cycle", float(first_holder) if first_holder is not None else None),
+                ("first-holder-cycle", float(first_holder) if first_holder is not None else None),  # TODO: should be enum
                 (DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value, None),
                 permanent_singleton_admission(state, holder_counts),
             ),
@@ -2183,15 +2185,15 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
+                ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),  # TODO: should be enum
                 (
                     DescriptiveScientificMetric.T_EVIDENCE.value,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
-                ("assignment-seconds", phase_durations.assignment_seconds),
-                ("reproduce-seconds", phase_durations.reproduce_seconds),
-                ("verify-seconds", phase_durations.verify_seconds),
-                ("synthesize-seconds", phase_durations.synthesize_seconds),
+                ("assignment-seconds", phase_durations.assignment_seconds),  # TODO: should be enum
+                ("reproduce-seconds", phase_durations.reproduce_seconds),  # TODO: should be enum
+                ("verify-seconds", phase_durations.verify_seconds),  # TODO: should be enum
+                ("synthesize-seconds", phase_durations.synthesize_seconds),  # TODO: should be enum
                 (
                     DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
                     post_evidence_wall_clock_seconds,
@@ -2707,7 +2709,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         terminal_state: AdmissionState,
     ) -> tuple[AdmissionStateObservation, ...]:
         arrival_cycle = next(
-            (value for name, value in metrics if name == "evidence-arrival-cycle"), None
+            (value for name, value in metrics if name == "evidence-arrival-cycle"), None  # TODO: should be enum
         )
         scientific_config = current_application_context().scientific_config
         horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles
@@ -2794,13 +2796,13 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         return state
 
 
-BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
+BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"  # TODO: should be enum
 
 
-ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"
+ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"  # TODO: should be enum
 
 
-SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
+SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"  # TODO: should be enum
 
 
 def _train_reproduction_update(

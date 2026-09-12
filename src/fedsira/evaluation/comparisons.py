@@ -68,7 +68,7 @@ from fedsira.runtime import current_application_context
 
 
 class ComparisonTestKind(StrEnum):
-    SUPERIORITY = "superiority"
+    SUPERIORITY = "superiority"  # TODO: should be enum
     NON_INFERIORITY = "non-inferiority"
 
 

@@ -235,7 +235,7 @@ def train_recovery_after_source_admission_delta(
     )
 
 
-DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
+DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"  # TODO: should be enum
 
 
 def _flatten_model_state(anchor: RealAnchor, state: ModelState) -> torch.Tensor:

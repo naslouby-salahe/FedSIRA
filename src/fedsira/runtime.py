@@ -123,7 +123,7 @@ def automatic_recovery_permitted(
     return attempts_used < automatic_infrastructure_retries_per_cell_phase
 
 
-NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"
+NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"  # TODO: should be enum
 LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"
 LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"
 
@@ -292,7 +292,7 @@ def configure_deterministic_backend() -> None:
     cudnn_conv.fp32_precision = "ieee"
 
 
-NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"
+NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"  # TODO: should be enum
 
 
 def numerical_runtime_identity() -> ArtifactDigest:
@@ -325,7 +325,7 @@ def blocking_environment_mismatches(
     )
 
 
-LOGGER_NAME_PREFIX = "fedsira"
+LOGGER_NAME_PREFIX = "fedsira"  # TODO: should be enum
 
 
 class StructuredJsonFormatter(logging.Formatter):

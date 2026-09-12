@@ -225,7 +225,7 @@ def materialize_ablation_references(
                 dependencies=(
                     ArtifactDependency(
                         kind=ArtifactDependencyKind.CONTENT,
-                        dependency="prepared-evidence",
+                        dependency="prepared-evidence",  # TODO: should be enum
                         digest=prepared_evidence,
                     ),
                 ),
@@ -438,7 +438,7 @@ def execute_smoke(overwrite: OverwriteExisting) -> None:
 
 
 SmokeRenderText = TextValue
-SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"
+SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"  # TODO: should be enum
 
 _DANMINI = NBaiotDomain.DANMINI_DOORBELL
 _ENNIO = NBaiotDomain.ENNIO_DOORBELL

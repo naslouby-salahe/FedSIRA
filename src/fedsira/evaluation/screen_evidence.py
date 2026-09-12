@@ -53,11 +53,11 @@ from fedsira.protocol.proposal import (
 )
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context, derive_uint32
 
-SCREEN_MATCHING_SCHEMA_VERSION: SchemaVersion = "fedsira|screen_matching|1"
-SCREEN_MATCHING_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|screen_matching|1"
-SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY = "anchor-model"
-SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY = "source-candidate-model"
-SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY = "prepared-evidence"
+SCREEN_MATCHING_SCHEMA_VERSION: SchemaVersion = "fedsira|screen_matching|1"  # TODO: should be enum
+SCREEN_MATCHING_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|screen_matching|1"  # TODO: should be enum
+SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY = "anchor-model"  # TODO: should be enum
+SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY = "source-candidate-model"  # TODO: should be enum
+SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY = "prepared-evidence"  # TODO: should be enum
 NO_CANDIDATE_MODEL_IDENTITY: ArtifactDigest = "0" * 64
 
 

@@ -1104,10 +1104,10 @@ def render_admission_delay_decomposition(
         )
     )
     phases: tuple[tuple[MetricName, TextValue], ...] = (
-        ("assignment-seconds", "assignment"),
-        ("reproduce-seconds", "reproduce"),
-        ("verify-seconds", "verify"),
-        ("synthesize-seconds", "synthesize"),
+        ("assignment-seconds", "assignment"),  # TODO: should be enum
+        ("reproduce-seconds", "reproduce"),  # TODO: should be enum
+        ("verify-seconds", "verify"),  # TODO: should be enum
+        ("synthesize-seconds", "synthesize"),  # TODO: should be enum
     )
     bottoms = [0.0] * len(cells)
     for metric, label in phases:

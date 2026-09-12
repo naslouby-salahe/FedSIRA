@@ -25,21 +25,21 @@ from fedsira.runtime import framed_bytes
 
 
 class CICIoTSpecialLabel(StrEnum):
-    BENIGN = "BENIGN"
-    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"
+    BENIGN = "BENIGN"  # TODO: should be enum
+    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"  # TODO: should be enum
 
 
 class _CICIoTBenignAlias(StrEnum):
-    BENIGNTRAFFIC = "BENIGNTRAFFIC"
-    BENIGN_TRAFFIC = "BENIGN_TRAFFIC"
-    BENIGN_FINAL = "BENIGN_FINAL"
+    BENIGNTRAFFIC = "BENIGNTRAFFIC"  # TODO: should be enum
+    BENIGN_TRAFFIC = "BENIGN_TRAFFIC"  # TODO: should be enum
+    BENIGN_FINAL = "BENIGN_FINAL"  # TODO: should be enum
 
 
 class CICIoT2023TargetFamilyMember(StrEnum):
-    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"
-    MIRAI_GREETH_FLOOD = "MIRAI_GREETH_FLOOD"
-    MIRAI_GREIP_FLOOD = "MIRAI_GREIP_FLOOD"
-    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"
+    BACKDOOR_MALWARE = "BACKDOOR_MALWARE"  # TODO: should be enum
+    MIRAI_GREETH_FLOOD = "MIRAI_GREETH_FLOOD"  # TODO: should be enum
+    MIRAI_GREIP_FLOOD = "MIRAI_GREIP_FLOOD"  # TODO: should be enum
+    MIRAI_UDPPLAIN = "MIRAI_UDPPLAIN"  # TODO: should be enum
 
     @property
     def raw_token(self) -> ClassLabel:
@@ -47,10 +47,10 @@ class CICIoT2023TargetFamilyMember(StrEnum):
 
 
 class CICIoTRowIdentifierToken(StrEnum):
-    INDEX = "INDEX"
-    ROW_ID = "ROW_ID"
-    ROWID = "ROWID"
-    UNNAMED_0 = "UNNAMED_0"
+    INDEX = "INDEX"  # TODO: should be enum
+    ROW_ID = "ROW_ID"  # TODO: should be enum
+    ROWID = "ROWID"  # TODO: should be enum
+    UNNAMED_0 = "UNNAMED_0"  # TODO: should be enum
 
 
 class CICIoT2023PseudoDomain(IntEnum):

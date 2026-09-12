@@ -24,9 +24,9 @@ from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.engine import PersistedExecutionRecord
 from fedsira.runtime import REPOSITORY_ROOT, framed_bytes
 
-COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|1"
-COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|1"
-COMPARISON_EVIDENCE_INSTANCE: ArtifactInstanceToken = "comparisons"
+COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|1"  # TODO: should be enum
+COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|1"  # TODO: should be enum
+COMPARISON_EVIDENCE_INSTANCE: ArtifactInstanceToken = "comparisons"  # TODO: should be enum
 
 
 class PersistedComparisonEvidence(FrozenDomainModel):
@@ -83,8 +83,8 @@ def publish_comparison_evidence(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="metric-evidence",
-                digest=metric_evidence_digest(records),
+                dependency="metric-evidence"  # TODO: should be enum
+,                digest=metric_evidence_digest(records),
             ),
         ),
         procedure_identity=COMPARISON_EVIDENCE_PROCEDURE_IDENTITY,

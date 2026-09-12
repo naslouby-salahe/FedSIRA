@@ -29,15 +29,15 @@ from fedsira.domain.types import (
 from fedsira.reporting.tables import RenderedTable
 from fedsira.runtime import REPOSITORY_ROOT
 
-PUBLICATION_SCHEMA_VERSION: SchemaVersion = "fedsira|publication|1"
+PUBLICATION_SCHEMA_VERSION: SchemaVersion = "fedsira|publication|1"  # TODO: should be enum
 TABLE_FIGURE_SOURCE_DATA_PROCEDURE_IDENTITY: ProcedureIdentity = (
-    "fedsira|table_figure_source_data|1"
+    "fedsira|table_figure_source_data|1"  # TODO: should be enum
 )
 TABLE_FIGURE_REPORT_EXPORT_PROCEDURE_IDENTITY: ProcedureIdentity = (
-    "fedsira|table_figure_report_export|1"
+    "fedsira|table_figure_report_export|1"  # TODO: should be enum
 )
-SOURCE_DATA_INSTANCE: ArtifactInstanceToken = "source-data"
-REPORT_EXPORT_INSTANCE: ArtifactInstanceToken = "report-export"
+SOURCE_DATA_INSTANCE: ArtifactInstanceToken = "source-data"  # TODO: should be enum
+REPORT_EXPORT_INSTANCE: ArtifactInstanceToken = "report-export"  # TODO: should be enum
 
 
 class RenderedTableIdentity(FrozenDomainModel):
@@ -138,8 +138,8 @@ def publish_table_figure_source_data(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="execution-evidence",
-                digest=execution_digest,
+                dependency="execution-evidence"  # TODO: should be enum
+,                digest=execution_digest,
             ),
             *(
                 ArtifactDependency(
@@ -178,8 +178,8 @@ def publish_table_figure_export(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.ARTIFACT,
-                dependency="source-data",
-                digest=source_data_identity,
+                dependency="source-data"  # TODO: should be enum
+,                digest=source_data_identity,
             ),
         ),
         procedure_identity=TABLE_FIGURE_REPORT_EXPORT_PROCEDURE_IDENTITY,

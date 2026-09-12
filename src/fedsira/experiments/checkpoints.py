@@ -30,13 +30,17 @@ from fedsira.runtime import (
     numerical_runtime_identity,
 )
 
-CHECKPOINT_SCHEMA_VERSION: SchemaVersion = "fedsira|checkpoint|1"
+CHECKPOINT_SCHEMA_VERSION: SchemaVersion = "fedsira|checkpoint|1"  # TODO: should be enum
 
 CHECKPOINT_PROCEDURE_IDENTITIES: tuple[tuple[ArtifactFamily, ProcedureIdentity], ...] = (
-    (ArtifactFamily.ANCHOR_CHECKPOINT, "fedsira|anchor_checkpoint|1"),
-    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "fedsira|source_candidate_checkpoint|1"),
-    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "fedsira|reproduction_checkpoint|1"),
-    (ArtifactFamily.BASELINE_CHECKPOINT, "fedsira|baseline_checkpoint|1"),
+    (ArtifactFamily.ANCHOR_CHECKPOINT, "fedsira|anchor_checkpoint|1"  # TODO: should be enum
+    ),
+    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "fedsira|source_candidate_checkpoint|1"  # TODO: should be enum
+    ),
+    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "fedsira|reproduction_checkpoint|1"  # TODO: should be enum
+    ),
+    (ArtifactFamily.BASELINE_CHECKPOINT, "fedsira|baseline_checkpoint|1"  # TODO: should be enum
+    ),
 )
 
 CHECKPOINT_PRODUCERS: tuple[tuple[ArtifactFamily, ArtifactProducer], ...] = (
@@ -98,7 +102,7 @@ def publish_anchor_checkpoints(
             (
                 ArtifactDependency(
                     kind=ArtifactDependencyKind.CONTENT,
-                    dependency="prepared-evidence",
+                    dependency="prepared-evidence",  # TODO: should be enum
                     digest=anchor.dataset_manifest_hash,
                 ),
             ),
@@ -138,7 +142,7 @@ def publish_trained_update(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="prepared-evidence",
+                dependency="prepared-evidence",  # TODO: should be enum
                 digest=dataset_manifest_hash,
             ),
         ),
