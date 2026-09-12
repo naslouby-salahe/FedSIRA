@@ -114,11 +114,34 @@ BYTE_UNIT_LABELS: tuple[tuple[ByteUnit, TextValue, ByteCount], ...] = (
 )
 
 
+RATE_VALUED_METRICS: tuple[MetricName, ...] = (
+    ComparisonMetric.LEGITIMATE_ADMISSION.value,
+    ComparisonMetric.MALICIOUS_ADMISSION.value,
+    ComparisonMetric.ATTACK_SUCCESS_RATE.value,
+    ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE.value,
+    ComparisonMetric.FALSE_LAUNCH.value,
+    ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE.value,
+    DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
+    "verifier-abstention-rate",
+    "reproduction-abstention-rate",
+    "defined-domain-fraction",
+)
+
+
+def format_rate_value(value: MetricValue | None) -> FormattedStatisticText:
+    rounding = _publication_rounding()
+    if value is None:
+        return "NA"
+    return f"{value * 100.0:.{rounding.percentage_decimals}f}%"
+
+
 def format_metric_value(
     value: MetricValue | None, metric: MetricName | None = None
 ) -> FormattedStatisticText:
     if metric is not None and metric in BYTE_VALUED_METRICS:
         return format_byte_value(value)
+    if metric is not None and metric in RATE_VALUED_METRICS:
+        return format_rate_value(value)
     rounding = _publication_rounding()
     if value is None:
         return "NA"
@@ -199,8 +222,8 @@ def _statistical_summary_row(
         materiality_direction.value,
         margin,
         str(comparison.complete_seed_count),
-        format_metric_value(comparison.mean_paired_difference),
-        format_metric_value(comparison.median_paired_difference),
+        format_metric_value(comparison.mean_paired_difference, definition.metric.value),
+        format_metric_value(comparison.median_paired_difference, definition.metric.value),
         effect,
         format_p_value(comparison.raw_p_value),
         format_p_value(comparison.adjusted_p_value),
@@ -362,7 +385,9 @@ def _comparison_value(
                 and definition.scientific_scenario == scenario
                 and definition.metric is metric
             ):
-                return format_metric_value(comparison.mean_paired_difference)
+                return format_metric_value(
+                    comparison.mean_paired_difference, comparison.definition.metric.value
+                )
     return "NA"
 
 
@@ -437,7 +462,9 @@ def _outcome_metric_text(
     scenario: ScenarioName,
     metric: MetricName,
 ) -> FormattedStatisticText:
-    return format_metric_value(_outcome_metric_mean(outcomes, experiment, method, scenario, metric))
+    return format_metric_value(
+        _outcome_metric_mean(outcomes, experiment, method, scenario, metric), metric
+    )
 
 
 def _outcome_metric_confidence_interval(
@@ -486,7 +513,9 @@ def _descriptive_timing_value(
 ) -> FormattedStatisticText:
     if experiment == EFFICIENCY_MEASUREMENT_NAME:
         return _outcome_timing_median_iqr(outcomes, experiment, method, scenario, metric)
-    return format_metric_value(_outcome_metric_mean(outcomes, experiment, method, scenario, metric))
+    return format_metric_value(
+        _outcome_metric_mean(outcomes, experiment, method, scenario, metric), metric
+    )
 
 
 def _completed_outcome_count(

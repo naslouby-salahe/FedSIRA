@@ -104,7 +104,7 @@ def test_build_epoch_batches_gathers_the_correct_rows_in_deterministic_order() -
     features = torch.arange(10.0).reshape(10, 1)
     labels = torch.arange(10)
     sample_ids = tuple(f"sample-{i}" for i in range(10))
-    batches = build_epoch_batches(features, labels, sample_ids, 42, 0, batch_size=4)
+    batches = tuple(build_epoch_batches(features, labels, sample_ids, 42, 0, batch_size=4))
     flattened_labels = torch.cat([labels_batch for _, labels_batch in batches])
     observed = {int(value) for value in flattened_labels}
     assert observed == set(range(10))
@@ -116,8 +116,8 @@ def test_build_epoch_batches_differs_across_epochs() -> None:
     features = torch.arange(10.0).reshape(10, 1)
     labels = torch.arange(10)
     sample_ids = tuple(f"sample-{i}" for i in range(10))
-    epoch_0 = build_epoch_batches(features, labels, sample_ids, 42, 0, batch_size=4)
-    epoch_1 = build_epoch_batches(features, labels, sample_ids, 42, 1, batch_size=4)
+    epoch_0 = tuple(build_epoch_batches(features, labels, sample_ids, 42, 0, batch_size=4))
+    epoch_1 = tuple(build_epoch_batches(features, labels, sample_ids, 42, 1, batch_size=4))
     first_batch_matches = torch.equal(epoch_0[0][0], epoch_1[0][0])
     assert not first_batch_matches
 

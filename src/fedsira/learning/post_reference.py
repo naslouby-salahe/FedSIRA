@@ -17,11 +17,14 @@ from fedsira.datasets.common import (
     RootCauseScope,
     apply_epistemic_target_marker,
     apply_heterogeneity_shift,
+    cap_replay_rows,
+    dataset_manifest_hash,
     flat_parameters_identity,
     poison_backdoor_rows,
     relabel_shared_label_error_rows_for_scope,
     scope_and_shift_rows,
     select_source_backdoor_poison_rows,
+    supported_replay_cap_for_target_role,
 )
 from fedsira.domain.enums import (
     EpistemicFailureType,
@@ -418,6 +421,14 @@ def combined_post_reference_rows(
         if class_id == adapter.target_class_token or class_id == irrelevant_class:
             continue
         rows = adapter.load_rows(domain, class_id, Role.POST_REFERENCE_REPLAY)
+        if rows is not None:
+            rows = cap_replay_rows(
+                rows,
+                dataset_manifest_hash(adapter.prepared_root),
+                adapter.domain_token(domain),
+                class_id,
+                supported_replay_cap_for_target_role(target_role),
+            )
         relabeled_mask: tuple[bool, ...] | None = None
         if (
             rows is not None

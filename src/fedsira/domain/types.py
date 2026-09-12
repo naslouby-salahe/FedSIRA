@@ -72,6 +72,9 @@ TrainingConditionId = TextValue
 SeedDerivationLabel = TextValue
 SampleId = TextValue
 SampleIdPrefix = TextValue
+SampleRowIndex = NonNegativeInt
+BatchRowIndices: TypeAlias = list[SampleRowIndex]
+BatchRowIndexSequence: TypeAlias = tuple[tuple[SampleRowIndex, ...], ...]
 SamplingSelectionDigest = Annotated[bytes, Field(min_length=32, max_length=32)]
 RelativePathText = TextValue
 PathToken = TextValue

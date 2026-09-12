@@ -74,7 +74,12 @@ from fedsira.domain.types import (
     TextValue,
     TriggerFeatureValue,
 )
-from fedsira.runtime import deterministic_order, framed_bytes
+from fedsira.runtime import (
+    current_application_context,
+    derive_uint32,
+    deterministic_order,
+    framed_bytes,
+)
 
 SUPPORTED_ROLE_ORDER: tuple[Role, ...] = (
     Role.ANCHOR_TRAIN,
@@ -315,6 +320,46 @@ def apply_sampling_cap(
         ),
     )
     return tuple(ordered[:cap])
+
+
+REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"
+
+
+def supported_replay_cap_for_target_role(role: Role) -> SamplingCap | None:
+    caps = current_application_context().scientific_config.datasets.primary.sampling_caps_per_domain
+    if role is Role.SOURCE_PROPOSAL:
+        return caps.source_proposal_supported_replay_per_supported_class
+    if role is Role.REPRODUCTION:
+        return caps.reproduction_supported_replay_per_supported_class
+    return None
+
+
+def cap_replay_rows(
+    rows: PreparedRows,
+    dataset_manifest_hash: DatasetManifestDigest,
+    domain_token: DomainId,
+    class_id: DatasetClassToken,
+    cap: SamplingCap | None,
+) -> PreparedRows:
+    if cap is None or len(rows.sample_ids) <= cap:
+        return rows
+    order_namespace_seed = derive_uint32(
+        REPLAY_CAP_SELECTION_SEPARATOR,
+        0,
+        dataset_manifest_hash,
+        domain_token,
+        class_id,
+    )
+    ordered = deterministic_order(
+        rows.sample_ids, REPLAY_CAP_SELECTION_SEPARATOR, order_namespace_seed
+    )
+    kept = frozenset(ordered[:cap])
+    retained = tuple(index for index, sample_id in enumerate(rows.sample_ids) if sample_id in kept)
+    return PreparedRows(
+        sample_ids=tuple(rows.sample_ids[index] for index in retained),
+        features=tuple(rows.features[index] for index in retained),
+        labels=tuple(rows.labels[index] for index in retained),
+    )
 
 
 def sampling_cap_for_role(

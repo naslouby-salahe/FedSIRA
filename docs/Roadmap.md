@@ -1661,6 +1661,18 @@ $$
 
 Lower is better; Capability Contract requires $\Delta BenignFAR\le0.01$. Generic one-vs-rest `FPR_c` remains available as a class metric but is never substituted for benign false alarms.
 
+### Sampling caps on supported replay
+
+`datasets.primary.sampling_caps_per_domain.source_proposal_supported_replay_per_supported_class` and `.reproduction_supported_replay_per_supported_class` cap the per-supported-class `Post-Reference Replay` rows drawn into the Source Proposal and Reproduction training populations respectively. The retained subset is a deterministic function of the prepared dataset digest, the domain, and the class; it does not depend on the master seed, matching the prepared-view cap convention. Other target roles draw their supported replay without a cap.
+
+### Safe dormancy
+
+A **permanent singleton admission** is a cell that reaches `Admitted` while the schedule provides exactly one eligible evidence holder and never provides a second holder anywhere in the horizon. The `Evidence Scarcity and Dormancy` cells report it as `permanent-singleton-admission`; final export verification requires the total across the experiment to be at most `evidence_thresholds.safe_dormancy.maximum_permanent_singleton_admissions`.
+
+### Data loading
+
+Training batches are drawn through a `torch` `DataLoader` whose batch sampler yields exactly the index batches the deterministic sample-id ordering defines, so the batch sequence is identical for any configured worker count. `execution.data_loader.workers`, `.pin_memory` and `.persistent_workers` therefore govern how the training data is loaded without changing which examples are trained on in which order. A trailing partial batch is retained, as `drop_last` is never set.
+
 ### Section 7.1 execution for the resolved core
 
 Every cell whose method is `Resolved FedSIRA Core` executes Section 7.1 as its first step, using the opening mode the Section 18.7 resolved core declares: `Proposal-Assisted` runs the proposal screen with the matched-control differential and the Capability Contract screen conditions, and `Candidate-Free` runs the candidate-free entry validation including `capability_contract.candidate_free_anchor_target_f1_maximum`. A cell whose opening does not reach `Admission Open` terminates in that state and never enters reproduction. The screened source artifact is the artifact the downstream path deploys, so the source that is screened is the source that is admitted or excluded.

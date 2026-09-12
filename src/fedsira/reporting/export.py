@@ -149,6 +149,7 @@ from fedsira.reporting.verification import (
     verify_mandatory_figure_source_data,
     verify_planned_cell_count_satisfied,
     verify_rendered_table,
+    verify_safe_dormancy,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -729,6 +730,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         manifest_dependency_verification,
         byzantine_bound_verification,
         comparison_evidence_verification,
+        safe_dormancy_verification,
     ) = run_bounded(
         "final_export_verification",
         verification_timeout,
@@ -743,6 +745,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
                 store.read_all_outcomes(BYZANTINE_BOUND_VIOLATION_NAME)
             ),
             verify_comparison_evidence_current(experiment_names, store),
+            verify_safe_dormancy(store.read_all_outcomes(EVIDENCE_SCARCITY_AND_DORMANCY_NAME)),
         ),
     )
     failures = (
@@ -752,6 +755,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         *manifest_dependency_verification.failures,
         *byzantine_bound_verification.failures,
         *comparison_evidence_verification.failures,
+        *safe_dormancy_verification.failures,
     )
     verification = CompletenessVerificationResult(passed=not failures, failures=failures)
     collapse_decisions = _load_collapse_decisions(store)

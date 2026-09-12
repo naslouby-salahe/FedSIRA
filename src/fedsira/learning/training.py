@@ -1,10 +1,14 @@
+from collections.abc import Iterable, Iterator
 from typing import Protocol, cast
 
 import torch
 from torch import nn, optim
+from torch.utils.data import DataLoader, Dataset, Sampler
 
 from fedsira.config import OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
+    BatchRowIndexSequence,
+    BatchRowIndices,
     BatchSize,
     DerivedSeed,
     EpochIndex,
@@ -12,12 +16,14 @@ from fedsira.domain.types import (
     LearningRate,
     LocalEpochCount,
     ParameterName,
+    RowCount,
     SampleId,
+    SampleRowIndex,
     TensorDomainModel,
     TrainingLoss,
 )
 from fedsira.learning.model import FedSIRAClassifier
-from fedsira.runtime import minibatch_order
+from fedsira.runtime import current_application_context, minibatch_order
 
 
 class _SteppableOptimizer(Protocol):
@@ -71,18 +77,53 @@ def ordered_minibatches(
     )
 
 
+def ordered_batch_row_indices(
+    sample_ids: tuple[SampleId, ...],
+    training_seed: DerivedSeed,
+    epoch: EpochIndex,
+    batch_size: BatchSize,
+) -> BatchRowIndexSequence:
+    return tuple(
+        tuple(_sample_index(sample_ids, sample_id) for sample_id in batch)
+        for batch in ordered_minibatches(training_seed, epoch, sample_ids, batch_size)
+    )
+
+
+class OrderedIndexDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
+    def __init__(self, features: torch.Tensor, labels: torch.Tensor) -> None:
+        self._features = features
+        self._labels = labels
+
+    def __len__(self) -> RowCount:
+        return int(self._features.shape[0])
+
+    def __getitem__(self, index: SampleRowIndex) -> tuple[torch.Tensor, torch.Tensor]:
+        return (self._features[index], self._labels[index])
+
+
+class DeclaredBatchSampler(Sampler[BatchRowIndices]):
+    def __init__(self, batches: BatchRowIndexSequence) -> None:
+        self._batches = batches
+
+    def __iter__(self) -> Iterator[BatchRowIndices]:
+        return iter([list(batch) for batch in self._batches])
+
+    def __len__(self) -> RowCount:
+        return len(self._batches)
+
+
 def train_one_epoch(
     model: FedSIRAClassifier,
     optimizer: optim.AdamW,
     loss_function: nn.CrossEntropyLoss,
     training_config: TrainingConfig,
-    batches: tuple[tuple[torch.Tensor, torch.Tensor], ...],
+    batches: Iterable[tuple[torch.Tensor, torch.Tensor]],
 ) -> TrainingLoss:
-    if not batches:
-        raise ValueError("local training requires at least one minibatch")
     model.train()
     total_loss: TrainingLoss = 0.0
+    batch_count = 0
     for features, labels in batches:
+        batch_count += 1
         optimizer.zero_grad(set_to_none=True)
         logits = model(features)
         loss = loss_function(logits, labels)
@@ -90,7 +131,9 @@ def train_one_epoch(
         clip_gradients(model, training_config)
         step_optimizer(optimizer)
         total_loss += float(loss.detach())
-    return total_loss / len(batches)
+    if batch_count == 0:
+        raise ValueError("local training requires at least one minibatch")
+    return total_loss / batch_count
 
 
 def _sample_index(sample_ids: tuple[SampleId, ...], selected: SampleId) -> EpochIndex:
@@ -123,12 +166,17 @@ def build_epoch_batches(
     training_seed: DerivedSeed,
     epoch: EpochIndex,
     batch_size: BatchSize,
-) -> tuple[tuple[torch.Tensor, torch.Tensor], ...]:
+) -> DataLoader[tuple[torch.Tensor, torch.Tensor]]:
     if features.shape[0] != labels.shape[0] or features.shape[0] != len(sample_ids):
         raise ValueError("features, labels, and sample ids must have identical row counts")
-    return tuple(
-        (features[indices], labels[indices])
-        for indices in ordered_batch_indices(sample_ids, training_seed, epoch, batch_size)
+    row_indices = ordered_batch_row_indices(sample_ids, training_seed, epoch, batch_size)
+    loader = current_application_context().scientific_config.execution.data_loader
+    return DataLoader(
+        OrderedIndexDataset(features, labels),
+        batch_sampler=DeclaredBatchSampler(row_indices),
+        num_workers=loader.workers,
+        pin_memory=loader.pin_memory,
+        persistent_workers=loader.persistent_workers,
     )
 
 

@@ -76,6 +76,7 @@ from fedsira.domain.types import (
     CompromisedReproducerCount,
     ConditionName,
     DomainId,
+    EligibleEvidenceHolderCount,
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
@@ -1993,7 +1994,14 @@ class ProtocolCellDispatch:
             metrics = metrics_from_state(
                 state, self._pending_real_report, legitimate_admission_eligible=True
             )
-            return (state, (*metrics, ("evidence-arrival-cycle", None)))
+            return (
+                state,
+                (
+                    *metrics,
+                    ("evidence-arrival-cycle", None),
+                    _permanent_singleton(state, holder_counts),
+                ),
+            )
         try:
             validate_no_safety_completion_before_tau_k(0, tau_k)
         except ValueError:
@@ -2001,7 +2009,14 @@ class ProtocolCellDispatch:
             metrics = metrics_from_state(
                 state, self._pending_real_report, legitimate_admission_eligible=True
             )
-            return (state, (*metrics, ("evidence-arrival-cycle", float(tau_k))))
+            return (
+                state,
+                (
+                    *metrics,
+                    ("evidence-arrival-cycle", float(tau_k)),
+                    _permanent_singleton(state, holder_counts),
+                ),
+            )
         state = self._advance_protocol(cell, evidence)
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
@@ -2028,6 +2043,7 @@ class ProtocolCellDispatch:
                 ),
                 ("first-holder-cycle", float(first_holder) if first_holder is not None else None),
                 (DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value, None),
+                _permanent_singleton(state, holder_counts),
             ),
         )
 
@@ -2634,6 +2650,16 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             raise ValueError(f"no registered cell handler for experiment {cell.experiment}")
         handler = cast(CellHandler, getattr(self, handler_name))
         return handler(cell, evidence)
+
+
+def _permanent_singleton(
+    state: AdmissionState, holder_counts: tuple[EligibleEvidenceHolderCount, ...]
+) -> MetricObservation:
+    sustained = bool(holder_counts) and max(holder_counts) <= 1
+    return (
+        DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION.value,
+        float(state is AdmissionState.ADMITTED and sustained),
+    )
 
 
 def _observation_value(

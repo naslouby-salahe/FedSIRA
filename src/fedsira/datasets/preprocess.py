@@ -28,6 +28,7 @@ from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
     PSEUDO_DOMAIN_COUNT,
     CICIoT2023DatasetManifestPayload,
+    CICIoT2023TargetFamilyMember,
 )
 from fedsira.datasets.common import (
     PREPARED_ROLE_VIEW_SCHEMA_VERSION,
@@ -360,6 +361,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
             official_expected_predictor_count=OFFICIAL_EXPECTED_PREDICTOR_COUNT,
             predictor_count_matches_official=summary.predictor_count_matches_official,
             class_registry=summary.class_registry,
+            target_family_members=tuple(member.value for member in CICIoT2023TargetFamilyMember),
             pseudo_domain_count=PSEUDO_DOMAIN_COUNT,
         ),
     )

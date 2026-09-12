@@ -92,6 +92,7 @@ class DescriptiveScientificMetric(StrEnum):
     PERSISTENT_STORAGE_BYTES = "persistent-storage-bytes"
     TOTAL_ATTEMPTS = "total-attempts"
     DORMANT_ADMISSION_RATE = "dormant-admission-rate"
+    PERMANENT_SINGLETON_ADMISSION = "permanent-singleton-admission"
 
 
 ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric

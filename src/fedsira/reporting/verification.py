@@ -117,6 +117,27 @@ BOUND_WITHIN_CONDITIONS: tuple[ConditionName, ...] = (
 )
 
 
+def verify_safe_dormancy(
+    records: tuple[PersistedExecutionRecord, ...],
+) -> CompletenessVerificationResult:
+    thresholds = current_application_context().scientific_config.evidence_thresholds.safe_dormancy
+    allowed = thresholds.maximum_permanent_singleton_admissions
+    observed: list[CheckpointIdentity] = []
+    for record in records:
+        if record.experiment != EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
+            continue
+        if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
+            continue
+        for metric_name, metric_value in record.metrics:
+            if metric_name != str(DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION):
+                continue
+            if metric_value == 1.0:
+                observed.append(f"{record.semantic_key}: permanent singleton admission")
+    if len(observed) > allowed:
+        return CompletenessVerificationResult(passed=False, failures=tuple(observed))
+    return CompletenessVerificationResult(passed=True, failures=())
+
+
 def verify_comparison_evidence_current(
     experiment_names: tuple[ExperimentName, ...],
     store: ExecutionRecordStore,

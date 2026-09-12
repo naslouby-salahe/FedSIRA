@@ -85,7 +85,8 @@ def normalize_label_token(raw_label: ClassLabel) -> ClassLabel:
 
 def normalize_label(raw_label: ClassLabel) -> ClassLabel:
     normalized = normalize_label_token(raw_label)
-    if normalized in CICIoT2023TargetFamilyMember.__members__:
+    target_family = tuple(member.value for member in CICIoT2023TargetFamilyMember)
+    if normalized in target_family:
         return TARGET_LABEL
     try:
         _CICIoTBenignAlias[normalized]
@@ -95,9 +96,10 @@ def normalize_label(raw_label: ClassLabel) -> ClassLabel:
 
 
 def target_family_collision_is_declared(first: ClassLabel, second: ClassLabel) -> BooleanValue:
+    target_family = tuple(member.value for member in CICIoT2023TargetFamilyMember)
     return (
-        normalize_label_token(first) in CICIoT2023TargetFamilyMember.__members__
-        and normalize_label_token(second) in CICIoT2023TargetFamilyMember.__members__
+        normalize_label_token(first) in target_family
+        and normalize_label_token(second) in target_family
     )
 
 
@@ -135,6 +137,7 @@ class CICIoT2023DatasetManifestPayload(FrozenDomainModel):
     official_expected_predictor_count: PredictorCount
     predictor_count_matches_official: PredictorCountMatchesOfficial
     class_registry: tuple[DatasetClassToken, ...]
+    target_family_members: tuple[ClassLabel, ...]
     pseudo_domain_count: DomainCount
 
 
