@@ -188,7 +188,11 @@ def test_complete_case_parsing_rejects_mismatched_row_width(tmp_path: Path) -> N
     _write_csv(
         csv_path,
         ("feature_a", "feature_b", "Label"),
-        (("1.0", "BenignTraffic"),),
+        (
+            ("1.0", "2.0", "BenignTraffic"),
+            ("1.0",),
+            ("3.0", "4.0", "Backdoor_Malware"),
+        ),
     )
     try:
         materialize_ciciot2023_prepared_views(
@@ -344,3 +348,51 @@ def test_resolve_row_identifier_columns_rejects_duplicate_values(tmp_path: Path)
         (_secondary_csv_file(path),), ("INDEX", "feature_a", "Label"), "Label"
     )
     assert identifiers == frozenset()
+
+
+def test_truncated_final_line_is_excluded_with_a_recorded_reason(tmp_path: Path) -> None:
+    target_directory = tmp_path / "Backdoor_Malware"
+    benign_directory = tmp_path / "Benign_Final"
+    target_directory.mkdir()
+    benign_directory.mkdir()
+    target_csv = target_directory / "part.csv"
+    benign_csv = benign_directory / "part.csv"
+    _write_csv(
+        target_csv,
+        ("feature_a", "feature_b"),
+        (("1.0", "2.0"), ("3.0", "4.0"), ("5.0", "6.0"), ("7.0", "8.0")),
+    )
+    with target_csv.open("a", encoding="utf-8") as handle:
+        handle.write("9.0,10.0,11.0\n")
+    with target_csv.open("a", encoding="utf-8") as handle:
+        handle.write("truncated\n")
+    _write_csv(
+        benign_csv,
+        ("feature_a", "feature_b"),
+        tuple((f"{index}.0", f"{index + 1}.0") for index in range(200)),
+    )
+    summary = materialize_ciciot2023_prepared_views(
+        (
+            _per_attack_csv_file(target_csv, TARGET_LABEL),
+            _per_attack_csv_file(benign_csv, "BENIGN"),
+        ),
+        tmp_path / "prepared",
+        tmp_path / "scaler",
+        tmp_path / "metadata",
+        tmp_path / "cache",
+        overwrite=True,
+    )
+    assert summary.raw_row_count == 206
+    assert summary.retained_row_count == 204
+    exclusions = (
+        duckdb.connect()
+        .execute(
+            "SELECT original_row_index, reason FROM read_parquet(?) ORDER BY original_row_index",
+            [(tmp_path / "metadata" / "dataset_exclusions.parquet").as_posix()],
+        )
+        .fetchall()
+    )
+    assert tuple((int(row[0]), str(row[1])) for row in exclusions) == (
+        (4, DatasetExclusionReason.ROW_WIDTH_MISMATCH),
+        (5, DatasetExclusionReason.ROW_WIDTH_MISMATCH),
+    )

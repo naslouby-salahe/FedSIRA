@@ -812,6 +812,8 @@ All non-label columns are candidate predictors. A canonical header token uses th
 
 The canonical output-class registry is deterministic: `BENIGN` first, `BACKDOOR_MALWARE` second, then all remaining observed canonical labels in lexicographically ascending UTF-8 order. The model input dimension is the validated predictor count; the output dimension is the registry length. Both are derived facts.
 
+A shard whose rows do not all match its validated header width is `Data Invalid` unless the mismatching rows form a trailing run at end of file, which is the signature of a truncated final line. In that case exactly those trailing rows are excluded by deterministic complete-case deletion with reason `row_width_mismatch` and their original row indices, they are written to the exclusion record like any other exclusion, they count in the reported raw row count, and the preceding rows of the shard are retained unchanged. A width mismatch anywhere else in a shard remains `Data Invalid`.
+
 Before role construction, every predictor is parsed to float64 for validation. Any row containing NaN, positive/negative infinity, or a value that cannot be parsed as a finite number is excluded by deterministic complete-case deletion. Its `stable_row_id`, file identity, original row index, and exclusion reason are written to a machine-readable exclusion record under `outputs/`; exclusion counts/rates are reported. No imputation, finite-value replacement, feature dropping based on outcomes, or silent schema repair is allowed.
 
 `stable_row_id` is `SHA256(canonical_bytes("CICIOT2023_SAMPLE_ID_V1", normalized_relative_csv_path, file_sha256, zero_based_original_row_index))`. Duplicate feature rows are retained as separate observations because their stable identities differ.

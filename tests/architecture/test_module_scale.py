@@ -20,7 +20,7 @@ JUSTIFIED_LINE_BUDGETS = {
     "protocol/baselines/defenses.py": 1000,
     "protocol/baselines/outcomes.py": 700,
     "protocol/baselines/training.py": 700,
-    "datasets/ciciot2023/prepare.py": 820,
+    "datasets/ciciot2023/prepare.py": 890,
     "datasets/nbaiot/prepare.py": 700,
     "application.py": 700,
 }

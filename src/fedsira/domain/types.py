@@ -111,6 +111,7 @@ RetryCount = NonNegativeInt
 BaselineRetrainingCount = NonNegativeInt
 
 RowCount = NonNegativeInt
+DatasetColumnCount = PositiveInt
 SourceRowIndex = NonNegativeInt
 ColumnIndex = NonNegativeInt
 SamplingCap = NonNegativeInt

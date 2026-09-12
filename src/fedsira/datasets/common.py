@@ -116,6 +116,7 @@ FILE_DIGEST_CHUNK_BYTES = 1_048_576
 class DatasetExclusionReason(StrEnum):
     NON_FINITE_PREDICTOR = "non_finite_predictor"
     UNPARSEABLE_PREDICTOR = "unparseable_predictor"
+    ROW_WIDTH_MISMATCH = "row_width_mismatch"
 
 
 class RoleWindow(FrozenDomainModel):
@@ -378,11 +379,13 @@ def varchar_column_map(names: tuple[DatasetColumnName, ...]) -> TextValue:
 def read_csv_relation(
     path: Path,
     header: tuple[DatasetColumnName, ...],
+    ignore_errors: BooleanValue = False,
 ) -> TextValue:
     return (
         "read_csv("
         f"{sql_string(path.as_posix())}, header=true, delim=',', quote='\"', escape='\"', "
-        f"auto_detect=false, columns={varchar_column_map(header)})"
+        f"auto_detect=false, ignore_errors={'true' if ignore_errors else 'false'}, "
+        f"columns={varchar_column_map(header)})"
     )
 
 

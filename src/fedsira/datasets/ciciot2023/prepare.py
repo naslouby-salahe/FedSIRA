@@ -53,6 +53,7 @@ from fedsira.domain.types import (
     BooleanValue,
     ClassLabel,
     DatasetClassToken,
+    DatasetColumnCount,
     DatasetColumnName,
     DatasetFileDigest,
     DatasetManifestDigest,
@@ -419,6 +420,44 @@ def _exclusion_reason_sql(predictor_columns: tuple[DatasetColumnName, ...]) -> T
     )
 
 
+def _trailing_width_mismatch_range(
+    path: Path, column_count: DatasetColumnCount
+) -> tuple[RowCount, RowCount] | None:
+    malformed: list[RowCount] = []
+    data_rows: RowCount = 0
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.reader(handle)
+        next(reader, None)
+        for index, row in enumerate(reader):
+            data_rows = index + 1
+            if len(row) != column_count:
+                malformed.append(index)
+    if not malformed:
+        return None
+    first_excluded = data_rows - len(malformed)
+    if tuple(malformed) != tuple(range(first_excluded, data_rows)):
+        return None
+    return (first_excluded, data_rows)
+
+
+def _record_width_exclusions(
+    connection: duckdb.DuckDBPyConnection,
+    item: SecondaryCsvFile,
+    malformed: tuple[RowCount, RowCount],
+) -> None:
+    first_excluded, data_rows = malformed
+    connection.execute(
+        "INSERT INTO exclusions "
+        "SELECT ciciot_stable_row_id(relative_path, file_sha256, original_row_index), "
+        "file_sha256, relative_path, original_row_index, reason FROM ("
+        f"SELECT {sql_string(item.relative_path)} AS relative_path, "
+        f"{sql_string(item.file_sha256)} AS file_sha256, "
+        "range AS original_row_index, "
+        f"{sql_string(DatasetExclusionReason.ROW_WIDTH_MISMATCH)} AS reason "
+        f"FROM range({first_excluded}, {data_rows}))"
+    )
+
+
 def _ingest_shard(
     connection: duckdb.DuckDBPyConnection,
     item: SecondaryCsvFile,
@@ -432,6 +471,7 @@ def _ingest_shard(
         "dataset.ingest",
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023, file=item.relative_path),
     )
+    physical_row_count: RowCount | None = None
     try:
         connection.execute(
             "CREATE OR REPLACE TABLE shard AS "
@@ -439,15 +479,41 @@ def _ingest_shard(
             f"FROM {read_csv_relation(item.absolute_path, header)}"
         )
     except duckdb.Error as error:
-        raise ValueError(
-            f"CICIoT2023 row width does not match validated header: file={item.relative_path}"
-        ) from error
+        malformed = _trailing_width_mismatch_range(item.absolute_path, len(header))
+        if malformed is None:
+            raise ValueError(
+                f"CICIoT2023 row width does not match validated header: file={item.relative_path}"
+            ) from error
+        log_structured_event(
+            CICIOT_PREPARATION_LOGGER,
+            "dataset.shard.width.excluded",
+            DatasetPreparationLogFields(
+                dataset=DatasetId.CICIOT2023,
+                file=item.relative_path,
+                excluded_rows=len(malformed),
+            ),
+        )
+        connection.execute(
+            "CREATE OR REPLACE TABLE shard AS "
+            "SELECT (row_number() OVER () - 1) AS original_row_index, * "
+            f"FROM {read_csv_relation(item.absolute_path, header, True)}"
+        )
+        recorded = connection.execute("SELECT count(*) FROM shard").fetchone()
+        if recorded is None or int(recorded[0]) != malformed[0]:
+            raise ValueError(
+                "CICIoT2023 width-excluded rows are not a trailing run: "
+                f"file={item.relative_path}"
+            ) from error
+        _record_width_exclusions(connection, item, malformed)
+        physical_row_count = malformed[1]
     count_row = connection.execute("SELECT count(*) FROM shard").fetchone()
     if count_row is None:
         raise ValueError(f"CICIoT2023 shard count query failed: {item.relative_path}")
     raw_count = count_row[0]
     if not isinstance(raw_count, int) or isinstance(raw_count, bool) or raw_count < 0:
         raise TypeError("CICIoT2023 shard row count must be a non-negative integer")
+    if physical_row_count is not None:
+        raw_count = physical_row_count
     reason_sql = _exclusion_reason_sql(predictor_columns)
     if item.label_column is not None:
         raw_label_sql: TextValue = sql_ident(item.label_column)
