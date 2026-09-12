@@ -815,9 +815,20 @@ def evaluate_domain(
         adapter.benign_class_token,
         supported_tokens,
     )
+    primary_dataset = current_application_context().scientific_config.datasets.primary
+    minimum_examples = primary_dataset.supported_metric_minimum_report_examples_per_class
+    under_represented = False
+    for token in supported_tokens:
+        counts = counts_by_class.get(token)
+        support = 0 if counts is None else counts.true_positive + counts.false_negative
+        if support < minimum_examples:
+            under_represented = True
+            break
     return DomainTargetMetrics(
         target_f1=metric_value(report, ComparisonMetric.TARGET_F1.value),
-        supported_macro_f1=macro_f1(supported_f1),
+        supported_macro_f1=(
+            MetricResult(value=None, denominator=0) if under_represented else macro_f1(supported_f1)
+        ),
         benign_far=benign_false_alarm_rate(
             true_labels, predicted_labels, adapter.benign_class_token
         ),
