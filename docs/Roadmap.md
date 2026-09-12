@@ -799,7 +799,12 @@ Because the processed release does not provide a one-row-to-one-organizational-d
 
 ## 11.1 Secondary schema, labels, and raw-data adaptation
 
-CSV shards are discovered recursively beneath the acquired official `CSV` dataset directory and ordered by normalized relative path ascending. Every shard must have one common header after trimming surrounding ASCII whitespace from column names. The canonical label column is the unique column whose trimmed case-insensitive name is `label`; zero or more than one such column is `Data Invalid`.
+CSV shards are discovered recursively beneath the acquired official `CSV` dataset directory and ordered by normalized relative path ascending. `datasets.secondary.acquisition` declares which of the release's two official representations is acquired, and exactly one is used; the two representations overlap and must never be combined.
+
+* `Labeled shards` acquires every shard whose header carries a `label` column. Every such shard must have one common header after trimming surrounding ASCII whitespace from column names. The canonical label column is the unique column whose trimmed case-insensitive name is `label`; more than one such column is `Data Invalid`, and a shard with no label column is not part of this representation.
+* `Per-attack shards` acquires every shard whose header carries no `label` column. The class of such a shard is the canonical token of its immediately enclosing directory name under the same Unicode-NFC/trim/uppercase/non-alphanumeric-to-underscore normalization, with the benign aliases below applied. Shards selected by this representation must share one common header, and a shard with no enclosing class directory is `Data Invalid`.
+
+The per-attack representation is the fuller release representation (46,776,700 data rows against 45,019,234 labeled rows, with the labeled representation retaining a uniform ~0.957 of each class), both representations resolve to the same 34 canonical classes, and the per-attack representation's row count is the one closest to the published release statistic. It is therefore the default acquisition. A predictor count other than the official expected 46 is a recorded documentation discrepancy for either representation.
 
 Canonical label tokens are produced by Unicode NFC normalization, trimming, uppercasing, replacing each maximal run of non-alphanumeric characters with `_`, collapsing repeated `_`, and stripping leading/trailing `_`. `BENIGNTRAFFIC` and `BENIGN_TRAFFIC` map to the single class `BENIGN`. `BACKDOOR_MALWARE` must be observed exactly after canonicalization or the secondary program is `Data Invalid`. Any two distinct raw labels that collapse to the same canonical token are allowed only when their normalized textual forms differ solely by case, whitespace, hyphen, or underscore; any other collision is `Data Invalid`.
 
@@ -1267,6 +1272,8 @@ Identical to the previous regime with $\pm1.0$ standardized-unit shifts.
 These are stress tests; they do not alter anchor training.
 
 ---
+
+The Section 15.9 feature-shift transform applies to every scenario that declares it, in every experiment: the `Feature Shift ±1.0` and `Honest Site-Specific Feature Shift — 1.0` conditions of Sections 30.5, 30.7, 30.10 and 30.17 all realize the same ±1.0 transformation over the same deterministically selected feature set, and `Feature Shift ±0.5` realizes the ±0.5 magnitude. The condition identity, not the experiment identity, selects the transform.
 
 ## 15.10 Transformation cardinality, root-cause, and controlled-episode completion rules
 
@@ -2075,7 +2082,7 @@ Within each verifier profile, reference condition is `All Honest`. For `One Fals
 
 ### Family 8 — mechanism ablation
 
-Every Section 30.10 variant consumes a matched `Full FedSIRA` reference artifact with the same scenario, seed, source, data roles, and non-ablated transforms. The variant's exact primary metric is specified in Section 30.10. Superiority/harm orientation follows the metric orientation above. The `Generic Three-Row Threshold` invalid Krum branch has no p-value; its separately labeled coordinate-median diagnostic supplies the comparison metric. All applicable ablation p-values share one Holm family.
+Every Section 30.10 variant consumes a matched `Full FedSIRA` reference artifact with the same scenario, seed, source, data roles, and non-ablated transforms. The reference is materialized as a `Domain/seed metric artifact` in the slot `(Mechanism Ablation, <scenario, seed>, Mechanism Ablation)` under the procedure identity `fedsira|ablation_reference|1`, keyed to the dataset's prepared-evidence digest; it is published on first execution and reused thereafter, and the comparison engine reads the reference side of every Family 8 comparison from those artifacts. Each ablation cell emits its declared claim metric: attack success rate for the variants whose claim metric is ASR, malicious admission where a malicious-authority fixture exists, false launch and reproduction attempts and post-evidence overhead on the opening paths, and the broad false-same-capability certification rate for the granularity variant. The variant's exact primary metric is specified in Section 30.10. Superiority/harm orientation follows the metric orientation above. The `Generic Three-Row Threshold` invalid Krum branch has no p-value; its separately labeled coordinate-median diagnostic supplies the comparison metric. All applicable ablation p-values share one Holm family.
 
 ### Family 9 — heterogeneity and failure boundaries
 
@@ -2307,6 +2314,7 @@ datasets:
   secondary:
     name: CICIoT2023
     target_class: BACKDOOR_MALWARE
+    acquisition: Per-attack shards
     pseudo_domain_partition_salt: 730201
 capability_contract:
   target_f1_minimum: 0.8
@@ -2731,6 +2739,10 @@ Staging → Complete
 `Failed`, interrupted, partial, or checksum-mismatched staging data never becomes `Complete`. Only `Complete` artifacts may be consumed. Incompatible previously published artifacts are diagnostic history only.
 
 ## 26.3 Reusable artifact families
+
+Every family is published through one store entry point and addressed by an **artifact slot** — `(family, instance, owning experiment)`. The `instance` token is a filesystem-safe label derived deterministically from the artifact's scientific coordinates. A slot directory holds every published identity for that instance plus a `current.json` pointer naming the active identity, so a consumer can read the current artifact without recomputing its dependencies while old identities remain as diagnostic history.
+
+An artifact's **identity** is `SHA256` over the framed tuple `(family, instance, experiment, schema version, procedure identity, sorted (dependency name, dependency digest) pairs)`. Identity is therefore dependency-keyed: a change to any declared material dependency, to the producing procedure, or to the payload schema yields a new identity that cannot reuse the previous publication. The manifest additionally records the payload content digest and byte length, the lifecycle state, the producer, the declared dependencies with their digests, the authoritative configuration digest, and the repository revision for provenance. `Complete` is reached only by an atomic payload rename followed by an atomic manifest write and then an atomic `current.json` update; a torn publication leaves no readable artifact. Reading re-validates the schema version, the lifecycle state, the payload content digest and the payload length. A manifest that cannot be parsed, including one written under a superseded schema, is reported as invalid evidence rather than aborting the report path.
 
 | Artifact family                                    | Clear producer                           | Material dependencies                                                                                                                                                                         | Primary consumers and reuse boundary                                                                                                                    |
 | -------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
