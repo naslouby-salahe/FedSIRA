@@ -75,25 +75,58 @@ def forbidden_alias_symbol_violations(tree: ast.Module) -> list[str]:
     return found
 
 
-def _enum_member_unwrap(node: ast.expr) -> bool:
+def _enum_class_names(tree: ast.Module) -> set[str]:
+    defined = {
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and any(
+            isinstance(base, ast.Name) and base.id in {"Enum", "IntEnum", "StrEnum"}
+            for base in node.bases
+        )
+    }
+    imported = {
+        imported.asname or imported.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module is not None
+        and node.module.endswith(".enums")
+        for imported in node.names
+    }
+    return defined | imported
+
+
+def _enum_loop_variables(tree: ast.Module) -> set[str]:
+    enum_classes = _enum_class_names(tree)
+    return {
+        node.target.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.For | ast.comprehension)
+        and isinstance(node.target, ast.Name)
+        and isinstance(node.iter, ast.Name)
+        and node.iter.id in enum_classes
+    }
+
+
+def _enum_member_unwrap(node: ast.expr, enum_variables: set[str]) -> bool:
     for child in ast.walk(node):
-        if (
-            isinstance(child, ast.Attribute)
-            and child.attr == "value"
-            and isinstance(child.value, ast.Attribute)
-            and child.value.attr.isupper()
-        ):
+        if not isinstance(child, ast.Attribute) or child.attr != "value":
+            continue
+        if isinstance(child.value, ast.Attribute) and child.value.attr.isupper():
+            return True
+        if isinstance(child.value, ast.Name) and child.value.id in enum_variables:
             return True
     return False
 
 
 def enum_value_in_comparison_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
+    enum_variables = _enum_loop_variables(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Compare):
             continue
         operands = [node.left, *node.comparators]
-        if any(_enum_member_unwrap(operand) for operand in operands):
+        if any(_enum_member_unwrap(operand, enum_variables) for operand in operands):
             found.append(f"{node.lineno}")
     return found
 
@@ -218,6 +251,22 @@ def test_enum_value_in_membership_mutation_is_detected() -> None:
         assert enum_value_in_comparison_violations(parse(path)) == ["5"]
 
 
+def test_loop_enum_value_in_comparison_mutation_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text(
+            "from enum import StrEnum\n"
+            "class Mode(StrEnum):\n"
+            "    LOCAL = 'local'\n"
+            "def handler(mode_text: str) -> bool:\n"
+            "    for mode in Mode:\n"
+            "        if mode.value == mode_text:\n"
+            "            return True\n"
+            "    return False\n"
+        )
+        assert enum_value_in_comparison_violations(parse(path)) == ["6"]
+
+
 def test_metric_result_value_comparison_is_not_flagged() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "compliant.py"
@@ -267,6 +316,11 @@ def test_discovery_scans_new_source_files() -> None:
         (root / "added_later.py").write_text("def second() -> None:\n    return None\n")
         rescanned = {path.name for path in iter_python_files(root)}
         assert "added_later.py" in rescanned
+
+
+def test_architecture_scanner_covers_every_production_source_file() -> None:
+    expected = {path for path in SRC_ROOT.rglob("*.py") if "__pycache__" not in path.parts}
+    assert set(iter_python_files(SRC_ROOT)) == expected
 
 
 def test_new_source_file_with_forbidden_alias_is_flagged_by_full_tree_scan() -> None:

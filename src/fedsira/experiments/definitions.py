@@ -574,7 +574,7 @@ def core_opening_episode(condition: ConditionName) -> ProposalEpisode:
 
 def ablation_scenario_for_condition(condition: ConditionName) -> AblationScenario | None:
     for scenario in AblationScenario:
-        if scenario.value == condition:
+        if scenario == condition:
             return scenario
     return None
 

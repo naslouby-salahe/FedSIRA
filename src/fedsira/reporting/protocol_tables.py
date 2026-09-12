@@ -224,18 +224,18 @@ def render_primary_domain_statistics_table() -> RenderedTable:
             role_counts(summary_for_domain(summaries, domain), target),
             supported_role_counts(summary_for_domain(summaries, domain), supported_exclusions),
             eligibility_text(
-                summary_for_domain(summaries, domain).count(Role.REPRODUCTION.value, target),
+                summary_for_domain(summaries, domain).count(Role.REPRODUCTION, target),
                 config.datasets.primary.sampling_caps_per_domain.reproduction_target,
             ),
             eligibility_text(
-                summary_for_domain(summaries, domain).count(Role.ROW_VERIFICATION.value, target),
+                summary_for_domain(summaries, domain).count(Role.ROW_VERIFICATION, target),
                 config.datasets.primary.sampling_caps_per_domain.row_verification_target,
             ),
             eligibility_text(
-                summary_for_domain(summaries, domain).count(Role.FINAL_GATE.value, target),
+                summary_for_domain(summaries, domain).count(Role.FINAL_GATE, target),
                 config.datasets.primary.sampling_caps_per_domain.final_gate_target,
             ),
-            str(summary_for_domain(summaries, domain).count_for_role(Role.REPORT_TEST.value)),
+            str(summary_for_domain(summaries, domain).count_for_role(Role.REPORT_TEST)),
         )
         for domain in primary_specification.domain_ids
     )
@@ -544,7 +544,7 @@ def render_metric_and_statistics_protocol_table() -> RenderedTable:
 
 def domain_target_count(summary: PreparedDomainSummary, target: DatasetClassToken) -> RowCount:
     return sum(
-        summary.count(role.value, target)
+        summary.count(role, target)
         for role in (
             Role.SOURCE_PROPOSAL,
             Role.CANDIDATE_SCREEN,
@@ -567,7 +567,7 @@ def summary_for_domain(
 
 def role_counts(summary: PreparedDomainSummary, target: DatasetClassToken) -> TextValue:
     return ";".join(
-        f"{role.value}={summary.count(role.value, target)}"
+        f"{role.value}={summary.count(role, target)}"
         for role in (Role.REPRODUCTION, Role.ROW_VERIFICATION, Role.FINAL_GATE, Role.REPORT_TEST)
     )
 
@@ -576,7 +576,7 @@ def supported_role_counts(
     summary: PreparedDomainSummary, excluded_classes: frozenset[DatasetClassToken]
 ) -> TextValue:
     return ";".join(
-        f"{role.value}={summary.count_for_role(role.value, excluded_classes)}"
+        f"{role.value}={summary.count_for_role(role, excluded_classes)}"
         for role in (
             Role.POST_REFERENCE_REPLAY,
             Role.ROW_VERIFICATION,

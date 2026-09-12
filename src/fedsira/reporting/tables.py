@@ -938,7 +938,7 @@ def _byzantine_boundary(
     config = current_application_context().scientific_config
     if experiment == BYZANTINE_BOUND_VIOLATION_NAME:
         for bound_condition in BoundCondition:
-            if bound_condition.value == condition:
+            if bound_condition == condition:
                 return ByzantineBoundaryRow(
                     bound_status=(
                         "Within Bound" if condition.endswith("Within Bound") else "Above Bound"

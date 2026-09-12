@@ -930,12 +930,12 @@ def render_capability_granularity_boundary(
     granularities = tuple(
         scope.value
         for scope in CapabilityContractScope
-        if any(outcome.cell.method == scope.value for outcome in completed)
+        if any(outcome.cell.method == scope for outcome in completed)
     )
     mixtures = tuple(
         mixture.value
         for mixture in RootCauseMixture
-        if any(outcome.cell.condition == mixture.value for outcome in completed)
+        if any(outcome.cell.condition == mixture for outcome in completed)
     )
 
     def values_for(metric: MetricName) -> tuple[tuple[MetricValue | None, ...], ...]:
@@ -997,7 +997,7 @@ def render_heterogeneity_synthesis_boundary(
     regimes = tuple(
         regime.value
         for regime in HeterogeneityRegime
-        if any(outcome.cell.condition == regime.value for outcome in completed)
+        if any(outcome.cell.condition == regime for outcome in completed)
     )
     methods = _experiment_methods(outcomes, HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME)
     positions = tuple(range(len(regimes)))

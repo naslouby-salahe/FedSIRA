@@ -622,9 +622,9 @@ class DatasetSpecification(FrozenDomainModel):
 
 class PreparedDomainSummary(FrozenDomainModel):
     domain_id: DomainId
-    counts: tuple[tuple[RoleToken, DatasetClassToken, RowCount], ...]
+    counts: tuple[tuple[Role, DatasetClassToken, RowCount], ...]
 
-    def count(self, role: RoleToken, class_token: DatasetClassToken) -> RowCount:
+    def count(self, role: Role, class_token: DatasetClassToken) -> RowCount:
         return next(
             (
                 value
@@ -635,7 +635,7 @@ class PreparedDomainSummary(FrozenDomainModel):
         )
 
     def count_for_role(
-        self, role: RoleToken, excluded_classes: frozenset[DatasetClassToken] = frozenset()
+        self, role: Role, excluded_classes: frozenset[DatasetClassToken] = frozenset()
     ) -> RowCount:
         return sum(
             value
@@ -661,8 +661,8 @@ def prepared_domain_summaries(
     prepared_root: Path,
 ) -> tuple[PreparedDomainSummary, ...]:
     specification = dataset_specification(dataset)
-    counts: defaultdict[DomainId, defaultdict[tuple[str, DatasetClassToken], int]] = defaultdict(
-        lambda: defaultdict(int)
+    counts: defaultdict[DomainId, defaultdict[tuple[Role, DatasetClassToken], RowCount]] = (
+        defaultdict(lambda: defaultdict(int))
     )
     for sidecar in sorted(prepared_root.glob("*.json")):
         payload = json.loads(sidecar.read_text(encoding="utf-8"))
@@ -677,7 +677,7 @@ def prepared_domain_summaries(
         )
         if domain_id not in specification.domain_ids:
             raise ValueError(f"unexpected {dataset.value} domain {domain_id!r} in {sidecar}")
-        counts[domain_id][(str(role), str(class_token))] += row_count
+        counts[domain_id][(role_from_hash_token(str(role)), str(class_token))] += row_count
     if not counts:
         raise ValueError(f"no prepared-view evidence exists for {dataset.value}")
     return tuple(
