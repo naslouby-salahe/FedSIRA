@@ -9,7 +9,7 @@ JUSTIFIED_LINE_BUDGETS = {
     "experiments/collapse.py": 700,
     "experiments/handlers.py": 3100,
     "learning/post_reference.py": 790,
-    "datasets/common.py": 1360,
+    "datasets/common.py": 1400,
     "evaluation/comparisons.py": 1200,
     "evaluation/metrics.py": 1320,
     "evaluation/service.py": 720,

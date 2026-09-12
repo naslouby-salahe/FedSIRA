@@ -53,6 +53,7 @@ from fedsira.domain.types import (
     OverwriteExisting,
     PredictorCount,
     PreparedEvidencePresent,
+    PreparedRowsCacheLimit,
     PreparedViewKey,
     Probability,
     RelativePathText,
@@ -513,6 +514,30 @@ def write_json_payload(
     path.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
 
 
+PREPARED_ROWS_CACHE_LIMIT: PreparedRowsCacheLimit = 256
+
+_PREPARED_ROWS_CACHE: OrderedDict[Path, PreparedRows] = OrderedDict()
+
+
+def cached_prepared_rows(path: Path) -> PreparedRows | None:
+    cached = _PREPARED_ROWS_CACHE.get(path)
+    if cached is None:
+        return None
+    _PREPARED_ROWS_CACHE.move_to_end(path)
+    return cached
+
+
+def remember_prepared_rows(path: Path, rows: PreparedRows) -> None:
+    _PREPARED_ROWS_CACHE[path] = rows
+    _PREPARED_ROWS_CACHE.move_to_end(path)
+    while len(_PREPARED_ROWS_CACHE) > PREPARED_ROWS_CACHE_LIMIT:
+        _PREPARED_ROWS_CACHE.popitem(last=False)
+
+
+def clear_prepared_rows_cache() -> None:
+    _PREPARED_ROWS_CACHE.clear()
+
+
 def view_parquet_path(prepared_root: Path, view_key: PreparedViewKey) -> Path:
     return prepared_root / f"{view_key}.parquet"
 
@@ -797,6 +822,15 @@ class DatasetAdapter:
         self, domain_id: DomainId, class_token: DatasetClassToken, role: Role
     ) -> PreparedRows | None:
         path = view_parquet_path(self.prepared_root, self.view_key(domain_id, class_token, role))
+        cached = cached_prepared_rows(path)
+        if cached is not None:
+            return cached
+        rows = self._read_prepared_rows(path)
+        if rows is not None:
+            remember_prepared_rows(path, rows)
+        return rows
+
+    def _read_prepared_rows(self, path: Path) -> PreparedRows | None:
         if not path.exists():
             return None
         connection = open_tabular_engine()

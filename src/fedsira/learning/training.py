@@ -4,12 +4,11 @@ from typing import Protocol, cast
 
 import torch
 from torch import nn, optim
-from torch.utils.data import DataLoader, Dataset, Sampler
+from torch.utils.data import DataLoader, IterableDataset, get_worker_info
 
 from fedsira.config import OptimizerConfig, TrainingConfig
 from fedsira.domain.types import (
     BatchRowIndexSequence,
-    BatchRowIndices,
     BatchSize,
     DerivedSeed,
     EpochIndex,
@@ -17,9 +16,7 @@ from fedsira.domain.types import (
     LearningRate,
     LocalEpochCount,
     ParameterName,
-    RowCount,
     SampleId,
-    SampleRowIndex,
     TensorDomainModel,
     TrainingLoss,
 )
@@ -91,27 +88,26 @@ def ordered_batch_row_indices(
     )
 
 
-class OrderedIndexDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
-    def __init__(self, features: torch.Tensor, labels: torch.Tensor) -> None:
+class DeclaredBatchDataset(IterableDataset[tuple[torch.Tensor, torch.Tensor]]):
+    def __init__(
+        self,
+        features: torch.Tensor,
+        labels: torch.Tensor,
+        row_indices: BatchRowIndexSequence,
+    ) -> None:
         self._features = features
         self._labels = labels
+        self._row_indices = row_indices
 
-    def __len__(self) -> RowCount:
-        return int(self._features.shape[0])
-
-    def __getitem__(self, index: SampleRowIndex) -> tuple[torch.Tensor, torch.Tensor]:
-        return (self._features[index], self._labels[index])
-
-
-class DeclaredBatchSampler(Sampler[BatchRowIndices]):
-    def __init__(self, batches: BatchRowIndexSequence) -> None:
-        self._batches = batches
-
-    def __iter__(self) -> Iterator[BatchRowIndices]:
-        return iter([list(batch) for batch in self._batches])
-
-    def __len__(self) -> RowCount:
-        return len(self._batches)
+    def __iter__(self) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
+        worker = get_worker_info()
+        shard_count = 1 if worker is None else worker.num_workers
+        shard_index = 0 if worker is None else worker.id
+        for batch_index, rows in enumerate(self._row_indices):
+            if batch_index % shard_count != shard_index:
+                continue
+            indices = torch.tensor(rows, dtype=torch.long)
+            yield (self._features[indices], self._labels[indices])
 
 
 def train_one_epoch(
@@ -186,8 +182,8 @@ def build_epoch_batches(
     row_indices = ordered_batch_row_indices(sample_ids, training_seed, epoch, batch_size)
     loader = current_application_context().scientific_config.execution.data_loader
     return DataLoader(
-        OrderedIndexDataset(features, labels),
-        batch_sampler=DeclaredBatchSampler(row_indices),
+        DeclaredBatchDataset(features, labels, row_indices),
+        batch_size=None,
         num_workers=loader.workers,
         pin_memory=loader.pin_memory,
         persistent_workers=loader.persistent_workers,

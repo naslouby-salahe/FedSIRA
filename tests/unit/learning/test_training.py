@@ -1,5 +1,6 @@
 import math
 
+import pytest
 import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
@@ -232,3 +233,43 @@ def test_fresh_optimizer_per_round_resets_adamw_state() -> None:
         model, OPTIMIZER_CONFIG.anchor_and_standard_fl_learning_rate, OPTIMIZER_CONFIG
     )
     assert len(fresh_optimizer.state) == 0
+
+
+def test_declared_batch_dataset_yields_the_declared_batch_order() -> None:
+    from fedsira.learning.training import DeclaredBatchDataset, ordered_batch_row_indices
+
+    n = 512
+    features = torch.arange(float(n)).reshape(n, 1)
+    labels = torch.arange(n)
+    sample_ids = tuple(f"sample-{i:04d}" for i in range(n))
+    declared = ordered_batch_row_indices(sample_ids, 42, 0, 64)
+    dataset = DeclaredBatchDataset(features, labels, declared)
+
+    produced = tuple(dataset)
+
+    assert len(produced) == len(declared)
+    assert [int(row) for _features, batch_labels in produced for row in batch_labels] == [
+        index for batch in declared for index in batch
+    ]
+
+
+def test_build_epoch_batches_preserves_the_declared_row_order() -> None:
+    from fedsira.learning.training import ordered_batch_row_indices
+
+    n = 512
+    features = torch.arange(float(n)).reshape(n, 1)
+    labels = torch.arange(n)
+    sample_ids = tuple(f"sample-{i:04d}" for i in range(n))
+    declared = ordered_batch_row_indices(sample_ids, 42, 0, 64)
+
+    batches = tuple(build_epoch_batches(features, labels, sample_ids, 42, 0, batch_size=64))
+
+    produced = [int(row) for _features, batch_labels in batches for row in batch_labels]
+    assert produced == [index for batch in declared for index in batch]
+
+
+def test_training_population_rejects_duplicate_sample_ids() -> None:
+    from fedsira.learning.training import sample_positions
+
+    with pytest.raises(ValueError, match="duplicate sample ids"):
+        sample_positions(("sample-1", "sample-1"))

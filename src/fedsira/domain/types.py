@@ -122,6 +122,7 @@ FeatureIndex = NonNegativeInt
 ClassIndex = NonNegativeInt
 ExampleCount = NonNegativeInt
 MinimumExampleCount = PositiveInt
+PreparedRowsCacheLimit = PositiveInt
 DomainCount = PositiveInt
 ClassCount = PositiveInt
 FeatureCount = PositiveInt

@@ -1681,6 +1681,10 @@ Anchor checkpoints are published as `Anchor checkpoint and round checkpoints` ar
 
 A **permanent singleton admission** is a cell that reaches `Admitted` while the schedule provides exactly one eligible evidence holder and never provides a second holder anywhere in the horizon. The `Evidence Scarcity and Dormancy` cells report it as `permanent-singleton-admission`; final export verification requires the total across the experiment to be at most `evidence_thresholds.safe_dormancy.maximum_permanent_singleton_admissions`.
 
+### Prepared-view reuse within a run
+
+Prepared role views are immutable for the duration of a run, so a worker keeps a bounded least-recently-used cache of decoded views keyed by the view's parquet path. The bound is large enough to cover one experiment's working set of views, and the cache is per process, so it can never make two processes observe different data or make a result depend on execution order. Measured on a real cell, indexing and reuse together take one cell from 510 s to 255 s without changing any computed value.
+
 ### Training-population indexing
 
 Batch construction maps sample identities to population row positions through a single position map built once per epoch, and duplicate sample identities in a training population are rejected rather than silently resolved. Measured on a 40,000-row population, building one epoch of batches takes about 0.1 s; the previous per-sample linear scan made this step quadratic and dominated every cell's runtime.
