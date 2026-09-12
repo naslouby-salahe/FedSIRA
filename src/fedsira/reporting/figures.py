@@ -1447,6 +1447,15 @@ def outcome_evidence_trajectory(
     horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles
     if any(not outcome.state_trajectory for outcome in completed):
         raise ValueError("Evidence Scarcity and Dormancy outcome lacks its state trajectory")
+    expected_cycles = frozenset(range(horizon + 1))
+    for outcome in completed:
+        observed_cycles = frozenset(observation.cycle for observation in outcome.state_trajectory)
+        if observed_cycles != expected_cycles:
+            raise ValueError(
+                "Evidence Scarcity and Dormancy state trajectory does not cover every "
+                f"logical cycle for {outcome.cell.semantic_key}: "
+                f"missing {sorted(expected_cycles - observed_cycles)}"
+            )
     result: list[EvidenceStateFraction] = []
     states = (
         AdmissionState.DORMANT,

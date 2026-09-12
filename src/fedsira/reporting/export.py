@@ -45,9 +45,11 @@ from fedsira.domain.types import (
     RepetitionIndex,
     ReportVerificationFailure,
     RepositoryPath,
+    RowCount,
     ScenarioName,
     SchemaVersion,
     ScientificCellCount,
+    TableCsvText,
     TableName,
     TextValue,
     VerificationPassed,
@@ -121,7 +123,6 @@ from fedsira.reporting.protocol_tables import (
 from fedsira.reporting.tables import (
     MANUSCRIPT_TABLE_NAMES,
     RenderedTable,
-    csv_text,
     render_ablation_results_table,
     render_byzantine_robustness_table,
     render_collapse_decisions_table,
@@ -238,7 +239,14 @@ class ReportExportResult(FrozenDomainModel):
     verification: CompletenessVerificationResult
 
 
+def _table_evidence_row_count(csv_body: TableCsvText) -> RowCount:
+    rows = csv_body.strip().splitlines()
+    return 0 if len(rows) <= 1 else len(rows) - 1
+
+
 def _write_table(root: Path, table: RenderedTable) -> Path:
+    if _table_evidence_row_count(table.csv_text) == 0:
+        raise ValueError(f"rendered table {table.name} carries no evidence rows")
     destination = root / f"{table.name}.csv"
     destination.write_text(table.csv_text + "\n")
     return destination
@@ -1249,25 +1257,6 @@ def render_mandatory_tables(
     ]
     if collapse_decisions is not None and resolved_core is not None:
         tables.append(render_collapse_decisions_table(collapse_decisions, resolved_core))
-    else:
-        tables.append(
-            RenderedTable(
-                name="Collapse Decisions",
-                csv_text=csv_text(
-                    (
-                        "mechanism",
-                        "comparator",
-                        "primary_material_effect",
-                        "adjusted_p",
-                        "liveness_safety_constraint",
-                        "survival_rule",
-                        "observed_outcome",
-                        "core_action",
-                    ),
-                    (),
-                ),
-            )
-        )
     tables.extend(
         (
             render_ablation_results_table(comparison_results, outcomes),
