@@ -1315,8 +1315,13 @@ class ProtocolCellDispatch:
             )
             single_verifier_active = False
         required_row_count = row_requirement(cell, self._resolved_core)
+        screened_source_delta = (
+            self._last_opening_stage.source_delta if self._last_opening_stage is not None else None
+        )
         source_delta = (
-            train_source_candidate_delta(
+            screened_source_delta
+            if screened_source_delta is not None
+            else train_source_candidate_delta(
                 nbaiot_adapter(self._primary_adapter.prepared_root),
                 cell.master_seed,
                 real_anchor,
