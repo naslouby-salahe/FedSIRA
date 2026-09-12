@@ -10,6 +10,7 @@ import pandas
 from fedsira.artifacts.store import ArtifactManifest, InvalidArtifactReport
 from fedsira.domain.enums import (
     AdmissionState,
+    ArtifactDependencyKind,
     ArtifactLifecycleState,
     ExperimentLifecycleState,
 )
@@ -252,10 +253,20 @@ def artifact_manifest_dependency_failures(
         f"{manifest.slot.family.value}/{manifest.slot.instance}: {manifest.identity} is "
         f"{manifest.lifecycle_state.value}"
         if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-        else manifest.identity
+        else f"{manifest.slot.family.value}/{manifest.slot.instance}: "
+        f"{dependency.dependency} upstream {dependency.digest} is not a published artifact"
         for manifest in manifests
+        for dependency in (
+            tuple(manifest.dependencies)
+            if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
+            else tuple(
+                item
+                for item in manifest.dependencies
+                if item.kind is ArtifactDependencyKind.ARTIFACT
+            )
+        )
         if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-        or any(dependency.digest not in identities for dependency in manifest.dependencies)
+        or dependency.digest not in identities
     )
     return (*unreadable, *unresolved)
 

@@ -9,7 +9,7 @@ from fedsira.artifacts.store import (
     publish_artifact,
     read_current_artifact,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer
+from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer
 from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInstanceToken,
@@ -82,6 +82,7 @@ def publish_comparison_evidence(
         payload=payload,
         dependencies=(
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency="metric-evidence",
                 digest=metric_evidence_digest(records),
             ),

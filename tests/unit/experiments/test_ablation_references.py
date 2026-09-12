@@ -1,5 +1,5 @@
 from fedsira.artifacts.store import ArtifactDependency, artifact_identity
-from fedsira.domain.enums import AblationReproducerStrategy, ArtifactFamily
+from fedsira.domain.enums import AblationReproducerStrategy, ArtifactDependencyKind, ArtifactFamily
 from fedsira.evaluation.comparisons import ComparisonMetric
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
@@ -68,25 +68,41 @@ def test_artifact_identity_changes_when_a_declared_dependency_changes() -> None:
     slot = ablation_reference_slot(AblationScenario.NATURAL, 1103)
     first = artifact_identity(
         slot,
-        (ArtifactDependency(dependency="prepared-evidence", digest="a" * 64),),
+        (
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT, dependency="prepared-evidence", digest="a" * 64
+            ),
+        ),
         "fedsira|ablation_reference|1",
     )
     second = artifact_identity(
         slot,
-        (ArtifactDependency(dependency="prepared-evidence", digest="b" * 64),),
+        (
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT, dependency="prepared-evidence", digest="b" * 64
+            ),
+        ),
         "fedsira|ablation_reference|1",
     )
     assert first != second
     assert first == artifact_identity(
         slot,
-        (ArtifactDependency(dependency="prepared-evidence", digest="a" * 64),),
+        (
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT, dependency="prepared-evidence", digest="a" * 64
+            ),
+        ),
         "fedsira|ablation_reference|1",
     )
 
 
 def test_artifact_identity_changes_when_the_procedure_changes() -> None:
     slot = ablation_reference_slot(AblationScenario.NATURAL, 1103)
-    dependencies = (ArtifactDependency(dependency="prepared-evidence", digest="a" * 64),)
+    dependencies = (
+        ArtifactDependency(
+            kind=ArtifactDependencyKind.CONTENT, dependency="prepared-evidence", digest="a" * 64
+        ),
+    )
     assert artifact_identity(
         slot, dependencies, "fedsira|ablation_reference|1"
     ) != artifact_identity(slot, dependencies, "fedsira|ablation_reference|2")
@@ -94,8 +110,12 @@ def test_artifact_identity_changes_when_the_procedure_changes() -> None:
 
 def test_artifact_identity_is_independent_of_dependency_declaration_order() -> None:
     slot = ablation_reference_slot(AblationScenario.NATURAL, 1103)
-    first = ArtifactDependency(dependency="alpha", digest="a" * 64)
-    second = ArtifactDependency(dependency="beta", digest="b" * 64)
+    first = ArtifactDependency(
+        kind=ArtifactDependencyKind.CONTENT, dependency="alpha", digest="a" * 64
+    )
+    second = ArtifactDependency(
+        kind=ArtifactDependencyKind.CONTENT, dependency="beta", digest="b" * 64
+    )
     assert artifact_identity(
         slot, (first, second), "fedsira|ablation_reference|1"
     ) == artifact_identity(slot, (second, first), "fedsira|ablation_reference|1")

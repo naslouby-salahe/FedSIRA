@@ -15,6 +15,7 @@ from fedsira.artifacts.store import (
 from fedsira.datasets.common import RealAnchor, flat_parameters_identity
 from fedsira.domain.enums import (
     AdmissionState,
+    ArtifactDependencyKind,
     ArtifactFamily,
     ArtifactProducer,
     TernaryOutcome,
@@ -158,6 +159,7 @@ def publish_verifier_assignment_report(
         payload,
         (
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=VERIFIER_ASSIGNMENT_DEPENDENCY,
                 digest=payload.commitment_identity,
             ),
@@ -177,6 +179,7 @@ def publish_reproduction_certificate(
         payload,
         (
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=REPRODUCTION_CERTIFICATE_DEPENDENCY,
                 digest=payload.commitment_identity,
             ),
@@ -196,6 +199,7 @@ def publish_krum_synthesized_update(
         payload,
         (
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=KRUM_SYNTHESIS_DEPENDENCY,
                 digest=payload.selected_update_identity,
             ),
@@ -215,6 +219,7 @@ def publish_final_gate_decision(
         payload,
         (
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=FINAL_GATE_DEPENDENCY,
                 digest=payload.production_model_identity,
             ),
@@ -234,6 +239,7 @@ def publish_baseline_calibration(
         payload,
         (
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=BASELINE_CALIBRATION_DEPENDENCY,
                 digest=payload.dataset_manifest_hash,
             ),

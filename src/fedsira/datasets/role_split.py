@@ -7,7 +7,13 @@ from fedsira.artifacts.store import (
     publish_artifact,
 )
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId, Role
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    ArtifactProducer,
+    DatasetId,
+    Role,
+)
 from fedsira.domain.types import (
     ArtifactInstanceToken,
     DatasetClassToken,
@@ -88,9 +94,13 @@ def publish_role_split_sample_manifest(
     return publish_artifact(
         slot=slot,
         producer=ArtifactProducer.PREPROCESSING,
-        payload=payload.model_dump_json().encode("utf-8"),
+        payload=payload.model_dump_json(by_alias=True).encode("utf-8"),
         dependencies=(
-            ArtifactDependency(dependency="dataset-manifest", digest=dataset_manifest_hash),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency="dataset-manifest",
+                digest=dataset_manifest_hash,
+            ),
         ),
         procedure_identity=ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY,
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),

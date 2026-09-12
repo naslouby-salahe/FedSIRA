@@ -10,7 +10,7 @@ from fedsira.artifacts.store import (
     publish_artifact,
     read_current_artifact,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer
+from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer
 from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInstanceToken,
@@ -136,9 +136,17 @@ def publish_table_figure_source_data(
         producer=ArtifactProducer.REPORTING_SOURCE_DATA,
         payload=payload.model_dump_json().encode("utf-8"),
         dependencies=(
-            ArtifactDependency(dependency="execution-evidence", digest=execution_digest),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency="execution-evidence",
+                digest=execution_digest,
+            ),
             *(
-                ArtifactDependency(dependency=item.evidence_name, digest=item.content_digest)
+                ArtifactDependency(
+                    kind=ArtifactDependencyKind.CONTENT,
+                    dependency=item.evidence_name,
+                    digest=item.content_digest,
+                )
                 for item in evidence
             ),
         ),
@@ -167,7 +175,13 @@ def publish_table_figure_export(
         slot=slot,
         producer=ArtifactProducer.REPORT_EXPORT,
         payload=payload.model_dump_json().encode("utf-8"),
-        dependencies=(ArtifactDependency(dependency="source-data", digest=source_data_identity),),
+        dependencies=(
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.ARTIFACT,
+                dependency="source-data",
+                digest=source_data_identity,
+            ),
+        ),
         procedure_identity=TABLE_FIGURE_REPORT_EXPORT_PROCEDURE_IDENTITY,
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
         staging_root=REPOSITORY_ROOT / artifact_staging_root(),

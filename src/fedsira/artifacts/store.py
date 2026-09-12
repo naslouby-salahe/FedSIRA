@@ -3,7 +3,12 @@ import os
 import uuid
 from pathlib import Path
 
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ArtifactProducer
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    ArtifactLifecycleState,
+    ArtifactProducer,
+)
 from fedsira.domain.types import (
     ArtifactComplete,
     ArtifactDependencyName,
@@ -41,6 +46,7 @@ ARTIFACT_LOG_NAME = "artifacts.log"
 
 
 class ArtifactDependency(FrozenDomainModel):
+    kind: ArtifactDependencyKind
     dependency: ArtifactDependencyName
     digest: ArtifactDigest
 
@@ -243,7 +249,11 @@ def read_published_manifest(
     _, manifest_path = published_artifact_paths(slot_directory, identity)
     if not manifest_path.exists():
         return None
-    return ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+    try:
+        return ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        _log_unreadable_manifest(manifest_path, error)
+        return None
 
 
 def is_artifact_complete_and_valid(
@@ -314,6 +324,10 @@ def _log_artifact_event(event: LogRecordText, slot: ArtifactSlot, identity: Arti
             artifact_identity=identity,
         ).model_dump(),
     )
+
+
+def _log_unreadable_manifest(manifest_path: Path, error: ValueError) -> None:
+    ARTIFACT_LOGGER.warning("artifact.manifest.unreadable %s: %s", manifest_path, error)
 
 
 def publish_artifact(

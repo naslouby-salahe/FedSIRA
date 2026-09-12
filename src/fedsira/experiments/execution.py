@@ -18,17 +18,12 @@ from fedsira.artifacts.paths import (
     workspace_root_for_family,
 )
 from fedsira.artifacts.store import (
-    ARTIFACT_SCHEMA_VERSION,
     ArtifactDependency,
-    ArtifactManifest,
-    ArtifactSlot,
-    artifact_identity,
     configuration_digest,
     configure_artifact_logging,
     publish_artifact,
     read_current_artifact,
     repository_revision,
-    validate_artifact_lifecycle_readable,
 )
 from fedsira.datasets.common import (
     SUPPORTED_ROLE_ORDER,
@@ -42,8 +37,8 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.enums import (
     AdmissionState,
+    ArtifactDependencyKind,
     ArtifactFamily,
-    ArtifactLifecycleState,
     ArtifactProducer,
     EpistemicFailureType,
     ExperimentLifecycleState,
@@ -57,13 +52,11 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
-    ArtifactDigest,
     ComparisonName,
     DatasetClassToken,
     ExampleCount,
     ExperimentName,
     FrozenDomainModel,
-    InvariantChecksPassed,
     MasterSeed,
     MetricValue,
     ModelInputWidth,
@@ -93,6 +86,7 @@ from fedsira.evaluation.statistics import (
     holm_adjusted_p_values,
     quantile_type7,
 )
+from fedsira.experiments.artifact_invariants import artifact_invariants
 from fedsira.experiments.byzantine import validate_byzantine_vocabulary
 from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.definitions import (
@@ -122,6 +116,11 @@ from fedsira.experiments.engine import (
     prerequisite_states_from_store,
 )
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment, build_plan
+from fedsira.experiments.smoke_records import (
+    PersistedSmokeRecord,
+    SmokeCheckResult,
+    SmokeSuiteResult,
+)
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
@@ -214,16 +213,18 @@ def materialize_ablation_references(
                 state_trajectory=outcome.state_trajectory,
             )
             payload = reference.model_dump_json().encode("utf-8")
+            prepared_evidence = dataset_manifest_hash(
+                REPOSITORY_ROOT / prepared_evidence_root(planned.definition.dataset)
+            )
             publish_artifact(
                 slot=slot,
                 producer=ArtifactProducer.EVALUATION_PRODUCER,
                 payload=payload,
                 dependencies=(
                     ArtifactDependency(
+                        kind=ArtifactDependencyKind.CONTENT,
                         dependency="prepared-evidence",
-                        digest=dataset_manifest_hash(
-                            REPOSITORY_ROOT / prepared_evidence_root(planned.definition.dataset)
-                        ),
+                        digest=prepared_evidence,
                     ),
                 ),
                 procedure_identity=ABLATION_REFERENCE_PROCEDURE_IDENTITY,
@@ -434,8 +435,6 @@ def execute_smoke(overwrite: OverwriteExisting) -> None:
         raise SystemExit(1)
 
 
-SmokeCheckName = TextValue
-SmokeCheckDetail = TextValue
 SmokeRenderText = TextValue
 SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"
 
@@ -495,28 +494,6 @@ SMOKE_CONFUSION_FALSE_POSITIVE = 1
 SMOKE_CONFUSION_FALSE_NEGATIVE = 1
 SMOKE_CONFUSION_TRUE_NEGATIVE = 0
 SMOKE_NONZERO_PRODUCTION_WEIGHT: ProductionWeight = 1.0
-
-
-class SmokeCheckResult(FrozenDomainModel):
-    name: SmokeCheckName
-    passed: InvariantChecksPassed
-    detail: SmokeCheckDetail | None = None
-
-
-class SmokeSuiteResult(FrozenDomainModel):
-    checks: tuple[SmokeCheckResult, ...]
-
-    @property
-    def passed(self) -> InvariantChecksPassed:
-        return all(check.passed for check in self.checks)
-
-
-class PersistedSmokeRecord(FrozenDomainModel):
-    schema_version: SchemaVersion
-    passed: InvariantChecksPassed
-    checks: tuple[SmokeCheckResult, ...]
-    configuration_digest: ArtifactDigest
-    code_revision: TextValue | None
 
 
 class ExperimentPrerequisiteState(FrozenDomainModel):
@@ -989,63 +966,6 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     )
 
 
-def _artifact_invariants() -> tuple[SmokeCheckResult, ...]:
-    manifest = ArtifactManifest(
-        schema_version=ARTIFACT_SCHEMA_VERSION,
-        slot=ArtifactSlot(family=ArtifactFamily.SCALER, instance="smoke-invariant"),
-        producer=ArtifactProducer.PREPROCESSING,
-        identity="a" * 64,
-        checksum="b" * 64,
-        payload_bytes=0,
-        lifecycle_state=ArtifactLifecycleState.COMPLETE,
-        dependencies=(),
-        procedure_identity="fedsira|smoke_artifact|1",
-        configuration_digest="c" * 64,
-        code_revision=None,
-    )
-    try:
-        validate_artifact_lifecycle_readable(manifest)
-        lifecycle_is_readable = True
-    except ValueError:
-        lifecycle_is_readable = False
-    parent_slot = ArtifactSlot(family=ArtifactFamily.SCALER, instance="smoke-parent")
-    child_slot = ArtifactSlot(family=ArtifactFamily.PREPARED_ROLE_VIEW, instance="smoke-descendant")
-    parent_identity = artifact_identity(
-        parent_slot,
-        (ArtifactDependency(dependency="raw-dataset", digest="a" * 64),),
-        "fedsira|smoke_parent|1",
-    )
-    changed_parent_identity = artifact_identity(
-        parent_slot,
-        (ArtifactDependency(dependency="raw-dataset", digest="d" * 64),),
-        "fedsira|smoke_parent|1",
-    )
-    child_identity = artifact_identity(
-        child_slot,
-        (ArtifactDependency(dependency="parent", digest=parent_identity),),
-        "fedsira|smoke_child|1",
-    )
-    changed_child_identity = artifact_identity(
-        child_slot,
-        (ArtifactDependency(dependency="parent", digest=changed_parent_identity),),
-        "fedsira|smoke_child|1",
-    )
-    return (
-        SmokeCheckResult(
-            name="complete artifact manifest is readable",
-            passed=lifecycle_is_readable,
-        ),
-        SmokeCheckResult(
-            name="changing one parent identity marks transitive descendants stale",
-            passed=(
-                parent_identity != changed_parent_identity
-                and child_identity != changed_child_identity
-                and child_identity != parent_identity
-            ),
-        ),
-    )
-
-
 def run_data_and_domain_evidence_validation(
     reproduction_target_count: PreparedReproductionTargetCount,
     reproduction_supported_count: PreparedSupportedReplayCount,
@@ -1109,7 +1029,7 @@ def run_smoke_suite(overwrite: OverwriteExisting) -> SmokeSuiteResult:
         *_extended_protocol_invariants(),
         *_mathematical_invariants(),
         *_extended_mathematical_invariants(),
-        *_artifact_invariants(),
+        *artifact_invariants(),
     )
     result = SmokeSuiteResult(checks=checks)
     _persist_smoke_record(result, overwrite or existing is None or not existing.passed)

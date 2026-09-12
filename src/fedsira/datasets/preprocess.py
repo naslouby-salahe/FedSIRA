@@ -55,7 +55,13 @@ from fedsira.datasets.role_split import (
     RoleSplitViewCount,
     publish_role_split_sample_manifest,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId, Role
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    ArtifactProducer,
+    DatasetId,
+    Role,
+)
 from fedsira.domain.types import (
     ArtifactDependencyName,
     ArtifactDigest,
@@ -108,6 +114,7 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
         payload=serialized_payload,
         dependencies=(
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=DATASET_FILE_MANIFEST_DEPENDENCY,
                 digest=payload.dataset_file_manifest_hash,
             ),
@@ -144,7 +151,11 @@ def publish_raw_dataset_identity(
         producer=ArtifactProducer.RAW_ACQUISITION,
         payload=payload,
         dependencies=(
-            ArtifactDependency(dependency=RAW_FILE_MANIFEST_DEPENDENCY, digest=manifest_hash),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=RAW_FILE_MANIFEST_DEPENDENCY,
+                digest=manifest_hash,
+            ),
         ),
         procedure_identity=RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY,
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
@@ -165,7 +176,11 @@ def publish_scaler(
         producer=ArtifactProducer.PREPROCESSING,
         payload=payload,
         dependencies=(
-            ArtifactDependency(dependency=RAW_FILE_MANIFEST_DEPENDENCY, digest=manifest_hash),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=RAW_FILE_MANIFEST_DEPENDENCY,
+                digest=manifest_hash,
+            ),
         ),
         procedure_identity=SCALER_ARTIFACT_PROCEDURE_IDENTITY,
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
@@ -210,6 +225,7 @@ def publish_prepared_role_view(
         payload=payload,
         dependencies=(
             ArtifactDependency(
+                kind=ArtifactDependencyKind.ARTIFACT,
                 dependency=ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY,
                 digest=role_split_manifest_identity,
             ),

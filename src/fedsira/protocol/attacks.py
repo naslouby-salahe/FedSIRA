@@ -20,6 +20,7 @@ from fedsira.domain.types import (
 from fedsira.learning.model import FedSIRAClassifier
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
 from fedsira.learning.training import clip_gradients, step_optimizer
+from fedsira.runtime import current_application_context
 
 
 def verifier_aware_training_step(
@@ -91,6 +92,20 @@ def source_copy_update(
     source_flat_parameters: torch.Tensor, baseline_flat_parameters: torch.Tensor
 ) -> torch.Tensor:
     return source_flat_parameters - baseline_flat_parameters
+
+
+def declared_source_backdoor_poison_fractions() -> tuple[Probability, ...]:
+    attacks = current_application_context().scientific_config.attacks_and_boundaries
+    return attacks.hidden_source_backdoor.poison_fraction_sweep
+
+
+def validate_declared_source_backdoor_poison_fraction(poison_fraction: Probability) -> None:
+    declared = declared_source_backdoor_poison_fractions()
+    if poison_fraction not in declared:
+        raise ValueError(
+            f"source-backdoor poison fraction {poison_fraction!r} is not one of the declared "
+            f"robustness sweep fractions {declared}"
+        )
 
 
 def select_model_replacement_carrier_rows(

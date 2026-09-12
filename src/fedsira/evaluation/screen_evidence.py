@@ -15,6 +15,7 @@ from fedsira.artifacts.store import (
 from fedsira.datasets.common import DatasetAdapter, RealAnchor, Role, flat_parameters_identity
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
+    ArtifactDependencyKind,
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
@@ -110,14 +111,17 @@ def publish_screen_matching(
         payload=payload.model_dump_json().encode("utf-8"),
         dependencies=(
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY,
                 digest=payload.anchor_model_identity,
             ),
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY,
                 digest=payload.candidate_model_identity,
             ),
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY,
                 digest=payload.dataset_manifest_hash,
             ),

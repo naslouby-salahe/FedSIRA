@@ -9,7 +9,7 @@ from fedsira.artifacts.store import (
     publish_artifact,
 )
 from fedsira.datasets.common import RealAnchor, flat_parameters_identity
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId
+from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer, DatasetId
 from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInstanceToken,
@@ -24,7 +24,11 @@ from fedsira.domain.types import (
     SchemaVersion,
     TextValue,
 )
-from fedsira.runtime import REPOSITORY_ROOT
+from fedsira.runtime import (
+    NUMERICAL_RUNTIME_DEPENDENCY,
+    REPOSITORY_ROOT,
+    numerical_runtime_identity,
+)
 
 CHECKPOINT_SCHEMA_VERSION: SchemaVersion = "fedsira|checkpoint|1"
 
@@ -93,6 +97,7 @@ def publish_anchor_checkpoints(
             payload,
             (
                 ArtifactDependency(
+                    kind=ArtifactDependencyKind.CONTENT,
                     dependency="prepared-evidence",
                     digest=anchor.dataset_manifest_hash,
                 ),
@@ -130,7 +135,13 @@ def publish_trained_update(
         family,
         slot,
         payload,
-        (ArtifactDependency(dependency="prepared-evidence", digest=dataset_manifest_hash),),
+        (
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency="prepared-evidence",
+                digest=dataset_manifest_hash,
+            ),
+        ),
     )
     return manifest
 
@@ -181,7 +192,14 @@ def publish_checkpoint(
         slot=slot,
         producer=checkpoint_producer(family),
         payload=payload.model_dump_json().encode("utf-8"),
-        dependencies=dependencies,
+        dependencies=(
+            *dependencies,
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=NUMERICAL_RUNTIME_DEPENDENCY,
+                digest=numerical_runtime_identity(),
+            ),
+        ),
         procedure_identity=checkpoint_procedure_identity(family),
         slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
         staging_root=REPOSITORY_ROOT / artifact_staging_root(),

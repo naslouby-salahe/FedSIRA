@@ -12,7 +12,13 @@ from fedsira.artifacts.store import (
     ArtifactSlot,
     publish_artifact,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactProducer, DatasetId, Role
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    ArtifactProducer,
+    DatasetId,
+    Role,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
@@ -24,7 +30,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     TextValue,
 )
-from fedsira.runtime import REPOSITORY_ROOT, framed_bytes
+from fedsira.runtime import REPOSITORY_ROOT, framed_bytes, numerical_runtime_identity
 
 MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"
 MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"
@@ -32,6 +38,7 @@ MODEL_SCORE_MODEL_DEPENDENCY = "model-checkpoint"
 MODEL_SCORE_VIEW_DEPENDENCY = "prepared-role-view"
 MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"
 MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"
+MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"
 DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"
 
 
@@ -117,15 +124,30 @@ def publish_model_score(
         producer=ArtifactProducer.SCORING_PRODUCER,
         payload=payload.model_dump_json().encode("utf-8"),
         dependencies=(
-            ArtifactDependency(dependency=MODEL_SCORE_MODEL_DEPENDENCY, digest=model_identity),
-            ArtifactDependency(dependency=MODEL_SCORE_VIEW_DEPENDENCY, digest=view_digest),
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=MODEL_SCORE_MODEL_DEPENDENCY,
+                digest=model_identity,
+            ),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=MODEL_SCORE_VIEW_DEPENDENCY,
+                digest=view_digest,
+            ),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY,
                 digest=class_registry_digest(class_tokens),
             ),
             ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
                 dependency=MODEL_SCORE_TRANSFORM_DEPENDENCY,
                 digest=scoring_transform_digest(scoring_transform),
+            ),
+            ArtifactDependency(
+                kind=ArtifactDependencyKind.CONTENT,
+                dependency=MODEL_SCORE_RUNTIME_DEPENDENCY,
+                digest=numerical_runtime_identity(),
             ),
         ),
         procedure_identity=MODEL_SCORE_PROCEDURE_IDENTITY,

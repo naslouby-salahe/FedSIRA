@@ -16,6 +16,7 @@ from fedsira.artifacts.store import (
 from fedsira.config import MaterialityConfig
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
+    ArtifactDependencyKind,
     ArtifactFamily,
     ArtifactProducer,
     CoreMethodIdentity,
@@ -664,6 +665,7 @@ def resolved_core_dependencies(
 ) -> tuple[ArtifactDependency, ...]:
     return tuple(
         ArtifactDependency(
+            kind=ArtifactDependencyKind.CONTENT,
             dependency=f"collapse-decision:{decision.kind.value}",
             digest=compute_checksum(decision.model_dump_json().encode("utf-8")),
         )

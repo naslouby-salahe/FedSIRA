@@ -224,6 +224,7 @@ from fedsira.protocol.attacks import (
     scale_model_replacement_delta,
     select_model_replacement_carrier_rows,
     source_copy_update,
+    validate_declared_source_backdoor_poison_fraction,
 )
 from fedsira.protocol.baselines.defenses import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
@@ -2611,9 +2612,13 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         if real_feature_names is None:
             return None
         trigger_indices = tuple(real_feature_names.index(name) for name in NBAIOT_TRIGGER_FEATURES)
+        poison_fraction = (
+            config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction
+        )
+        validate_declared_source_backdoor_poison_fraction(poison_fraction)
         return BackdoorScope(
             attack_generation_seed=derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed),
-            poison_fraction=config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction,
+            poison_fraction=poison_fraction,
             trigger_feature_indices=trigger_indices,
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
         )

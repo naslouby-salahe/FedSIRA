@@ -136,6 +136,11 @@ class AblationReproducerStrategy(StrEnum):
     VERIFIER_AWARE = "Verifier-aware"
 
 
+class ArtifactDependencyKind(StrEnum):
+    ARTIFACT = "Artifact identity"
+    CONTENT = "Content digest"
+
+
 class ArtifactProducer(StrEnum):
     RAW_ACQUISITION = "Raw acquisition"
     DATASET_PREPARATION = "Dataset preparation"

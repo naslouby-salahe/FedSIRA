@@ -32,6 +32,7 @@ from fedsira.domain.enums import (
 from fedsira.domain.types import (
     UINT32_MODULUS,
     AlgorithmName,
+    ArtifactDigest,
     AutomaticallyRetriable,
     AutomaticRecoveryPermitted,
     CheckpointIdentity,
@@ -289,6 +290,23 @@ def configure_deterministic_backend() -> None:
     torch.backends.cuda.matmul.fp32_precision = "ieee"
     cudnn_conv = cast(_Fp32PrecisionController, torch.backends.cudnn.conv)
     cudnn_conv.fp32_precision = "ieee"
+
+
+NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"
+
+
+def numerical_runtime_identity() -> ArtifactDigest:
+    return hashlib.sha256(
+        framed_bytes(
+            torch.__version__,
+            str(torch.version.cuda),
+            REFERENCE_CUBLAS_WORKSPACE_CONFIG,
+            str(torch.are_deterministic_algorithms_enabled()),
+            str(torch.backends.cudnn.deterministic),
+            str(torch.backends.cudnn.benchmark),
+            torch.get_float32_matmul_precision(),
+        )
+    ).hexdigest()
 
 
 def collect_environment_mismatches(
