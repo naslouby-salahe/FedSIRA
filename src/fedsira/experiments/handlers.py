@@ -179,7 +179,9 @@ from fedsira.experiments.engine import (
     CellExecutionOutcome,
     CellExecutor,
     PreparedEvidenceCounts,
+    PreparedEvidenceProvenanceError,
     ProtocolPhaseDurations,
+    invalid_prepared_evidence_outcome,
     load_prepared_evidence_counts,
 )
 from fedsira.experiments.execution import (
@@ -2661,19 +2663,18 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
                 final_gate_adequate_domain_count=0,
             )
         else:
-            evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
+            try:
+                evidence = load_prepared_evidence_counts(prepared_root, target_class_token)
+            except PreparedEvidenceProvenanceError as error:
+                return invalid_prepared_evidence_outcome(
+                    cell, FailureClass.INVARIANT_VIOLATION, str(error)
+                )
             if evidence is None:
-                return CellExecutionOutcome(
-                    cell=cell,
-                    terminal_state=ExperimentLifecycleState.INVALID,
-                    failure=FailureDetail(
-                        failure_class=FailureClass.EVIDENCE_INSUFFICIENT,
-                        message=(
-                            "prepared evidence is not materialized for this cell; "
-                            "run fedsira preprocess first"
-                        ),
-                        cell_phase=ScientificCellPhase.PREPARE,
-                    ),
+                return invalid_prepared_evidence_outcome(
+                    cell,
+                    FailureClass.EVIDENCE_INSUFFICIENT,
+                    "prepared evidence is not materialized for this cell; "
+                    "run fedsira preprocess first",
                 )
         try:
             _state, metrics = self._execute_cell_protocol(cell, evidence)

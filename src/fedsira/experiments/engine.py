@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from fedsira.artifacts.paths import artifact_instance_token
 from fedsira.artifacts.store import ArtifactSlot
-from fedsira.datasets.common import Role
+from fedsira.datasets.common import PreparedViewSidecar, Role
+from fedsira.datasets.prepared_validation import prepared_view_publication_failures
 from fedsira.domain.enums import (
     AdmissionState,
     ArtifactFamily,
@@ -23,7 +24,6 @@ from fedsira.domain.models import (
 from fedsira.domain.types import (
     ArtifactDigest,
     CellCompletionStatus,
-    ClassLabel,
     DatasetClassToken,
     DomainId,
     EvidenceCycleIndex,
@@ -40,9 +40,7 @@ from fedsira.domain.types import (
     OverwriteExisting,
     ProcedureIdentity,
     RepetitionIndex,
-    RowCount,
     ScenarioName,
-    SchemaVersion,
     ScientificCellCount,
     ScientificCellSemanticKey,
     TextValue,
@@ -481,12 +479,26 @@ class ExecutionRecordStore:
         )
 
 
-class PreparedViewSidecar(FrozenDomainModel):
-    class_id: ClassLabel
-    domain: DomainId
-    role: Role
-    row_count: RowCount
-    schema_version: SchemaVersion
+class PreparedEvidenceProvenanceError(ValueError):
+    def __init__(self, failures: tuple[FailureMessage, ...]) -> None:
+        super().__init__("; ".join(failures))
+        self.failures = failures
+
+
+def invalid_prepared_evidence_outcome(
+    cell: ScientificCell,
+    failure_class: FailureClass,
+    message: FailureMessage,
+) -> CellExecutionOutcome:
+    return CellExecutionOutcome(
+        cell=cell,
+        terminal_state=ExperimentLifecycleState.INVALID,
+        failure=FailureDetail(
+            failure_class=failure_class,
+            message=message,
+            cell_phase=ScientificCellPhase.PREPARE,
+        ),
+    )
 
 
 def load_prepared_evidence_counts(
@@ -494,6 +506,9 @@ def load_prepared_evidence_counts(
 ) -> PreparedEvidenceCounts | None:
     if not prepared_root.exists():
         return None
+    provenance_failures = prepared_view_publication_failures(prepared_root)
+    if provenance_failures:
+        raise PreparedEvidenceProvenanceError(provenance_failures)
     screen_target_count = 0
     reproduction_target_count = 0
     reproduction_supported_count = 0

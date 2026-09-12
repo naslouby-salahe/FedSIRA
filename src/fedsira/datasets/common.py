@@ -191,6 +191,14 @@ class PreparedRoleViewManifest(FrozenDomainModel):
     parquet_bytes: ByteCount
 
 
+class PreparedViewSidecar(FrozenDomainModel):
+    class_id: ClassLabel
+    domain: DomainId
+    role: Role
+    row_count: RowCount
+    schema_version: SchemaVersion
+
+
 SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"
 
 
