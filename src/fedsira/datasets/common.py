@@ -158,6 +158,20 @@ class FeatureMoments(FrozenDomainModel):
         return self
 
 
+class RawDatasetFileIdentity(FrozenDomainModel):
+    relative_path: RelativePathText
+    file_sha256: DatasetFileDigest
+
+
+class RawDatasetIdentityPayload(FrozenDomainModel):
+    schema_version: SchemaVersion
+    dataset: DatasetId
+    files: tuple[RawDatasetFileIdentity, ...]
+
+
+SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"
+
+
 class ScalerMetadata(FrozenDomainModel):
     schema_version: SchemaVersion
     feature_names: tuple[DatasetColumnName, ...]

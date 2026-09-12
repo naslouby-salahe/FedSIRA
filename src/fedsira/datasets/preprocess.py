@@ -15,6 +15,9 @@ from fedsira.artifacts.store import (
     publish_artifact,
 )
 from fedsira.datasets.ciciot2023.prepare import (
+    compute_dataset_manifest_hash as compute_secondary_dataset_manifest_hash,
+)
+from fedsira.datasets.ciciot2023.prepare import (
     discover_secondary_csv_files,
     materialize_ciciot2023_prepared_views,
 )
@@ -23,7 +26,15 @@ from fedsira.datasets.ciciot2023.schema import (
     PSEUDO_DOMAIN_COUNT,
     CICIoT2023DatasetManifestPayload,
 )
-from fedsira.datasets.common import DatasetPreparationLogFields, dataset_specification
+from fedsira.datasets.common import (
+    SCALER_METADATA_SCHEMA_VERSION,
+    DatasetPreparationLogFields,
+    RawDatasetFileIdentity,
+    RawDatasetIdentityPayload,
+    ScalerMetadata,
+    dataset_specification,
+    prepared_feature_names,
+)
 from fedsira.datasets.nbaiot.prepare import (
     classes_structurally_unavailable,
     compute_dataset_manifest_hash,
@@ -37,9 +48,11 @@ from fedsira.domain.types import (
     ArtifactDependencyName,
     ArtifactReuseDecision,
     DatasetClassToken,
+    DatasetManifestDigest,
     OverwriteExisting,
     Probability,
     ProcedureIdentity,
+    SchemaVersion,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -54,6 +67,12 @@ from fedsira.runtime import (
 )
 
 PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
+
+RAW_DATASET_IDENTITY_SCHEMA_VERSION: SchemaVersion = "fedsira|raw_dataset_identity|1"
+RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|raw_dataset_identity|1"
+SCALER_ARTIFACT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|scaler|1"
+RAW_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "raw-file-manifest"
+PREPARED_EVIDENCE_DEPENDENCY: ArtifactDependencyName = "prepared-evidence"
 
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
@@ -89,6 +108,56 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
     return reused
 
 
+def publish_raw_dataset_identity(
+    dataset: DatasetId,
+    files: tuple[RawDatasetFileIdentity, ...],
+    manifest_hash: DatasetManifestDigest,
+) -> ArtifactReuseDecision:
+    slot = ArtifactSlot(family=ArtifactFamily.RAW_DATASET_IDENTITY, instance=dataset)
+    payload = (
+        RawDatasetIdentityPayload(
+            schema_version=RAW_DATASET_IDENTITY_SCHEMA_VERSION,
+            dataset=dataset,
+            files=files,
+        )
+        .model_dump_json()
+        .encode("utf-8")
+    )
+    _, reused = publish_artifact(
+        slot=slot,
+        producer=ArtifactProducer.RAW_ACQUISITION,
+        payload=payload,
+        dependencies=(
+            ArtifactDependency(dependency=RAW_FILE_MANIFEST_DEPENDENCY, digest=manifest_hash),
+        ),
+        procedure_identity=RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY,
+        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
+        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+    )
+    return reused
+
+
+def publish_scaler(
+    dataset: DatasetId,
+    scaler: ScalerMetadata,
+    manifest_hash: DatasetManifestDigest,
+) -> ArtifactReuseDecision:
+    slot = ArtifactSlot(family=ArtifactFamily.SCALER, instance=dataset)
+    payload = scaler.model_dump_json().encode("utf-8")
+    _, reused = publish_artifact(
+        slot=slot,
+        producer=ArtifactProducer.PREPROCESSING,
+        payload=payload,
+        dependencies=(
+            ArtifactDependency(dependency=RAW_FILE_MANIFEST_DEPENDENCY, digest=manifest_hash),
+        ),
+        procedure_identity=SCALER_ARTIFACT_PROCEDURE_IDENTITY,
+        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
+        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+    )
+    return reused
+
+
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     raw_root = (
@@ -119,6 +188,14 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
             structurally_unavailable_classes=unavailable_classes,
         ),
     )
+    publish_raw_dataset_identity(
+        DatasetId.N_BAIOT,
+        tuple(
+            RawDatasetFileIdentity(relative_path=item.relative_path, file_sha256=item.file_sha256)
+            for item in discovered
+        ),
+        manifest_hash,
+    )
     prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
     _views, moments = materialize_nbaiot_prepared_views(
         discovered,
@@ -126,6 +203,17 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         REPOSITORY_ROOT / prepared_feature_root(),
         overwrite,
         retain_materialized_views=False,
+    )
+    publish_scaler(
+        DatasetId.N_BAIOT,
+        ScalerMetadata(
+            schema_version=SCALER_METADATA_SCHEMA_VERSION,
+            feature_names=tuple(prepared_feature_names(prepared_root) or ()),
+            means=moments.means,
+            standard_deviations=moments.standard_deviations,
+            training_row_count=moments.training_row_count,
+        ),
+        manifest_hash,
     )
     log_structured_event(
         PREPROCESSING_LOGGER,
@@ -157,6 +245,14 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     cache_root = preprocessing_extraction_cache_root(
         REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
     )
+    publish_raw_dataset_identity(
+        DatasetId.CICIOT2023,
+        tuple(
+            RawDatasetFileIdentity(relative_path=item.relative_path, file_sha256=item.file_sha256)
+            for item in discovered
+        ),
+        compute_secondary_dataset_manifest_hash(discovered),
+    )
     summary = materialize_ciciot2023_prepared_views(
         discovered,
         REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023),
@@ -164,6 +260,17 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         REPOSITORY_ROOT / preprocessing_metadata_root(),
         cache_root,
         overwrite,
+    )
+    publish_scaler(
+        DatasetId.CICIOT2023,
+        ScalerMetadata(
+            schema_version=SCALER_METADATA_SCHEMA_VERSION,
+            feature_names=summary.predictor_columns,
+            means=summary.scaler.means,
+            standard_deviations=summary.scaler.standard_deviations,
+            training_row_count=summary.scaler.training_row_count,
+        ),
+        summary.dataset_manifest_hash,
     )
     reused = _publish_dataset_manifest(
         CICIoT2023DatasetManifestPayload(
