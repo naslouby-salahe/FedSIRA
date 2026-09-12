@@ -79,6 +79,7 @@ from fedsira.domain.types import (
     ExperimentName,
     FrozenDomainModel,
     MasterSeed,
+    MetricName,
     MetricObservation,
     MetricValue,
     ReproductionAttemptCount,
@@ -150,6 +151,7 @@ from fedsira.experiments.definitions import (
     SourceExclusionMethod,
     VerifierCondition,
     VerifierProfile,
+    ablation_mixed_episode_instances,
     ablation_opening_mode,
     ablation_reproducer_strategy,
     ablation_scenario_episode,
@@ -386,6 +388,11 @@ class ProtocolCellDispatch:
         config = current_application_context().scientific_config
         variant = cell.method
         claim_metrics: tuple[MetricObservation, ...] = ()
+        if (
+            ablation_scenario_for_condition(cell.condition)
+            is AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL
+        ):
+            return self._execute_mixed_episode_ablation_cell(cell, evidence)
         if variant == AblationVariant.RANDOM_COMMITTEE_PROFILE:
             verifier_cell = replace(
                 cell,
@@ -967,6 +974,59 @@ class ProtocolCellDispatch:
                 ).value
                 if stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
                 else None,
+            ),
+        )
+
+    def _execute_mixed_episode_ablation_cell(
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+        instances: list[tuple[ProposalEpisode, AdmissionState, tuple[MetricObservation, ...]]] = []
+        for episode in ablation_mixed_episode_instances(
+            AblationScenario.MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL
+        ):
+            instance_state, instance_observations = self._execute_opening_cell(
+                replace(cell, condition=episode), evidence
+            )
+            instances.append((episode, instance_state, instance_observations))
+        legitimate = next(
+            instance
+            for instance in instances
+            if instance[0] is ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY
+        )
+        irrelevant = next(
+            instance
+            for instance in instances
+            if instance[0] is ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT
+        )
+        state = legitimate[1]
+        attempts = _mean_of_defined(
+            tuple(
+                _observation_value(instance_observations, ComparisonMetric.REPRODUCTION_ATTEMPTS)
+                for _episode, _state, instance_observations in instances
+            )
+        )
+        overhead = _mean_of_defined(
+            tuple(
+                _observation_value(instance_observations, ComparisonMetric.POST_EVIDENCE_OVERHEAD)
+                for _episode, _state, instance_observations in instances
+            )
+        )
+        return (
+            state,
+            _observations_with_replacements(
+                legitimate[2],
+                (
+                    (
+                        ComparisonMetric.FALSE_LAUNCH,
+                        _observation_value(irrelevant[2], ComparisonMetric.FALSE_LAUNCH),
+                    ),
+                    (ComparisonMetric.REPRODUCTION_ATTEMPTS, attempts),
+                    (ComparisonMetric.POST_EVIDENCE_OVERHEAD, overhead),
+                    (
+                        ComparisonMetric.MALICIOUS_ADMISSION,
+                        _observation_value(irrelevant[2], ComparisonMetric.MALICIOUS_ADMISSION),
+                    ),
+                ),
             ),
         )
 
@@ -2563,6 +2623,40 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         return handler(cell, evidence)
 
 
+def _observation_value(
+    observations: tuple[MetricObservation, ...], metric: MetricName
+) -> MetricValue | None:
+    for metric_name, metric_value in reversed(observations):
+        if metric_name == metric:
+            return metric_value
+    return None
+
+
+def _observations_with_replacements(
+    observations: tuple[MetricObservation, ...],
+    replacements: tuple[MetricObservation, ...],
+) -> tuple[MetricObservation, ...]:
+    replaced = tuple(
+        (metric_name, _observation_value(replacements, metric_name))
+        if any(name == metric_name for name, _value in replacements)
+        else (metric_name, metric_value)
+        for metric_name, metric_value in observations
+    )
+    appended = tuple(
+        replacement
+        for replacement in replacements
+        if not any(name == replacement[0] for name, _value in observations)
+    )
+    return (*replaced, *appended)
+
+
+def _mean_of_defined(values: tuple[MetricValue | None, ...]) -> MetricValue | None:
+    defined = tuple(value for value in values if value is not None)
+    if not defined:
+        return None
+    return sum(defined) / len(defined)
+
+
 BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
 
 
@@ -2575,6 +2669,8 @@ SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
 def opening_mode_for_cell(
     cell: ScientificCell, resolved_core: ResolvedCore | None = None
 ) -> AdmissionOpeningMode:
+    if cell.experiment == MECHANISM_ABLATION_NAME:
+        return ablation_opening_mode(AblationVariant(cell.method))
     if cell.method == RESOLVED_FEDSIRA_CORE_METHOD and resolved_core is not None:
         return resolved_core.opening_mode
     if cell.method == OpeningMode.PROPOSAL_ASSISTED:
