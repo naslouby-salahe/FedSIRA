@@ -81,6 +81,7 @@ from fedsira.domain.types import (
     MasterSeed,
     MetricObservation,
     MetricValue,
+    ReproductionAttemptCount,
     RequiredReproductionRowCount,
 )
 from fedsira.evaluation.comparisons import (
@@ -305,6 +306,7 @@ class ProtocolCellDispatch:
     _last_committee_deltas: OrderedDict[DomainId, torch.Tensor]
     _last_compromised_reproducers: frozenset[DomainId]
     _last_ablation_strategy: AblationReproducerStrategy
+    _last_reproduction_attempts: ReproductionAttemptCount
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None: ...
 
@@ -384,21 +386,30 @@ class ProtocolCellDispatch:
                 method=VerifierProfile.RANDOM_COMMITTEE_DIAGNOSTIC,
                 condition=VerifierCondition.ONE_FALSE_POSITIVE,
             )
-            return self._execute_verifier_robustness_cell(verifier_cell, evidence)
-        if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW:
-            state = self.client_review_outcome(cell)
-            return (
-                state,
-                metrics_from_state(
-                    state, self._pending_real_report, legitimate_admission_eligible=True
-                ),
+            state, metrics = self._execute_verifier_robustness_cell(verifier_cell, evidence)
+            return (state, (*metrics, *self._ablation_claim_metrics(cell, state)))
+        if variant in (
+            AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW,
+            AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK,
+        ):
+            state = (
+                self.client_review_outcome(cell)
+                if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW
+                else self._source_release_after_full_external_check_outcome(cell, evidence)
             )
-        if variant == AblationVariant.SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK:
-            state = self._source_release_after_full_external_check_outcome(cell, evidence)
             return (
                 state,
-                metrics_from_state(
-                    state, self._pending_real_report, legitimate_admission_eligible=True
+                (
+                    *metrics_from_state(
+                        state, self._pending_real_report, legitimate_admission_eligible=True
+                    ),
+                    (
+                        ComparisonMetric.ATTACK_SUCCESS_RATE,
+                        self._deployed_source_asr(cell)
+                        if state is AdmissionState.ADMITTED
+                        else 0.0,
+                    ),
+                    (ComparisonMetric.MALICIOUS_ADMISSION, float(state is AdmissionState.ADMITTED)),
                 ),
             )
         if variant in (
@@ -986,7 +997,7 @@ class ProtocolCellDispatch:
             observations.append(
                 (
                     ComparisonMetric.REPRODUCTION_ATTEMPTS,
-                    float(len(self._last_committee_deltas)),
+                    float(self._last_reproduction_attempts),
                 )
             )
         if asr_metric is ComparisonMetric.POST_EVIDENCE_OVERHEAD:
@@ -1001,6 +1012,30 @@ class ProtocolCellDispatch:
                 )
             )
         return tuple(observations)
+
+    def _deployed_source_asr(self, cell: ScientificCell) -> MetricValue | None:
+        backdoor_scope = self.backdoor_scope_for_cell(cell)
+        real_anchor = self.real_anchor(cell.master_seed)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
+        if backdoor_scope is None or real_anchor is None or source_domain is None:
+            return None
+        source_delta = train_source_candidate_delta(
+            nbaiot_adapter(self._primary_adapter.prepared_root),
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            backdoor_scope=backdoor_scope,
+        )
+        if source_delta is None:
+            return None
+        return compute_source_backdoor_asr(
+            nbaiot_adapter(self._primary_adapter.prepared_root),
+            real_anchor,
+            real_anchor.flat_parameters + source_delta,
+            source_domain,
+            backdoor_scope.trigger_feature_indices,
+            backdoor_scope.trigger_value,
+        ).value
 
     def _ablation_production_asr(self, cell: ScientificCell) -> MetricValue | None:
         backdoor_scope = self.backdoor_scope_for_cell(cell)
@@ -1059,6 +1094,7 @@ class ProtocolCellDispatch:
         self._last_committee_deltas = OrderedDict()
         self._last_compromised_reproducers = frozenset()
         self._last_ablation_strategy = AblationReproducerStrategy.NONE
+        self._last_reproduction_attempts = 0
         config = current_application_context().scientific_config
         self._pending_real_report = None
         evidence_minima = config.capability_contract.evidence_minima
@@ -1214,6 +1250,7 @@ class ProtocolCellDispatch:
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
             )
             self._last_committee_deltas = updates
+            self._last_reproduction_attempts = len(attempts)
             if progression_state is AdmissionState.VERIFICATION_PENDING:
                 verification_timer = ElapsedTimer()
                 certified_positive_report_count = 0
