@@ -9,9 +9,16 @@ from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AdmissionOpeningMode,
     AdmissionState,
+    BaselineIdentity,
+    CapabilityContractScope,
+    ComparisonMetric,
     CoreMethodIdentity,
     ExperimentLifecycleState,
+    MetricObservationKey,
+    OpeningMode,
+    PrimaryScenario,
     RootCauseMixture,
+    SourceExclusionMethod,
 )
 from fedsira.domain.models import (
     ScientificCell,
@@ -22,7 +29,6 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
-    ComparisonMetric,
     ComparisonResult,
     ComparisonState,
     build_comparison_registry,
@@ -41,7 +47,6 @@ from fedsira.experiments.definitions import (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    PrimaryScenario,
 )
 from fedsira.experiments.engine import (
     AdmissionStateObservation,
@@ -63,9 +68,9 @@ from fedsira.reporting.export import (
     project_evidence_trajectory,
     verify_experiment_artifacts,
 )
-from fedsira.reporting.figure_observations import EvidenceStateFraction
 from fedsira.reporting.figures import (
     MANDATORY_FIGURE_NAMES,
+    EvidenceStateFraction,
     render_capability_granularity_boundary,
     render_protocol_schematic,
     render_security_utility_tradeoff,
@@ -168,16 +173,16 @@ def test_capability_granularity_boundary_uses_completed_outcome_evidence(tmp_pat
     outcome = CellExecutionOutcome(
         cell=ScientificCell(
             experiment=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-            method="Broad Target Only",
-            condition=RootCauseMixture.BALANCED_50_50.value,
+            method=CapabilityContractScope.BROAD_TARGET_ONLY,
+            condition=RootCauseMixture.BALANCED_50_50,
             master_seed=1103,
         ),
         terminal_state=ExperimentLifecycleState.COMPLETED,
         failure=None,
         metrics=(
-            ("false-same-capability-rate", 0.25),
-            ("root-cause-a-target-f1", 0.7),
-            ("root-cause-b-target-f1", 0.6),
+            (ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, 0.25),
+            (MetricObservationKey.ROOT_CAUSE_A_TARGET_F1, 0.7),
+            (MetricObservationKey.ROOT_CAUSE_B_TARGET_F1, 0.6),
         ),
     )
     destination = tmp_path / "Capability-Granularity Boundary.png"
@@ -207,7 +212,7 @@ def test_export_experiment_report_blocks_primary_figure_without_comparison_evide
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -231,7 +236,7 @@ def test_export_experiment_report_blocks_efficiency_figure_without_repeated_tele
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=EFFICIENCY_MEASUREMENT_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="timed",
                     master_seed=1103,
                 ),
@@ -256,7 +261,7 @@ def test_experiment_evidence_verification_rejects_missing_metric_artifact(tmp_pa
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -290,7 +295,7 @@ def test_experiment_evidence_verification_rejects_wrong_summary_identity(tmp_pat
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -328,7 +333,7 @@ def test_experiment_evidence_verification_rejects_stale_summary_digest(tmp_path:
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -366,7 +371,7 @@ def test_experiment_evidence_verification_rejects_empty_required_table(tmp_path:
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -403,7 +408,7 @@ def test_experiment_evidence_verification_rejects_empty_required_figure(tmp_path
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -439,7 +444,7 @@ def test_primary_results_uses_observed_outcome_metrics_for_method_summaries() ->
             CellExecutionOutcome(
                 cell=ScientificCell(
                     experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-                    method="Resolved FedSIRA Core",
+                    method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     condition="Legitimate Unsupported Capability",
                     master_seed=1103,
                 ),
@@ -469,7 +474,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
     return (
         CollapseDecision(
             kind=CollapseDecisionKind.PROPOSAL_ASSISTANCE,
-            comparator="Candidate-Free",
+            comparator=OpeningMode.CANDIDATE_FREE,
             survives=True,
             primary_material_effect="false-launch",
             adjusted_p_value=0.01,
@@ -478,7 +483,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.PLURALITY,
-            comparator="One Independent Retrain",
+            comparator=BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
             survives=True,
             primary_material_effect="malicious-admission",
             adjusted_p_value=0.02,
@@ -487,7 +492,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION,
-            comparator="Source-Update Sanitization Reference",
+            comparator=BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
             survives=True,
             primary_material_effect="asr",
             adjusted_p_value=0.03,
@@ -496,7 +501,7 @@ def _collapse_decisions() -> tuple[CollapseDecision, ...]:
         ),
         CollapseDecision(
             kind=CollapseDecisionKind.EXTERNAL_VERIFICATION,
-            comparator="Multiple Retrains with Direct Krum",
+            comparator=BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
             survives=True,
             primary_material_effect="malicious-admission",
             adjusted_p_value=0.04,
@@ -556,7 +561,7 @@ def test_export_project_summary_accepts_descriptive_experiments_without_comparis
     descriptive_outcome = CellExecutionOutcome(
         cell=ScientificCell(
             experiment=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
-            method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+            method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             condition="Immediate Quorum",
             master_seed=1103,
         ),
@@ -632,7 +637,7 @@ def test_render_useful_backdoored_source_uses_completed_outcome_metrics(tmp_path
     outcome = CellExecutionOutcome(
         cell=ScientificCell(
             experiment=SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-            method="Full FedSIRA",
+            method=SourceExclusionMethod.FULL_FEDSIRA,
             condition=PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT.value,
             master_seed=1103,
         ),
@@ -679,7 +684,7 @@ def test_project_evidence_trajectory_uses_persisted_cycle_and_terminal_state(
         CellExecutionOutcome(
             cell=ScientificCell(
                 experiment=EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
-                method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                 condition="Immediate Quorum",
                 master_seed=1103,
             ),
@@ -703,7 +708,7 @@ def test_project_efficiency_telemetry_aggregates_completed_outcome_timings() -> 
     outcome = CellExecutionOutcome(
         cell=ScientificCell(
             experiment=EFFICIENCY_MEASUREMENT_NAME,
-            method="Resolved FedSIRA Core",
+            method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             condition="timed",
             master_seed=1103,
             repetition=1,
@@ -731,7 +736,7 @@ def test_delay_and_efficiency_table_uses_unique_outcome_evidence_rows() -> None:
         CellExecutionOutcome(
             cell=ScientificCell(
                 experiment=EFFICIENCY_MEASUREMENT_NAME,
-                method="Resolved FedSIRA Core",
+                method=CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                 condition="Efficiency",
                 master_seed=1103,
             ),
@@ -748,7 +753,11 @@ def test_delay_and_efficiency_table_uses_unique_outcome_evidence_rows() -> None:
     )
     table = render_delay_and_efficiency_table((), outcomes)
     row = next(csv.reader((table.csv_text.splitlines()[1],)))
-    assert row[:3] == ["Efficiency Measurement", "Resolved FedSIRA Core", "Efficiency"]
+    assert row[:3] == [
+        "Efficiency Measurement",
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
+        "Efficiency",
+    ]
     assert row[8] == "3.00 [3.00,3.00]"
     assert row[10] == "0.00 GiB"
     assert row[11] == "0.00 GiB"

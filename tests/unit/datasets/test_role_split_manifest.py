@@ -7,13 +7,12 @@ from fedsira.artifacts.paths import artifact_slot_directory
 from fedsira.artifacts.store import ArtifactManifest, read_current_artifact
 from fedsira.datasets.layout import raw_dataset_present, validate_repository_layout
 from fedsira.datasets.role_split import (
-    ROLE_SPLIT_MANIFEST_INSTANCE,
     RoleSplitSampleManifestPayload,
     RoleSplitViewCount,
     publish_role_split_sample_manifest,
     role_split_sample_manifest_slot,
 )
-from fedsira.domain.enums import ArtifactFamily, DatasetId, Role
+from fedsira.domain.enums import ArtifactFamily, ArtifactInstanceLabel, DatasetId, Role
 from fedsira.runtime import (
     bound_application_context,
     current_application_context,
@@ -63,7 +62,7 @@ def test_role_split_manifest_records_governed_split_specification(
     manifest, payload = _current(isolated_repository, DatasetId.N_BAIOT)
     assert manifest.family is ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST
     slot = role_split_sample_manifest_slot(DatasetId.N_BAIOT)
-    assert slot.instance == f"{ROLE_SPLIT_MANIFEST_INSTANCE}-{DatasetId.N_BAIOT.value}"
+    assert slot.instance == f"{ArtifactInstanceLabel.ROLE_SPLIT}-{DatasetId.N_BAIOT}"
     primary = current_application_context().scientific_config.datasets.primary
     assert payload.role_intervals == primary.role_intervals
     assert payload.sampling_caps_per_domain == primary.sampling_caps_per_domain

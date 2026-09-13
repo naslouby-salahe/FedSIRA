@@ -1,4 +1,4 @@
-from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.enums import ExperimentLifecycleState, ExperimentName
 from fedsira.experiments.definitions import COLLAPSE_EXPERIMENT_NAMES, POST_CORE_EXPERIMENT_NAMES
 from fedsira.experiments.planning import build_plan, validate_planned_cell_count_invariant
 
@@ -39,7 +39,7 @@ def test_plan_has_no_duplicate_semantic_cells() -> None:
 
 def test_efficiency_measurement_has_five_repetitions_per_method_seed() -> None:
     plan = build_plan(resolved_core_complete=True)
-    efficiency = plan.experiment("Efficiency Measurement")
+    efficiency = plan.experiment(ExperimentName.EFFICIENCY_MEASUREMENT)
     assert len(efficiency.cells) == 60
     for method in ("Resolved FedSIRA Core", "One Independent Retrain"):
         method_cells = tuple(cell for cell in efficiency.cells if cell.method == method)

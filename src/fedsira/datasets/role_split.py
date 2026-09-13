@@ -9,10 +9,10 @@ from fedsira.artifacts.store import (
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
-    ArtifactFamilyDirectoryToken,
+    ArtifactInstanceLabel,
     ArtifactProducer,
-    ArtifactInstanceToken,
     DatasetId,
     Role,
 )
@@ -31,8 +31,6 @@ ROLE_SPLIT_SAMPLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|role_split_s
 ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = (
     "fedsira|role_split_sample_manifest|1"
 )
-ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY = "role-split-manifest"
-ROLE_SPLIT_MANIFEST_INSTANCE: ArtifactInstanceToken = ArtifactInstanceToken.ROLE_SPLIT
 
 
 class RoleSplitViewCount(FrozenDomainModel):
@@ -57,7 +55,7 @@ class RoleSplitSampleManifestPayload(FrozenDomainModel):
 def role_split_sample_manifest_slot(dataset: DatasetId) -> ArtifactSlot:
     return ArtifactSlot(
         family=ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST,
-        instance=f"{ROLE_SPLIT_MANIFEST_INSTANCE}-{dataset.value}",
+        instance=f"{ArtifactInstanceLabel.ROLE_SPLIT}-{dataset}",
     )
 
 
@@ -79,9 +77,7 @@ def role_split_sample_manifest(
         domain_ids=tuple(sorted({item.domain for item in counts})),
         role_intervals=primary.role_intervals,
         sampling_caps_per_domain=primary.sampling_caps_per_domain,
-        counts=tuple(
-            sorted(counts, key=lambda item: (item.domain, item.class_id, item.role.value))
-        ),
+        counts=tuple(sorted(counts, key=lambda item: (item.domain, item.class_id, item.role))),
     )
 
 
@@ -99,7 +95,7 @@ def publish_role_split_sample_manifest(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=ArtifactFamilyDirectoryToken.DATASET_MANIFEST,
+                dependency=ArtifactDependencyLabel.DATASET_MANIFEST,
                 digest=dataset_manifest_hash,
             ),
         ),

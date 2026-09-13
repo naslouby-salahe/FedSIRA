@@ -14,8 +14,10 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     DatasetId,
     ExperimentLifecycleState,
+    ExperimentName,
     FailureClass,
     LogEvent,
+    RuntimeComponentName,
     ScientificCellPhase,
     WorkspaceDirectoryToken,
 )
@@ -26,11 +28,11 @@ from fedsira.domain.models import (
 from fedsira.domain.types import (
     ArtifactDigest,
     CellCompletionStatus,
+    CodeRevision,
     DatasetClassToken,
     DomainId,
     EvidenceCycleIndex,
     ExecutionSchemaVersion,
-    ExperimentName,
     FailureMessage,
     FrozenDomainModel,
     LogRecordText,
@@ -45,7 +47,6 @@ from fedsira.domain.types import (
     ScenarioName,
     ScientificCellCount,
     ScientificCellSemanticKey,
-    TextValue,
     TimeoutSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
@@ -70,7 +71,7 @@ if TYPE_CHECKING:
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"
 ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
 ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
-EXECUTION_LOGGER = get_structured_logger(WorkspaceDirectoryToken.EXECUTION)
+EXECUTION_LOGGER = get_structured_logger(RuntimeComponentName.EXECUTION)
 
 
 class CellPhaseLogFields(FrozenDomainModel):
@@ -91,7 +92,7 @@ class AdmissionStateObservation(FrozenDomainModel):
 
 class ExecutionProvenance(FrozenDomainModel):
     configuration_digest: ArtifactDigest
-    code_revision: TextValue | None
+    code_revision: CodeRevision | None
     dataset_manifest_hash: ArtifactDigest
 
 
@@ -300,8 +301,9 @@ def _execute_cell_phase_with_timeout(
     )
     try:
         outcome = run_bounded(
-            "scientific_cell_phase", #TODO: use enum not hardcoded string
-            timeout_seconds, lambda: executor.execute_cell(cell)
+            RuntimeComponentName.SCIENTIFIC_CELL_PHASE,
+            timeout_seconds,
+            lambda: executor.execute_cell(cell),
         )
     except OperationTimeoutError:
         EXECUTION_LOGGER.info(

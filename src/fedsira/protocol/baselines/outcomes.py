@@ -9,7 +9,6 @@ from fedsira.datasets.common import (
     RealAnchor,
     Role,
     flat_parameters_identity,
-    role_hash_token,
 )
 from fedsira.datasets.nbaiot.schema import (
     NBAIOT_CLASS_ORDER,
@@ -21,6 +20,8 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.enums import (
     AdmissionState,
+    ReviewPanelProfile,
+    SeedDerivationLabel,
     TernaryOutcome,
 )
 from fedsira.domain.models import (
@@ -56,15 +57,11 @@ from fedsira.protocol.admission import (
     median_domain_target_f1,
 )
 from fedsira.protocol.baselines.defenses import (
-    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
-    INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
-    INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
-    SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
-    SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
     evaluate_certified_ensemble,
     independent_local_reference_reviewer_is_positive,
     recovery_backdoor_alarm_threshold,
     recovery_rollback_is_triggered,
+    review_panel_requirements,
     train_certified_ensemble_group_checkpoints,
 )
 from fedsira.protocol.baselines.registry import (
@@ -96,7 +93,6 @@ from fedsira.protocol.synthesis import (
     synthesis_pending_transition,
 )
 from fedsira.protocol.verification import (
-    VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR,
     deterministic_verifier_panel,
     honest_verifier_report,
     panel_votes_are_one_per_domain,
@@ -144,6 +140,9 @@ class ProtocolBaselineOutcomes:
 
     def client_review_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
+        client_review_reviewer_count, _client_review_required_positive_reviews = (
+            review_panel_requirements(ReviewPanelProfile.CLIENT_REVIEW)
+        )
         source_domain = source_domain_for_cell(nbaiot_adapter(self._prepared_root), cell)
         real_anchor = self.real_anchor(cell.master_seed)
         positive_report_count = 0
@@ -159,9 +158,9 @@ class ProtocolBaselineOutcomes:
             if source_delta is not None and self.candidate_capability_contract_passes(
                 real_anchor, source_domain, real_anchor.flat_parameters + source_delta
             ):
-                positive_report_count = CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
+                positive_report_count = client_review_reviewer_count
         return review_style_baseline_outcome(
-            adequate_reviewer_count=CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+            adequate_reviewer_count=client_review_reviewer_count,
             positive_report_count=positive_report_count,
             panel_size=config.protocol.admission_opening.screen_domains,
             required_positive_reports=config.protocol.admission_opening.required_positive_screen_domains,
@@ -171,6 +170,9 @@ class ProtocolBaselineOutcomes:
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
         config = current_application_context().scientific_config
+        client_review_reviewer_count, _client_review_required_positive_reviews = (
+            review_panel_requirements(ReviewPanelProfile.CLIENT_REVIEW)
+        )
         source_domain = source_domain_for_cell(nbaiot_adapter(self._prepared_root), cell)
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
@@ -182,14 +184,14 @@ class ProtocolBaselineOutcomes:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + clipped_delta
         positive_report_count = (
-            CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT
+            client_review_reviewer_count
             if self.candidate_capability_contract_passes(
                 real_anchor, source_domain, production_checkpoint
             )
             else 0
         )
         review_state = review_style_baseline_outcome(
-            adequate_reviewer_count=CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
+            adequate_reviewer_count=client_review_reviewer_count,
             positive_report_count=positive_report_count,
             panel_size=config.protocol.admission_opening.screen_domains,
             required_positive_reports=config.protocol.admission_opening.required_positive_screen_domains,
@@ -389,6 +391,10 @@ class ProtocolBaselineOutcomes:
     def _secure_continual_assessment_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> AdmissionState:
+        (
+            secure_continual_assessment_reviewer_count,
+            secure_continual_assessment_required_positive_reviews,
+        ) = review_panel_requirements(ReviewPanelProfile.SECURE_CONTINUAL_ASSESSMENT)
         source_domain = source_domain_for_cell(nbaiot_adapter(self._prepared_root), cell)
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
@@ -400,7 +406,7 @@ class ProtocolBaselineOutcomes:
             return AdmissionState.DORMANT
         candidate_flat = real_anchor.flat_parameters + source_delta
         reviewers = non_source_domains(nbaiot_adapter(self._prepared_root), source_domain)[
-            :SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT
+            :secure_continual_assessment_reviewer_count
         ]
         positive_report_count = sum(
             1
@@ -408,10 +414,10 @@ class ProtocolBaselineOutcomes:
             if self.candidate_capability_contract_passes(real_anchor, domain, candidate_flat)
         )
         review_state = review_style_baseline_outcome(
-            adequate_reviewer_count=SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
+            adequate_reviewer_count=secure_continual_assessment_reviewer_count,
             positive_report_count=positive_report_count,
-            panel_size=SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
-            required_positive_reports=SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
+            panel_size=secure_continual_assessment_reviewer_count,
+            required_positive_reports=secure_continual_assessment_required_positive_reviews,
         )
         if review_state is not AdmissionState.ADMITTED:
             return review_state
@@ -563,6 +569,10 @@ class ProtocolBaselineOutcomes:
 
     def _independent_local_reference_outcome(self, cell: ScientificCell) -> AdmissionState:
         config = current_application_context().scientific_config
+        (
+            independent_local_reference_reviewer_count,
+            independent_local_reference_required_positive_reviews,
+        ) = review_panel_requirements(ReviewPanelProfile.INDEPENDENT_LOCAL_REFERENCE)
         source_domain = source_domain_for_cell(nbaiot_adapter(self._prepared_root), cell)
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
@@ -584,7 +594,7 @@ class ProtocolBaselineOutcomes:
             return AdmissionState.DORMANT
         contract = build_capability_contract(
             real_anchor.dataset_manifest_hash,
-            role_hash_token(Role.POST_REFERENCE_REPLAY),
+            Role.POST_REFERENCE_REPLAY.name,
             config.datasets.primary.name,
             len(NBAIOT_DOMAIN_ORDER),
             real_anchor.dataset_manifest_hash,
@@ -624,7 +634,7 @@ class ProtocolBaselineOutcomes:
             if verifier_is_eligible(domain, source_domain, source_domain)
         )
         reviewer_assignment_seed = verifier_assignment_seed_for_row(
-            derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, cell.master_seed),
+            derive_uint32(SeedDerivationLabel.VERIFIER_ASSIGNMENT_NAMESPACE, cell.master_seed),
             flat_parameters_identity(source_delta),
         )
         reviewer_domains = tuple(
@@ -632,7 +642,7 @@ class ProtocolBaselineOutcomes:
             for domain in deterministic_verifier_panel(
                 eligible_reviewer_domains,
                 reviewer_assignment_seed,
-                INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
+                independent_local_reference_reviewer_count,
             )
         )
         positive_report_count = 0
@@ -670,6 +680,6 @@ class ProtocolBaselineOutcomes:
         return review_style_baseline_outcome(
             adequate_reviewer_count=len(reviewer_domains),
             positive_report_count=positive_report_count,
-            panel_size=INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT,
-            required_positive_reports=INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS,
+            panel_size=independent_local_reference_reviewer_count,
+            required_positive_reports=independent_local_reference_required_positive_reviews,
         )

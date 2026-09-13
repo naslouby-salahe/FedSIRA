@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.enums import BaselineIdentity, ExperimentLifecycleState
 from fedsira.domain.models import (
     PreparedEvidenceCounts,
     ScientificCell,
@@ -89,10 +89,10 @@ def test_baseline_implementation_validation_dispatches_to_baseline_cell(
     executor = ProtocolCellExecutor()
     cell = ScientificCell(
         experiment=BASELINE_IMPLEMENTATION_VALIDATION_NAME,
-        method="Local-Only Reference",
+        method=BaselineIdentity.LOCAL_ONLY_REFERENCE,
         condition="Legitimate Target Capability",
         master_seed=900001,
     )
     outcome = executor.execute_cell(cell)
-    assert called == ["Local-Only Reference"]
+    assert called == [BaselineIdentity.LOCAL_ONLY_REFERENCE]
     assert outcome.terminal_state is ExperimentLifecycleState.COMPLETED

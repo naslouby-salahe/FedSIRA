@@ -28,10 +28,14 @@ from fedsira.datasets.nbaiot.schema import (
     deterministic_domain_order,
     nbaiot_adapter,
 )
-from fedsira.domain.enums import AdmissionState, SeedNamespace
+from fedsira.domain.enums import (
+    AdmissionState,
+    AlgorithmName,
+    ReviewPanelProfile,
+    SeedDerivationLabel,
+)
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
-    AlgorithmName,
     ArtifactDigest,
     CalibrationErrorCount,
     CapabilityContractSatisfied,
@@ -73,7 +77,6 @@ from fedsira.domain.types import (
     ReviewerPositiveDecision,
     RoundIndex,
     RowCount,
-    SeedDerivationLabel,
     SourceIsProductionUpdate,
     TargetBearingMemberPresent,
     TensorDomainModel,
@@ -126,11 +129,20 @@ CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES: Final[tuple[Role, Role]] = (
     Role.CANDIDATE_SCREEN,
     Role.POST_REFERENCE_REPLAY,
 )
-CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT: Final[ReviewerCount] = 3 #TODO: convert to enum
-SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT: Final[ReviewerCount] = 3 #TODO: convert to enum
-SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS: Final[ReviewerCount] = 2 #TODO: convert to enum
-INDEPENDENT_LOCAL_REFERENCE_REVIEWER_COUNT: Final[ReviewerCount] = 3 #TODO: convert to enum
-INDEPENDENT_LOCAL_REFERENCE_REQUIRED_POSITIVE_REVIEWS: Final[ReviewerCount] = 2 #TODO: convert to enum
+REVIEW_PANEL_REQUIREMENTS: Final[
+    tuple[tuple[ReviewPanelProfile, ReviewerCount, ReviewerCount], ...]
+] = (
+    (ReviewPanelProfile.CLIENT_REVIEW, 3, 3),
+    (ReviewPanelProfile.SECURE_CONTINUAL_ASSESSMENT, 3, 2),
+    (ReviewPanelProfile.INDEPENDENT_LOCAL_REFERENCE, 3, 2),
+)
+
+
+def review_panel_requirements(profile: ReviewPanelProfile) -> tuple[ReviewerCount, ReviewerCount]:
+    for candidate, reviewer_count, required_positive_reviews in REVIEW_PANEL_REQUIREMENTS:
+        if candidate is profile:
+            return reviewer_count, required_positive_reviews
+    raise ValueError(f"unknown review panel profile: {profile}")
 
 
 def client_review_direct_admission_production_is_source(
@@ -148,10 +160,11 @@ def validate_client_review_composite_screen(roles: tuple[Role, ...]) -> None:
 
 
 def validate_client_review_reviewer_count(reviewer_count: ReviewerCount) -> None:
-    if reviewer_count != CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT:
-        raise ValueError(
-            f"client review requires exactly {CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT} reviewers"
-        )
+    reviewer_count_requirement, _required_positive_reviews = review_panel_requirements(
+        ReviewPanelProfile.CLIENT_REVIEW
+    )
+    if reviewer_count != reviewer_count_requirement:
+        raise ValueError(f"client review requires exactly {reviewer_count_requirement} reviewers")
 
 
 def client_review_then_retrain_should_discard_source_weights(
@@ -192,7 +205,6 @@ def secure_continual_assessment_post_reference_rounds() -> FederatedRoundCount:
     return baselines.secure_continual_assessment_post_reference_rounds
 
 
-CLIENT_SAMPLING_SEPARATOR: SeedDerivationLabel = SeedNamespace.CLIENT_SAMPLING
 Domain = TypeVar("Domain")
 
 
@@ -239,7 +251,7 @@ def krum_reference_post_reference_rounds() -> FederatedRoundCount:
 
 
 def client_sampling_round_seed(master_seed: MasterSeed, round_index: RoundIndex) -> DerivedSeed:
-    return derive_uint32(CLIENT_SAMPLING_SEPARATOR, master_seed, round_index)
+    return derive_uint32(SeedDerivationLabel.CLIENT_SAMPLING, master_seed, round_index)
 
 
 def client_sampling_round_order(
@@ -248,7 +260,7 @@ def client_sampling_round_order(
     round_index: RoundIndex,
 ) -> tuple[Domain, ...]:
     round_seed = client_sampling_round_seed(master_seed, round_index)
-    return deterministic_order(eligible_domains, CLIENT_SAMPLING_SEPARATOR, round_seed)
+    return deterministic_order(eligible_domains, SeedDerivationLabel.CLIENT_SAMPLING, round_seed)
 
 
 def krum_reference_round_participants(
@@ -264,13 +276,6 @@ def krum_reference_round_participants(
     if len(selected) < participant_count:
         return None
     return selected
-
-
-DOMAIN_PARTITION_SEPARATOR: SeedDerivationLabel = SeedNamespace.DOMAIN_PARTITION
-CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "CERTIFIED_ENSEMBLE_ANCHOR"
-CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
-    "CERTIFIED_ENSEMBLE_POST_REFERENCE"
-)
 
 
 @dataclass(frozen=True)
@@ -289,7 +294,9 @@ def certified_ensemble_domain_groups(
     domain_partition_namespace_seed: NamespaceSeed, group_count: GroupCount
 ) -> tuple[tuple[DomainId, ...], ...]:
     ordered = deterministic_domain_order(
-        NBAIOT_DOMAIN_ORDER, DOMAIN_PARTITION_SEPARATOR, domain_partition_namespace_seed
+        NBAIOT_DOMAIN_ORDER,
+        SeedDerivationLabel.DOMAIN_PARTITION,
+        domain_partition_namespace_seed,
     )
     group_size = len(ordered) // group_count
     return tuple(
@@ -349,8 +356,8 @@ def _group_anchor_checkpoint(
     input_width = len(first_rows.features[0])
     output_width = len(NBAIOT_CLASS_ORDER)
     initialization_seed = derive_uint32(
-        "CERTIFIED_ENSEMBLE_GROUP_INIT",
-        namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
+        SeedDerivationLabel.CERTIFIED_ENSEMBLE_GROUP_INIT,
+        namespace_seed(master_seed, SeedDerivationLabel.MODEL_INITIALIZATION),
         group_index,
     )
     seed_job_local_rng_streams(initialization_seed)
@@ -386,7 +393,7 @@ def _group_anchor_checkpoint(
                         master_seed,
                         dataset_manifest_hash(prepared_root),
                         start_checkpoint_identity,
-                        CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN,
+                        AlgorithmName.CERTIFIED_ENSEMBLE_ANCHOR,
                         domain,
                         round_index,
                     ),
@@ -470,7 +477,7 @@ def _group_post_reference_round_clients(
                     master_seed,
                     manifest_hash,
                     start_checkpoint_identity,
-                    CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+                    AlgorithmName.CERTIFIED_ENSEMBLE_POST_REFERENCE,
                     domain,
                     round_index,
                 ),
@@ -486,7 +493,9 @@ def train_certified_ensemble_group_checkpoints(
     prepared_root: Path, master_seed: MasterSeed
 ) -> tuple[GroupCheckpoint, ...] | None:
     config = current_application_context().scientific_config
-    domain_partition_namespace_seed = namespace_seed(master_seed, SeedNamespace.DOMAIN_PARTITION)
+    domain_partition_namespace_seed = namespace_seed(
+        master_seed, SeedDerivationLabel.DOMAIN_PARTITION
+    )
     groups = certified_ensemble_domain_groups(
         domain_partition_namespace_seed,
         config.baselines.multiple_model_certified_ensemble_group_count,

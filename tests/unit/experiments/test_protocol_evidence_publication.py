@@ -12,6 +12,7 @@ from fedsira.domain.enums import (
     ArtifactDependencyKind,
     ArtifactFamily,
     ArtifactLifecycleState,
+    ExperimentName,
     TernaryOutcome,
 )
 from fedsira.experiments.protocol_evidence import (
@@ -28,7 +29,7 @@ from fedsira.experiments.protocol_evidence import (
 )
 from fedsira.reporting.verification import artifact_manifest_dependency_failures
 
-EXPERIMENT = "Mechanism Ablation"
+EXPERIMENT = ExperimentName.MECHANISM_ABLATION
 
 
 @pytest.fixture

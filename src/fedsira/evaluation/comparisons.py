@@ -5,18 +5,33 @@ from enum import StrEnum
 
 from fedsira.config import BootstrapConfig, MultiplicityConfig
 from fedsira.domain.enums import (
+    AblationVariant,
+    BaselineIdentity,
+    CapabilityContractScope,
+    ComparisonFamily,
     ComparisonMetric,
     CoreMethodIdentity,
+    ExperimentName,
+    ExternalVerificationCondition,
+    HeterogeneityRegime,
+    OpeningMode,
+    PluralityCondition,
+    PrimaryScenario,
     ProposalEpisode,
+    ReproducerCondition,
     RootCauseMixture,
+    SecondaryScenario,
+    SourceExclusionMethod,
+    VerifierCondition,
+    VerifierProfile,
 )
 from fedsira.domain.types import (
     ComparisonMargin,
     ComparisonName,
+    ComparisonReferenceLabel,
     CompleteSeedCount,
     ConfidenceIntervalBound,
     EffectSize,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MaterialityDecision,
@@ -46,24 +61,10 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    AblationVariant,
-    CapabilityContractGranularity,
-    ComparisonFamily,
     EpistemicFailureType,
-    ExternalVerificationCondition,
-    HeterogeneityRegime,
-    OpeningMode,
-    PluralityCondition,
-    PrimaryScenario,
-    ReproducerCondition,
-    SecondaryScenario,
-    SourceExclusionMethod,
-    VerifierCondition,
-    VerifierProfile,
     ablation_scenario_for_variant,
     epistemic_strength_tokens,
 )
-from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import current_application_context
 
 
@@ -334,7 +335,7 @@ def build_comparison_name(
     experiment: ExperimentName,
     scenario: ScenarioName,
     method: MethodName,
-    reference: MethodName,
+    reference: ComparisonReferenceLabel,
     metric: ComparisonMetric,
     test_kind: ComparisonTestKind,
 ) -> ComparisonName:
@@ -346,7 +347,7 @@ def _reference_label(
     reference_method: MethodName,
     reference_scenario: ScenarioName,
     reference_kind: ComparisonReferenceKind,
-) -> MethodName:
+) -> ComparisonReferenceLabel:
     if reference_kind is ComparisonReferenceKind.ZERO:
         return CoreMethodIdentity.ZERO_REFERENCE
     if method == reference_method:
@@ -970,7 +971,7 @@ def _capability_boundary_comparisons() -> tuple[ComparisonDefinition, ...]:
             ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
             mixture,
-            CapabilityContractGranularity.BROAD_TARGET_ONLY,
+            CapabilityContractScope.BROAD_TARGET_ONLY,
             CoreMethodIdentity.ZERO_REFERENCE,
             _superiority(
                 ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,

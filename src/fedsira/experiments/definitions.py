@@ -1,254 +1,81 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from enum import StrEnum
-from typing import TypeAlias
 
 from fedsira.domain.enums import (
     AblationReproducerStrategy,
+    AblationScenario,
+    AblationVariant,
     AdmissionOpeningMode,
+    BaselineIdentity,
+    BoundCondition,
+    CapabilityContractScope,
+    ComparisonFamily,
     ComparisonMetric,
     CoreMethodIdentity,
     DatasetId,
+    DescriptiveScientificMetric,
+    EfficiencyCondition,
     EpistemicFailureType,
+    EvidenceArrivalSchedule,
+    ExperimentClass,
+    ExperimentName,
+    ExternalVerificationCondition,
+    FigureName,
+    HeterogeneityRegime,
+    OpeningMode,
+    PluralityCondition,
+    PrimaryScenario,
     ProposalEpisode,
+    ReproducerCondition,
     RootCauseMixture,
+    SecondaryScenario,
+    SourceExclusionMethod,
+    TableName,
+    VerifierCondition,
+    VerifierProfile,
 )
 from fedsira.domain.types import (
     ArtifactFileName,
     BooleanValue,
     ConditionName,
-    ExperimentName,
     FeatureShiftMagnitude,
-    FigureName,
     FrozenDomainModel,
     MethodName,
     ScientificCellCount,
+    ScientificMetric,
     SeedCount,
-    TableName,
 )
 from fedsira.protocol.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
-    BaselineIdentity,
     BaselineValidationFixture,
 )
-from fedsira.protocol.rules import EvidenceArrivalSchedule
 from fedsira.runtime import current_application_context
 
-
-class ComparisonFamily(StrEnum):
-    PROPOSAL_SCREEN_NECESSITY = "proposal-screen necessity"
-    PLURALITY_NECESSITY = "plurality necessity"
-    SOURCE_EXCLUSION_CENTRAL_EFFECT = "source-exclusion central effect"
-    EXTERNAL_VERIFICATION_NECESSITY = "external reproduction verification necessity"
-    PRIMARY_BASELINE_SUPERIORITY = "primary baseline superiority"
-    REPRODUCER_ROBUSTNESS = "reproducer robustness"
-    VERIFIER_ROBUSTNESS = "verifier robustness"
-    MECHANISM_ABLATION = "mechanism ablation"
-    HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY = (
-        "heterogeneity/failure-boundary secondary comparisons"
-    )
-    SECONDARY_GENERALIZATION = "secondary generalization"
-
-
-class ExperimentClass(StrEnum):
-    VALIDATION = "Validation"
-    EXPLORATORY = "Exploratory"
-    CONFIRMATORY = "Confirmatory"
-    ABLATION = "Ablation"
-    ROBUSTNESS = "Robustness"
-    FAILURE_BOUNDARY = "Failure Boundary"
-    DIAGNOSTIC = "Diagnostic"
-    GENERALIZATION = "Generalization"
-
-
-class EfficiencyCondition(StrEnum):
-    TIMED = "timed"
-
-
-class TrainingProtocolStage(StrEnum):
-    ANCHOR = "anchor"
-    SOURCE_CANDIDATE = "source candidate"
-    HONEST_REPRODUCTION = "honest reproduction"
-
-
-class DescriptiveScientificMetric(StrEnum):
-    VALIDATION_GATE = "validation gate"
-    LOGICAL_STATE_BY_CYCLE = "state-by-logical-cycle"
-    TIME_TO_FIRST_REPRODUCTION = "time-to-first-reproduction"
-    T_EVIDENCE = "t-evidence"
-    TIME_TO_CERTIFICATE = "time-to-certificate"
-    TERMINAL_PROTOCOL_OUTCOME = "terminal-protocol-outcome"
-    CROSS_DOMAIN_VERIFIER_AGREEMENT = "cross-domain-verifier-agreement"
-    CERTIFIED_ROW_YIELD = "certified-row-yield"
-    ROOT_CAUSE_TARGET_F1 = "root-cause-target-f1"
-    CERTIFICATE_ADMISSION_RATE = "certificate-admission-rate-under-corrupted-operational-evidence"
-    WALL_CLOCK_SECONDS = "post-evidence-wall-clock-seconds"
-    GPU_SECONDS = "gpu-seconds"
-    PEAK_GPU_MEMORY_BYTES = "peak-gpu-memory-bytes"
-    PEAK_HOST_RSS_BYTES = "peak-host-rss-bytes"
-    COMMUNICATION_BYTES = "communication-bytes"
-    MODEL_TRANSMISSIONS = "model-transmissions"
-    PERSISTENT_STORAGE_BYTES = "persistent-storage-bytes"
-    TOTAL_ATTEMPTS = "total-attempts"
-    DORMANT_ADMISSION_RATE = "dormant-admission-rate"
-    PERMANENT_SINGLETON_ADMISSION = "permanent-singleton-admission"
-    VERIFIER_ABSTENTION_RATE = "verifier-abstention-rate"
-    REPRODUCTION_ABSTENTION_RATE = "reproduction-abstention-rate"
-    DEFINED_DOMAIN_FRACTION = "defined-domain-fraction"
-    TERMINAL_STATE = "terminal-state"
-    ACCURACY = "accuracy"
-    MACRO_F1 = "macro-f1"
-    WEIGHTED_F1 = "weighted-f1"
-    BALANCED_ACCURACY = "balanced-accuracy"
-    TARGET_F1_GAIN = "target-f1-gain"
-    P10_DOMAIN_TARGET_F1 = "p10-domain-target-f1"
-    DOMAIN_DISPARITY = "domain-disparity"
-    DOMAIN_IQR = "domain-iqr"
-    COEFFICIENT_OF_VARIATION = "coefficient-of-variation"
-    EQUAL_WEIGHT_DOMAIN_MEAN_TARGET_F1 = "equal-weight-domain-mean-target-f1"
-
-
-
-ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric
-
-
-class OpeningMode(StrEnum):
-    PROPOSAL_ASSISTED = "Proposal-Assisted"
-    CANDIDATE_FREE = "Candidate-Free"
-
-
-class PluralityCondition(StrEnum):
-    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
-
-
-class ExternalVerificationCondition(StrEnum):
-    LEGITIMATE_TRANSFERABLE_CAPABILITY = "Legitimate Transferable Capability"
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
-    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"
-
-
-class PrimaryScenario(StrEnum):
-    LEGITIMATE_UNSUPPORTED_CAPABILITY = "Legitimate Unsupported Capability"
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
-    ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT = "One Byzantine Post-Reference Participant"
-
-
-class SourceExclusionMethod(StrEnum):
-    FULL_FEDSIRA = "Full FedSIRA"
-    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"
-    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"
-    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"
-    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"
-    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"
-
-
-class AblationVariant(StrEnum):
-    FULL_FEDSIRA = "Full FedSIRA"
-    NO_PROPOSAL_SCREEN = "No Proposal Screen"
-    RAW_TARGET_F1_SCREEN_ONLY = "Raw Target-F1 Screen Only"
-    NO_MATCHED_CONTROL = "No Matched Control"
-    SOURCE_RELEASE_AFTER_PEER_REVIEW = "Source Release after Peer Review"
-    SOURCE_RELEASE_AFTER_FULL_EXTERNAL_CHECK = "Source Release after Full External Check"
-    ONE_INDEPENDENT_REPRODUCTION = "One Independent Reproduction"
-    MULTIPLE_REPRODUCTIONS_WITHOUT_CROSS_VERIFICATION = (
-        "Multiple Reproductions without Cross-Verification"
-    )
-    SAME_CONTEXT_VERIFICATION_ONLY = "Same-Context Verification Only"
-    NO_ORIGIN_EXCLUSION = "No Origin Exclusion"
-    PARAMETER_SIMILARITY_CERTIFICATION = "Parameter-Similarity Certification"
-    CANDIDATE_FREE_REPRODUCTION = "Candidate-Free Reproduction"
-    DIRECT_KRUM_OF_RETRAINS = "Direct Krum of Retrains"
-    GENERIC_THREE_ROW_THRESHOLD = "Generic Three-Row Threshold"
-    RANDOM_COMMITTEE_PROFILE = "Random Committee Profile"
-    NO_FINAL_SYNTHESIS_GATE = "No Final Synthesis Gate"
-    BYZANTINE_REPRODUCER_COPIES_SOURCE = "Byzantine Reproducer Copies Source"
-    CAPABILITY_CONTRACT_GRANULARITY = "Capability-Contract Granularity"
-
-
-class AblationScenario(StrEnum):
-    USEFUL_BACKDOORED_SOURCE_5_PERCENT = "Useful Backdoored Source — 5%"
-    MIXED_LEGITIMATE_IRRELEVANT_PROPOSAL = "Mixed Legitimate/Irrelevant Proposal Episode"
-    GENERIC_HARD_SUPPORTED_EXAMPLES = "Generic Hard Supported Examples"
-    HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0 = "Honest Site-Specific Feature Shift — 1.0"
-    ONE_MALICIOUS_REPRODUCER = "One Malicious Reproducer"
-    NATURAL = "Natural"
-    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"
-    LEGITIMATE_TARGET_CAPABILITY = "Legitimate Target Capability"
-    ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER = "One Verifier-Aware Backdoor Reproducer"
-    ONE_COMPROMISED_VERIFIER = "One Compromised Verifier"
-    UNDER_SPECIFICATION_FIXTURE = "Under-Specification Fixture"
-
-
-class ReproducerCondition(StrEnum):
-    CLEAN = "CLEAN"
-    ONE_SOURCE_COPY = "One Source Copy"
-    ONE_MODEL_REPLACEMENT_BACKDOOR = "One Model-Replacement Backdoor"
-    ONE_VERIFIER_AWARE_BACKDOOR = "One Verifier-Aware Backdoor"
-    TWO_SOURCE_COPIES = "Two Source Copies"
-    TWO_MODEL_REPLACEMENT_BACKDOORS = "Two Model-Replacement Backdoors"
-    TWO_VERIFIER_AWARE_BACKDOORS = "Two Verifier-Aware Backdoors"
-
-
-class VerifierProfile(StrEnum):
-    DETERMINISTIC_BOUND = "Deterministic Bound"
-    RANDOM_COMMITTEE_DIAGNOSTIC = "Random-Committee Diagnostic"
-
-
-class VerifierCondition(StrEnum):
-    ALL_HONEST = "All Honest"
-    ONE_FALSE_POSITIVE = "One False Positive"
-    TWO_FALSE_POSITIVES = "Two False Positives"
-    ONE_FALSE_NEGATIVE = "One False Negative"
-    TWO_FALSE_NEGATIVES = "Two False Negatives"
-
-
-class BoundCondition(StrEnum):
-    ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND = "One Byzantine Reproducer — Within Bound"
-    TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND = "Two Byzantine Reproducers — Above Bound"
-    ONE_BYZANTINE_VERIFIER_WITHIN_BOUND = "One Byzantine Verifier — Within Bound"
-    TWO_BYZANTINE_VERIFIERS_ABOVE_BOUND = "Two Byzantine Verifiers — Above Bound"
-
-
-class CapabilityContractGranularity(StrEnum):
-    BROAD_TARGET_ONLY = "Broad Target Only"
-    ROOT_CAUSE_A_SCOPED = "Root-Cause A Scoped"
-    ROOT_CAUSE_B_SCOPED = "Root-Cause B Scoped"
-
-
-class HeterogeneityRegime(StrEnum):
-    NATURAL = "Natural"
-    QUANTITY_SKEW = "Quantity Skew"
-    FEATURE_SHIFT_0_5 = "Feature Shift ±0.5"
-    FEATURE_SHIFT_1_0 = "Feature Shift ±1.0"
-
-
-class SecondaryScenario(StrEnum):
-    LEGITIMATE_BACKDOOR_MALWARE_CAPABILITY = "Legitimate Backdoor-Malware Capability"
-    ONE_BYZANTINE_SOURCE_COPY_REPRODUCER = "One Byzantine Source-Copy Reproducer"
-
-
-CELL_METRICS_TABLE_NAME: TableName = "Cell Metrics"
+CELL_METRICS_TABLE_NAME: TableName = TableName.CELL_METRICS
 CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
 SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
 AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
 STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"
-PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = "FedSIRA Protocol Schematic"
-PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = "Primary Security-Utility Tradeoff"
-USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = "Useful Backdoored Source"
-COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = "Collapse Decision Effects"
-COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Reproducer Boundary"
-COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = "Compromised-Verifier Boundary"
-SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = "Shared Epistemic Failure"
-CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = "Capability-Granularity Boundary"
-HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = "Heterogeneity Synthesis Boundary"
-ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = "Admission-Delay Decomposition"
-EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = "Efficiency Profile"
-EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = "Evidence-Arrival State Trajectory"
-SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = "Secondary Generalization"
+PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = FigureName.PROTOCOL_SCHEMATIC
+PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = (
+    FigureName.PRIMARY_SECURITY_UTILITY_TRADEOFF
+)
+USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = FigureName.USEFUL_BACKDOORED_SOURCE
+COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = FigureName.COLLAPSE_DECISION_EFFECTS
+COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = FigureName.COMPROMISED_REPRODUCER_BOUNDARY
+COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = FigureName.COMPROMISED_VERIFIER_BOUNDARY
+SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = FigureName.SHARED_EPISTEMIC_FAILURE
+CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = FigureName.CAPABILITY_GRANULARITY_BOUNDARY
+HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = (
+    FigureName.HETEROGENEITY_SYNTHESIS_BOUNDARY
+)
+ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME: FigureName = FigureName.ADMISSION_DELAY_DECOMPOSITION
+EFFICIENCY_PROFILE_FIGURE_NAME: FigureName = FigureName.EFFICIENCY_PROFILE
+EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME: FigureName = (
+    FigureName.EVIDENCE_ARRIVAL_STATE_TRAJECTORY
+)
+SECONDARY_GENERALIZATION_FIGURE_NAME: FigureName = FigureName.SECONDARY_GENERALIZATION
 
 
 class ExperimentArtifactSpecification(FrozenDomainModel):
@@ -289,27 +116,49 @@ class ExperimentDefinition(FrozenDomainModel):
     artifacts: ExperimentArtifactSpecification
 
 
-DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = "Data and Domain Evidence Validation"
-PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = "Protocol Invariant Validation"
-BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = "Baseline Implementation Validation"
-PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = "Proposal-Assisted Opening Necessity"
-SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = "Single-Reproduction Necessity"
-SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = "Source-Artifact Exclusion Necessity"
-EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = "External Verification Necessity"
-PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = "Primary Confirmatory Evaluation"
-MECHANISM_ABLATION_NAME: ExperimentName = "Mechanism Ablation"
-COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Reproducer Robustness"
-COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = "Compromised-Verifier Robustness"
-BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = "Byzantine-Bound Violation"
-EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = "Evidence Scarcity and Dormancy"
-SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = "Shared Epistemic-Failure Boundary"
-CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: ExperimentName = (
-    "Capability Under-Specification Boundary"
+DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME: ExperimentName = (
+    ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION
 )
-HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = "Heterogeneous-Reproduction Boundary"
-ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = "Admission-Delay Decomposition"
-EFFICIENCY_MEASUREMENT_NAME: ExperimentName = "Efficiency Measurement"
-SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = "Secondary-Dataset Generalization"
+PROTOCOL_INVARIANT_VALIDATION_NAME: ExperimentName = ExperimentName.PROTOCOL_INVARIANT_VALIDATION
+BASELINE_IMPLEMENTATION_VALIDATION_NAME: ExperimentName = (
+    ExperimentName.BASELINE_IMPLEMENTATION_VALIDATION
+)
+PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME: ExperimentName = (
+    ExperimentName.PROPOSAL_ASSISTED_OPENING_NECESSITY
+)
+SINGLE_REPRODUCTION_NECESSITY_NAME: ExperimentName = ExperimentName.SINGLE_REPRODUCTION_NECESSITY
+SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME: ExperimentName = (
+    ExperimentName.SOURCE_ARTIFACT_EXCLUSION_NECESSITY
+)
+EXTERNAL_VERIFICATION_NECESSITY_NAME: ExperimentName = (
+    ExperimentName.EXTERNAL_VERIFICATION_NECESSITY
+)
+PRIMARY_CONFIRMATORY_EVALUATION_NAME: ExperimentName = (
+    ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
+)
+MECHANISM_ABLATION_NAME: ExperimentName = ExperimentName.MECHANISM_ABLATION
+COMPROMISED_REPRODUCER_ROBUSTNESS_NAME: ExperimentName = (
+    ExperimentName.COMPROMISED_REPRODUCER_ROBUSTNESS
+)
+COMPROMISED_VERIFIER_ROBUSTNESS_NAME: ExperimentName = (
+    ExperimentName.COMPROMISED_VERIFIER_ROBUSTNESS
+)
+BYZANTINE_BOUND_VIOLATION_NAME: ExperimentName = ExperimentName.BYZANTINE_BOUND_VIOLATION
+EVIDENCE_SCARCITY_AND_DORMANCY_NAME: ExperimentName = ExperimentName.EVIDENCE_SCARCITY_AND_DORMANCY
+SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME: ExperimentName = (
+    ExperimentName.SHARED_EPISTEMIC_FAILURE_BOUNDARY
+)
+CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME: ExperimentName = (
+    ExperimentName.CAPABILITY_UNDER_SPECIFICATION_BOUNDARY
+)
+HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME: ExperimentName = (
+    ExperimentName.HETEROGENEOUS_REPRODUCTION_BOUNDARY
+)
+ADMISSION_DELAY_DECOMPOSITION_NAME: ExperimentName = ExperimentName.ADMISSION_DELAY_DECOMPOSITION
+EFFICIENCY_MEASUREMENT_NAME: ExperimentName = ExperimentName.EFFICIENCY_MEASUREMENT
+SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = (
+    ExperimentName.SECONDARY_DATASET_GENERALIZATION
+)
 
 REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
@@ -929,7 +778,7 @@ def _experiment_definitions(confirmatory_seed_count: SeedCount) -> tuple[Experim
         ExperimentDefinition(
             name=CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
             experiment_class=ExperimentClass.FAILURE_BOUNDARY,
-            methods=tuple(CapabilityContractGranularity),
+            methods=tuple(CapabilityContractScope),
             conditions=tuple(RootCauseMixture),
             seed_count=confirmatory_seed_count,
             nominal_cell_count=60,

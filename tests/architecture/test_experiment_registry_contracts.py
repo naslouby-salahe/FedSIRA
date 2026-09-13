@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from _repo import SRC_ROOT, iter_python_files, parse
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import DatasetId, TableName
 from fedsira.experiments.definitions import (
     ExperimentDefinition,
     experiment_registry,
@@ -33,8 +33,15 @@ def _rendered_table_names() -> frozenset[str]:
             if not (isinstance(node.func, ast.Name) and node.func.id == "RenderedTable"):
                 continue
             for keyword in node.keywords:
-                if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
-                    produced.add(str(keyword.value.value))
+                if keyword.arg != "name":
+                    continue
+                if isinstance(keyword.value, ast.Constant) and isinstance(keyword.value.value, str):
+                    produced.add(keyword.value.value)
+                elif (
+                    isinstance(keyword.value, ast.Attribute)
+                    and keyword.value.attr in TableName.__members__
+                ):
+                    produced.add(TableName[keyword.value.attr])
     return frozenset(produced)
 
 
@@ -176,10 +183,10 @@ def test_every_ablation_variant_is_dispatched_explicitly() -> None:
     from _repo import SRC_ROOT, parse
 
     handlers = SRC_ROOT / "experiments" / "handlers.py"
-    definitions = SRC_ROOT / "experiments" / "definitions.py"
+    canonical_enums = SRC_ROOT / "domain" / "enums.py"
 
     variants: list[str] = []
-    for node in parse(definitions).body:
+    for node in parse(canonical_enums).body:
         if isinstance(node, ast.ClassDef) and node.name == "AblationVariant":
             variants = [
                 target.id

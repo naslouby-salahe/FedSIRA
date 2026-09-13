@@ -5,7 +5,7 @@ from typing import Protocol, cast
 
 import torch
 
-from fedsira.domain.enums import AdmissionState
+from fedsira.domain.enums import AdmissionState, SeedDerivationLabel
 from fedsira.domain.types import (
     ArtifactDigest,
     CheckpointIdentity,
@@ -19,11 +19,8 @@ from fedsira.domain.types import (
     ReproductionCertified,
     ReproductionWasTrained,
     ResolvedRowRequirementReached,
-    SeedDerivationLabel,
 )
 from fedsira.runtime import derive_uint32, framed_bytes
-
-REPRODUCTION_COMMITMENT_SEPARATOR: SeedDerivationLabel = "REPRODUCTION_COMMITMENT"
 
 
 class _ListConvertibleTensor(Protocol):
@@ -102,7 +99,7 @@ def compute_reproduction_commitment_hash(
     ).tolist()
     parameter_bytes = struct.pack(f">{len(flat_values)}d", *flat_values)
     header = framed_bytes(
-        REPRODUCTION_COMMITMENT_SEPARATOR,
+        SeedDerivationLabel.REPRODUCTION_COMMITMENT,
         reproducer_domain,
         capability_identity,
         training_seed,
@@ -128,9 +125,6 @@ def select_compromised_reproducers(
     return tuple(feasible_in_order[:requested_compromised_count])
 
 
-COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH" #TODO: convert to enum instead of hardcoded string. It already exists. Just added there
-
-
 def commitment_digest(
     reproducer_domain: DomainId,
     master_seed: MasterSeed,
@@ -140,6 +134,6 @@ def commitment_digest(
     return compute_reproduction_commitment_hash(
         reproducer_domain,
         capability_identity,
-        derive_uint32(COMMITMENT_HASH_SEPARATOR, master_seed),
+        derive_uint32(SeedDerivationLabel.COMMITMENT_HASH, master_seed),
         reproduced_flat_parameters,
     )

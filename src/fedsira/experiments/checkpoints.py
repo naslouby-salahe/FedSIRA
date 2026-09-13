@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import re
+
 import torch
 
 from fedsira.artifacts.paths import artifact_slot_directory, artifact_staging_root
@@ -9,10 +13,20 @@ from fedsira.artifacts.store import (
     publish_artifact,
 )
 from fedsira.datasets.common import RealAnchor, flat_parameters_identity
-from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer, DatasetId
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactDependencyLabel,
+    ArtifactFamily,
+    ArtifactProducer,
+    DatasetId,
+    ExperimentName,
+    ProposalEpisode,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     ArtifactInstanceToken,
+    CheckpointStageIdentity,
+    ConditionName,
     DatasetManifestDigest,
     DomainId,
     FrozenDomainModel,
@@ -22,15 +36,15 @@ from fedsira.domain.types import (
     ModelParameterValue,
     ProcedureIdentity,
     SchemaVersion,
-    TextValue,
 )
 from fedsira.runtime import (
-    NUMERICAL_RUNTIME_DEPENDENCY,
     REPOSITORY_ROOT,
     numerical_runtime_identity,
 )
 
 CHECKPOINT_SCHEMA_VERSION: SchemaVersion = "fedsira|checkpoint|1"
+
+NON_SLUG_CHARACTER_RUN = re.compile(r"[^A-Za-z0-9]+")
 
 CHECKPOINT_PROCEDURE_IDENTITIES: tuple[tuple[ArtifactFamily, ProcedureIdentity], ...] = (
     (ArtifactFamily.ANCHOR_CHECKPOINT, "fedsira|anchor_checkpoint|1"),
@@ -52,7 +66,7 @@ class CheckpointPayload(FrozenDomainModel):
     dataset: DatasetId
     family: ArtifactFamily
     master_seed: MasterSeed
-    stage_identity: TextValue #TODO: Consider creating a dedicated type for stage identity to improve type safety and clarity.
+    stage_identity: CheckpointStageIdentity
     dataset_manifest_hash: DatasetManifestDigest
     model_input_width: ModelInputWidth
     model_output_width: ModelOutputWidth
@@ -65,7 +79,7 @@ def publish_anchor_checkpoints(
     master_seed: MasterSeed,
     anchor: RealAnchor,
 ) -> tuple[ArtifactManifest, ...]:
-    stages = (
+    stages: tuple[tuple[CheckpointStageIdentity, torch.Tensor], ...] = (
         ("final", anchor.flat_parameters),
         *tuple(
             (f"round-start-{round_index:02d}", round_parameters)
@@ -98,7 +112,7 @@ def publish_anchor_checkpoints(
             (
                 ArtifactDependency(
                     kind=ArtifactDependencyKind.CONTENT,
-                    dependency="prepared-evidence", #TODO: use enum for dependency types
+                    dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                     digest=anchor.dataset_manifest_hash,
                 ),
             ),
@@ -111,7 +125,7 @@ def publish_trained_update(
     family: ArtifactFamily,
     dataset: DatasetId,
     master_seed: MasterSeed,
-    stage_identity: TextValue,
+    stage_identity: CheckpointStageIdentity,
     dataset_manifest_hash: DatasetManifestDigest,
     update: torch.Tensor,
     input_width: ModelInputWidth,
@@ -138,7 +152,7 @@ def publish_trained_update(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="prepared-evidence", #TODO: use enum for dependency types
+                dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                 digest=dataset_manifest_hash,
             ),
         ),
@@ -146,13 +160,15 @@ def publish_trained_update(
     return manifest
 
 
-def source_candidate_stage_identity(episode: TextValue #TODO: Consider creating a dedicated type for episode to improve type safety and clarity. And find all TextValue usage outside of types and fix that
-                                    , source_domain: DomainId) -> TextValue: #TODO: Consider creating or using a better type for the return of this method.
+def source_candidate_stage_identity(
+    episode: ProposalEpisode, source_domain: DomainId
+) -> CheckpointStageIdentity:
     return f"source-candidate-{episode}-{source_domain}"
 
 
-def reproduction_stage_identity(domain: DomainId, condition: TextValue  #TODO: Consider creating a dedicated type for condition to improve type safety and clarity.
-                                ) -> TextValue: #TODO: Consider creating or using a better type for the return of this method.
+def reproduction_stage_identity(
+    domain: DomainId, condition: ConditionName
+) -> CheckpointStageIdentity:
     return f"reproduction-{domain}-{condition}"
 
 
@@ -173,15 +189,16 @@ def checkpoint_producer(family: ArtifactFamily) -> ArtifactProducer:
 def checkpoint_slot(
     family: ArtifactFamily,
     instance: ArtifactInstanceToken,
-    experiment: TextValue | None = None,
+    experiment: ExperimentName | None = None,
 ) -> ArtifactSlot:
     return ArtifactSlot(family=family, instance=instance, experiment=experiment)
 
 
 def checkpoint_stage_instance(
-    master_seed: MasterSeed, stage_identity: TextValue #TODO: Consider creating a dedicated type for stage identity to improve type safety and clarity.
+    master_seed: MasterSeed, stage_identity: CheckpointStageIdentity
 ) -> ArtifactInstanceToken:
-    return f"seed-{master_seed}-{stage_identity}"
+    slug = NON_SLUG_CHARACTER_RUN.sub("-", stage_identity).strip("-").lower()
+    return f"seed-{master_seed}-{slug}"
 
 
 def publish_checkpoint(
@@ -198,7 +215,7 @@ def publish_checkpoint(
             *dependencies,
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=NUMERICAL_RUNTIME_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.NUMERICAL_RUNTIME,
                 digest=numerical_runtime_identity(),
             ),
         ),

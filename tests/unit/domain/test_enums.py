@@ -7,7 +7,7 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 
 
@@ -15,9 +15,26 @@ def test_dataset_id_has_exactly_the_two_roadmap_datasets() -> None:
     assert {member.value for member in DatasetId} == {"N-BaIoT", "CICIoT2023"}
 
 
-def test_seed_namespace_has_exactly_fifteen_fixed_tokens() -> None:
-    assert len(list(SeedNamespace)) == 15
-    assert "BOOTSTRAP" not in {member.value for member in SeedNamespace}
+def test_seed_derivation_label_retains_the_fifteen_namespace_tokens() -> None:
+    namespace_tokens = {
+        "DATA_SPLIT",
+        "DOMAIN_PARTITION",
+        "MODEL_INITIALIZATION",
+        "CLIENT_SAMPLING",
+        "SOURCE_SELECTION",
+        "SOURCE_TRAINING",
+        "ATTACK_GENERATION",
+        "SCREEN_DOMAIN_ORDER",
+        "SCREEN_FOLD",
+        "REPRODUCER_ORDER",
+        "VERIFIER_ASSIGNMENT",
+        "BYZANTINE_SELECTION",
+        "LOCAL_TRAINING",
+        "COMMITTEE_DRAW",
+        "HETEROGENEITY",
+    }
+    assert namespace_tokens.issubset({member.value for member in SeedDerivationLabel})
+    assert "BOOTSTRAP" not in {member.value for member in SeedDerivationLabel}
 
 
 def test_failure_class_has_exactly_nine_classes() -> None:

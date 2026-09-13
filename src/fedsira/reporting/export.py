@@ -26,9 +26,18 @@ from fedsira.artifacts.store import (
     load_published_manifests,
 )
 from fedsira.domain.enums import (
+    AdmissionState,
     ArtifactFamily,
+    ComparisonFamily,
+    DelayPhaseMetric,
+    DescriptiveScientificMetric,
     ExperimentLifecycleState,
+    ExperimentName,
+    FigureName,
     LogEvent,
+    ReportColumnName,
+    RuntimeComponentName,
+    TableName,
     WorkspaceFileToken,
 )
 from fedsira.domain.models import (
@@ -39,8 +48,6 @@ from fedsira.domain.types import (
     BooleanValue,
     ComparisonName,
     EvidenceCycleIndex,
-    ExperimentName,
-    FigureName,
     FrozenDomainModel,
     MasterSeed,
     MethodName,
@@ -49,6 +56,7 @@ from fedsira.domain.types import (
     OverwriteExisting,
     RelativePathText,
     RepetitionIndex,
+    ReportScopeText,
     ReportVerificationFailure,
     RepositoryPath,
     RowCount,
@@ -56,8 +64,6 @@ from fedsira.domain.types import (
     SchemaVersion,
     ScientificCellCount,
     TableCsvText,
-    TableName,
-    TextValue,
     VerificationPassed,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult, ComparisonState
@@ -89,8 +95,6 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     STATE_TRAJECTORY_PARQUET_NAME,
-    ComparisonFamily,
-    DescriptiveScientificMetric,
     experiment_by_name,
 )
 from fedsira.experiments.engine import (
@@ -106,19 +110,17 @@ from fedsira.experiments.planning import (
     validate_planned_cell_count_invariant,
 )
 from fedsira.reporting import tables as table_renderers
-from fedsira.reporting.figure_observations import (
+from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
-)
-from fedsira.reporting.figures import efficiency_telemetry as project_efficiency_telemetry
-from fedsira.reporting.figures import evidence_trajectory as project_evidence_trajectory
-from fedsira.reporting.figures import (
     outcome_evidence_trajectory,
     project_result_evidence,
     render_experiment_figures,
     render_mandatory_figures,
     validate_mandatory_figures_covered,
 )
+from fedsira.reporting.figures import efficiency_telemetry as project_efficiency_telemetry
+from fedsira.reporting.figures import evidence_trajectory as project_evidence_trajectory
 from fedsira.reporting.protocol_tables import (
     render_baseline_protocol_table,
     render_dataset_and_domain_protocol_table,
@@ -179,25 +181,22 @@ from fedsira.runtime import (
 
 EXPORT_SCHEMA_VERSION: SchemaVersion = "fedsira|report_export|1"
 
-REPORT_LOGGER = get_structured_logger("reporting")
+REPORT_LOGGER = get_structured_logger(RuntimeComponentName.REPORTING)
 
-PROJECT_SUMMARY_EXPORT_NAME: ExperimentName = "project summary"
+PROJECT_SUMMARY_EXPORT_NAME: ReportScopeText = "project summary"
 
 
 class ReportLogFields(FrozenDomainModel):
-    report_scope: ExperimentName
+    report_scope: ReportScopeText
     artifact_count: ScientificCellCount | None = None
 
 
 _RESULT_TABLE_EVIDENCE: tuple[tuple[TableName, tuple[ExperimentName, ...]], ...] = (
-    ("Primary Results" #TODO: convert to enum instead of hardcoded string
-     , (PRIMARY_CONFIRMATORY_EVALUATION_NAME,)),
-    ("Source-Exclusion Results" #TODO: convert to enum instead of hardcoded string
-     , (SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,)),
-    ("Ablation Results" #TODO: convert to enum instead of hardcoded string
-     , (MECHANISM_ABLATION_NAME,)),
+    (TableName.PRIMARY_RESULTS, (PRIMARY_CONFIRMATORY_EVALUATION_NAME,)),
+    (TableName.SOURCE_EXCLUSION_RESULTS, (SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,)),
+    (TableName.ABLATION_RESULTS, (MECHANISM_ABLATION_NAME,)),
     (
-        "Byzantine Robustness", #TODO: convert to enum instead of hardcoded string
+        TableName.BYZANTINE_ROBUSTNESS,
         (
             COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
             COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
@@ -205,7 +204,7 @@ _RESULT_TABLE_EVIDENCE: tuple[tuple[TableName, tuple[ExperimentName, ...]], ...]
         ),
     ),
     (
-        "Failure Boundaries", #TODO: convert to enum instead of hardcoded string
+        TableName.FAILURE_BOUNDARIES,
         (
             EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
             SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -214,14 +213,13 @@ _RESULT_TABLE_EVIDENCE: tuple[tuple[TableName, tuple[ExperimentName, ...]], ...]
         ),
     ),
     (
-        "Delay and Efficiency", #TODO: convert to enum instead of hardcoded string
+        TableName.DELAY_AND_EFFICIENCY,
         (
             ADMISSION_DELAY_DECOMPOSITION_NAME,
             EFFICIENCY_MEASUREMENT_NAME,
         ),
     ),
-    ("Generalization Results" #TODO: convert to enum instead of hardcoded string
-     , (SECONDARY_DATASET_GENERALIZATION_NAME,)),
+    (TableName.GENERALIZATION_RESULTS, (SECONDARY_DATASET_GENERALIZATION_NAME,)),
 )
 
 
@@ -645,7 +643,9 @@ def execute_report(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         fields = ReportLogFields(report_scope=scope)
         log_structured_event(REPORT_LOGGER, LogEvent.REPORT_STARTED, fields)
         timeout = context.scientific_config.execution.timeouts_seconds.experiment_analysis_or_report
-        run_bounded("report", timeout, lambda: _execute_bound(name, overwrite))
+        run_bounded(
+            RuntimeComponentName.CREATING_REPORT, timeout, lambda: _execute_bound(name, overwrite)
+        )
         log_structured_event(REPORT_LOGGER, LogEvent.REPORT_COMPLETED, fields)
 
 
@@ -706,7 +706,7 @@ def _execute_bound(name: ExperimentName | None, overwrite: OverwriteExisting) ->
         comparison_evidence_verification,
         safe_dormancy_verification,
     ) = run_bounded(
-        "final_export_verification",
+        RuntimeComponentName.FINAL_EXPORT_VERIFICATION,
         verification_timeout,
         lambda: (
             verify_planned_cell_count_satisfied(plan, terminal_count_records),
@@ -859,10 +859,10 @@ RESOURCES_PARQUET_NAME = "resources.parquet"
 
 _TIMING_METRICS: frozenset[MetricName] = frozenset(
     (
-        "assignment-seconds", #TODO: convert to enum instead of hardcoded string
-        "reproduce-seconds", #TODO: convert to enum instead of hardcoded string
-        "verify-seconds", #TODO: convert to enum instead of hardcoded string
-        "synthesize-seconds", #TODO: convert to enum instead of hardcoded string
+        DelayPhaseMetric.ASSIGNMENT_SECONDS,
+        DelayPhaseMetric.REPRODUCE_SECONDS,
+        DelayPhaseMetric.VERIFY_SECONDS,
+        DelayPhaseMetric.SYNTHESIZE_SECONDS,
         DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
     )
 )
@@ -894,7 +894,7 @@ class MetricEvidenceRow(FrozenDomainModel):
         ScenarioName,
         MasterSeed,
         RepetitionIndex | None,
-        TextValue,
+        ExperimentLifecycleState,
         MetricName,
         MetricValue | None,
     ]:
@@ -904,7 +904,7 @@ class MetricEvidenceRow(FrozenDomainModel):
             self.condition,
             self.master_seed,
             self.repetition,
-            self.terminal_state.value,
+            self.terminal_state,
             self.metric,
             self.value,
         )
@@ -945,7 +945,7 @@ class StateTrajectoryEvidenceRow(FrozenDomainModel):
     master_seed: MasterSeed
     repetition: RepetitionIndex | None
     logical_evidence_cycle: EvidenceCycleIndex
-    admission_state: TextValue
+    admission_state: AdmissionState
 
     def values(
         self,
@@ -956,7 +956,7 @@ class StateTrajectoryEvidenceRow(FrozenDomainModel):
         MasterSeed,
         RepetitionIndex | None,
         EvidenceCycleIndex,
-        TextValue,
+        AdmissionState,
     ]:
         return (
             self.experiment,
@@ -985,19 +985,19 @@ class ComparisonEvidenceRow(FrozenDomainModel):
         self,
     ) -> tuple[
         ExperimentName,
-        TextValue,
-        TextValue,
+        ComparisonFamily,
+        ComparisonName,
         MethodName,
         ScenarioName,
         MetricName,
         ScientificCellCount,
         MetricValue | None,
         MetricValue | None,
-        TextValue,
+        ComparisonState,
     ]:
         return (
             self.experiment,
-            self.family.value,
+            self.family,
             self.comparison,
             self.method,
             self.scenario,
@@ -1005,7 +1005,7 @@ class ComparisonEvidenceRow(FrozenDomainModel):
             self.complete_seed_count,
             self.mean_paired_difference,
             self.adjusted_p_value,
-            self.state.value,
+            self.state,
         )
 
 
@@ -1074,7 +1074,7 @@ def _state_trajectory_rows(
             master_seed=outcome.cell.master_seed,
             repetition=outcome.cell.repetition,
             logical_evidence_cycle=observation.cycle,
-            admission_state=observation.state.value,
+            admission_state=observation.state,
         )
         for outcome in outcomes
         for observation in outcome.state_trajectory
@@ -1092,7 +1092,7 @@ def _comparison_rows(
             comparison=comparison.definition.comparison_name,
             method=comparison.definition.method,
             scenario=comparison.definition.scientific_scenario,
-            metric=comparison.definition.metric.value,
+            metric=comparison.definition.metric,
             complete_seed_count=comparison.complete_seed_count,
             mean_paired_difference=comparison.mean_paired_difference,
             adjusted_p_value=comparison.adjusted_p_value,
@@ -1107,14 +1107,14 @@ def _write_metric_parquet(destination: Path, rows: tuple[MetricEvidenceRow, ...]
     frame = pandas.DataFrame(
         tuple(row.values() for row in rows),
         columns=(
-            "experiment", #TODO: convert to enum instead of hardcoded string
-            "method", #TODO: convert to enum instead of hardcoded string
-            "condition", #TODO: convert to enum instead of hardcoded string
-            "master_seed", #TODO: convert to enum instead of hardcoded string
-            "repetition", #TODO: convert to enum instead of hardcoded string
-            "terminal_state", #TODO: convert to enum instead of hardcoded string
-            "metric", #TODO: convert to enum instead of hardcoded string
-            "value", #TODO: convert to enum instead of hardcoded string
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.METHOD,
+            ReportColumnName.CONDITION,
+            ReportColumnName.MASTER_SEED,
+            ReportColumnName.REPETITION,
+            ReportColumnName.TERMINAL_STATE,
+            ReportColumnName.METRIC,
+            ReportColumnName.VALUE,
         ),
     )
     frame.to_parquet(destination, index=False)
@@ -1127,7 +1127,14 @@ def _write_aggregate_metric_parquet(
 ) -> Path:
     frame = pandas.DataFrame(
         tuple(row.values() for row in rows),
-        columns=("experiment", "method", "condition", "metric", "observation_count", "mean_value"), #TODO: convert to enum instead of hardcoded string
+        columns=(
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.METHOD,
+            ReportColumnName.CONDITION,
+            ReportColumnName.METRIC,
+            ReportColumnName.OBSERVATION_COUNT,
+            ReportColumnName.MEAN_VALUE,
+        ),
     )
     frame.to_parquet(destination, index=False)
     return destination
@@ -1140,13 +1147,13 @@ def _write_state_trajectory_parquet(
     frame = pandas.DataFrame(
         tuple(row.values() for row in rows),
         columns=(
-            "experiment", #TODO: convert to enum instead of hardcoded string
-            "method", #TODO: convert to enum instead of hardcoded string
-            "condition", #TODO: convert to enum instead of hardcoded string
-            "master_seed", #TODO: convert to enum instead of hardcoded string
-            "repetition", #TODO: convert to enum instead of hardcoded string
-            "logical_evidence_cycle", #TODO: convert to enum instead of hardcoded string
-            "admission_state", #TODO: convert to enum instead of hardcoded string
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.METHOD,
+            ReportColumnName.CONDITION,
+            ReportColumnName.MASTER_SEED,
+            ReportColumnName.REPETITION,
+            ReportColumnName.LOGICAL_EVIDENCE_CYCLE,
+            ReportColumnName.ADMISSION_STATE,
         ),
     )
     frame.to_parquet(destination, index=False)
@@ -1157,16 +1164,16 @@ def _write_comparison_parquet(destination: Path, rows: tuple[ComparisonEvidenceR
     frame = pandas.DataFrame(
         tuple(row.values() for row in rows),
         columns=(
-            "experiment", #TODO: convert to enum instead of hardcoded string
-            "family", #TODO: convert to enum instead of hardcoded string
-            "comparison", #TODO: convert to enum instead of hardcoded string
-            "method", #TODO: convert to enum instead of hardcoded string
-            "scenario", #TODO: convert to enum instead of hardcoded string
-            "metric", #TODO: convert to enum instead of hardcoded string
-            "complete_seed_count", #TODO: convert to enum instead of hardcoded string
-            "mean_paired_difference", #TODO: convert to enum instead of hardcoded string
-            "adjusted_p_value", #TODO: convert to enum instead of hardcoded string
-            "state", #TODO: convert to enum instead of hardcoded string
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.FAMILY,
+            ReportColumnName.COMPARISON,
+            ReportColumnName.METHOD,
+            ReportColumnName.SCENARIO,
+            ReportColumnName.METRIC,
+            ReportColumnName.COMPLETE_SEED_COUNT,
+            ReportColumnName.MEAN_PAIRED_DIFFERENCE,
+            ReportColumnName.ADJUSTED_P_VALUE,
+            ReportColumnName.STATE,
         ),
     )
     frame.to_parquet(destination, index=False)

@@ -1,5 +1,6 @@
 from fedsira.datasets.common import (
     PREPROCESSING_SAMPLE_ORDER_SEED,
+    Role,
     apply_sampling_cap,
     sampling_cap_selection_digest,
 )
@@ -10,12 +11,12 @@ def test_preprocessing_sample_order_seed_matches_the_fixed_roadmap_value() -> No
 
 
 def test_sampling_cap_selection_digest_is_deterministic() -> None:
-    args = ("a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "SOURCE_PROPOSAL", 7)
+    args = ("a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", Role.SOURCE_PROPOSAL, 7)
     assert sampling_cap_selection_digest(*args) == sampling_cap_selection_digest(*args)
 
 
 def test_sampling_cap_selection_digest_changes_with_row_index() -> None:
-    base = ("a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", "SOURCE_PROPOSAL")
+    base = ("a" * 64, "DANMINI_DOORBELL", "GAFGYT_COMBO", Role.SOURCE_PROPOSAL)
     first = sampling_cap_selection_digest(*base, 0)
     second = sampling_cap_selection_digest(*base, 1)
     assert first != second
@@ -26,7 +27,7 @@ def test_apply_sampling_cap_returns_all_rows_when_under_the_cap() -> None:
         "a" * 64,
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
-        "SOURCE_PROPOSAL",
+        Role.SOURCE_PROPOSAL,
         (0, 1, 2),
         cap=10,
     )
@@ -38,7 +39,7 @@ def test_apply_sampling_cap_selects_exactly_the_cap_when_over() -> None:
         "a" * 64,
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
-        "SOURCE_PROPOSAL",
+        Role.SOURCE_PROPOSAL,
         tuple(range(100)),
         cap=10,
     )
@@ -52,7 +53,7 @@ def test_apply_sampling_cap_is_deterministic_across_runs() -> None:
         "a" * 64,
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
-        "SOURCE_PROPOSAL",
+        Role.SOURCE_PROPOSAL,
         tuple(range(50)),
     )
     first = apply_sampling_cap(*args, cap=5)
@@ -66,7 +67,7 @@ def test_apply_sampling_cap_selection_differs_by_role_and_class() -> None:
         "a" * 64,
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
-        "SOURCE_PROPOSAL",
+        Role.SOURCE_PROPOSAL,
         rows,
         cap=5,
     )
@@ -74,7 +75,7 @@ def test_apply_sampling_cap_selection_differs_by_role_and_class() -> None:
         "a" * 64,
         "DANMINI_DOORBELL",
         "GAFGYT_COMBO",
-        "CANDIDATE_SCREEN",
+        Role.CANDIDATE_SCREEN,
         rows,
         cap=5,
     )

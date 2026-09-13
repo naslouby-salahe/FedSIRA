@@ -6,21 +6,35 @@ from collections.abc import Callable
 from io import StringIO
 
 from fedsira.config import PublicationRoundingConfig
-from fedsira.domain.enums import ByteUnit, CoreMethodIdentity
+from fedsira.domain.enums import (
+    AblationVariant,
+    BoundCondition,
+    ByteUnit,
+    CoreMethodIdentity,
+    DelayPhaseMetric,
+    DescriptiveScientificMetric,
+    ExperimentName,
+    PrimaryScenario,
+    ReportCellLiteral,
+    ReportColumnName,
+    SecondaryScenario,
+    SourceExclusionMethod,
+    TableName,
+)
 from fedsira.domain.types import (
     ByteCount,
-    ExperimentName,
     FormattedStatisticText,
     FrozenDomainModel,
     MethodName,
     MetricName,
     MetricValue,
+    ProtocolRuleText,
     PValue,
+    ReportCellText,
+    ReportColumnText,
     RowCount,
     ScenarioName,
     TableCsvText,
-    TableName,
-    TextValue,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonDefinition,
@@ -57,12 +71,6 @@ from fedsira.experiments.definitions import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    AblationVariant,
-    BoundCondition,
-    DescriptiveScientificMetric,
-    PrimaryScenario,
-    SecondaryScenario,
-    SourceExclusionMethod,
     ablation_scenario_for_variant,
     experiment_by_name,
 )
@@ -72,22 +80,22 @@ from fedsira.experiments.engine import (
 from fedsira.runtime import current_application_context
 
 MANUSCRIPT_TABLE_NAMES: tuple[TableName, ...] = (
-    "Dataset and Domain Protocol",
-    "Primary Domain Statistics",
-    "Model and Training Protocol",
-    "Security and Capability-Contract Protocol",
-    "Baseline Protocol",
-    "Experiment Plan",
-    "Metric and Statistics Protocol",
-    "Primary Results",
-    "Source-Exclusion Results",
-    "Collapse Decisions",
-    "Ablation Results",
-    "Byzantine Robustness",
-    "Failure Boundaries",
-    "Delay and Efficiency",
-    "Generalization Results",
-    "Statistical Summary",
+    TableName.DATASET_AND_DOMAIN_PROTOCOL,
+    TableName.PRIMARY_DOMAIN_STATISTICS,
+    TableName.MODEL_AND_TRAINING_PROTOCOL,
+    TableName.SECURITY_AND_CAPABILITY_CONTRACT_PROTOCOL,
+    TableName.BASELINE_PROTOCOL,
+    TableName.EXPERIMENT_PLAN,
+    TableName.METRIC_AND_STATISTICS_PROTOCOL,
+    TableName.PRIMARY_RESULTS,
+    TableName.SOURCE_EXCLUSION_RESULTS,
+    TableName.COLLAPSE_DECISIONS,
+    TableName.ABLATION_RESULTS,
+    TableName.BYZANTINE_ROBUSTNESS,
+    TableName.FAILURE_BOUNDARIES,
+    TableName.DELAY_AND_EFFICIENCY,
+    TableName.GENERALIZATION_RESULTS,
+    TableName.STATISTICAL_SUMMARY,
 )
 
 
@@ -109,7 +117,7 @@ BYTE_VALUED_METRICS: tuple[MetricName, ...] = (
     DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES,
 )
 
-BYTE_UNIT_LABELS: tuple[tuple[ByteUnit, TextValue, ByteCount], ...] = (
+BYTE_UNIT_LABELS: tuple[tuple[ByteUnit, ReportCellText, ByteCount], ...] = (
     (ByteUnit.IEC, "GiB", 1024**3),
 )
 
@@ -131,7 +139,7 @@ RATE_VALUED_METRICS: tuple[MetricName, ...] = (
 def format_rate_value(value: MetricValue | None) -> FormattedStatisticText:
     rounding = _publication_rounding()
     if value is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     return f"{value * 100.0:.{rounding.percentage_decimals}f}%"
 
 
@@ -144,30 +152,30 @@ def format_metric_value(
         return format_rate_value(value)
     rounding = _publication_rounding()
     if value is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     return f"{value:.{rounding.f1_accuracy_rates_decimals}f}"
 
 
 def format_byte_value(value: MetricValue | None) -> FormattedStatisticText:
     rounding = _publication_rounding()
     if value is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     for unit, label, scale in BYTE_UNIT_LABELS:
         if unit is rounding.byte_units:
             return f"{value / scale:.{rounding.byte_decimals}f} {label}"
-    raise ValueError(f"unsupported byte unit: {rounding.byte_units.value}")
+    raise ValueError(f"unsupported byte unit: {rounding.byte_units}")
 
 
 def format_p_value(value: PValue | None) -> FormattedStatisticText:
     rounding = _publication_rounding()
     if value is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     if value < rounding.p_value_display_floor:
         return f"<{rounding.p_value_display_floor:.4f}"
     return f"{value:.{rounding.p_value_significant_digits}g}"
 
 
-def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
+def _comparison_reference_label(definition: ComparisonDefinition) -> ReportCellText:
     if definition.reference_kind is ComparisonReferenceKind.ZERO:
         return ComparisonReferenceKind.ZERO
     if (
@@ -189,25 +197,26 @@ def _comparison_reference_label(definition: ComparisonDefinition) -> TextValue:
 def _statistical_summary_row(
     family: ComparisonFamilyResult,
     comparison: ComparisonResult,
-) -> tuple[TextValue, ...]:
+) -> tuple[ReportCellText, ...]:
     definition = comparison.definition
     effect_decimals = _publication_rounding().effect_size_decimals
     effect = (
-        "NA" #TODO: convert to enum instead of hardcoded string
+        ReportCellLiteral.NOT_AVAILABLE
         if comparison.paired_standardized_effect is None
         else f"{comparison.paired_standardized_effect:.{effect_decimals}f}"
     )
     confidence_interval = (
-        "NA" #TODO: convert to enum instead of hardcoded string
+        ReportCellLiteral.NOT_AVAILABLE
         if comparison.confidence_interval is None
         else (f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]")
     )
-    margin = "NA" #TODO: convert to enum instead of hardcoded string
+    margin = ReportCellLiteral.NOT_AVAILABLE
     if definition.margin is not None:
         margin = f"{definition.margin:.3f}"
     materiality = (
-        "NA" #TODO: convert to enum instead of hardcoded string
-        if definition.material_threshold is None else f"{definition.material_threshold:.3f}"
+        ReportCellLiteral.NOT_AVAILABLE
+        if definition.material_threshold is None
+        else f"{definition.material_threshold:.3f}"
     )
     reference_label = _comparison_reference_label(definition)
     comparison_identity = (
@@ -217,26 +226,32 @@ def _statistical_summary_row(
     test_kind: ComparisonTestKind = definition.test_kind
     materiality_direction: MaterialityDirection = definition.materiality_direction
     return (
-        str(family.family),
+        family.family,
         comparison_identity,
-        str(definition.metric),
-        str(definition.orientation),
-        str(test_kind),
-        str(materiality_direction),
+        definition.metric,
+        definition.orientation,
+        test_kind,
+        materiality_direction,
         margin,
         str(comparison.complete_seed_count),
-        format_metric_value(comparison.mean_paired_difference, str(definition.metric)),
-        format_metric_value(comparison.median_paired_difference, str(definition.metric)),
+        format_metric_value(comparison.mean_paired_difference, definition.metric),
+        format_metric_value(comparison.median_paired_difference, definition.metric),
         effect,
         format_p_value(comparison.raw_p_value),
         format_p_value(comparison.adjusted_p_value),
         confidence_interval,
         materiality,
-        "pass"  #TODO: convert to enum instead of hardcoded string
-         if comparison.comparison_state is ComparisonState.PASSED else "fail", #TODO: convert to enum instead of hardcoded string
-        "pass" #TODO: convert to enum instead of hardcoded string
-            if comparison.materiality_passes is not False else "fail", #TODO: convert to enum instead of hardcoded string
-        str(comparison.comparison_state),
+        (
+            ReportCellLiteral.PASS
+            if comparison.comparison_state is ComparisonState.PASSED
+            else ReportCellLiteral.FAIL
+        ),
+        (
+            ReportCellLiteral.PASS
+            if comparison.materiality_passes is not False
+            else ReportCellLiteral.FAIL
+        ),
+        comparison.comparison_state,
     )
 
 
@@ -249,34 +264,34 @@ def render_statistical_summary_table(
         for comparison in family.comparisons
     )
     return RenderedTable(
-        name="Statistical Summary", #TODO: convert to enum instead of hardcoded string
+        name=TableName.STATISTICAL_SUMMARY,
         csv_text=csv_text(
             (
-                "comparison_family",
-                "comparison",
-                "metric",
-                "direction",
-                "test_kind",
-                "materiality_direction",
-                "margin",
-                "n_pairs",
-                "mean_difference",
-                "median_difference",
-                "paired_dz",
-                "raw_p",
-                "holm_p",
-                "confidence_interval_95",
-                "materiality_threshold",
-                "statistical_pass",
-                "materiality_pass",
-                "final_comparison_state",
+                ReportColumnName.COMPARISON_FAMILY,
+                ReportColumnName.COMPARISON,
+                ReportColumnName.METRIC,
+                ReportColumnName.DIRECTION,
+                ReportColumnName.TEST_KIND,
+                ReportColumnName.MATERIALITY_DIRECTION,
+                ReportColumnName.MARGIN,
+                ReportColumnName.N_PAIRS,
+                ReportColumnName.MEAN_DIFFERENCE,
+                ReportColumnName.MEDIAN_DIFFERENCE,
+                ReportColumnName.PAIRED_DZ,
+                ReportColumnName.RAW_P,
+                ReportColumnName.HOLM_P,
+                ReportColumnName.CONFIDENCE_INTERVAL_95,
+                ReportColumnName.MATERIALITY_THRESHOLD,
+                ReportColumnName.STATISTICAL_PASS,
+                ReportColumnName.MATERIALITY_PASS,
+                ReportColumnName.FINAL_COMPARISON_STATE,
             ),
             rows,
         ),
     )
 
 
-COLLAPSE_SURVIVAL_RULES: tuple[tuple[CollapseDecisionKind, TextValue], ...] = (
+COLLAPSE_SURVIVAL_RULES: tuple[tuple[CollapseDecisionKind, ProtocolRuleText], ...] = (
     (
         CollapseDecisionKind.PROPOSAL_ASSISTANCE,
         (
@@ -311,29 +326,29 @@ COLLAPSE_SURVIVAL_RULES: tuple[tuple[CollapseDecisionKind, TextValue], ...] = (
 )
 
 
-def _collapse_survival_rule(kind: CollapseDecisionKind) -> TextValue:
+def _collapse_survival_rule(kind: CollapseDecisionKind) -> ProtocolRuleText:
     for registered_kind, rule in COLLAPSE_SURVIVAL_RULES:
         if registered_kind is kind:
             return rule
-    raise ValueError(f"unsupported collapse decision kind {kind.value}")
+    raise ValueError(f"unsupported collapse decision kind {kind}")
 
 
 def _collapse_core_action(
     kind: CollapseDecisionKind,
     resolved_core: ResolvedCore,
-) -> TextValue:
+) -> ReportCellText:
     if kind is CollapseDecisionKind.PROPOSAL_ASSISTANCE:
-        return resolved_core.opening_mode.value
+        return resolved_core.opening_mode
     if kind is CollapseDecisionKind.PLURALITY:
-        return resolved_core.reproduction_row_requirement.value
+        return resolved_core.reproduction_row_requirement
     if kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION:
         return "source-excluded" if resolved_core.source_excluded else "source-influenced"
     if kind is CollapseDecisionKind.EXTERNAL_VERIFICATION:
-        return resolved_core.row_verification_mode.value
-    raise ValueError(f"unsupported collapse decision kind {kind.value}")
+        return resolved_core.row_verification_mode
+    raise ValueError(f"unsupported collapse decision kind {kind}")
 
 
-def _collapse_observed_outcome(decision: CollapseDecision) -> TextValue:
+def _collapse_observed_outcome(decision: CollapseDecision) -> ReportCellText:
     if decision.kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION and not decision.survives:
         return "Central Not Supported"
     return "Survives" if decision.survives else "Removed"
@@ -345,11 +360,11 @@ def render_collapse_decisions_table(
 ) -> RenderedTable:
     rows = tuple(
         (
-            decision.kind.value,
+            decision.kind,
             decision.comparator,
-            decision.primary_material_effect or "none",
+            decision.primary_material_effect or ReportCellLiteral.NONE,
             format_p_value(decision.adjusted_p_value),
-            "pass" if decision.constraint_passes else "fail",
+            (ReportCellLiteral.PASS if decision.constraint_passes else ReportCellLiteral.FAIL),
             _collapse_survival_rule(decision.kind),
             _collapse_observed_outcome(decision),
             _collapse_core_action(decision.kind, resolved_core),
@@ -357,17 +372,17 @@ def render_collapse_decisions_table(
         for decision in decisions
     )
     return RenderedTable(
-        name="Collapse Decisions",
+        name=TableName.COLLAPSE_DECISIONS,
         csv_text=csv_text(
             (
-                "mechanism",
-                "comparator",
-                "primary_material_effect",
-                "adjusted_p",
-                "liveness_safety_constraint",
-                "survival_rule",
-                "observed_outcome",
-                "core_action",
+                ReportColumnName.MECHANISM,
+                ReportColumnName.COMPARATOR,
+                ReportColumnName.PRIMARY_MATERIAL_EFFECT,
+                ReportColumnName.ADJUSTED_P,
+                ReportColumnName.LIVENESS_SAFETY_CONSTRAINT,
+                ReportColumnName.SURVIVAL_RULE,
+                ReportColumnName.OBSERVED_OUTCOME,
+                ReportColumnName.CORE_ACTION,
             ),
             rows,
         ),
@@ -392,9 +407,9 @@ def _comparison_value(
             ):
                 return format_metric_value(
                     comparison.mean_paired_difference,
-                    comparison.definition.metric.value,
+                    comparison.definition.metric,
                 )
-    return "NA"
+    return ReportCellLiteral.NOT_AVAILABLE
 
 
 def _comparison_result(
@@ -421,14 +436,14 @@ def _comparison_confidence_interval(
     comparison: ComparisonResult | None,
 ) -> FormattedStatisticText:
     if comparison is None or comparison.confidence_interval is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     return f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]"
 
 
 def _materiality_text(comparison: ComparisonResult | None) -> FormattedStatisticText:
     if comparison is None or comparison.materiality_passes is None:
-        return "NA"
-    return "pass" if comparison.materiality_passes else "fail"
+        return ReportCellLiteral.NOT_AVAILABLE
+    return ReportCellLiteral.PASS if comparison.materiality_passes else ReportCellLiteral.FAIL
 
 
 def _outcome_metric_values(
@@ -490,7 +505,7 @@ def _outcome_metric_confidence_interval(
         config.seeds_and_determinism.analysis_seed,
     )
     if interval is None:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     return f"[{interval[0]:.3f},{interval[1]:.3f}]"
 
 
@@ -503,7 +518,7 @@ def _outcome_timing_median_iqr(
 ) -> FormattedStatisticText:
     values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
     if not values:
-        return "NA"
+        return ReportCellLiteral.NOT_AVAILABLE
     ordered_values = tuple(sorted(values))
     median = quantile_type7(ordered_values, 0.5)
     first_quartile = quantile_type7(ordered_values, 0.25)
@@ -531,7 +546,7 @@ def _completed_outcome_count(
     experiment: ExperimentName,
     method: MethodName,
     scenario: ScenarioName,
-) -> TextValue:
+) -> ReportCellText:
     return str(
         sum(
             1
@@ -668,20 +683,20 @@ def render_primary_results_table(
         for method, scenario in methods_scenarios
     )
     return RenderedTable(
-        name="Primary Results",
+        name=TableName.PRIMARY_RESULTS,
         csv_text=csv_text(
             (
-                "method",
-                "scenario",
-                "target_f1_mean",
-                "target_f1_95_ci",
-                "supported_macro_f1_harm",
-                "benign_false_alarm_rate_increase",
-                str(ComparisonMetric.ATTACK_SUCCESS_RATE),
-                "malicious_admission",
-                "legitimate_admission",
-                "worst_domain_target_f1",
-                "complete_seed_count",
+                ReportColumnName.METHOD,
+                ReportColumnName.SCENARIO,
+                ReportColumnName.TARGET_F1_MEAN,
+                ReportColumnName.TARGET_F1_95_CI,
+                ReportColumnName.SUPPORTED_MACRO_F1_HARM,
+                ReportColumnName.BENIGN_FALSE_ALARM_RATE_INCREASE,
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+                ReportColumnName.MALICIOUS_ADMISSION,
+                ReportColumnName.LEGITIMATE_ADMISSION,
+                ReportColumnName.WORST_DOMAIN_TARGET_F1,
+                ReportColumnName.COMPLETE_SEED_COUNT,
             ),
             rows,
         ),
@@ -702,7 +717,7 @@ def render_source_exclusion_results_table(
         None,
     )
     source_exclusion_gate_outcome: FormattedStatisticText = (
-        "NA"
+        ReportCellLiteral.NOT_AVAILABLE
         if source_exclusion_decision is None
         else ("Survives" if source_exclusion_decision.survives else "Not Supported")
     )
@@ -745,7 +760,7 @@ def render_source_exclusion_results_table(
             method,
         )
     )
-    target_noninferiority_status: FormattedStatisticText = "NA"
+    target_noninferiority_status: FormattedStatisticText = ReportCellLiteral.NOT_AVAILABLE
     target_noninferiority_comparison = _comparison_result(
         comparison_results,
         SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
@@ -754,7 +769,7 @@ def render_source_exclusion_results_table(
         ComparisonMetric.TARGET_F1,
     )
     if target_noninferiority_comparison is not None:
-        target_noninferiority_status = target_noninferiority_comparison.comparison_state.value
+        target_noninferiority_status = target_noninferiority_comparison.comparison_state
     rows = tuple(
         (
             method,
@@ -786,7 +801,7 @@ def render_source_exclusion_results_table(
             (
                 target_noninferiority_status
                 if method == SourceExclusionMethod.FULL_FEDSIRA
-                else "NA"
+                else ReportCellLiteral.NOT_AVAILABLE
             ),
             _outcome_summary_or_comparison(
                 outcomes,
@@ -818,19 +833,19 @@ def render_source_exclusion_results_table(
         )
     )
     return RenderedTable(
-        name="Source-Exclusion Results",
+        name=TableName.SOURCE_EXCLUSION_RESULTS,
         csv_text=csv_text(
             (
-                "method",
-                "post_production_asr",
-                "asr_difference_vs_fedsira",
-                "adjusted_p",
-                "confidence_interval_95",
-                "target_f1",
-                "target_noninferiority_pass",
-                "supported_f1_harm",
-                "benign_fpr_increase",
-                "source_exclusion_gate_outcome",
+                ReportColumnName.METHOD,
+                ReportColumnName.POST_PRODUCTION_ASR,
+                ReportColumnName.ASR_DIFFERENCE_VS_FEDSIRA,
+                ReportColumnName.ADJUSTED_P,
+                ReportColumnName.CONFIDENCE_INTERVAL_95,
+                ReportColumnName.TARGET_F1,
+                ReportColumnName.TARGET_NONINFERIORITY_PASS,
+                ReportColumnName.SUPPORTED_F1_HARM,
+                ReportColumnName.BENIGN_FPR_INCREASE,
+                ReportColumnName.SOURCE_EXCLUSION_GATE_OUTCOME,
             ),
             rows,
         ),
@@ -841,7 +856,7 @@ def render_ablation_results_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     outcomes: tuple[CellExecutionOutcome, ...],
 ) -> RenderedTable:
-    rows: list[tuple[TextValue, ...]] = []
+    rows: list[tuple[ReportCellText, ...]] = []
     for variant in AblationVariant:
         scenario = ablation_scenario_for_variant(variant)
         is_reference = variant is AblationVariant.FULL_FEDSIRA
@@ -851,16 +866,16 @@ def render_ablation_results_table(
         comparison = _comparison_result(
             comparison_results,
             MECHANISM_ABLATION_NAME,
-            variant.value,
+            variant,
             scenario,
             metric,
         )
         rows.append(
             (
-                variant.value,
-                variant.value,
+                variant,
+                variant,
                 scenario,
-                metric.value,
+                metric,
                 (
                     "reference row"
                     if is_reference
@@ -882,7 +897,7 @@ def render_ablation_results_table(
                     outcomes,
                     comparison_results,
                     MECHANISM_ABLATION_NAME,
-                    variant.value,
+                    variant,
                     scenario,
                     ComparisonMetric.TARGET_F1,
                 ),
@@ -890,7 +905,7 @@ def render_ablation_results_table(
                     outcomes,
                     comparison_results,
                     MECHANISM_ABLATION_NAME,
-                    variant.value,
+                    variant,
                     scenario,
                     ComparisonMetric.SUPPORTED_MACRO_F1_HARM,
                 ),
@@ -898,33 +913,33 @@ def render_ablation_results_table(
                     outcomes,
                     comparison_results,
                     MECHANISM_ABLATION_NAME,
-                    variant.value,
+                    variant,
                     scenario,
                     ComparisonMetric.ATTACK_SUCCESS_RATE,
                 ),
                 _completed_outcome_count(
                     outcomes,
                     MECHANISM_ABLATION_NAME,
-                    variant.value,
+                    variant,
                     scenario,
                 ),
             )
         )
     return RenderedTable(
-        name="Ablation Results",
+        name=TableName.ABLATION_RESULTS,
         csv_text=csv_text(
             (
-                "variant",
-                "targeted_mechanism",
-                "scenario",
-                "primary_metric",
-                "difference_from_full_reference",
-                "adjusted_p",
-                "materiality_pass",
-                "target_f1",
-                "supported_harm",
-                "asr_or_malicious_admission",
-                "complete_seeds",
+                ReportColumnName.VARIANT,
+                ReportColumnName.TARGETED_MECHANISM,
+                ReportColumnName.SCENARIO,
+                ReportColumnName.PRIMARY_METRIC,
+                ReportColumnName.DIFFERENCE_FROM_FULL_REFERENCE,
+                ReportColumnName.ADJUSTED_P,
+                ReportColumnName.MATERIALITY_PASS,
+                ReportColumnName.TARGET_F1,
+                ReportColumnName.SUPPORTED_HARM,
+                ReportColumnName.ASR_OR_MALICIOUS_ADMISSION,
+                ReportColumnName.COMPLETE_SEEDS,
             ),
             tuple(rows),
         ),
@@ -932,9 +947,9 @@ def render_ablation_results_table(
 
 
 class ByzantineBoundaryRow(FrozenDomainModel):
-    bound_status: TextValue
+    bound_status: ReportCellText
     compromised_count: RowCount
-    strategy: TextValue
+    strategy: ScenarioName
 
 
 def _condition_compromised_count(condition: ScenarioName) -> RowCount:
@@ -979,7 +994,7 @@ def render_byzantine_robustness_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     outcomes: tuple[CellExecutionOutcome, ...],
 ) -> RenderedTable:
-    rows: list[tuple[TextValue, ...]] = []
+    rows: list[tuple[ReportCellText, ...]] = []
     for family in comparison_results:
         for comparison in family.comparisons:
             definition = comparison.definition
@@ -995,7 +1010,7 @@ def render_byzantine_robustness_table(
             )
             rows.append(
                 (
-                    family.family.value,
+                    family.family,
                     definition.method,
                     definition.scientific_scenario,
                     boundary.bound_status,
@@ -1052,35 +1067,35 @@ def render_byzantine_robustness_table(
             )
     rows.sort(key=lambda row: (row[0], row[3] != "Within Bound", int(row[4]), row[1], row[2]))
     return RenderedTable(
-        name="Byzantine Robustness",
+        name=TableName.BYZANTINE_ROBUSTNESS,
         csv_text=csv_text(
             (
-                "bound_family",
-                "method",
-                "condition",
-                "bound_status",
-                "compromised_count",
-                "strategy",
-                "malicious_admission",
-                "legitimate_admission",
-                str(ComparisonMetric.ATTACK_SUCCESS_RATE),
-                "target_f1",
-                "certified_yield",
-                "dormant_rate",
-                "complete_seeds",
+                ReportColumnName.BOUND_FAMILY,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.BOUND_STATUS,
+                ReportColumnName.COMPROMISED_COUNT,
+                ReportColumnName.STRATEGY,
+                ReportColumnName.MALICIOUS_ADMISSION,
+                ReportColumnName.LEGITIMATE_ADMISSION,
+                ComparisonMetric.ATTACK_SUCCESS_RATE,
+                ReportColumnName.TARGET_F1,
+                ReportColumnName.CERTIFIED_YIELD,
+                ReportColumnName.DORMANT_RATE,
+                ReportColumnName.COMPLETE_SEEDS,
             ),
             tuple(rows),
         ),
     )
 
 
-def _strength_from_condition(condition: ScenarioName) -> TextValue:
+def _strength_from_condition(condition: ScenarioName) -> ReportCellText:
     if "|" not in condition:
         return "not applicable"
     return condition.rsplit("|", 1)[1]
 
 
-def _scope_boundary_for_boundary_experiment(experiment: ExperimentName) -> TextValue:
+def _scope_boundary_for_boundary_experiment(experiment: ExperimentName) -> ReportCellText:
     if experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
         return "corrupted operational evidence; clean oracle reported separately"
     if experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME:
@@ -1096,7 +1111,7 @@ def render_failure_boundaries_table(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     outcomes: tuple[CellExecutionOutcome, ...],
 ) -> RenderedTable:
-    rows: list[tuple[TextValue, ...]] = []
+    rows: list[tuple[ReportCellText, ...]] = []
     boundary_experiments = (
         EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
         SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -1155,7 +1170,7 @@ def render_failure_boundaries_table(
                                 ComparisonMetric.TARGET_F1,
                             )
                             if is_oracle_experiment
-                            else "NA"
+                            else ReportCellLiteral.NOT_AVAILABLE
                         ),
                         (
                             _scope_boundary_for_boundary_experiment(experiment)
@@ -1165,17 +1180,17 @@ def render_failure_boundaries_table(
                     )
                 )
     return RenderedTable(
-        name="Failure Boundaries",
+        name=TableName.FAILURE_BOUNDARIES,
         csv_text=csv_text(
             (
-                "boundary_family",
-                "condition",
-                "strength",
-                "admission_dormancy",
-                "target_f1",
-                "worst_domain_f1",
-                "clean_oracle_error",
-                "scope_boundary",
+                ReportColumnName.BOUNDARY_FAMILY,
+                ReportColumnName.CONDITION,
+                ReportColumnName.STRENGTH,
+                ReportColumnName.ADMISSION_DORMANCY,
+                ReportColumnName.TARGET_F1,
+                ReportColumnName.WORST_DOMAIN_F1,
+                ReportColumnName.CLEAN_ORACLE_ERROR,
+                ReportColumnName.SCOPE_BOUNDARY,
             ),
             tuple(rows),
         ),
@@ -1224,10 +1239,18 @@ def render_delay_and_efficiency_table(
                     DescriptiveScientificMetric.T_EVIDENCE,
                 )
             ),
-            _descriptive_timing_value(outcomes, experiment, method, scenario, "assignment-seconds"),
-            _descriptive_timing_value(outcomes, experiment, method, scenario, "reproduce-seconds"),
-            _descriptive_timing_value(outcomes, experiment, method, scenario, "verify-seconds"),
-            _descriptive_timing_value(outcomes, experiment, method, scenario, "synthesize-seconds"),
+            _descriptive_timing_value(
+                outcomes, experiment, method, scenario, DelayPhaseMetric.ASSIGNMENT_SECONDS
+            ),
+            _descriptive_timing_value(
+                outcomes, experiment, method, scenario, DelayPhaseMetric.REPRODUCE_SECONDS
+            ),
+            _descriptive_timing_value(
+                outcomes, experiment, method, scenario, DelayPhaseMetric.VERIFY_SECONDS
+            ),
+            _descriptive_timing_value(
+                outcomes, experiment, method, scenario, DelayPhaseMetric.SYNTHESIZE_SECONDS
+            ),
             _descriptive_timing_value(
                 outcomes,
                 experiment,
@@ -1295,31 +1318,31 @@ def render_delay_and_efficiency_table(
         for experiment, method, scenario in rows_to_render
     )
     return RenderedTable(
-        name="Delay and Efficiency",
+        name=TableName.DELAY_AND_EFFICIENCY,
         csv_text=csv_text(
             (
-                "experiment",
-                "method",
-                "condition",
-                "t_evidence",
-                "assignment_seconds",
-                "reproduction_seconds",
-                "verification_seconds",
-                "synthesis_seconds",
-                "post_evidence_wall_clock",
-                "gpu_seconds",
-                "peak_gpu_memory",
-                "host_rss",
-                "communication_bytes",
-                "transmissions",
-                "storage_bytes",
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.T_EVIDENCE,
+                ReportColumnName.ASSIGNMENT_SECONDS,
+                ReportColumnName.REPRODUCTION_SECONDS,
+                ReportColumnName.VERIFICATION_SECONDS,
+                ReportColumnName.SYNTHESIS_SECONDS,
+                ReportColumnName.POST_EVIDENCE_WALL_CLOCK,
+                ReportColumnName.GPU_SECONDS,
+                ReportColumnName.PEAK_GPU_MEMORY,
+                ReportColumnName.HOST_RSS,
+                ReportColumnName.COMMUNICATION_BYTES,
+                ReportColumnName.TRANSMISSIONS,
+                ReportColumnName.STORAGE_BYTES,
             ),
             rows,
         ),
     )
 
 
-GENERALIZATION_SCOPE_LABEL: TextValue = "Data/Attack Generalization Only"
+GENERALIZATION_SCOPE_LABEL: ReportCellText = "Data/Attack Generalization Only"
 
 
 def _generalization_references(
@@ -1346,16 +1369,16 @@ def render_generalization_results_table(
     definition = experiment_by_name(SECONDARY_DATASET_GENERALIZATION_NAME)
     references = _generalization_references(comparison_results)
     reference_label = ";".join(references) if references else "no predeclared comparator"
-    rows: list[tuple[TextValue, ...]] = []
+    rows: list[tuple[ReportCellText, ...]] = []
     for method in definition.methods:
         for secondary_scenario in SecondaryScenario:
-            scenario = secondary_scenario.value
+            scenario = secondary_scenario
             comparison = next(
                 (
                     _comparison_result(
                         comparison_results,
                         SECONDARY_DATASET_GENERALIZATION_NAME,
-                        str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+                        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                         scenario,
                         metric,
                     )
@@ -1435,21 +1458,21 @@ def render_generalization_results_table(
                 )
             )
     return RenderedTable(
-        name="Generalization Results",
+        name=TableName.GENERALIZATION_RESULTS,
         csv_text=csv_text(
             (
-                "method", #TODO: convert to enum instead of hardcoded string
-                "scenario", #TODO: convert to enum instead of hardcoded string
-                "target_f1_or_gain", #TODO: convert to enum instead of hardcoded string
-                "supported_harm", #TODO: convert to enum instead of hardcoded string
-                "benign_false_alarm_rate_increase", #TODO: convert to enum instead of hardcoded string
-                "malicious_admission", #TODO: convert to enum instead of hardcoded string
-                "legitimate_admission", #TODO: convert to enum instead of hardcoded string
-                "paired_effect_vs_fedsira", #TODO: convert to enum instead of hardcoded string
-                "predeclared_comparator", #TODO: convert to enum instead of hardcoded string
-                "adjusted_p", #TODO: convert to enum instead of hardcoded string
-                "materiality_pass", #TODO: convert to enum instead of hardcoded string
-                "scope_label", #TODO: convert to enum instead of hardcoded string
+                ReportColumnName.METHOD,
+                ReportColumnName.SCENARIO,
+                ReportColumnName.TARGET_F1_OR_GAIN,
+                ReportColumnName.SUPPORTED_HARM,
+                ReportColumnName.BENIGN_FALSE_ALARM_RATE_INCREASE,
+                ReportColumnName.MALICIOUS_ADMISSION,
+                ReportColumnName.LEGITIMATE_ADMISSION,
+                ReportColumnName.PAIRED_EFFECT_VS_FEDSIRA,
+                ReportColumnName.PREDECLARED_COMPARATOR,
+                ReportColumnName.ADJUSTED_P,
+                ReportColumnName.MATERIALITY_PASS,
+                ReportColumnName.SCOPE_LABEL,
             ),
             tuple(rows),
         ),
@@ -1462,8 +1485,8 @@ class RenderedTable(FrozenDomainModel):
 
 
 def csv_text(
-    header: tuple[TextValue, ...],
-    rows: tuple[tuple[TextValue, ...], ...],
+    header: tuple[ReportColumnText, ...],
+    rows: tuple[tuple[ReportCellText, ...], ...],
 ) -> TableCsvText:
     buffer = StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
@@ -1477,7 +1500,7 @@ def render_cell_metrics(
     table_name: TableName,
     format_value: Callable[[MetricValue | None], FormattedStatisticText],
 ) -> RenderedTable:
-    rows: list[tuple[TextValue, ...]] = []
+    rows: list[tuple[ReportCellText, ...]] = []
     for outcome in outcomes:
         for metric_name, metric_value in outcome.metrics:
             rows.append(
@@ -1496,14 +1519,14 @@ def render_cell_metrics(
         name=table_name,
         csv_text=csv_text(
             (
-                "experiment", #TODO: convert to enum instead of hardcoded string
-                "method", #TODO: convert to enum instead of hardcoded string
-                "condition", #TODO: convert to enum instead of hardcoded string
-                "master_seed", #TODO: convert to enum instead of hardcoded string
-                "repetition", #TODO: convert to enum instead of hardcoded string
-                "terminal_state", #TODO: convert to enum instead of hardcoded string
-                "metric", #TODO: convert to enum instead of hardcoded string
-                "value", #TODO: convert to enum instead of hardcoded string
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.MASTER_SEED,
+                ReportColumnName.REPETITION,
+                ReportColumnName.TERMINAL_STATE,
+                ReportColumnName.METRIC,
+                ReportColumnName.VALUE,
             ),
             tuple(rows),
         ),

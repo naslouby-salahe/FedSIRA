@@ -9,11 +9,16 @@ from fedsira.artifacts.store import (
     publish_artifact,
     read_current_artifact,
 )
-from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactDependencyLabel,
+    ArtifactFamily,
+    ArtifactInstanceLabel,
+    ArtifactProducer,
+    ExperimentName,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
-    ArtifactInstanceToken,
-    ExperimentName,
     FailureMessage,
     FramingField,
     FrozenDomainModel,
@@ -26,7 +31,6 @@ from fedsira.runtime import REPOSITORY_ROOT, framed_bytes
 
 COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|1"
 COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|1"
-COMPARISON_EVIDENCE_INSTANCE: ArtifactInstanceToken = "comparisons"
 
 
 class PersistedComparisonEvidence(FrozenDomainModel):
@@ -55,7 +59,7 @@ def metric_evidence_digest(
 def comparison_evidence_slot(experiment: ExperimentName) -> ArtifactSlot:
     return ArtifactSlot(
         family=ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
-        instance=COMPARISON_EVIDENCE_INSTANCE,
+        instance=ArtifactInstanceLabel.COMPARISONS,
         experiment=experiment,
     )
 
@@ -83,7 +87,7 @@ def publish_comparison_evidence(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="metric-evidence",
+                dependency=ArtifactDependencyLabel.METRIC_EVIDENCE,
                 digest=metric_evidence_digest(records),
             ),
         ),

@@ -19,9 +19,10 @@ from fedsira.domain.enums import (
     CapabilityContractScope,
     DatasetId,
     EpistemicFailureType,
+    NBaiotTriggerFeature,
     Role,
     RootCause,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -60,7 +61,6 @@ from fedsira.domain.types import (
     RepositoryPath,
     RoleBoundary,
     RolePosition,
-    RoleToken,
     RoleWindowContainsSample,
     RowCount,
     SampleId,
@@ -68,11 +68,10 @@ from fedsira.domain.types import (
     SamplingCap,
     SamplingSelectionDigest,
     SchemaVersion,
-    SeedDerivationLabel,
     SourceRowIndex,
+    SqlText,
     SquaredFeatureAccumulator,
     StandardizedValue,
-    TextValue,
     TriggerFeatureValue,
 )
 from fedsira.runtime import (
@@ -219,17 +218,6 @@ if not TRAINING_AND_SCREENING_ROLES.isdisjoint(EVIDENCE_ROLES):
     raise AssertionError("evidence roles must never also be eligible for training/screening")
 
 
-def role_hash_token(role: Role) -> RoleToken:
-    return role.name
-
-
-def role_from_hash_token(token: RoleToken) -> Role:
-    try:
-        return Role[token]
-    except KeyError as error:
-        raise ValueError(f"unsupported role token: {token}") from error
-
-
 def role_for_normalized_position(
     normalized_position: RolePosition,
     windows: tuple[RoleWindow, ...],
@@ -290,7 +278,7 @@ def sampling_cap_selection_digest(
     dataset_file_sha256: DatasetFileDigest,
     domain_hash_token: DomainId,
     class_id: ClassLabel,
-    role_hash_token_value: RoleToken,
+    role: Role,
     original_row_index: SourceRowIndex,
 ) -> SamplingSelectionDigest:
     return hashlib.sha256(
@@ -298,7 +286,7 @@ def sampling_cap_selection_digest(
             dataset_file_sha256,
             domain_hash_token,
             class_id,
-            role_hash_token_value,
+            role.name,
             original_row_index,
             PREPROCESSING_SAMPLE_ORDER_SEED,
         )
@@ -309,7 +297,7 @@ def apply_sampling_cap(
     dataset_file_sha256: DatasetFileDigest,
     domain_hash_token: DomainId,
     class_id: ClassLabel,
-    role_hash_token_value: RoleToken,
+    role: Role,
     original_row_indices: tuple[SourceRowIndex, ...],
     cap: SamplingCap,
 ) -> tuple[SourceRowIndex, ...]:
@@ -322,16 +310,13 @@ def apply_sampling_cap(
                 dataset_file_sha256,
                 domain_hash_token,
                 class_id,
-                role_hash_token_value,
+                role,
                 original_row_index,
             ),
             original_row_index,
         ),
     )
     return tuple(ordered[:cap])
-
-
-REPLAY_CAP_SELECTION_SEPARATOR: SeedDerivationLabel = "REPLAY_CAP_SELECTION"
 
 
 def supported_replay_cap_for_target_role(role: Role) -> SamplingCap | None:
@@ -353,14 +338,14 @@ def cap_replay_rows(
     if cap is None or len(rows.sample_ids) <= cap:
         return rows
     order_namespace_seed = derive_uint32(
-        REPLAY_CAP_SELECTION_SEPARATOR,
+        SeedDerivationLabel.REPLAY_CAP_SELECTION,
         0,
         dataset_manifest_hash,
         domain_token,
         class_id,
     )
     ordered = deterministic_order(
-        rows.sample_ids, REPLAY_CAP_SELECTION_SEPARATOR, order_namespace_seed
+        rows.sample_ids, SeedDerivationLabel.REPLAY_CAP_SELECTION, order_namespace_seed
     )
     kept = frozenset(ordered[:cap])
     retained = tuple(index for index, sample_id in enumerate(rows.sample_ids) if sample_id in kept)
@@ -448,15 +433,15 @@ def fit_feature_moments(
     )
 
 
-def sql_string(value: TextValue) -> TextValue:
+def sql_string(value: SqlText) -> SqlText:
     return "'" + value.replace("'", "''") + "'"
 
 
-def sql_ident(name: DatasetColumnName) -> TextValue:
+def sql_ident(name: DatasetColumnName) -> SqlText:
     return '"' + name.replace('"', '""') + '"'
 
 
-def varchar_column_map(names: tuple[DatasetColumnName, ...]) -> TextValue:
+def varchar_column_map(names: tuple[DatasetColumnName, ...]) -> SqlText:
     return "{" + ", ".join(f"{sql_string(name)}: 'VARCHAR'" for name in names) + "}"
 
 
@@ -464,7 +449,7 @@ def read_csv_relation(
     path: Path,
     header: tuple[DatasetColumnName, ...],
     ignore_errors: BooleanValue = False,
-) -> TextValue:
+) -> SqlText:
     return (
         "read_csv("
         f"{sql_string(path.as_posix())}, header=true, delim=',', quote='\"', escape='\"', "
@@ -473,11 +458,11 @@ def read_csv_relation(
     )
 
 
-def role_case_sql(position_sql: TextValue, windows: tuple[RoleWindow, ...]) -> TextValue:
+def role_case_sql(position_sql: SqlText, windows: tuple[RoleWindow, ...]) -> SqlText:
     clauses = tuple(
         "WHEN "
         f"{position_sql} >= {window.lower_inclusive} AND {position_sql} < {window.upper_exclusive} "
-        f"THEN {sql_string(role_hash_token(window.role))}"
+        f"THEN {sql_string(window.role.name)}"
         for window in windows
     )
     return "CASE " + " ".join(clauses) + " END"
@@ -488,7 +473,7 @@ def standardized_feature_sql(
     mean: FeatureMoment,
     standard_deviation: FeatureMoment,
     scaling_config: ScalingConfig,
-) -> TextValue:
+) -> SqlText:
     expression = f"(({sql_ident(column)} - ({mean})) / ({standard_deviation}))"
     return (
         f"LEAST(GREATEST({expression}, {scaling_config.clip_min}), {scaling_config.clip_max}) "
@@ -504,7 +489,7 @@ def open_tabular_engine(database_path: Path | None = None) -> duckdb.DuckDBPyCon
 
 def copy_query_to_parquet(
     connection: duckdb.DuckDBPyConnection,
-    query: TextValue,
+    query: SqlText,
     path: Path,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -552,7 +537,7 @@ def view_parquet_path(prepared_root: Path, view_key: PreparedViewKey) -> Path:
 
 def fetch_feature_statistics(
     connection: duckdb.DuckDBPyConnection,
-    source_sql: TextValue,
+    source_sql: SqlText,
     feature_names: tuple[DatasetColumnName, ...],
 ) -> tuple[FeatureStatistic, ...]:
     aggregations = ", ".join(
@@ -614,9 +599,9 @@ class DatasetSpecification(FrozenDomainModel):
     benign_class: DatasetClassToken
     supported_class_tokens: tuple[DatasetClassToken, ...]
     attack_carrier_class: DatasetClassToken | None
-    trigger_feature_names: tuple[FeatureName, ...]
+    trigger_feature_names: tuple[NBaiotTriggerFeature, ...]
     expected_predictor_count: PredictorCount | None
-    domain_proxy_semantics: TextValue
+    domain_proxy_semantics: SqlText
     raw_data_relative: RepositoryPath
 
 
@@ -677,7 +662,7 @@ def prepared_domain_summaries(
         )
         if domain_id not in specification.domain_ids:
             raise ValueError(f"unexpected {dataset} domain {domain_id!r} in {sidecar}")
-        counts[domain_id][(role_from_hash_token(str(role)), str(class_token))] += row_count
+        counts[domain_id][(Role(role), str(class_token))] += row_count
     if not counts:
         raise ValueError(f"no prepared-view evidence exists for {dataset}")
     return tuple(
@@ -803,7 +788,7 @@ class DatasetAdapter:
         return self.specification.benign_class
 
     @property
-    def trigger_feature_names(self) -> tuple[FeatureName, ...]:
+    def trigger_feature_names(self) -> tuple[NBaiotTriggerFeature, ...]:
         return self.specification.trigger_feature_names
 
     def domain_token(self, domain_id: DomainId) -> DomainId:
@@ -822,7 +807,7 @@ class DatasetAdapter:
     def view_key(
         self, domain_id: DomainId, class_token: DatasetClassToken, role: Role
     ) -> PreparedViewKey:
-        return f"{self.domain_token(domain_id)}_{class_token}_{role_hash_token(role)}"
+        return f"{self.domain_token(domain_id)}_{class_token}_{role.name}"
 
     def load_rows(
         self, domain_id: DomainId, class_token: DatasetClassToken, role: Role
@@ -910,9 +895,6 @@ class DatasetAdapter:
         return None if not combined_features else torch.cat(combined_features, dim=0).mean(dim=0)
 
 
-ATTACK_GENERATION_SEPARATOR: SeedDerivationLabel = SeedNamespace.ATTACK_GENERATION
-
-
 def fraction_to_attack_count(
     fraction: Probability, eligible_population_size: ExampleCount
 ) -> AttackCount:
@@ -923,7 +905,9 @@ def attack_row_order(
     eligible_row_ids: Sequence[ArtifactDigest], attack_generation_namespace_seed: NamespaceSeed
 ) -> tuple[ArtifactDigest, ...]:
     return deterministic_order(
-        tuple(eligible_row_ids), ATTACK_GENERATION_SEPARATOR, attack_generation_namespace_seed
+        tuple(eligible_row_ids),
+        SeedDerivationLabel.ATTACK_GENERATION,
+        attack_generation_namespace_seed,
     )
 
 
@@ -970,13 +954,12 @@ def relabel_triggered_rows_as_benign(
     return relabeled
 
 
-ROOT_CAUSE_SEPARATOR: SeedDerivationLabel = "CAPABILITY_ROOT_CAUSE"
-
-
 def root_cause_for_sample(sample_id: SampleId) -> RootCause:
     attacks = current_application_context().scientific_config.attacks_and_boundaries
     modulus = attacks.capability_under_specification.root_cause_hash_modulus
-    digest = hashlib.sha256(framed_bytes(ROOT_CAUSE_SEPARATOR, sample_id)).digest()
+    digest = hashlib.sha256(
+        framed_bytes(SeedDerivationLabel.CAPABILITY_ROOT_CAUSE, sample_id)
+    ).digest()
     index = int.from_bytes(digest[0:8], byteorder="big", signed=False) % modulus
     return RootCause.A if index == 0 else RootCause.B
 
@@ -1030,12 +1013,15 @@ def balanced_capability_selection(
     attack_generation_namespace_seed: NamespaceSeed,
 ) -> tuple[tuple[SampleId, ...], tuple[SampleId, ...]]:
     selected_count = min(len(root_cause_a_row_ids), len(root_cause_b_row_ids))
-    separator: SeedDerivationLabel = SeedNamespace.ATTACK_GENERATION
     ordered_a = deterministic_order(
-        tuple(root_cause_a_row_ids), separator, attack_generation_namespace_seed
+        tuple(root_cause_a_row_ids),
+        SeedDerivationLabel.ATTACK_GENERATION,
+        attack_generation_namespace_seed,
     )
     ordered_b = deterministic_order(
-        tuple(root_cause_b_row_ids), separator, attack_generation_namespace_seed
+        tuple(root_cause_b_row_ids),
+        SeedDerivationLabel.ATTACK_GENERATION,
+        attack_generation_namespace_seed,
     )
     return ordered_a[:selected_count], ordered_b[:selected_count]
 
@@ -1087,15 +1073,6 @@ def apply_attacker_induced_common_context(
     return apply_trigger_transform(standardized_features, trigger_feature_indices, trigger_value)
 
 
-QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY
-
-
-HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"
-
-
-HETEROGENEITY_FEATURE_SIGN_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_SIGN"
-
-
 class DomainQuantitySkew(FrozenDomainModel):
     domain: DomainId
     multiplier: HeterogeneityMultiplier
@@ -1112,7 +1089,7 @@ def quantity_skew_multiplier_by_domain(
     ordered_domains = deterministic_domain_order(
         adapter,
         domain_ids,
-        QUANTITY_SKEW_SEPARATOR,
+        SeedDerivationLabel.HETEROGENEITY,
         heterogeneity_namespace_seed,
     )
     return tuple(
@@ -1152,7 +1129,7 @@ def select_heterogeneity_shift_features(
 ) -> tuple[FeatureName, ...]:
     ordered = deterministic_order(
         all_feature_names,
-        HETEROGENEITY_FEATURE_ORDER_SEPARATOR,
+        SeedDerivationLabel.HETEROGENEITY_FEATURE_ORDER,
         heterogeneity_namespace_seed,
     )
     return ordered[:selected_feature_count]
@@ -1165,7 +1142,7 @@ def feature_shift_sign(
 ) -> FeatureShiftSign:
     digest = hashlib.sha256(
         framed_bytes(
-            HETEROGENEITY_FEATURE_SIGN_SEPARATOR,
+            SeedDerivationLabel.HETEROGENEITY_FEATURE_SIGN,
             heterogeneity_namespace_seed,
             domain_token,
             feature_name,

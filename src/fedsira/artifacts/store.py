@@ -5,23 +5,25 @@ from pathlib import Path
 
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
-    ArtifactDependencyName,
     ArtifactFamily,
     ArtifactFileToken,
-    ArtifactInstanceToken,
     ArtifactLifecycleState,
     ArtifactProducer,
+    ExperimentName,
     GitMetadataToken,
     LogEvent,
-    WorkspaceDirectoryToken,
+    RuntimeComponentName,
 )
 from fedsira.domain.types import (
     ArtifactComplete,
+    ArtifactDependencyName,
     ArtifactDigest,
+    ArtifactInstanceToken,
     ArtifactPayloadBytes,
     ArtifactReuseDecision,
+    ArtifactSerializedText,
     ByteCount,
-    ExperimentName,
+    CodeRevision,
     FailureMessage,
     FrozenDomainModel,
     LogRecordText,
@@ -29,7 +31,6 @@ from fedsira.domain.types import (
     RelativePathText,
     SchemaVersion,
     SupersededPublication,
-    TextValue,
 )
 from fedsira.runtime import (
     REPOSITORY_ROOT,
@@ -41,7 +42,7 @@ from fedsira.runtime import (
 
 ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
 
-ARTIFACT_LOGGER = get_structured_logger(WorkspaceDirectoryToken.ARTIFACTS)
+ARTIFACT_LOGGER = get_structured_logger(RuntimeComponentName.ARTIFACTS)
 
 ARTIFACT_PAYLOAD_SUFFIX: ArtifactFileToken = ArtifactFileToken.PAYLOAD_SUFFIX
 ARTIFACT_MANIFEST_SUFFIX: ArtifactFileToken = ArtifactFileToken.MANIFEST_SUFFIX
@@ -73,7 +74,7 @@ class ArtifactManifest(FrozenDomainModel):
     dependencies: tuple[ArtifactDependency, ...]
     procedure_identity: ProcedureIdentity
     configuration_digest: ArtifactDigest
-    code_revision: TextValue | None
+    code_revision: CodeRevision | None
 
     @property
     def family(self) -> ArtifactFamily:
@@ -110,7 +111,7 @@ def configure_artifact_logging(log_path: Path) -> None:
     configure_structured_file_logging(ARTIFACT_LOGGER, log_path)
 
 
-def repository_revision() -> TextValue | None:
+def repository_revision() -> CodeRevision | None:
     git_root = REPOSITORY_ROOT / GitMetadataToken.GIT_DIR
     head_path = git_root / GitMetadataToken.HEAD
     try:
@@ -162,7 +163,7 @@ def verify_checksum(payload: ArtifactPayloadBytes, manifest: ArtifactManifest) -
         raise ValueError(f"checksum mismatch for artifact {manifest.identity}")
 
 
-def _write_text_atomically(path: Path, text: TextValue) -> None:
+def _write_text_atomically(path: Path, text: ArtifactSerializedText) -> None:
     temporary_path = path.with_name(f"{path.name}.{uuid.uuid4().hex}.partial")
     temporary_path.write_text(text, encoding="utf-8")
     os.replace(temporary_path, path)
@@ -343,7 +344,7 @@ def read_current_artifact(
 
 class ArtifactLogFields(FrozenDomainModel):
     artifact_family: ArtifactFamily
-    artifact_instance: ArtifactInstanceToken | TextValue
+    artifact_instance: ArtifactInstanceToken
     artifact_identity: ArtifactDigest
 
 

@@ -4,7 +4,7 @@ import unicodedata
 from enum import IntEnum, StrEnum
 
 from fedsira.datasets.common import DatasetSpecification
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import DatasetId, SeedDerivationLabel
 from fedsira.domain.types import (
     BooleanValue,
     ClassLabel,
@@ -19,7 +19,6 @@ from fedsira.domain.types import (
     PredictorCountMatchesOfficial,
     RowCount,
     SampleId,
-    SeedDerivationLabel,
 )
 from fedsira.runtime import framed_bytes
 
@@ -43,7 +42,7 @@ class CICIoT2023TargetFamilyMember(StrEnum):
 
     @property
     def raw_token(self) -> ClassLabel:
-        return self.value
+        return self
 
 
 class CICIoTRowIdentifierToken(StrEnum):
@@ -73,7 +72,6 @@ TARGET_LABEL = CICIoTSpecialLabel.BACKDOOR_MALWARE
 BENIGN_LABEL = CICIoTSpecialLabel.BENIGN
 OFFICIAL_EXPECTED_PREDICTOR_COUNT: PredictorCount = 46
 PSEUDO_DOMAIN_COUNT: DomainCount = len(CICIoT2023PseudoDomain)
-PSEUDO_DOMAIN_HASH_SEPARATOR: SeedDerivationLabel = "CIC_IOT_2023_PSEUDO_DOMAIN"
 _NON_ALPHANUMERIC_RUN = re.compile(r"[^0-9A-Za-z]+")
 
 
@@ -85,7 +83,7 @@ def normalize_label_token(raw_label: ClassLabel) -> ClassLabel:
 
 def normalize_label(raw_label: ClassLabel) -> ClassLabel:
     normalized = normalize_label_token(raw_label)
-    target_family = tuple(member.value for member in CICIoT2023TargetFamilyMember)
+    target_family = tuple(CICIoT2023TargetFamilyMember)
     if normalized in target_family:
         return TARGET_LABEL
     try:
@@ -96,7 +94,7 @@ def normalize_label(raw_label: ClassLabel) -> ClassLabel:
 
 
 def target_family_collision_is_declared(first: ClassLabel, second: ClassLabel) -> BooleanValue:
-    target_family = tuple(member.value for member in CICIoT2023TargetFamilyMember)
+    target_family = tuple(CICIoT2023TargetFamilyMember)
     return (
         normalize_label_token(first) in target_family
         and normalize_label_token(second) in target_family
@@ -116,7 +114,7 @@ def hash_to_pseudo_domain(
 ) -> CICIoT2023PseudoDomain:
     digest = hashlib.sha256(
         framed_bytes(
-            PSEUDO_DOMAIN_HASH_SEPARATOR,
+            SeedDerivationLabel.PSEUDO_DOMAIN_HASH,
             dataset_manifest_hash,
             label,
             stable_row_id,

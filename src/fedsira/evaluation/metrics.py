@@ -25,8 +25,10 @@ from fedsira.datasets.common import (
 )
 from fedsira.domain.enums import (
     AdmissionState,
+    DescriptiveScientificMetric,
+    NBaiotTriggerFeature,
     RootCause,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.models import (
     ConfusionCounts,
@@ -49,7 +51,6 @@ from fedsira.domain.types import (
     FalseCertificationCount,
     FalseSameEquivalenceCheck,
     FeatureIndex,
-    FeatureName,
     FoldIndex,
     LegitimateAdmissionEligible,
     MasterSeed,
@@ -82,9 +83,6 @@ from fedsira.evaluation.statistics import (
     minimum_defined_domain_count,
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
-)
-from fedsira.experiments.definitions import (
-    DescriptiveScientificMetric,
 )
 from fedsira.learning.model import (
     FedSIRAClassifier,
@@ -1102,7 +1100,7 @@ def compute_screen_differential(
     control_anchor_loss = per_sample_cross_entropy(anchor_model, control_features, control_labels)
     control_source_loss = per_sample_cross_entropy(source_model, control_features, control_labels)
     config = current_application_context().scientific_config
-    screen_fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, master_seed)
+    screen_fold_seed = derive_uint32(SeedDerivationLabel.SCREEN_FOLD_SEED, master_seed)
     fold_count = config.protocol.proposal_screen.fold_count
     fold_assignment: OrderedDict[ArtifactDigest, FoldIndex] = OrderedDict()
     target_observations: list[ScreenLossObservation] = []
@@ -1163,7 +1161,7 @@ def triggered_to_benign_rate(
     flat_parameters: torch.Tensor,
     domain: DomainId,
     role: Role,
-    trigger_feature_names: tuple[FeatureName, ...],
+    trigger_feature_names: tuple[NBaiotTriggerFeature, ...],
     trigger_value: TriggerFeatureValue,
 ) -> MetricResult:
     feature_names = adapter.feature_names()

@@ -2,8 +2,8 @@ import typer
 from rich.console import Console
 
 from fedsira.application import FedSIRAApplication
-from fedsira.domain.enums import DatasetId
-from fedsira.domain.types import ExperimentName, OverwriteExisting
+from fedsira.domain.enums import DatasetId, ExperimentName
+from fedsira.domain.types import OverwriteExisting
 
 app = typer.Typer(name="fedsira", no_args_is_help=True)
 console = Console()

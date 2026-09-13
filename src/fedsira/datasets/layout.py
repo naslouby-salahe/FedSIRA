@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fedsira.artifacts.paths import prepared_evidence_root
 from fedsira.datasets.common import dataset_specification
-from fedsira.domain.enums import DatasetId, ExperimentLifecycleState
-from fedsira.domain.types import BooleanValue, FailureMessage
+from fedsira.domain.enums import DatasetId, ExperimentLifecycleState, RepositoryRootName
+from fedsira.domain.types import BooleanValue, FailureMessage, FrozenDomainModel
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
 
@@ -23,23 +23,48 @@ def raw_dataset_root(dataset: DatasetId) -> Path | None:
 def required_raw_dataset_root(dataset: DatasetId) -> Path:
     root = raw_dataset_root(dataset)
     if root is None:
-        raise ValueError(f"raw data for {dataset.value} is present under no configured root")
+        raise ValueError(f"raw data for {dataset} is present under no configured root")
     return root
 
 
-def validate_repository_layout() -> tuple[FailureMessage, ...]:
+class RepositoryLayoutFailure(FrozenDomainModel):
+    root: RepositoryRootName
+    message: FailureMessage
+
+
+def validate_repository_layout() -> tuple[RepositoryLayoutFailure, ...]:
     layout = current_application_context().scientific_config.execution.repository_layout
     repository_root = current_application_context().repository_root
-    failures: list[FailureMessage] = []
+    failures: list[RepositoryLayoutFailure] = []
     if not (repository_root / layout.source).is_dir():
-        failures.append(f"configured source root is missing: {layout.source}")
+        failures.append(
+            RepositoryLayoutFailure(
+                root=RepositoryRootName.SOURCE,
+                message=f"configured source root is missing: {layout.source}",
+            )
+        )
     if not (repository_root / layout.tests).is_dir():
-        failures.append(f"configured tests root is missing: {layout.tests}")
+        failures.append(
+            RepositoryLayoutFailure(
+                root=RepositoryRootName.TESTS,
+                message=f"configured tests root is missing: {layout.tests}",
+            )
+        )
     if not (repository_root / layout.raw_data).exists():
-        failures.append(f"configured raw data root is missing: {layout.raw_data}")
+        failures.append(
+            RepositoryLayoutFailure(
+                root=RepositoryRootName.RAW_DATA,
+                message=f"configured raw data root is missing: {layout.raw_data}",
+            )
+        )
     if not (repository_root / layout.manuscript_results).exists():
         failures.append(
-            f"configured manuscript results root is missing: {layout.manuscript_results}"
+            RepositoryLayoutFailure(
+                root=RepositoryRootName.MANUSCRIPT_RESULTS,
+                message=(
+                    "configured manuscript results root is missing: " f"{layout.manuscript_results}"
+                ),
+            )
         )
     return tuple(failures)
 

@@ -9,7 +9,7 @@ from fedsira.datasets.common import (
     RealAnchor,
     Role,
 )
-from fedsira.domain.enums import AdmissionState, SeedNamespace, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, SeedDerivationLabel, TernaryOutcome
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     AllowSourceAsVerifier,
@@ -24,7 +24,6 @@ from fedsira.domain.types import (
     OneVotePerDomain,
     ReproductionRowCertified,
     ResolvedRowRequirementReached,
-    SeedDerivationLabel,
     TimestampValid,
     VerifierCount,
     VerifierEligible,
@@ -46,10 +45,6 @@ from fedsira.protocol.proposal import (
 )
 from fedsira.protocol.rules import resolve_ternary_outcome
 from fedsira.runtime import current_application_context, derive_uint32, deterministic_order
-
-VERIFIER_ASSIGNMENT_SEPARATOR: SeedDerivationLabel = SeedNamespace.VERIFIER_ASSIGNMENT #TODO: convert to enum instead of hardcoded string
-BYZANTINE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.BYZANTINE_SELECTION #TODO: convert to enum instead of hardcoded string
-COMMITTEE_DRAW_SEPARATOR: SeedDerivationLabel = SeedNamespace.COMMITTEE_DRAW #TODO: convert to enum instead of hardcoded string
 
 
 def verifier_is_eligible(
@@ -80,7 +75,7 @@ def verifier_assignment_seed_for_row(
     verifier_assignment_namespace_seed: NamespaceSeed, reproduction_commitment_hash: ArtifactDigest
 ) -> DerivedSeed:
     return derive_uint32(
-        VERIFIER_ASSIGNMENT_SEPARATOR,
+        SeedDerivationLabel.VERIFIER_ASSIGNMENT,
         verifier_assignment_namespace_seed,
         reproduction_commitment_hash,
     )
@@ -89,16 +84,18 @@ def verifier_assignment_seed_for_row(
 def deterministic_verifier_panel(
     eligible_domains: Sequence[DomainId], row_seed: DerivedSeed, panel_size: VerifierCount
 ) -> tuple[DomainId, ...]:
-    return deterministic_order(tuple(eligible_domains), VERIFIER_ASSIGNMENT_SEPARATOR, row_seed)[
-        :panel_size
-    ]
+    return deterministic_order(
+        tuple(eligible_domains), SeedDerivationLabel.VERIFIER_ASSIGNMENT, row_seed
+    )[:panel_size]
 
 
 def byzantine_selection_order(
     eligible_domains: Sequence[DomainId], byzantine_selection_namespace_seed: NamespaceSeed
 ) -> tuple[DomainId, ...]:
     return deterministic_order(
-        tuple(eligible_domains), BYZANTINE_SELECTION_SEPARATOR, byzantine_selection_namespace_seed
+        tuple(eligible_domains),
+        SeedDerivationLabel.BYZANTINE_SELECTION,
+        byzantine_selection_namespace_seed,
     )
 
 
@@ -123,7 +120,7 @@ def diagnostic_committee_panel(
     panel_size: VerifierCount,
 ) -> tuple[DomainId, ...]:
     return deterministic_order(
-        tuple(eligible_domains), COMMITTEE_DRAW_SEPARATOR, committee_draw_namespace_seed
+        tuple(eligible_domains), SeedDerivationLabel.COMMITTEE_DRAW, committee_draw_namespace_seed
     )[:panel_size]
 
 
@@ -153,9 +150,6 @@ def verification_pending_transition(
     return AdmissionState.REPRODUCTION_PENDING
 
 
-VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE" #TODO: convert to enum instead of hardcoded string
-
-
 def verifier_panel(
     adapter: DatasetAdapter,
     source_domain: DomainId | None,
@@ -171,7 +165,7 @@ def verifier_panel(
         if verifier_is_eligible(domain, source_domain, reproducer_domain, allow_source_as_verifier)
     )
     row_seed = verifier_assignment_seed_for_row(
-        derive_uint32(VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR, master_seed),
+        derive_uint32(SeedDerivationLabel.VERIFIER_ASSIGNMENT_NAMESPACE, master_seed),
         commitment_hash,
     )
     if not verifier_assignment_timestamp_is_valid(1.0, 0.0):

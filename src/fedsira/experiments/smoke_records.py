@@ -1,13 +1,12 @@
+from fedsira.domain.enums import SmokeCheckName
 from fedsira.domain.types import (
     ArtifactDigest,
+    CodeRevision,
     FrozenDomainModel,
     InvariantChecksPassed,
     SchemaVersion,
-    TextValue,
+    SmokeCheckDetail,
 )
-
-SmokeCheckName = TextValue
-SmokeCheckDetail = TextValue
 
 
 class SmokeCheckResult(FrozenDomainModel):
@@ -29,4 +28,4 @@ class PersistedSmokeRecord(FrozenDomainModel):
     passed: InvariantChecksPassed
     checks: tuple[SmokeCheckResult, ...]
     configuration_digest: ArtifactDigest
-    code_revision: TextValue | None
+    code_revision: CodeRevision | None

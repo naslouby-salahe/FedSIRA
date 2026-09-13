@@ -1,10 +1,7 @@
 from pathlib import Path
 
 from fedsira.datasets.common import DatasetAdapter, dataset_specification
-from fedsira.domain.enums import DatasetId
-from fedsira.experiments.definitions import (
-    EvidenceArrivalSchedule,
-)
+from fedsira.domain.enums import DatasetId, EvidenceArrivalSchedule
 from fedsira.protocol.rules import (
     compute_t_evidence,
     cycle_when_requirement_met,

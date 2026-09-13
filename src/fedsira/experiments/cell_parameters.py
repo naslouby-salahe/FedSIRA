@@ -1,15 +1,15 @@
 from fedsira.datasets.common import DatasetAdapter, Role
-from fedsira.domain.enums import AdmissionOpeningMode, CoreMethodIdentity
+from fedsira.domain.enums import (
+    AblationVariant,
+    AdmissionOpeningMode,
+    BaselineIdentity,
+    CoreMethodIdentity,
+    OpeningMode,
+)
 from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import BooleanValue, DomainId, RequiredReproductionRowCount
 from fedsira.experiments.collapse import ResolvedCore
-from fedsira.experiments.definitions import (
-    MECHANISM_ABLATION_NAME,
-    AblationVariant,
-    OpeningMode,
-    ablation_opening_mode,
-)
-from fedsira.protocol.baselines.registry import BaselineIdentity
+from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, ablation_opening_mode
 from fedsira.protocol.capability_contract import reproduction_evidence_is_adequate
 from fedsira.protocol.proposal import supported_role_count, target_role_count
 from fedsira.runtime import current_application_context

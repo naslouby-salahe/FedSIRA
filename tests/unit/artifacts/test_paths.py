@@ -6,7 +6,7 @@ from fedsira.artifacts.paths import (
     path_scope_for_family,
     workspace_root_for_family,
 )
-from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope
+from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, ExperimentName
 
 
 def test_preprocessing_family_maps_to_execution_workspace_preprocessing() -> None:
@@ -34,11 +34,25 @@ def test_experiment_artifact_family_requires_experiment_name() -> None:
 
 
 def test_experiment_artifact_family_maps_under_execution_workspace_experiments() -> None:
-    root = workspace_root_for_family(ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "krum-baseline")
-    assert root == execution_workspace_root() / "experiments" / "krum-baseline"
+    root = workspace_root_for_family(
+        ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
+    )
+    assert (
+        root
+        == execution_workspace_root()
+        / "experiments"
+        / ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
+    )
 
 
 def test_manuscript_result_family_maps_under_manuscript_results_only() -> None:
-    root = workspace_root_for_family(ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "krum-baseline")
-    assert root == manuscript_results_root() / "experiments" / "krum-baseline"
+    root = workspace_root_for_family(
+        ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
+    )
+    assert (
+        root
+        == manuscript_results_root()
+        / "experiments"
+        / ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
+    )
     assert execution_workspace_root() not in root.parents

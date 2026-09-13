@@ -37,8 +37,6 @@ from fedsira.datasets.common import (
     open_tabular_engine,
     read_csv_relation,
     role_case_sql,
-    role_from_hash_token,
-    role_hash_token,
     sampling_cap_for_role,
     sql_ident,
     sql_string,
@@ -48,7 +46,13 @@ from fedsira.datasets.common import (
     view_parquet_path,
     write_json_payload,
 )
-from fedsira.domain.enums import CICIoT2023Acquisition, DatasetId, LogEvent
+from fedsira.domain.enums import (
+    CICIoT2023Acquisition,
+    DatasetId,
+    LogEvent,
+    RuntimeComponentName,
+    SeedDerivationLabel,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -65,14 +69,13 @@ from fedsira.domain.types import (
     PredictorCountMatchesOfficial,
     PreparedViewKey,
     RelativePathText,
-    RoleToken,
+    RoleHashToken,
     RowCount,
     SampleIdPrefix,
     SamplingSelectionDigest,
     SchemaVersion,
-    SeedDerivationLabel,
     SourceRowIndex,
-    TextValue,
+    SqlText,
 )
 from fedsira.runtime import (
     current_application_context,
@@ -82,7 +85,6 @@ from fedsira.runtime import (
 )
 
 _ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
-DATASET_MANIFEST_SEPARATOR: SeedDerivationLabel = "CICIOT2023_DATASET_MANIFEST_V1"
 STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"
 PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
@@ -90,7 +92,7 @@ ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|
 EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
 _WHITESPACE_HYPHEN_UNDERSCORE = re.compile(r"[\s\-_]+")
 
-CICIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")
+CICIOT_PREPARATION_LOGGER = get_structured_logger(RuntimeComponentName.DATASET_PREPARATION)
 
 
 class SecondaryCsvFile(FrozenDomainModel):
@@ -161,7 +163,7 @@ def secondary_sampling_selection_key(
             dataset_manifest_hash,
             pseudo_domain.display_token,
             normalized_label,
-            role_hash_token(role),
+            role.name,
             stable_row_id,
             PREPROCESSING_SAMPLE_ORDER_SEED,
         )
@@ -207,7 +209,7 @@ def discover_secondary_csv_files(
         )
     if not discovered:
         raise ValueError(
-            f"no CICIoT2023 CSV shards match the configured {acquisition.value} acquisition "
+            f"no CICIoT2023 CSV shards match the configured {acquisition} acquisition "
             f"beneath {csv_root}"
         )
     return tuple(discovered)
@@ -221,7 +223,7 @@ def compute_dataset_manifest_hash(
     fields: list[FramingField] = []
     for item in sorted(discovered, key=lambda discovered_file: discovered_file.relative_path):
         fields.extend((item.relative_path, item.file_sha256))
-    return hashlib.sha256(framed_bytes(DATASET_MANIFEST_SEPARATOR, *fields)).hexdigest()
+    return hashlib.sha256(framed_bytes(SeedDerivationLabel.DATASET_MANIFEST, *fields)).hexdigest()
 
 
 def read_csv_header(path: Path) -> tuple[DatasetColumnName, ...]:
@@ -360,7 +362,7 @@ def _ciciot_pseudo_domain(
 def _ciciot_sampling_digest(
     label: DatasetClassToken,
     domain_index: CICIoT2023PseudoDomain,
-    role_token: RoleToken,
+    role_hash_token: RoleHashToken,
     row_id: ArtifactDigest,
     dataset_manifest_hash: DatasetManifestDigest,
 ) -> SamplingSelectionDigest:
@@ -368,7 +370,7 @@ def _ciciot_sampling_digest(
         dataset_manifest_hash,
         label,
         CICIoT2023PseudoDomain(domain_index),
-        role_from_hash_token(role_token),
+        Role[role_hash_token],
         row_id,
     )
     return digest
@@ -408,7 +410,7 @@ def _create_preparation_tables(
     )
 
 
-def _exclusion_reason_sql(predictor_columns: tuple[DatasetColumnName, ...]) -> TextValue:
+def _exclusion_reason_sql(predictor_columns: tuple[DatasetColumnName, ...]) -> SqlText:
     unparseable = " OR ".join(
         f"try_cast({sql_ident(name)} AS DOUBLE) IS NULL" for name in predictor_columns
     )
@@ -519,7 +521,7 @@ def _ingest_shard(
         raw_count = physical_row_count
     reason_sql = _exclusion_reason_sql(predictor_columns)
     if item.label_column is not None:
-        raw_label_sql: TextValue = sql_ident(item.label_column)
+        raw_label_sql: SqlText = sql_ident(item.label_column)
     elif item.shard_class is not None:
         raw_label_sql = sql_string(item.shard_class)
     else:
@@ -564,27 +566,26 @@ def _ingest_shard(
     return raw_count, labels
 
 
-def _cap_case_sql(caps: SamplingCapsPerDomain) -> TextValue:
+def _cap_case_sql(caps: SamplingCapsPerDomain) -> SqlText:
     target = sql_string(CICIoTSpecialLabel.BACKDOOR_MALWARE)
     benign = sql_string(CICIoTSpecialLabel.BENIGN)
-    clauses: list[TextValue] = []
+    clauses: list[SqlText] = []
     for role in TARGET_ROLE_ORDER:
         cap = sampling_cap_for_role(caps, role, is_target=True, is_benign=False)
         if cap is None:
             continue
         clauses.append(
-            f"WHEN normalized_label = {target} AND role = {sql_string(role_hash_token(role))} "
-            f"THEN {cap}"
+            f"WHEN normalized_label = {target} AND role = {sql_string(role.name)} THEN {cap}"
         )
     for role in SUPPORTED_ROLE_ORDER:
         if role is Role.REPORT_TEST:
             clauses.append(
-                f"WHEN normalized_label != {target} AND role = {sql_string(role_hash_token(role))} "
+                f"WHEN normalized_label != {target} AND role = {sql_string(role.name)} "
                 f"AND normalized_label = {benign} THEN {caps.report_test_benign}"
             )
             other_cap = caps.report_test_other_supported_per_class
             clauses.append(
-                f"WHEN normalized_label != {target} AND role = {sql_string(role_hash_token(role))} "
+                f"WHEN normalized_label != {target} AND role = {sql_string(role.name)} "
                 f"AND normalized_label != {benign} THEN {other_cap}"
             )
             continue
@@ -592,8 +593,7 @@ def _cap_case_sql(caps: SamplingCapsPerDomain) -> TextValue:
         if cap is None:
             continue
         clauses.append(
-            f"WHEN normalized_label != {target} AND role = {sql_string(role_hash_token(role))} "
-            f"THEN {cap}"
+            f"WHEN normalized_label != {target} AND role = {sql_string(role.name)} THEN {cap}"
         )
     return "CASE " + " ".join(clauses) + " END"
 
@@ -681,17 +681,17 @@ def _write_secondary_views(
         "FROM role_assignments GROUP BY 1, 2, 3 ORDER BY 1, 2, 3"
     ).fetchall()
     summaries: list[SecondaryPreparedViewSummary] = []
-    for domain_index, label, role_token, row_count in identities:
+    for domain_index, label, stored_role_hash_token, row_count in identities:
         pseudo_domain = CICIoT2023PseudoDomain(int(domain_index))
-        role = role_from_hash_token(str(role_token))
-        view_key: PreparedViewKey = f"{pseudo_domain.display_token}_{label}_{role_hash_token(role)}"
+        role = Role[str(stored_role_hash_token)]
+        view_key: PreparedViewKey = f"{pseudo_domain.display_token}_{label}_{role.name}"
         parquet_path = view_parquet_path(prepared_root, view_key)
         query = (
             "SELECT retained.stable_row_id AS sample_id, retained.normalized_label AS label, "
             f"{standardized} FROM role_assignments JOIN retained USING (stable_row_id) "
             f"WHERE role_assignments.pseudo_domain = {int(pseudo_domain)} "
             f"AND role_assignments.normalized_label = {sql_string(str(label))} "
-            f"AND role_assignments.role = {sql_string(role_hash_token(role))} "
+            f"AND role_assignments.role = {sql_string(role.name)} "
             "ORDER BY retained.stable_row_id"
         )
         if overwrite or not parquet_path.exists():
@@ -795,7 +795,7 @@ def materialize_ciciot2023_prepared_views(
             "SELECT "
             + ", ".join(sql_ident(name) for name in predictor_columns)
             + " FROM retained JOIN role_assignments USING (stable_row_id) "
-            f"WHERE role_assignments.role = {sql_string(role_hash_token(Role.ANCHOR_TRAIN))} "
+            f"WHERE role_assignments.role = {sql_string(Role.ANCHOR_TRAIN.name)} "
             f"AND retained.normalized_label != {sql_string(CICIoTSpecialLabel.BACKDOOR_MALWARE)}"
         )
         moments = fit_feature_moments(

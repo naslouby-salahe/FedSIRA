@@ -1,9 +1,12 @@
 from fedsira.domain.enums import (
     ArtifactFamily,
+    ArtifactInstanceLabel,
+    BaselineIdentity,
+    ComparisonMetric,
     ExperimentLifecycleState,
+    ExperimentName,
 )
 from fedsira.evaluation.comparison_evidence import (
-    COMPARISON_EVIDENCE_INSTANCE,
     PersistedComparisonEvidence,
     comparison_evidence_failures,
     comparison_evidence_slot,
@@ -15,17 +18,19 @@ from fedsira.experiments.engine import (
     PersistedExecutionRecord,
 )
 
+METHOD = BaselineIdentity.FEDAVG_REFERENCE
+
 
 def _record(metric_value: float | None) -> PersistedExecutionRecord:
     return PersistedExecutionRecord(
         schema_version=EXECUTION_RECORD_SCHEMA_VERSION,
-        semantic_key="Experiment|Method|Scenario|1103",
-        experiment="Experiment",
-        method="Method",
+        semantic_key=f"{ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION}|'''{METHOD}'''|Scenario|1103",
+        experiment=ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION,
+        method=METHOD,
         condition="Scenario",
         master_seed=1103,
         terminal_state=ExperimentLifecycleState.COMPLETED,
-        metrics=(("target-f1", metric_value),),
+        metrics=((ComparisonMetric.TARGET_F1, metric_value),),
         failure=None,
     )
 
@@ -46,17 +51,17 @@ def test_metric_evidence_digest_is_independent_of_record_order() -> None:
 
 
 def test_comparison_evidence_slot_is_per_experiment_and_uses_the_family() -> None:
-    slot = comparison_evidence_slot("Mechanism Ablation")
+    slot = comparison_evidence_slot(ExperimentName.MECHANISM_ABLATION)
     assert slot.family is ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT
-    assert slot.instance == COMPARISON_EVIDENCE_INSTANCE
-    assert slot.experiment == "Mechanism Ablation"
-    assert slot != comparison_evidence_slot("Primary Confirmatory Evaluation")
+    assert slot.instance == ArtifactInstanceLabel.COMPARISONS
+    assert slot.experiment == ExperimentName.MECHANISM_ABLATION
+    assert slot != comparison_evidence_slot(ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION)
 
 
 def test_persisted_comparison_evidence_round_trips_its_fields() -> None:
     evidence = PersistedComparisonEvidence(
         schema_version="fedsira|comparison_evidence|1",
-        experiment="Experiment",
+        experiment=ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION,
         metric_evidence_digest="a" * 64,
         families=(),
     )
@@ -65,5 +70,10 @@ def test_persisted_comparison_evidence_round_trips_its_fields() -> None:
 
 
 def test_currency_check_is_silent_when_no_evidence_was_published() -> None:
-    assert comparison_evidence_failures("Unpublished-Experiment", (_record(0.5),)) == ()
-    assert read_comparison_evidence("Unpublished-Experiment") is None
+    assert (
+        comparison_evidence_failures(
+            ExperimentName.SECONDARY_DATASET_GENERALIZATION, (_record(0.5),)
+        )
+        == ()
+    )
+    assert read_comparison_evidence(ExperimentName.SECONDARY_DATASET_GENERALIZATION) is None

@@ -11,6 +11,10 @@ from fedsira.domain.enums import (
     AdmissionState,
     ArtifactFamily,
     ArtifactFamilyDirectoryToken,
+    ExternalVerificationCondition,
+    PluralityCondition,
+    ReproducerCondition,
+    SecondaryScenario,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -20,12 +24,6 @@ from fedsira.domain.types import (
 )
 from fedsira.experiments.cell_parameters import domain_is_reproduction_adequate
 from fedsira.experiments.checkpoints import publish_trained_update, reproduction_stage_identity
-from fedsira.experiments.definitions import (
-    ExternalVerificationCondition,
-    PluralityCondition,
-    ReproducerCondition,
-    SecondaryScenario,
-)
 from fedsira.experiments.engine import PreparedEvidenceCounts
 from fedsira.experiments.planning import ScientificCell
 from fedsira.learning.post_reference import (
@@ -53,7 +51,6 @@ from fedsira.protocol.reproduction import (
 from fedsira.protocol.rules import reproducer_order_for_cell, reproduction_update_vector
 from fedsira.runtime import current_application_context
 
-BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
 ANCHOR_CHECKPOINT_IDENTITY = ArtifactFamilyDirectoryToken.ANCHOR_CHECKPOINT
 SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
 

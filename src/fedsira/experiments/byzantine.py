@@ -1,12 +1,8 @@
-from fedsira.domain.enums import ByzantineVerifierBehavior
+from fedsira.domain.enums import ByzantineVerifierBehavior, ReproducerCondition, VerifierCondition
 from fedsira.domain.types import (
     ByzantineDomainCount,
     CompromisedReproducerCount,
     ConditionName,
-)
-from fedsira.experiments.definitions import (
-    ReproducerCondition,
-    VerifierCondition,
 )
 from fedsira.runtime import current_application_context
 

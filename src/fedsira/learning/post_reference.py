@@ -27,11 +27,11 @@ from fedsira.datasets.common import (
     supported_replay_cap_for_target_role,
 )
 from fedsira.domain.enums import (
+    AlgorithmName,
     EpistemicFailureType,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.types import (
-    AlgorithmName,
     ArtifactDigest,
     BooleanValue,
     DatasetClassToken,
@@ -223,10 +223,6 @@ def run_post_reference_training(
 DomainT = TypeVar("DomainT", bound=str)
 
 
-LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "LOCAL_ONLY_REFERENCE"
-CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "CENTRALIZED_REFERENCE"
-
-
 def train_local_only_reference_checkpoint(
     adapter: DatasetAdapter, master_seed: MasterSeed, domain: DomainId
 ) -> torch.Tensor | None:
@@ -253,8 +249,8 @@ def train_local_only_reference_checkpoint(
     output_width = len(adapter.class_tokens)
     seed_job_local_rng_streams(
         derive_uint32(
-            "LOCAL_ONLY_REFERENCE_INIT",
-            namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
+            SeedDerivationLabel.LOCAL_ONLY_REFERENCE_INIT,
+            namespace_seed(master_seed, SeedDerivationLabel.MODEL_INITIALIZATION),
             adapter.domain_token(domain),
         )
     )
@@ -275,7 +271,7 @@ def train_local_only_reference_checkpoint(
                 master_seed,
                 adapter.manifest_hash(),
                 "local-only-start",
-                LOCAL_ONLY_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.LOCAL_ONLY_REFERENCE,
                 adapter.domain_token(domain),
                 0,
             ),
@@ -330,8 +326,8 @@ def train_centralized_reference_checkpoint(
     output_width = len(adapter.class_tokens)
     seed_job_local_rng_streams(
         derive_uint32(
-            "CENTRALIZED_REFERENCE_INIT",
-            namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION),
+            SeedDerivationLabel.CENTRALIZED_REFERENCE_INIT,
+            namespace_seed(master_seed, SeedDerivationLabel.MODEL_INITIALIZATION),
         )
     )
     initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
@@ -351,7 +347,7 @@ def train_centralized_reference_checkpoint(
                 master_seed,
                 adapter.manifest_hash(),
                 "centralized-start",
-                CENTRALIZED_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.CENTRALIZED_REFERENCE,
                 adapter.domain_token(adapter.domain_ids[0]),
                 0,
             ),
@@ -360,17 +356,6 @@ def train_centralized_reference_checkpoint(
     final_model = FedSIRAClassifier(input_width, output_width)
     load_model_state(final_model, client_result.state)
     return flatten_trainable_parameters(final_model)
-
-
-SOURCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SOURCE_CANDIDATE" #TODO:  convert to enum
-REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "REPRODUCTION" #TODO:  convert to enum
-VERIFIER_AWARE_REPRODUCTION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "VERIFIER_AWARE_REPRODUCTION" #TODO:  convert to enum
-IRRELEVANT_SOURCE_IMPROVEMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = ( #TODO:  convert to enum
-    "IRRELEVANT_SOURCE_IMPROVEMENT" #TODO:  convert to enum
-) #TODO:  convert to enum
-GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN: AlgorithmName = ( #TODO:  convert to enum
-    "GENERIC_HARD_SUPPORTED_EXAMPLES"
-)
 
 
 def combined_post_reference_rows(
@@ -620,7 +605,7 @@ def train_irrelevant_source_improvement_delta(
         anchor,
         source_domain,
         Role.REPRODUCTION,
-        IRRELEVANT_SOURCE_IMPROVEMENT_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.IRRELEVANT_SOURCE_IMPROVEMENT,
         None,
         None,
         None,
@@ -644,7 +629,7 @@ def train_verifier_aware_reproduction_delta(
         anchor,
         domain,
         Role.REPRODUCTION,
-        VERIFIER_AWARE_REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.VERIFIER_AWARE_REPRODUCTION,
         None,
         None,
         backdoor_scope,
@@ -669,7 +654,7 @@ def train_domain_reproduction_delta(
         anchor,
         domain,
         Role.REPRODUCTION,
-        REPRODUCTION_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.REPRODUCTION,
         root_cause_scope,
         epistemic_failure_scope,
         backdoor_scope,
@@ -707,7 +692,7 @@ def train_source_candidate_delta(
         anchor,
         source_domain,
         Role.SOURCE_PROPOSAL,
-        SOURCE_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.SOURCE_CANDIDATE,
         backdoor_scope=backdoor_scope,
     )
 
@@ -755,7 +740,7 @@ def train_generic_hard_supported_examples_delta(
         master_seed,
         anchor.dataset_manifest_hash,
         flat_parameters_identity(anchor.flat_parameters),
-        GENERIC_HARD_SUPPORTED_EXAMPLES_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.GENERIC_HARD_SUPPORTED_EXAMPLES,
         adapter.domain_token(source_domain),
         -1,
     )

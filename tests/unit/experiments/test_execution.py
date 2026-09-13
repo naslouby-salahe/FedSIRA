@@ -3,10 +3,17 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from fedsira.domain.enums import ExperimentLifecycleState, ScientificCellPhase
+from fedsira.domain.enums import (
+    ExperimentLifecycleState,
+    ExperimentName,
+    ScientificCellPhase,
+    SourceExclusionMethod,
+)
 from fedsira.domain.models import (
     ScientificCell,
 )
+from fedsira.domain.types import ConditionName, MasterSeed, MethodName
+from fedsira.experiments.definitions import experiment_registry
 from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
@@ -28,7 +35,12 @@ from fedsira.experiments.planning import (
 )
 
 
-def _cell(experiment: str, method: str, condition: str, master_seed: int) -> ScientificCell:
+def _cell(
+    experiment: ExperimentName,
+    method: MethodName,
+    condition: ConditionName,
+    master_seed: MasterSeed,
+) -> ScientificCell:
     return ScientificCell(
         experiment=experiment,
         method=method,
@@ -68,13 +80,13 @@ def test_terminal_experiment_states_are_exact() -> None:
 
 def test_derive_experiment_lifecycle_empty_ready_experiment_is_ready() -> None:
     plan = build_plan(resolved_core_complete=False)
-    planned = plan.experiment("Protocol Invariant Validation")
+    planned = plan.experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION)
     assert derive_experiment_lifecycle(planned, ()) is ExperimentLifecycleState.READY
 
 
 def test_derive_experiment_lifecycle_empty_post_core_experiment_is_blocked() -> None:
     plan = build_plan(resolved_core_complete=False)
-    planned = plan.experiment("Primary Confirmatory Evaluation")
+    planned = plan.experiment(ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION)
     assert derive_experiment_lifecycle(planned, ()) is ExperimentLifecycleState.BLOCKED
 
 
@@ -88,7 +100,12 @@ def _provenance() -> ExecutionProvenance:
 
 def test_record_store_round_trip(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
-    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
     outcome = _completed_outcome(cell)
     store.write_outcome(outcome, _provenance())
     restored = store.read_outcome(cell.experiment, cell.semantic_key)
@@ -101,13 +118,20 @@ def test_record_store_round_trip(tmp_path: Path) -> None:
 
 def test_record_store_read_missing_returns_none(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
-    assert store.read_outcome("Missing-Experiment", "missing-key") is None
-    assert store.read_all_outcomes("Missing-Experiment") == ()
+    assert (
+        store.read_outcome(ExperimentName.SECONDARY_DATASET_GENERALIZATION, "missing-key") is None
+    )
+    assert store.read_all_outcomes(ExperimentName.SECONDARY_DATASET_GENERALIZATION) == ()
 
 
 def test_record_store_read_malformed_record_is_rejected(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
-    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
     store.write_outcome(_completed_outcome(cell), _provenance())
     record_dir = tmp_path / "experiments" / cell.experiment / "records"
     next(record_dir.glob("*.json")).write_text("{not valid json")
@@ -118,19 +142,21 @@ def test_record_store_read_malformed_record_is_rejected(tmp_path: Path) -> None:
 def test_validate_experiment_prerequisites_requires_completed_state() -> None:
     completed = (
         ExperimentPrerequisiteState(
-            experiment="Proposal-Assisted Opening Necessity",
+            experiment=ExperimentName.PROPOSAL_ASSISTED_OPENING_NECESSITY,
             lifecycle_state=ExperimentLifecycleState.COMPLETED,
         ),
     )
-    validate_experiment_prerequisites_met("Primary Confirmatory Evaluation", completed)
+    validate_experiment_prerequisites_met(ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION, completed)
     incomplete = (
         ExperimentPrerequisiteState(
-            experiment="Proposal-Assisted Opening Necessity",
+            experiment=ExperimentName.PROPOSAL_ASSISTED_OPENING_NECESSITY,
             lifecycle_state=ExperimentLifecycleState.NOT_STARTED,
         ),
     )
     with pytest.raises(ValueError):
-        validate_experiment_prerequisites_met("Primary Confirmatory Evaluation", incomplete)
+        validate_experiment_prerequisites_met(
+            ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION, incomplete
+        )
 
 
 def test_validate_no_duplicate_semantic_cells() -> None:
@@ -150,7 +176,12 @@ def test_validate_cell_phase_sequence_rejects_duplicate_phase() -> None:
 
 
 def test_validate_cell_terminal_record_accepts_terminal_states_only() -> None:
-    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
     validate_cell_terminal_record(cell, ExperimentLifecycleState.COMPLETED)
     validate_cell_terminal_record(cell, ExperimentLifecycleState.FAILED)
     with pytest.raises(ValueError):
@@ -164,13 +195,13 @@ def test_execute_experiment_rejects_missing_prerequisite() -> None:
 
     incomplete = (
         ExperimentPrerequisiteState(
-            experiment="Data and Domain Evidence Validation",
+            experiment=ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION,
             lifecycle_state=ExperimentLifecycleState.NOT_STARTED,
         ),
     )
     with pytest.raises(ValueError, match="requires prerequisite"):
         execute_experiment(
-            "Proposal-Assisted Opening Necessity",
+            ExperimentName.PROPOSAL_ASSISTED_OPENING_NECESSITY,
             NeverExecutor(),
             prerequisite_states=incomplete,
         )
@@ -190,21 +221,17 @@ def test_execute_experiment_reuses_completed_records_without_reexecution(
 
     _override_workspace_root(tmp_path, monkeypatch)
     executor = CountingExecutor()
-    result = execute_experiment("Protocol Invariant Validation", executor)
+    result = execute_experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION, executor)
     assert executor.executions == 1
     assert result.lifecycle_state is ExperimentLifecycleState.COMPLETED
-    second = execute_experiment("Protocol Invariant Validation", executor)
+    second = execute_experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION, executor)
     assert executor.executions == 1
     assert second.lifecycle_state is ExperimentLifecycleState.COMPLETED
 
 
-def test_execute_experiment_unknown_name_rejected() -> None:
-    class NeverExecutor:
-        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
-            raise AssertionError(f"unexpected execution of {cell.semantic_key}")
-
-    with pytest.raises(KeyError):
-        execute_experiment("Not-A-Registered-Experiment", NeverExecutor())
+def test_experiment_identity_set_closes_over_the_registry() -> None:
+    registered = frozenset(definition.name for definition in experiment_registry())
+    assert registered == frozenset(ExperimentName)
 
 
 def test_execute_experiment_invalid_outcome_yields_invalid_lifecycle(
@@ -221,7 +248,7 @@ def test_execute_experiment_invalid_outcome_yields_invalid_lifecycle(
             )
 
     _override_workspace_root(tmp_path, monkeypatch)
-    result = execute_experiment("Protocol Invariant Validation", InvalidExecutor())
+    result = execute_experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION, InvalidExecutor())
     assert result.lifecycle_state is ExperimentLifecycleState.INVALID
 
 
@@ -239,13 +266,18 @@ def test_execute_experiment_failed_outcome_yields_failed_lifecycle(
             )
 
     _override_workspace_root(tmp_path, monkeypatch)
-    result = execute_experiment("Protocol Invariant Validation", FailedExecutor())
+    result = execute_experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION, FailedExecutor())
     assert result.lifecycle_state is ExperimentLifecycleState.FAILED
 
 
 def test_record_store_rejects_reuse_when_provenance_changed(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
-    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
     store.write_outcome(_completed_outcome(cell), _provenance())
     provenance = _provenance()
     assert store.reusable_outcome(cell.experiment, cell.semantic_key, provenance) is not None
@@ -259,7 +291,12 @@ def test_record_store_rejects_reuse_when_provenance_changed(tmp_path: Path) -> N
 
 def test_record_store_does_not_reuse_an_incomplete_record(tmp_path: Path) -> None:
     store = ExecutionRecordStore(tmp_path)
-    cell = _cell("Single-Reproduction Necessity", "Full FedSIRA", "All Honest", 1)
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
     store.write_outcome(
         CellExecutionOutcome(
             cell=cell,

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.domain.enums import AdmissionOpeningMode
+from fedsira.domain.enums import AdmissionOpeningMode, ComparisonFamily, OpeningMode
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
@@ -23,7 +23,6 @@ from fedsira.experiments.collapse import (
     resolve_all_eight_cases,
     resolve_core_mapping,
 )
-from fedsira.experiments.definitions import ComparisonFamily
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
 MATERIALITY = CONFIG.metrics_and_statistics.materiality
@@ -228,7 +227,7 @@ def test_external_verification_survival_requires_effect_and_liveness_constraint(
 def _decision(kind: CollapseDecisionKind, survives: bool) -> CollapseDecision:
     return CollapseDecision(
         kind=kind,
-        comparator="Candidate-Free",
+        comparator=OpeningMode.CANDIDATE_FREE,
         survives=survives,
         primary_material_effect="malicious-admission" if survives else None,
         adjusted_p_value=0.001 if survives else None,

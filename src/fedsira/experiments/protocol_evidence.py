@@ -16,28 +16,30 @@ from fedsira.datasets.common import RealAnchor, flat_parameters_identity
 from fedsira.domain.enums import (
     AdmissionState,
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactProducer,
+    BaselineIdentity,
+    ExperimentName,
     TernaryOutcome,
 )
 from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     ArtifactDigest,
+    ArtifactInstanceName,
     BooleanValue,
     DatasetManifestDigest,
     DomainId,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MethodName,
     Percentile,
     ProcedureIdentity,
+    ProtocolRuleText,
     ReproductionRowCount,
     SchemaVersion,
     ScientificCellCount,
-    TextValue,
 )
-from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
 PROTOCOL_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|protocol_evidence|1"
@@ -50,13 +52,8 @@ KRUM_SYNTHESIS_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|krum_synthesized
 FINAL_GATE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|final_gate_decision|1"
 BASELINE_CALIBRATION_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|baseline_calibration|1"
 
-VERIFIER_ASSIGNMENT_DEPENDENCY = "commitment-identity"
-REPRODUCTION_CERTIFICATE_DEPENDENCY = "certified-row-reports"
-KRUM_SYNTHESIS_DEPENDENCY = "certified-reproduction-rows"
-FINAL_GATE_DEPENDENCY = "production-model"
-BASELINE_CALIBRATION_DEPENDENCY = "prepared-evidence"
 
-CORRECTNESS_BY_REQUIRED_REPORTS_CERTIFICATE_RULE: TextValue = "required-positive-reports"
+CORRECTNESS_BY_REQUIRED_REPORTS_CERTIFICATE_RULE: ProtocolRuleText = "required-positive-reports"
 
 
 class VerifierReportOutcome(FrozenDomainModel):
@@ -84,7 +81,7 @@ class ReproductionCertificatePayload(FrozenDomainModel):
     master_seed: MasterSeed
     reproducer_domain: DomainId
     commitment_identity: ArtifactDigest
-    certificate_rule: TextValue
+    certificate_rule: ProtocolRuleText
     panel_size: ScientificCellCount
     required_positive_reports: ScientificCellCount
     certified_row_count: ReproductionRowCount
@@ -115,8 +112,8 @@ class BaselineCalibrationPayload(FrozenDomainModel):
     schema_version: SchemaVersion
     experiment: ExperimentName
     master_seed: MasterSeed
-    baseline: TextValue
-    calibration_rule: TextValue
+    baseline: MethodName
+    calibration_rule: ProtocolRuleText
     calibration_population: ArtifactDigest
     anchor_model_identity: ArtifactDigest
     calibration_percentile: Percentile
@@ -125,7 +122,7 @@ class BaselineCalibrationPayload(FrozenDomainModel):
 
 def _publish(
     family: ArtifactFamily,
-    instance: ArtifactDigest | TextValue,
+    instance: ArtifactInstanceName,
     experiment: ExperimentName,
     producer: ArtifactProducer,
     payload: FrozenDomainModel,
@@ -160,7 +157,7 @@ def publish_verifier_assignment_report(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=VERIFIER_ASSIGNMENT_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.COMMITMENT_IDENTITY,
                 digest=payload.commitment_identity,
             ),
         ),
@@ -180,7 +177,7 @@ def publish_reproduction_certificate(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=REPRODUCTION_CERTIFICATE_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.CERTIFIED_ROW_REPORTS,
                 digest=payload.commitment_identity,
             ),
         ),
@@ -200,7 +197,7 @@ def publish_krum_synthesized_update(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=KRUM_SYNTHESIS_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.CERTIFIED_REPRODUCTION_ROWS,
                 digest=payload.selected_update_identity,
             ),
         ),
@@ -220,7 +217,7 @@ def publish_final_gate_decision(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=FINAL_GATE_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.PRODUCTION_MODEL,
                 digest=payload.production_model_identity,
             ),
         ),
@@ -240,7 +237,7 @@ def publish_baseline_calibration(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=BASELINE_CALIBRATION_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                 digest=payload.dataset_manifest_hash,
             ),
         ),
@@ -255,7 +252,7 @@ CALIBRATED_BASELINE_METHODS: tuple[BaselineIdentity, ...] = (
 )
 
 
-def baseline_calibration_rule(method: MethodName) -> tuple[TextValue, Percentile] | None:
+def baseline_calibration_rule(method: MethodName) -> tuple[ProtocolRuleText, Percentile] | None:
     baselines = current_application_context().scientific_config.baselines
     if method is BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER:
         return (

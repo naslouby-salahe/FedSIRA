@@ -4,9 +4,10 @@ from fedsira.domain.enums import (
     CellPhaseState,
     DatasetId,
     ExperimentLifecycleState,
+    ExperimentName,
     FailureClass,
     ScientificCellPhase,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -14,7 +15,6 @@ from fedsira.domain.types import (
     DerivedSeed,
     DomainId,
     EpochIndex,
-    ExperimentName,
     ExperimentSlug,
     FeatureName,
     MasterSeed,
@@ -43,5 +43,5 @@ __all__ = [
     "RoundIndex",
     "ScientificCellPhase",
     "SeedBundle",
-    "SeedNamespace",
+    "SeedDerivationLabel",
 ]

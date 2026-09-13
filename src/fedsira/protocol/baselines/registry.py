@@ -5,7 +5,7 @@ from typing import Final, TypeVar
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.domain.enums import AdmissionState, TernaryOutcome
+from fedsira.domain.enums import AdmissionState, BaselineIdentity, TernaryOutcome
 from fedsira.domain.types import (
     BaselineFullParticipationAllowed,
     BaselineRetrainingCount,
@@ -24,28 +24,6 @@ from fedsira.protocol.reproduction import next_reproducer_domain
 from fedsira.runtime import current_application_context
 
 Domain = TypeVar("Domain", bound=Hashable)
-
-
-class BaselineIdentity(StrEnum):
-    LOCAL_ONLY_REFERENCE = "Local-Only Reference"
-    CENTRALIZED_REFERENCE = "Centralized Reference"
-    FEDAVG_REFERENCE = "FedAvg Reference"
-    CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION = "Client Review with Direct Source Admission"
-    CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN = "Client Review then One Independent Retrain"
-    ONE_INDEPENDENT_RETRAIN = "One Independent Retrain"
-    CANDIDATE_FREE_FULL_PATH = "Candidate-Free Full Path"
-    MULTIPLE_RETRAINS_WITH_DIRECT_KRUM = "Multiple Retrains with Direct Krum"
-    THREE_ROW_COORDINATE_MEDIAN_ALTERNATIVE = "Three-Row Coordinate-Median Alternative"
-    MULTIPLE_MODEL_CERTIFIED_ENSEMBLE = "Multiple-Model Certified Ensemble"
-    INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION = (
-        "Independent Local Reference with Source Admission"
-    )
-    UPDATE_RECONSTRUCTION_FILTER = "Update Reconstruction Filter"
-    DENSITY_CLUSTER_TRIMMED_MEAN = "Density-Cluster Trimmed Mean"
-    SECURE_CONTINUAL_ASSESSMENT_REFERENCE = "Secure Continual Assessment Reference"
-    RECOVERY_AFTER_SOURCE_ADMISSION = "Recovery after Source Admission"
-    SOURCE_UPDATE_SANITIZATION_REFERENCE = "Source-Update Sanitization Reference"
-    KRUM_ROBUST_AGGREGATION_REFERENCE = "Krum Robust Aggregation Reference"
 
 
 class BaselineValidationFixture(StrEnum):

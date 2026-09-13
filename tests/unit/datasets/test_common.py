@@ -7,8 +7,6 @@ from fedsira.datasets.common import (
     RoleWindow,
     compute_sample_id,
     role_for_normalized_position,
-    role_from_hash_token,
-    role_hash_token,
 )
 
 
@@ -16,28 +14,28 @@ def role_window(role: Role, lower: float, upper: float) -> RoleWindow:
     return RoleWindow(role=role, lower_inclusive=lower, upper_exclusive=upper)
 
 
-def test_every_role_has_a_round_trip_hash_token() -> None:
+def test_every_role_name_is_a_round_trip_hash_token() -> None:
     for role in Role:
-        token = role_hash_token(role)
+        token = role.name
         assert token == token.upper()
-        assert role_from_hash_token(token) is role
+        assert Role[token] is role
 
 
 def test_role_hash_tokens_match_roadmap_exactly() -> None:
-    assert role_hash_token(Role.ANCHOR_TRAIN) == "ANCHOR_TRAIN"
-    assert role_hash_token(Role.ANCHOR_VALIDATION) == "ANCHOR_VALIDATION"
-    assert role_hash_token(Role.POST_REFERENCE_REPLAY) == "POST_REFERENCE_REPLAY"
-    assert role_hash_token(Role.ROW_VERIFICATION) == "ROW_VERIFICATION"
-    assert role_hash_token(Role.FINAL_GATE) == "FINAL_GATE"
-    assert role_hash_token(Role.REPORT_TEST) == "REPORT_TEST"
-    assert role_hash_token(Role.SOURCE_PROPOSAL) == "SOURCE_PROPOSAL"
-    assert role_hash_token(Role.CANDIDATE_SCREEN) == "CANDIDATE_SCREEN"
-    assert role_hash_token(Role.REPRODUCTION) == "REPRODUCTION"
+    assert Role.ANCHOR_TRAIN.name == "ANCHOR_TRAIN"
+    assert Role.ANCHOR_VALIDATION.name == "ANCHOR_VALIDATION"
+    assert Role.POST_REFERENCE_REPLAY.name == "POST_REFERENCE_REPLAY"
+    assert Role.ROW_VERIFICATION.name == "ROW_VERIFICATION"
+    assert Role.FINAL_GATE.name == "FINAL_GATE"
+    assert Role.REPORT_TEST.name == "REPORT_TEST"
+    assert Role.SOURCE_PROPOSAL.name == "SOURCE_PROPOSAL"
+    assert Role.CANDIDATE_SCREEN.name == "CANDIDATE_SCREEN"
+    assert Role.REPRODUCTION.name == "REPRODUCTION"
 
 
 def test_unknown_role_hash_token_is_rejected() -> None:
-    with pytest.raises(ValueError, match="unsupported role token"):
-        role_from_hash_token("UNKNOWN_ROLE")
+    with pytest.raises(KeyError):
+        Role["UNKNOWN_ROLE"]
 
 
 def test_training_and_evidence_roles_are_disjoint() -> None:

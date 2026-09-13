@@ -5,9 +5,8 @@ from fedsira.config import CapabilityContractConfig, EvidenceMinimaConfig
 from fedsira.datasets.common import (
     DatasetAdapter,
     Role,
-    role_hash_token,
 )
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import DatasetId, SeedDerivationLabel
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -22,21 +21,19 @@ from fedsira.domain.types import (
     FeatureSchemaDigest,
     FrozenDomainModel,
     ProductionWeight,
-    RoleToken,
-    SeedDerivationLabel,
+    RoleHashToken,
     SupportedMacroF1Drop,
     TargetF1,
     TargetF1Gain,
 )
 from fedsira.runtime import current_application_context, framed_bytes
 
-CAPABILITY_IDENTITY_SEPARATOR: SeedDerivationLabel = "FedSIRA|capability_contract_identity"
 SOURCE_DIRECT_PRODUCTION_WEIGHT: Final[ProductionWeight] = 0.0
 
 
 class CapabilitySelector(FrozenDomainModel):
     dataset_manifest_hash: DatasetManifestDigest
-    supported_control_role: RoleToken
+    supported_control_role: RoleHashToken
 
 
 class CapabilityScope(FrozenDomainModel):
@@ -58,7 +55,7 @@ class CapabilityContract(FrozenDomainModel):
 
 def build_capability_contract(
     dataset_manifest_hash: DatasetManifestDigest,
-    supported_control_role: RoleToken,
+    supported_control_role: RoleHashToken,
     dataset_id: DatasetId,
     domain_count: DomainCount,
     feature_schema_hash: FeatureSchemaDigest,
@@ -92,7 +89,7 @@ def build_capability_contract(
 def compute_capability_identity(contract: CapabilityContract) -> ArtifactDigest:
     return hashlib.sha256(
         framed_bytes(
-            CAPABILITY_IDENTITY_SEPARATOR,
+            SeedDerivationLabel.CAPABILITY_CONTRACT_IDENTITY,
             contract.selector.dataset_manifest_hash,
             contract.selector.supported_control_role,
             contract.target_class,
@@ -174,7 +171,7 @@ def capability_contract_for_digest(
     config = current_application_context().scientific_config
     return build_capability_contract(
         dataset_manifest_hash,
-        role_hash_token(Role.POST_REFERENCE_REPLAY),
+        Role.POST_REFERENCE_REPLAY.name,
         config.datasets.primary.name,
         len(adapter.domain_ids),
         dataset_manifest_hash,

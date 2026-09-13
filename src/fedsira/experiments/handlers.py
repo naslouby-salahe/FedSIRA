@@ -28,7 +28,6 @@ from fedsira.datasets.common import (
     prepared_feature_names,
     quantity_skew_multiplier_by_domain,
     quantity_skew_multiplier_for_domain,
-    role_hash_token,
     select_heterogeneity_shift_features,
     target_row_ids_for_contract,
     validate_excluded_root_cause_not_supported,
@@ -41,25 +40,43 @@ from fedsira.datasets.nbaiot.schema import (
 )
 from fedsira.domain.enums import (
     AblationReproducerStrategy,
+    AblationScenario,
+    AblationVariant,
     AdmissionOpeningMode,
     AdmissionState,
     ArtifactFamily,
+    BaselineIdentity,
+    BoundCondition,
     ByzantineVerifierBehavior,
     CapabilityContractScope,
     CoreMethodIdentity,
     DatasetId,
+    DelayPhaseMetric,
+    DescriptiveScientificMetric,
     DormantOrigin,
+    EvidenceArrivalSchedule,
     ExperimentLifecycleState,
+    ExperimentName,
+    ExternalVerificationCondition,
     FailureClass,
+    HeterogeneityRegime,
+    MetricObservationKey,
+    OpeningMode,
+    PluralityCondition,
+    ReproducerCondition,
     ScientificCellPhase,
-    SeedNamespace,
+    SeedDerivationLabel,
+    SourceExclusionMethod,
     TernaryOutcome,
+    VerifierCondition,
+    VerifierProfile,
     WorkspaceFileToken,
 )
 from fedsira.domain.models import (
     SERVER_ID,
     AdmissionDelayDecomposition,
     CommunicationMessageMetadata,
+    CommunicationMessageType,
     MetricResult,
     ProposalOracleLabel,
     TensorEnvelopePayload,
@@ -74,9 +91,9 @@ from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     CellHandlerName,
+    CommunicationMessageCount,
     CompromisedProductionAncestry,
     DomainId,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MetricObservation,
@@ -127,7 +144,6 @@ from fedsira.experiments.checkpoints import (
     source_candidate_stage_identity,
 )
 from fedsira.experiments.collapse import ResolvedCore
-from fedsira.experiments.communication import efficiency_message_counts
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
@@ -149,21 +165,8 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    AblationScenario,
-    AblationVariant,
-    BoundCondition,
-    DescriptiveScientificMetric,
     EpistemicFailureType,
-    EvidenceArrivalSchedule,
-    ExternalVerificationCondition,
-    HeterogeneityRegime,
-    OpeningMode,
-    PluralityCondition,
     ProposalEpisode,
-    ReproducerCondition,
-    SourceExclusionMethod,
-    VerifierCondition,
-    VerifierProfile,
     ablation_mixed_episode_instances,
     ablation_opening_mode,
     ablation_reproducer_strategy,
@@ -208,7 +211,6 @@ from fedsira.experiments.protocol_evidence import (
     record_verification_evidence,
 )
 from fedsira.experiments.reproduction_progression import (
-    BYZANTINE_VERIFIER_SELECTION_SEPARATOR,
     reproduction_progression,
 )
 from fedsira.learning.federated import train_anchor
@@ -231,13 +233,14 @@ from fedsira.protocol.attacks import (
 )
 from fedsira.protocol.baselines.defenses import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
-    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
     DomainFeatureMean,
+    ReviewPanelProfile,
     client_review_direct_admission_production_is_source,
     client_review_then_retrain_local_epochs,
     client_review_then_retrain_should_discard_source_weights,
     direct_krum_committee_rows,
     parameter_similarity_certification_row_results,
+    review_panel_requirements,
     same_context_verifier_panel,
     validate_client_review_composite_screen,
     validate_client_review_reviewer_count,
@@ -247,7 +250,6 @@ from fedsira.protocol.baselines.defenses import (
 from fedsira.protocol.baselines.outcomes import ProtocolBaselineOutcomes
 from fedsira.protocol.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
-    BaselineIdentity,
     domain_target_view,
     domain_without_target_view_may_participate,
     first_eligible_non_source_reproducer,
@@ -327,6 +329,27 @@ from fedsira.runtime import (
     current_application_context,
     derive_uint32,
 )
+
+
+def _efficiency_message_counts() -> (
+    tuple[
+        tuple[CommunicationMessageType, CommunicationMessageCount],
+        ...,
+    ]
+):
+    return (
+        (CommunicationMessageType.SOURCE_COMMITMENT, 1),
+        (CommunicationMessageType.MODEL_DISTRIBUTION, 8),
+        (CommunicationMessageType.UPDATE_SUBMISSION, 8),
+        (CommunicationMessageType.CAPABILITY_CONTRACT, 1),
+        (CommunicationMessageType.REVIEW_ASSIGNMENT, 3),
+        (CommunicationMessageType.REVIEW_REPORT, 3),
+        (CommunicationMessageType.VERIFIER_ASSIGNMENT, 5),
+        (CommunicationMessageType.VERIFIER_REPORT, 5),
+        (CommunicationMessageType.FINAL_GATE_ASSIGNMENT, 6),
+        (CommunicationMessageType.FINAL_GATE_REPORT, 6),
+        (CommunicationMessageType.DECISION, 1),
+    )
 
 
 class ProtocolCellDispatch:
@@ -461,7 +484,7 @@ class ProtocolCellDispatch:
                 condition=ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES,
             )
             return self._execute_opening_cell(
-                opening_cell, evidence, screen_predicate_variant=AblationVariant(variant)
+                opening_cell, evidence, screen_predicate_variant=variant
             )
         state = self._advance_protocol(cell, evidence)
         claim_metrics = self._ablation_claim_metrics(cell, state)
@@ -495,10 +518,18 @@ class ProtocolCellDispatch:
                     )
                 except ValueError:
                     row_results = ()
-                extra.append(("parameter-similarity-committed-rows", #TODO: use enum not hardcoded string
-                              float(len(committed_rows))))
-                extra.append(("parameter-similarity-certified-rows", #TODO: use enum not hardcoded string
-                              float(sum(row_results))))
+                extra.append(
+                    (
+                        MetricObservationKey.PARAMETER_SIMILARITY_COMMITTED_ROWS,
+                        float(len(committed_rows)),
+                    )
+                )
+                extra.append(
+                    (
+                        MetricObservationKey.PARAMETER_SIMILARITY_CERTIFIED_ROWS,
+                        float(sum(row_results)),
+                    )
+                )
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD:
             validate_three_row_coordinate_median_committee_size(
                 row_requirement(cell, self._resolved_core),
@@ -508,8 +539,7 @@ class ProtocolCellDispatch:
                 raise ValueError(
                     "Generic Three-Row Threshold requires the Krum n=3,f=1 branch to be Invalid"
                 )
-            extra.append(("krum-n3-f1-invalid", #TODO: use enum not hardcoded string
-                          1.0))
+            extra.append((MetricObservationKey.KRUM_N3_F1_INVALID, 1.0))
         elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
@@ -535,7 +565,9 @@ class ProtocolCellDispatch:
                     real_anchor,
                     candidate_domains,
                 )
-                balanced_selection_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
+                balanced_selection_seed = derive_uint32(
+                    SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed
+                )
                 broad_certified_count = 0
                 false_same_count = 0
                 for domain, delta in committee_deltas.items():
@@ -568,13 +600,13 @@ class ProtocolCellDispatch:
                         false_same_count += 1
                 extra.append(
                     (
-                        "capability-contract-granularity-broad-certified-rows", #TODO: use enum not hardcoded string
+                        MetricObservationKey.CAPABILITY_CONTRACT_GRANULARITY_BROAD_CERTIFIED_ROWS,
                         float(broad_certified_count),
                     )
                 )
                 extra.append(
                     (
-                        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, #TODO: use enum not hardcoded string
+                        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
                         false_same_count / broad_certified_count
                         if broad_certified_count > 0
                         else None,
@@ -659,13 +691,13 @@ class ProtocolCellDispatch:
                 )
                 extra.append(
                     (
-                        "root-cause-a-target-f1", #TODO: use enum not hardcoded string
+                        MetricObservationKey.ROOT_CAUSE_A_TARGET_F1,
                         capability_summary.root_cause_a_target_f1.value,
                     )
                 )
                 extra.append(
                     (
-                        "root-cause-b-target-f1", #TODO: use enum not hardcoded string
+                        MetricObservationKey.ROOT_CAUSE_B_TARGET_F1,
                         capability_summary.root_cause_b_target_f1.value,
                     )
                 )
@@ -681,7 +713,10 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
             extra.append(
-                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID)) #TODO: use enum not hardcoded string
+                (
+                    MetricObservationKey.PROPOSAL_ORACLE_LABEL,
+                    float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
+                )
             )
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
@@ -702,12 +737,14 @@ class ProtocolCellDispatch:
             validate_excluded_root_cause_not_supported(
                 scope, supported_ids, root_cause_a_ids, root_cause_b_ids
             )
-            extra.append(("target-row-ids", float(len(target_row_ids))))
+            extra.append((MetricObservationKey.TARGET_ROW_IDS, float(len(target_row_ids))))
         if cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
             failure_type_token, strength_token = cell.condition.split("|")
             failure_type = EpistemicFailureType(failure_type_token)
             strength = float(strength_token)
-            attack_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
+            attack_seed = derive_uint32(
+                SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed
+            )
             real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._primary_adapter.prepared_root)
@@ -743,11 +780,22 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
                 extra.append(
-                    ("defined-domain-count", float(epistemic_summary.defined_domain_count))
+                    (
+                        MetricObservationKey.DEFINED_DOMAIN_COUNT,
+                        float(epistemic_summary.defined_domain_count),
+                    )
                 )
-                extra.append((DescriptiveScientificMetric.TARGET_F1_GAIN, epistemic_summary.target_f1_gain.value))
                 extra.append(
-                    ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)
+                    (
+                        DescriptiveScientificMetric.TARGET_F1_GAIN,
+                        epistemic_summary.target_f1_gain.value,
+                    )
+                )
+                extra.append(
+                    (
+                        MetricObservationKey.SUPPORTED_MACRO_F1_DROP,
+                        epistemic_summary.supported_macro_f1_drop.value,
+                    )
                 )
                 extra.append(
                     (
@@ -755,30 +803,37 @@ class ProtocolCellDispatch:
                         epistemic_summary.benign_far_increase.value,
                     )
                 )
-                extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))
                 extra.append(
                     (
-                        "diagnostic-marker-insufficient", #TODO: use enum not hardcoded string
+                        MetricObservationKey.DIAGNOSTIC_MARKER_VALUE,
+                        epistemic_summary.diagnostic_marker.value,
+                    )
+                )
+                extra.append(
+                    (
+                        MetricObservationKey.DIAGNOSTIC_MARKER_INSUFFICIENT,
                         1.0 if epistemic_summary.diagnostic_marker.value is None else 0.0,
                     )
                 )
                 extra.append(
                     (
-                        "proposal-oracle-label",
+                        MetricObservationKey.PROPOSAL_ORACLE_LABEL,
                         float(oracle_label is ProposalOracleLabel.ORACLE_VALID),
                     )
                 )
             else:
-                extra.append(("defined-domain-count", 0.0))
+                extra.append((MetricObservationKey.DEFINED_DOMAIN_COUNT, 0.0))
                 extra.append((DescriptiveScientificMetric.TARGET_F1_GAIN, None))
-                extra.append(("supported-macro-f1-drop", None))
+                extra.append((MetricObservationKey.SUPPORTED_MACRO_F1_DROP, None))
                 extra.append((ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, None))
-                extra.append(("diagnostic-marker-value", None))
-                extra.append(("diagnostic-marker-insufficient", 1.0))
-                extra.append(("proposal-oracle-label", 0.0))
+                extra.append((MetricObservationKey.DIAGNOSTIC_MARKER_VALUE, None))
+                extra.append((MetricObservationKey.DIAGNOSTIC_MARKER_INSUFFICIENT, 1.0))
+                extra.append((MetricObservationKey.PROPOSAL_ORACLE_LABEL, 0.0))
         if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             regime = cell.condition
-            heterogeneity_seed = derive_uint32(SeedNamespace.HETEROGENEITY_SEED, cell.master_seed)
+            heterogeneity_seed = derive_uint32(
+                SeedDerivationLabel.HETEROGENEITY_SEED, cell.master_seed
+            )
             if regime == HeterogeneityRegime.QUANTITY_SKEW:
                 multiplier_by_domain = quantity_skew_multiplier_by_domain(
                     self._primary_adapter,
@@ -796,7 +851,7 @@ class ProtocolCellDispatch:
                     evidence.reproduction_target_count,
                     quantity_skew_multiplier_for_domain(excluded, NBAIOT_DOMAIN_ORDER[0]),
                 )
-                extra.append(("quantity-skew-cap", float(applied_cap)))
+                extra.append((MetricObservationKey.QUANTITY_SKEW_CAP, float(applied_cap)))
             else:
                 heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
                 if heterogeneity_scope is not None:
@@ -805,16 +860,16 @@ class ProtocolCellDispatch:
                         heterogeneity_scope.selected_feature_names[0],
                         heterogeneity_seed,
                     )
-                    extra.append(("feature-shift-sign", float(feature_sign)))
+                    extra.append((MetricObservationKey.FEATURE_SHIFT_SIGN, float(feature_sign)))
                     extra.append(
                         (
-                            "feature-shift-count",
+                            MetricObservationKey.FEATURE_SHIFT_COUNT,
                             float(len(heterogeneity_scope.selected_feature_names)),
                         )
                     )
                 else:
-                    extra.append(("feature-shift-sign", None))
-                    extra.append(("feature-shift-count", 0.0))
+                    extra.append((MetricObservationKey.FEATURE_SHIFT_SIGN, None))
+                    extra.append((MetricObservationKey.FEATURE_SHIFT_COUNT, 0.0))
         return (state, (*metrics, *extra))
 
     def _run_opening_stage(
@@ -888,7 +943,7 @@ class ProtocolCellDispatch:
             screen_order = screen_domain_order(
                 non_source,
                 screen_domain_order_namespace_seed=derive_uint32(
-                    "SCREEN_DOMAIN_ORDER_SEED", cell.master_seed
+                    SeedDerivationLabel.SCREEN_DOMAIN_ORDER_SEED, cell.master_seed
                 ),
                 screen_domain_count=config.protocol.admission_opening.screen_domains,
             )
@@ -918,7 +973,7 @@ class ProtocolCellDispatch:
             state = candidate_screen_transition(
                 opening_mode, screen_results, config.protocol.admission_opening
             )
-        screen_fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, cell.master_seed)
+        screen_fold_seed = derive_uint32(SeedDerivationLabel.SCREEN_FOLD_SEED, cell.master_seed)
         fold_sample_id = (
             first_target_sample_id(
                 self._primary_adapter, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
@@ -1734,7 +1789,10 @@ class ProtocolCellDispatch:
             state = self._advance_protocol(cell, evidence)
         elif method == BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
             validate_client_review_composite_screen(CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES)
-            validate_client_review_reviewer_count(CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT)
+            required_reviewer_count, _required_positive_reviews = review_panel_requirements(
+                ReviewPanelProfile.CLIENT_REVIEW
+            )
+            validate_client_review_reviewer_count(required_reviewer_count)
             real_anchor = self.real_anchor(cell.master_seed)
             source_domain = source_domain_for_cell(self._primary_adapter, cell)
             source_delta = (
@@ -1797,7 +1855,7 @@ class ProtocolCellDispatch:
         config = current_application_context().scientific_config
         condition = cell.condition
         compromised_count = compromised_reproducer_count(condition)
-        attack_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
+        attack_seed = derive_uint32(SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed)
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(self._primary_adapter, cell)
         carrier_rows = (
@@ -1927,7 +1985,7 @@ class ProtocolCellDispatch:
             )
             byzantine_order = byzantine_selection_order(
                 eligible_verifiers,
-                derive_uint32(BYZANTINE_VERIFIER_SELECTION_SEPARATOR, cell.master_seed),
+                derive_uint32(SeedDerivationLabel.BYZANTINE_VERIFIER_SELECTION, cell.master_seed),
             )
             compromised_count = compromised_verifier_count(condition)
             compromised_verifiers = select_compromised_verifiers(byzantine_order, compromised_count)
@@ -1945,7 +2003,7 @@ class ProtocolCellDispatch:
                 panel = diagnostic_committee_panel(
                     eligible_verifiers,
                     committee_draw_namespace_seed=derive_uint32(
-                        "VERIFIER_ROW_SEED", cell.master_seed
+                        SeedDerivationLabel.VERIFIER_ROW_SEED, cell.master_seed
                     ),
                     panel_size=config.protocol.verification.panel_size,
                 )
@@ -2093,7 +2151,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", None),
+                    (MetricObservationKey.EVIDENCE_ARRIVAL_CYCLE, None),
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2108,7 +2166,7 @@ class ProtocolCellDispatch:
                 state,
                 (
                     *metrics,
-                    ("evidence-arrival-cycle", float(tau_k)),
+                    (MetricObservationKey.EVIDENCE_ARRIVAL_CYCLE, float(tau_k)),
                     permanent_singleton_admission(state, holder_counts),
                 ),
             )
@@ -2127,7 +2185,7 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k)),
+                (MetricObservationKey.EVIDENCE_ARRIVAL_CYCLE, float(tau_k)),
                 (
                     "logical-information-arrival-cycles",
                     float(delay_decomposition.logical_information_arrival_cycles),
@@ -2179,15 +2237,18 @@ class ProtocolCellDispatch:
             state,
             (
                 *metrics,
-                ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
+                (
+                    MetricObservationKey.EVIDENCE_ARRIVAL_CYCLE,
+                    float(tau_k) if tau_k is not None else None,
+                ),
                 (
                     DescriptiveScientificMetric.T_EVIDENCE,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
-                ("assignment-seconds", phase_durations.assignment_seconds),
-                ("reproduce-seconds", phase_durations.reproduce_seconds),
-                ("verify-seconds", phase_durations.verify_seconds),
-                ("synthesize-seconds", phase_durations.synthesize_seconds),
+                (DelayPhaseMetric.ASSIGNMENT_SECONDS, phase_durations.assignment_seconds),
+                (DelayPhaseMetric.REPRODUCE_SECONDS, phase_durations.reproduce_seconds),
+                (DelayPhaseMetric.VERIFY_SECONDS, phase_durations.verify_seconds),
+                (DelayPhaseMetric.SYNTHESIZE_SECONDS, phase_durations.synthesize_seconds),
                 (
                     DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
                     post_evidence_wall_clock_seconds,
@@ -2220,7 +2281,7 @@ class ProtocolCellDispatch:
         def measured_execution() -> TimingWorkerResult:
             envelopes: list[bytes] = []
             metadata_records: list[CommunicationMessageMetadata] = []
-            for message_type, count in efficiency_message_counts():
+            for message_type, count in _efficiency_message_counts():
                 for _index in range(count):
                     metadata = CommunicationMessageMetadata(
                         message_type=message_type,
@@ -2514,7 +2575,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             return False
         contract = build_capability_contract(
             real_anchor.dataset_manifest_hash,
-            role_hash_token(Role.POST_REFERENCE_REPLAY),
+            Role.POST_REFERENCE_REPLAY.name,
             config.datasets.primary.name,
             len(NBAIOT_DOMAIN_ORDER),
             real_anchor.dataset_manifest_hash,
@@ -2573,7 +2634,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             return False
         contract = build_capability_contract(
             real_anchor.dataset_manifest_hash,
-            role_hash_token(Role.POST_REFERENCE_REPLAY),
+            Role.POST_REFERENCE_REPLAY.name,
             config.datasets.primary.name,
             len(NBAIOT_DOMAIN_ORDER),
             real_anchor.dataset_manifest_hash,
@@ -2615,7 +2676,9 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         )
         validate_declared_source_backdoor_poison_fraction(poison_fraction)
         return BackdoorScope(
-            attack_generation_seed=derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed),
+            attack_generation_seed=derive_uint32(
+                SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed
+            ),
             poison_fraction=poison_fraction,
             trigger_feature_indices=trigger_indices,
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
@@ -2629,7 +2692,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
             return None
-        heterogeneity_seed = derive_uint32(SeedNamespace.HETEROGENEITY_SEED, cell.master_seed)
+        heterogeneity_seed = derive_uint32(SeedDerivationLabel.HETEROGENEITY_SEED, cell.master_seed)
         selected_feature_names = select_heterogeneity_shift_features(
             real_feature_names,
             heterogeneity_seed,
@@ -2703,7 +2766,12 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         terminal_state: AdmissionState,
     ) -> tuple[AdmissionStateObservation, ...]:
         arrival_cycle = next(
-            (value for name, value in metrics if name == "evidence-arrival-cycle"), None
+            (
+                value
+                for name, value in metrics
+                if name == MetricObservationKey.EVIDENCE_ARRIVAL_CYCLE
+            ),
+            None,
         )
         scientific_config = current_application_context().scientific_config
         horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles

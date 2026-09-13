@@ -7,24 +7,29 @@ from fedsira.datasets.common import (
     prepared_domain_summaries,
     prepared_view_digest,
 )
-from fedsira.domain.enums import DatasetId, Role
+from fedsira.domain.enums import (
+    DatasetId,
+    EnvironmentObservation,
+    ExperimentClass,
+    ExperimentName,
+    ReportCellLiteral,
+    ReportColumnName,
+    Role,
+    TableName,
+    TrainingProtocolStage,
+)
 from fedsira.domain.types import (
     DatasetClassToken,
     DomainId,
-    ExperimentName,
+    ProtocolRuleText,
+    ReportCellText,
     RowCount,
-    TextValue,
 )
 from fedsira.evaluation.comparisons import (
     ComparisonDefinition,
     build_comparison_registry,
 )
-from fedsira.experiments.definitions import (
-    ExperimentClass,
-    ExperimentDefinition,
-    TrainingProtocolStage,
-    experiment_by_name,
-)
+from fedsira.experiments.definitions import ExperimentDefinition, experiment_by_name
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.protocol.baselines.registry import BASELINE_CONTRACTS
 from fedsira.reporting.tables import RenderedTable
@@ -32,14 +37,14 @@ from fedsira.reporting.tables import csv_text as _csv_text
 from fedsira.runtime import REPOSITORY_ROOT, current_application_context
 
 
-def _experiment_class_label(experiment_class: ExperimentClass) -> TextValue:
-    return experiment_class.value
+def _experiment_class_label(experiment_class: ExperimentClass) -> ReportCellText:
+    return experiment_class
 
 
 def _downstream_role(
     experiment: ExperimentName,
     definitions: tuple[ExperimentDefinition, ...],
-) -> TextValue:
+) -> ReportCellText:
     dependents = tuple(
         definition.name for definition in definitions if experiment in definition.prerequisites
     )
@@ -60,31 +65,31 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
                 str(seed) for seed in sorted(frozenset(cell.master_seed for cell in planned.cells))
             ),
             str(len(planned.cells)),
-            ";".join(metric.value for metric in planned.definition.primary_metrics),
+            ";".join(planned.definition.primary_metrics),
             (
-                planned.definition.comparison_family.value
+                planned.definition.comparison_family
                 if planned.definition.comparison_family is not None
                 else "none (descriptive evidence)"
             ),
-            ";".join(planned.definition.prerequisites) or "none",
+            ";".join(planned.definition.prerequisites) or ReportCellLiteral.NONE,
             _downstream_role(planned.definition.name, definitions),
         )
         for planned in plan.experiments
     )
     return RenderedTable(
-        name="Experiment Plan",
+        name=TableName.EXPERIMENT_PLAN,
         csv_text=_csv_text(
             (
-                "experiment", #TODO: convert to enum instead of hardcoded string
-                "class", #TODO: convert to enum instead of hardcoded string
-                "methods", #TODO: convert to enum instead of hardcoded string
-                "scenarios_or_variants", #TODO: convert to enum instead of hardcoded string
-                "seeds", #TODO: convert to enum instead of hardcoded string
-                "nominal_run_count", #TODO: convert to enum instead of hardcoded string
-                "primary_metrics", #TODO: convert to enum instead of hardcoded string
-                "claim_family", #TODO: convert to enum instead of hardcoded string
-                "prerequisite", #TODO: convert to enum instead of hardcoded string
-                "downstream_role", #TODO: convert to enum instead of hardcoded string
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.CLASS,
+                ReportColumnName.METHODS,
+                ReportColumnName.SCENARIOS_OR_VARIANTS,
+                ReportColumnName.SEEDS,
+                ReportColumnName.NOMINAL_RUN_COUNT,
+                ReportColumnName.PRIMARY_METRICS,
+                ReportColumnName.CLAIM_FAMILY,
+                ReportColumnName.PREREQUISITE,
+                ReportColumnName.DOWNSTREAM_ROLE,
             ),
             rows,
         ),
@@ -119,7 +124,7 @@ def render_dataset_and_domain_protocol_table() -> RenderedTable:
     )
     rows = (
         (
-            primary.name.value,
+            primary.name,
             f"UCI {primary.uci_dataset_id}; DOI {primary.doi}",
             prepared_view_digest(primary_root),
             str(
@@ -146,8 +151,8 @@ def render_dataset_and_domain_protocol_table() -> RenderedTable:
             "primary",
         ),
         (
-            secondary.name.value,
-            f"{secondary.name.value} ({secondary_specification.raw_data_relative})",
+            secondary.name,
+            f"{secondary.name} ({secondary_specification.raw_data_relative})",
             prepared_view_digest(secondary_root),
             str(
                 sum(
@@ -174,22 +179,22 @@ def render_dataset_and_domain_protocol_table() -> RenderedTable:
         ),
     )
     return RenderedTable(
-        name="Dataset and Domain Protocol",
+        name=TableName.DATASET_AND_DOMAIN_PROTOCOL,
         csv_text=_csv_text(
             (
-                "dataset",
-                "source_identifier",
-                "prepared_view_digest",
-                "materialized_rows",
-                "retained_feature_count",
-                "canonical_class_count",
-                "target_class",
-                "domain_proxy_count",
-                "proxy_semantics",
-                "target_holders",
-                "evidence_minimum_rule",
-                "split_replay_semantics",
-                "primary_secondary_role",
+                ReportColumnName.DATASET,
+                ReportColumnName.SOURCE_IDENTIFIER,
+                ReportColumnName.PREPARED_VIEW_DIGEST,
+                ReportColumnName.MATERIALIZED_ROWS,
+                ReportColumnName.RETAINED_FEATURE_COUNT,
+                ReportColumnName.DISTINCT_CLASS_COUNT,
+                ReportColumnName.TARGET_CLASS,
+                ReportColumnName.DOMAIN_PROXY_COUNT,
+                ReportColumnName.PROXY_SEMANTICS,
+                ReportColumnName.TARGET_HOLDERS,
+                ReportColumnName.EVIDENCE_MINIMUM_RULE,
+                ReportColumnName.SPLIT_REPLAY_SEMANTICS,
+                ReportColumnName.PRIMARY_SECONDARY_ROLE,
             ),
             rows,
         ),
@@ -218,9 +223,11 @@ def render_primary_domain_statistics_table() -> RenderedTable:
         (
             domain,
             domain,
-            "available"
-            if domain_target_count(summary_for_domain(summaries, domain), target) > 0
-            else "unavailable",
+            (
+                EnvironmentObservation.AVAILABLE
+                if domain_target_count(summary_for_domain(summaries, domain), target) > 0
+                else EnvironmentObservation.UNAVAILABLE
+            ),
             role_counts(summary_for_domain(summaries, domain), target),
             supported_role_counts(summary_for_domain(summaries, domain), supported_exclusions),
             eligibility_text(
@@ -240,18 +247,18 @@ def render_primary_domain_statistics_table() -> RenderedTable:
         for domain in primary_specification.domain_ids
     )
     return RenderedTable(
-        name="Primary Domain Statistics",
+        name=TableName.PRIMARY_DOMAIN_STATISTICS,
         csv_text=_csv_text(
             (
-                "domain_id",
-                "device_type",
-                "target_availability",
-                "role_target_counts",
-                "supported_role_counts",
-                "reproduction_eligibility",
-                "verifier_eligibility",
-                "final_gate_eligibility",
-                "report_test_rows",
+                ReportColumnName.DOMAIN_ID,
+                ReportColumnName.DEVICE_TYPE,
+                ReportColumnName.TARGET_AVAILABILITY,
+                ReportColumnName.ROLE_TARGET_COUNTS,
+                ReportColumnName.SUPPORTED_ROLE_COUNTS,
+                ReportColumnName.REPRODUCTION_ELIGIBILITY,
+                ReportColumnName.VERIFIER_ELIGIBILITY,
+                ReportColumnName.FINAL_GATE_ELIGIBILITY,
+                ReportColumnName.REPORT_TEST_ROWS,
             ),
             rows,
         ),
@@ -263,7 +270,7 @@ def render_model_and_training_protocol_table() -> RenderedTable:
     model = config.model
     rows = (
         (
-            TrainingProtocolStage.ANCHOR.value,
+            TrainingProtocolStage.ANCHOR,
             "MLP",
             "Xavier",
             "cross-entropy",
@@ -271,13 +278,13 @@ def render_model_and_training_protocol_table() -> RenderedTable:
             str(model.optimizer.anchor_and_standard_fl_learning_rate),
             str(model.training.batch_size),
             str(model.anchor_fedavg.rounds),
-            "none",
+            ReportCellLiteral.NONE,
             "Anchor Train / Anchor Validation",
             str(model.anchor_fedavg.checkpoint_cadence_rounds),
             str(model.training.gradient_global_l2_clip),
         ),
         (
-            TrainingProtocolStage.SOURCE_CANDIDATE.value,
+            TrainingProtocolStage.SOURCE_CANDIDATE,
             "MLP",
             "Xavier from anchor",
             "CE+KL+delta-L2",
@@ -294,7 +301,7 @@ def render_model_and_training_protocol_table() -> RenderedTable:
             str(model.training.gradient_global_l2_clip),
         ),
         (
-            TrainingProtocolStage.HONEST_REPRODUCTION.value,
+            TrainingProtocolStage.HONEST_REPRODUCTION,
             "MLP",
             "Xavier from anchor",
             "CE+KL+delta-L2",
@@ -312,21 +319,21 @@ def render_model_and_training_protocol_table() -> RenderedTable:
         ),
     )
     return RenderedTable(
-        name="Model and Training Protocol",
+        name=TableName.MODEL_AND_TRAINING_PROTOCOL,
         csv_text=_csv_text(
             (
-                "stage",
-                "architecture",
-                "initialization",
-                "loss",
-                "optimizer",
-                "learning_rate",
-                "batch_size",
-                "epochs_or_rounds",
-                "regularizers",
-                "data_roles",
-                "checkpoint_rule",
-                "gradient_clip",
+                ReportColumnName.STAGE,
+                ReportColumnName.ARCHITECTURE,
+                ReportColumnName.INITIALIZATION,
+                ReportColumnName.LOSS,
+                ReportColumnName.OPTIMIZER,
+                ReportColumnName.LEARNING_RATE,
+                ReportColumnName.BATCH_SIZE,
+                ReportColumnName.EPOCHS_OR_ROUNDS,
+                ReportColumnName.REGULARIZERS,
+                ReportColumnName.DATA_ROLES,
+                ReportColumnName.CHECKPOINT_RULE,
+                ReportColumnName.GRADIENT_CLIP,
             ),
             rows,
         ),
@@ -364,9 +371,9 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
             str(diagnostic.byzantine_domain_count),
             str(diagnostic.panel_size),
             str(diagnostic.required_positive_reports),
-            "NA",
-            "NA",
-            "NA",
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
             str(contract.target_f1_minimum),
             str(contract.supported_macro_f1_drop_maximum),
             str(contract.benign_false_alarm_rate_increase_maximum),
@@ -376,9 +383,9 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
         (
             "Krum synthesis",
             str(protocol.synthesis.maximum_byzantine_reproduction_rows),
-            "NA",
+            ReportCellLiteral.NOT_AVAILABLE,
             str(protocol.synthesis.committee_size),
-            "NA",
+            ReportCellLiteral.NOT_AVAILABLE,
             str(protocol.synthesis.committee_size),
             str(protocol.synthesis.committee_size),
             str(
@@ -386,21 +393,21 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
                 - protocol.synthesis.maximum_byzantine_reproduction_rows
                 - 2
             ),
-            "NA",
-            "NA",
-            "NA",
-            "NA",
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
             "source-excluded",
         ),
         (
             "final gate",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
-            "NA",
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
+            ReportCellLiteral.NOT_AVAILABLE,
             str(protocol.final_gate.median_target_f1_minimum),
             str(protocol.final_gate.supported_macro_f1_drop_maximum),
             str(protocol.final_gate.benign_false_alarm_rate_increase_maximum),
@@ -409,29 +416,29 @@ def render_security_and_capability_contract_protocol_table() -> RenderedTable:
         ),
     )
     return RenderedTable(
-        name="Security and Capability-Contract Protocol",
+        name=TableName.SECURITY_AND_CAPABILITY_CONTRACT_PROTOCOL,
         csv_text=_csv_text(
             (
-                "profile",
-                "f_R",
-                "f_V",
-                "panel_size",
-                "positive_threshold",
-                "certified_row_requirement",
-                "krum_n",
-                "krum_nearest_neighbor_count",
-                "target_threshold",
-                "supported_f1_margin",
-                "benign_fpr_margin",
-                "evidence_minimum",
-                "scope",
+                ReportColumnName.PROFILE,
+                ReportColumnName.F_R,
+                ReportColumnName.F_V,
+                ReportColumnName.PANEL_SIZE,
+                ReportColumnName.POSITIVE_THRESHOLD,
+                ReportColumnName.CERTIFIED_ROW_REQUIREMENT,
+                ReportColumnName.KRUM_N,
+                ReportColumnName.KRUM_NEAREST_NEIGHBOR_COUNT,
+                ReportColumnName.TARGET_THRESHOLD,
+                ReportColumnName.SUPPORTED_F1_MARGIN,
+                ReportColumnName.BENIGN_FPR_MARGIN,
+                ReportColumnName.EVIDENCE_MINIMUM,
+                ReportColumnName.SCOPE,
             ),
             rows,
         ),
     )
 
 
-BASELINE_TUNING_DATA_RULE: TextValue = (
+BASELINE_TUNING_DATA_RULE: ProtocolRuleText = (
     "anchor-train/anchor-validation only; report-test, row-verification and "
     "final-gate rows are never used for tuning"
 )
@@ -440,40 +447,40 @@ BASELINE_TUNING_DATA_RULE: TextValue = (
 def render_baseline_protocol_table() -> RenderedTable:
     rows = tuple(
         (
-            contract.identity.value,
-            contract.mechanism_family.value,
+            contract.identity,
+            contract.mechanism_family,
             "yes" if contract.source_artifact_deployed else "no",
             str(contract.independent_retraining_count),
-            contract.external_verification.value,
-            contract.aggregation_synthesis.value,
-            contract.training_budget.value,
+            contract.external_verification,
+            contract.aggregation_synthesis,
+            contract.training_budget,
             BASELINE_TUNING_DATA_RULE,
-            contract.production_object.value,
-            contract.implementation_status.value,
+            contract.production_object,
+            contract.implementation_status,
         )
         for contract in BASELINE_CONTRACTS
     )
     return RenderedTable(
-        name="Baseline Protocol",
+        name=TableName.BASELINE_PROTOCOL,
         csv_text=_csv_text(
             (
-                "method",
-                "mechanism_family",
-                "source_artifact_deployed",
-                "independent_retraining_count",
-                "external_verification",
-                "aggregation_synthesis",
-                "training_budget",
-                "tuning_data",
-                "production_object",
-                "implementation_status",
+                ReportColumnName.METHOD,
+                ReportColumnName.MECHANISM_FAMILY,
+                ReportColumnName.SOURCE_ARTIFACT_DEPLOYED,
+                ReportColumnName.INDEPENDENT_RETRAINING_COUNT,
+                ReportColumnName.EXTERNAL_VERIFICATION,
+                ReportColumnName.AGGREGATION_SYNTHESIS,
+                ReportColumnName.TRAINING_BUDGET,
+                ReportColumnName.TUNING_DATA,
+                ReportColumnName.PRODUCTION_OBJECT,
+                ReportColumnName.IMPLEMENTATION_STATUS,
             ),
             rows,
         ),
     )
 
 
-def _metric_primary_role(definition: ComparisonDefinition) -> TextValue:
+def _metric_primary_role(definition: ComparisonDefinition) -> ReportCellText:
     experiment = experiment_by_name(definition.experiment)
     for metric in experiment.primary_metrics:
         if metric is definition.metric:
@@ -481,14 +488,14 @@ def _metric_primary_role(definition: ComparisonDefinition) -> TextValue:
     return "secondary"
 
 
-def _metric_effect_threshold(definition: ComparisonDefinition) -> TextValue:
-    thresholds: list[TextValue] = []
+def _metric_effect_threshold(definition: ComparisonDefinition) -> ReportCellText:
+    thresholds: list[ReportCellText] = []
     if definition.material_threshold is not None:
         thresholds.append(f"material {definition.material_threshold:.3f}")
     if definition.margin is not None:
         thresholds.append(f"non-inferiority margin {definition.margin:.3f}")
     if not thresholds:
-        return "none"
+        return ReportCellLiteral.NONE
     return "; ".join(thresholds)
 
 
@@ -498,16 +505,16 @@ def render_metric_and_statistics_protocol_table() -> RenderedTable:
     bootstrap = config.metrics_and_statistics.bootstrap
     rows = tuple(
         (
-            definition.metric.value,
-            definition.orientation.value,
+            definition.metric,
+            definition.orientation,
             "master-seed instance after equal-weight domain aggregation",
             "zero denominator or structurally inapplicable metric is NA with reason",
             _metric_primary_role(definition),
             _metric_effect_threshold(definition),
-            definition.test_kind.value,
-            definition.sidedness.value,
+            definition.test_kind,
+            definition.sidedness,
             f"{multiplicity.family_wise_alpha:.3f}",
-            definition.family.value,
+            definition.family,
             (
                 f"{bootstrap.confidence_level:.3f} percentile bootstrap, "
                 f"{bootstrap.resamples} resamples, analysis seed "
@@ -516,26 +523,26 @@ def render_metric_and_statistics_protocol_table() -> RenderedTable:
         )
         for definition in build_comparison_registry()
     )
-    unique: list[tuple[TextValue, ...]] = []
+    unique: list[tuple[ReportCellText, ...]] = []
     for row in rows:
         if row in unique:
             continue
         unique.append(row)
     return RenderedTable(
-        name="Metric and Statistics Protocol",
+        name=TableName.METRIC_AND_STATISTICS_PROTOCOL,
         csv_text=_csv_text(
             (
-                "metric",
-                "mathematical_orientation",
-                "aggregation_unit",
-                "undefined_rule",
-                "primary_secondary_role",
-                "effect_threshold",
-                "test",
-                "sidedness",
-                "alpha",
-                "multiplicity_family",
-                "ci_method",
+                ReportColumnName.METRIC,
+                ReportColumnName.MATHEMATICAL_ORIENTATION,
+                ReportColumnName.AGGREGATION_UNIT,
+                ReportColumnName.UNDEFINED_RULE,
+                ReportColumnName.PRIMARY_SECONDARY_ROLE,
+                ReportColumnName.EFFECT_THRESHOLD,
+                ReportColumnName.TEST,
+                ReportColumnName.SIDEDNESS,
+                ReportColumnName.ALPHA,
+                ReportColumnName.MULTIPLICITY_FAMILY,
+                ReportColumnName.CI_METHOD,
             ),
             tuple(unique),
         ),
@@ -565,18 +572,18 @@ def summary_for_domain(
     raise ValueError(f"no summary for {domain}")
 
 
-def role_counts(summary: PreparedDomainSummary, target: DatasetClassToken) -> TextValue:
+def role_counts(summary: PreparedDomainSummary, target: DatasetClassToken) -> ReportCellText:
     return ";".join(
-        f"{role.value}={summary.count(role, target)}"
+        f"{role}={summary.count(role, target)}"
         for role in (Role.REPRODUCTION, Role.ROW_VERIFICATION, Role.FINAL_GATE, Role.REPORT_TEST)
     )
 
 
 def supported_role_counts(
     summary: PreparedDomainSummary, excluded_classes: frozenset[DatasetClassToken]
-) -> TextValue:
+) -> ReportCellText:
     return ";".join(
-        f"{role.value}={summary.count_for_role(role, excluded_classes)}"
+        f"{role}={summary.count_for_role(role, excluded_classes)}"
         for role in (
             Role.POST_REFERENCE_REPLAY,
             Role.ROW_VERIFICATION,
@@ -586,5 +593,5 @@ def supported_role_counts(
     )
 
 
-def eligibility_text(observed: RowCount, required: RowCount) -> TextValue:
+def eligibility_text(observed: RowCount, required: RowCount) -> ReportCellText:
     return f"{'eligible' if observed >= required else 'insufficient'} ({observed}/{required})"

@@ -2,8 +2,11 @@ import os
 
 import torch
 
+from fedsira.domain.enums import (
+    CublasWorkspaceConfig,
+    EnvironmentVariableName,
+)
 from fedsira.runtime import (
-    REFERENCE_CUBLAS_WORKSPACE_CONFIG,
     check_unrar_availability,
     collect_environment_mismatches,
     configure_deterministic_backend,
@@ -29,7 +32,8 @@ def test_check_unrar_availability_reports_capability_when_archives_exist() -> No
 
 def test_configure_deterministic_backend_sets_cublas_workspace_config() -> None:
     configure_deterministic_backend()
-    assert os.environ["CUBLAS_WORKSPACE_CONFIG"] == REFERENCE_CUBLAS_WORKSPACE_CONFIG
+    cublas_workspace_config = os.environ[EnvironmentVariableName.CUBLAS_WORKSPACE_CONFIG]
+    assert cublas_workspace_config == CublasWorkspaceConfig.REFERENCE
     assert torch.backends.cudnn.deterministic is True
     assert torch.backends.cudnn.benchmark is False
     torch.use_deterministic_algorithms(False)

@@ -14,12 +14,14 @@ from fedsira.artifacts.store import (
 )
 from fedsira.datasets.common import DatasetAdapter, RealAnchor, Role, flat_parameters_identity
 from fedsira.domain.enums import (
+    AblationVariant,
     AdmissionOpeningMode,
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -34,7 +36,6 @@ from fedsira.domain.types import (
     ProcedureIdentity,
     SchemaVersion,
     ScientificCellCount,
-    TextValue,
 )
 from fedsira.evaluation.metrics import (
     compute_screen_differential,
@@ -43,7 +44,6 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
-from fedsira.experiments.definitions import AblationVariant
 from fedsira.protocol.capability_contract import screen_evidence_is_adequate
 from fedsira.protocol.proposal import (
     ScreenDomainResult,
@@ -56,9 +56,6 @@ from fedsira.runtime import REPOSITORY_ROOT, current_application_context, derive
 
 SCREEN_MATCHING_SCHEMA_VERSION: SchemaVersion = "fedsira|screen_matching|1"
 SCREEN_MATCHING_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|screen_matching|1"
-SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY = "anchor-model"
-SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY = "source-candidate-model"
-SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY = "prepared-evidence"
 NO_CANDIDATE_MODEL_IDENTITY: ArtifactDigest = "0" * 64
 
 
@@ -67,7 +64,7 @@ class ScreenMatchingPayload(FrozenDomainModel):
     dataset: DatasetId
     domain: DomainId
     opening_mode: AdmissionOpeningMode
-    screen_predicate_variant: TextValue | None
+    screen_predicate_variant: AblationVariant | None
     is_evidence_adequate: EvidenceAdequate
     meets_opening_predicate: OpeningPredicateSatisfied
     anchor_model_identity: ArtifactDigest
@@ -90,7 +87,7 @@ def screen_matching_slot(
         family=ArtifactFamily.SCREEN_MATCHING_ARTIFACT,
         instance=artifact_instance_token(
             f"screen-{domain}",
-            dataset.value,
+            dataset,
             anchor_model_identity,
             candidate_model_identity,
         ),
@@ -113,17 +110,17 @@ def publish_screen_matching(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=SCREEN_MATCHING_ANCHOR_MODEL_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.ANCHOR_MODEL,
                 digest=payload.anchor_model_identity,
             ),
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=SCREEN_MATCHING_CANDIDATE_MODEL_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.SOURCE_CANDIDATE_MODEL,
                 digest=payload.candidate_model_identity,
             ),
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=SCREEN_MATCHING_PREPARED_EVIDENCE_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                 digest=payload.dataset_manifest_hash,
             ),
         ),
@@ -145,7 +142,7 @@ def evaluate_screen_domain(
     config = current_application_context().scientific_config
     dataset = adapter.specification.dataset
     fold_count = config.protocol.proposal_screen.fold_count
-    fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, master_seed)
+    fold_seed = derive_uint32(SeedDerivationLabel.SCREEN_FOLD_SEED, master_seed)
     anchor_model_identity = flat_parameters_identity(anchor.flat_parameters)
     candidate_model_identity = (
         NO_CANDIDATE_MODEL_IDENTITY
@@ -167,9 +164,7 @@ def evaluate_screen_domain(
                 dataset=dataset,
                 domain=domain,
                 opening_mode=opening_mode,
-                screen_predicate_variant=(
-                    None if screen_predicate_variant is None else screen_predicate_variant.value
-                ),
+                screen_predicate_variant=screen_predicate_variant,
                 is_evidence_adequate=result.is_evidence_adequate,
                 meets_opening_predicate=result.meets_opening_predicate,
                 anchor_model_identity=anchor_model_identity,

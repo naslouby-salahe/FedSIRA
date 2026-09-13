@@ -1,4 +1,12 @@
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
+from fedsira.domain.enums import (
+    AblationVariant,
+    ComparisonFamily,
+    CoreMethodIdentity,
+    ExperimentName,
+    PrimaryScenario,
+    ReproducerCondition,
+)
 from fedsira.evaluation.comparisons import (
     ComparisonFamilyResult,
     ComparisonMetric,
@@ -13,10 +21,6 @@ from fedsira.evaluation.comparisons import (
 from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-    AblationVariant,
-    ComparisonFamily,
-    PrimaryScenario,
-    ReproducerCondition,
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -35,9 +39,9 @@ def test_registry_has_unique_comparison_names() -> None:
 def test_comparison_name_follows_section_18_9_pattern() -> None:
     name = build_comparison_name(
         ComparisonFamily.PLURALITY_NECESSITY,
-        "Single-Reproduction Necessity",
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
         "One Byzantine Source-Copy Reproducer",
-        "Full Plurality Path",
+        CoreMethodIdentity.FULL_PLURALITY_PATH,
         "One Independent Retrain",
         ComparisonMetric.MALICIOUS_ADMISSION,
         ComparisonTestKind.SUPERIORITY,

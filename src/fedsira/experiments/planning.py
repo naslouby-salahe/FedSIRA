@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from fedsira.artifacts.paths import workspace_root_for_family
-from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.enums import (
+    AblationVariant,
+    ArtifactFamily,
+    EfficiencyCondition,
+    ExperimentLifecycleState,
+    ExperimentName,
+    ReportColumnName,
+)
 from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     CollapseDecisionPassed,
     ConditionName,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     PlanRenderText,
@@ -23,8 +29,6 @@ from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
-    AblationVariant,
-    EfficiencyCondition,
     ExperimentDefinition,
     ablation_scenario_for_variant,
     baseline_validation_fixture_for_method,
@@ -343,7 +347,7 @@ def render_plan(plan: ExperimentPlan) -> PlanRenderText:
     lines: list[str] = []
     lines.append("FedSIRA experiment plan")
     lines.append("")
-    lines.append(f"{'experiment':<55} {'cells':>6}  state")
+    lines.append(f"{ReportColumnName.EXPERIMENT:<55} {'cells':>6}  state")
     for planned in plan.experiments:
         state = planned.lifecycle_state
         suffix = ""

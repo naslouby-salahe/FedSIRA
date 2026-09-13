@@ -1,12 +1,17 @@
 import math
 from collections.abc import Sequence
-from enum import StrEnum
 
 import torch
 
 from fedsira.config import ResourceHorizonConfig
 from fedsira.datasets.common import DatasetAdapter
-from fedsira.domain.enums import AdmissionState, DormantOrigin, SeedNamespace, TernaryOutcome
+from fedsira.domain.enums import (
+    AdmissionState,
+    DormantOrigin,
+    EvidenceArrivalSchedule,
+    SeedDerivationLabel,
+    TernaryOutcome,
+)
 from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
@@ -32,7 +37,6 @@ from fedsira.domain.types import (
     NewlyAdequateEvidenceExists,
     ObservedPositiveReportCount,
     RequiredReproductionRowCount,
-    SeedDerivationLabel,
     UnderlyingVoteIsPositive,
 )
 from fedsira.runtime import derive_uint32, deterministic_order
@@ -131,13 +135,6 @@ def reproduction_update_vector(
     return reproduced_flat_parameters - anchor_flat_parameters
 
 
-class EvidenceArrivalSchedule(StrEnum):
-    PERMANENT_SINGLETON = "Permanent Singleton"
-    ONE_HONEST_HOLDER = "One Honest Holder"
-    GRADUAL_TO_QUORUM = "Gradual to Quorum"
-    IMMEDIATE_QUORUM = "Immediate Quorum"
-
-
 TERMINAL_ADMISSION_STATES = frozenset(
     {AdmissionState.ADMITTED, AdmissionState.REJECTED, AdmissionState.EXPIRED}
 )
@@ -191,9 +188,6 @@ def resolve_ternary_outcome(
     return TernaryOutcome.NEGATIVE
 
 
-REPRODUCER_ORDER_SEPARATOR: SeedDerivationLabel = SeedNamespace.REPRODUCER_ORDER
-
-
 _GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[
     tuple[EvidenceCycleIndex, EligibleEvidenceHolderCount],
     ...,
@@ -214,7 +208,7 @@ def reproducer_order(
     tokens = tuple(adapter.domain_token(domain) for domain in eligible_domains)
     ordered_tokens = deterministic_order(
         tokens,
-        REPRODUCER_ORDER_SEPARATOR,
+        SeedDerivationLabel.REPRODUCER_ORDER,
         reproducer_order_namespace_seed,
     )
     return tuple(eligible_domains[tokens.index(token)] for token in ordered_tokens)
@@ -314,7 +308,7 @@ def reproducer_order_for_cell(
     tokens = tuple(adapter.domain_ids)
     ordered_tokens = deterministic_order(
         tokens,
-        REPRODUCER_ORDER_SEPARATOR,
-        derive_uint32(SeedNamespace.REPRODUCER_ORDER_SEED, cell.master_seed),
+        SeedDerivationLabel.REPRODUCER_ORDER,
+        derive_uint32(SeedDerivationLabel.REPRODUCER_ORDER_SEED, cell.master_seed),
     )
     return tuple(tokens[tokens.index(token)] for token in ordered_tokens)

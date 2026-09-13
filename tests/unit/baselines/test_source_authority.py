@@ -1,15 +1,13 @@
 import torch
 
 from fedsira.datasets.common import Role
-from fedsira.domain.enums import AdmissionState
+from fedsira.domain.enums import AdmissionState, ReviewPanelProfile
 from fedsira.protocol.baselines.defenses import (
     CLIENT_REVIEW_COMPOSITE_SCREEN_ROLES,
-    CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT,
-    SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS,
-    SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT,
     client_review_direct_admission_production_is_source,
     client_review_then_retrain_local_epochs,
     client_review_then_retrain_should_discard_source_weights,
+    review_panel_requirements,
 )
 
 
@@ -18,12 +16,11 @@ def test_client_review_composite_screen_roles_and_reviewer_count() -> None:
         Role.CANDIDATE_SCREEN,
         Role.POST_REFERENCE_REPLAY,
     )
-    assert CLIENT_REVIEW_REQUIRED_REVIEWER_COUNT == 3
+    assert review_panel_requirements(ReviewPanelProfile.CLIENT_REVIEW)[0] == 3
 
 
 def test_secure_continual_assessment_reviewer_gate_is_two_of_three() -> None:
-    assert SECURE_CONTINUAL_ASSESSMENT_REVIEWER_COUNT == 3
-    assert SECURE_CONTINUAL_ASSESSMENT_REQUIRED_POSITIVE_REVIEWS == 2
+    assert review_panel_requirements(ReviewPanelProfile.SECURE_CONTINUAL_ASSESSMENT) == (3, 2)
 
 
 def test_client_review_direct_admission_production_is_source() -> None:

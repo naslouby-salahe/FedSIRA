@@ -10,21 +10,26 @@ from fedsira.artifacts.store import (
     publish_artifact,
     read_current_artifact,
 )
-from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily, ArtifactProducer
-from fedsira.domain.types import (
-    ArtifactDigest,
-    ArtifactInstanceToken,
-    ByteCount,
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactDependencyLabel,
+    ArtifactFamily,
+    ArtifactInstanceLabel,
+    ArtifactProducer,
     ExperimentName,
     FigureName,
+    TableName,
+)
+from fedsira.domain.types import (
+    ArtifactDigest,
+    ByteCount,
     FrozenDomainModel,
     ProcedureIdentity,
     RelativePathText,
+    ReportEvidenceName,
     RepositoryPath,
     RowCount,
     SchemaVersion,
-    TableName,
-    TextValue,
 )
 from fedsira.reporting.tables import RenderedTable
 from fedsira.runtime import REPOSITORY_ROOT
@@ -36,8 +41,6 @@ TABLE_FIGURE_SOURCE_DATA_PROCEDURE_IDENTITY: ProcedureIdentity = (
 TABLE_FIGURE_REPORT_EXPORT_PROCEDURE_IDENTITY: ProcedureIdentity = (
     "fedsira|table_figure_report_export|1"
 )
-SOURCE_DATA_INSTANCE: ArtifactInstanceToken = "source-data"
-REPORT_EXPORT_INSTANCE: ArtifactInstanceToken = "report-export"
 
 
 class RenderedTableIdentity(FrozenDomainModel):
@@ -53,7 +56,7 @@ class RenderedFigureIdentity(FrozenDomainModel):
 
 
 class ReportEvidenceIdentity(FrozenDomainModel):
-    evidence_name: TextValue
+    evidence_name: ReportEvidenceName
     content_digest: ArtifactDigest
 
 
@@ -80,7 +83,7 @@ def content_digest(path: RepositoryPath) -> ArtifactDigest:
 def table_figure_source_data_slot(experiment: ExperimentName) -> ArtifactSlot:
     return ArtifactSlot(
         family=ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
-        instance=SOURCE_DATA_INSTANCE,
+        instance=ArtifactInstanceLabel.SOURCE_DATA,
         experiment=experiment,
     )
 
@@ -88,7 +91,7 @@ def table_figure_source_data_slot(experiment: ExperimentName) -> ArtifactSlot:
 def table_figure_export_slot(experiment: ExperimentName) -> ArtifactSlot:
     return ArtifactSlot(
         family=ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,
-        instance=REPORT_EXPORT_INSTANCE,
+        instance=ArtifactInstanceLabel.REPORT_EXPORT,
         experiment=experiment,
     )
 
@@ -122,7 +125,7 @@ def publish_table_figure_source_data(
         ),
         figures=tuple(
             RenderedFigureIdentity(
-                figure=Path(path).stem,
+                figure=FigureName(Path(path).stem),
                 content_bytes=Path(path).stat().st_size,
                 content_digest=content_digest(path),
             )
@@ -138,7 +141,7 @@ def publish_table_figure_source_data(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="execution-evidence",
+                dependency=ArtifactDependencyLabel.EXECUTION_EVIDENCE,
                 digest=execution_digest,
             ),
             *(
@@ -178,7 +181,7 @@ def publish_table_figure_export(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.ARTIFACT,
-                dependency="source-data",
+                dependency=ArtifactDependencyLabel.SOURCE_DATA,
                 digest=source_data_identity,
             ),
         ),

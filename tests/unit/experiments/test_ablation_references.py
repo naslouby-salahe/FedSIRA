@@ -1,5 +1,12 @@
 from fedsira.artifacts.store import ArtifactDependency, artifact_identity
-from fedsira.domain.enums import AblationReproducerStrategy, ArtifactDependencyKind, ArtifactFamily
+from fedsira.domain.enums import (
+    AblationReproducerStrategy,
+    AblationScenario,
+    AblationVariant,
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    HeterogeneityRegime,
+)
 from fedsira.evaluation.comparisons import (
     ComparisonFamily,
     ComparisonMetric,
@@ -8,9 +15,6 @@ from fedsira.evaluation.comparisons import (
 )
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
-    AblationScenario,
-    AblationVariant,
-    HeterogeneityRegime,
     ablation_reproducer_strategy,
     ablation_scenario_for_condition,
     feature_shift_magnitude,

@@ -11,7 +11,6 @@ from fedsira.datasets.common import (
     DatasetExclusionReason,
     Role,
     open_tabular_engine,
-    role_hash_token,
     view_parquet_path,
 )
 from fedsira.datasets.nbaiot.prepare import (
@@ -357,9 +356,7 @@ def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) ->
     )
     assert views
     view = views[0]
-    view_key = (
-        f"{nbaiot_domain_hash_token(view.domain)}_{view.class_id}_{role_hash_token(view.role)}"
-    )
+    view_key = f"{nbaiot_domain_hash_token(view.domain)}_{view.class_id}_{view.role.name}"
     parquet_path = view_parquet_path(prepared_root, view_key)
     assert parquet_path.exists()
     connection = duckdb.connect()

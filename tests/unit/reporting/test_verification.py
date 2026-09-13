@@ -1,4 +1,4 @@
-from fedsira.domain.enums import ExperimentLifecycleState
+from fedsira.domain.enums import ExperimentLifecycleState, ExperimentName
 from fedsira.experiments.planning import build_plan
 from fedsira.reporting.verification import (
     CompletenessVerificationResult,
@@ -24,17 +24,19 @@ def test_execution_evidence_verification_requires_each_planned_cell() -> None:
 def test_execution_evidence_verification_requires_complete_terminal_experiments() -> None:
     states = (
         ExperimentLifecycleRecord(
-            experiment="Data and Domain Evidence Validation",
+            experiment=ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION,
             state=ExperimentLifecycleState.COMPLETED,
         ),
         ExperimentLifecycleRecord(
-            experiment="Protocol Invariant Validation",
+            experiment=ExperimentName.PROTOCOL_INVARIANT_VALIDATION,
             state=ExperimentLifecycleState.RUNNING,
         ),
     )
-    assert verify_experiments_completed(states, ("Data and Domain Evidence Validation",)).passed
+    assert verify_experiments_completed(
+        states, (ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION,)
+    ).passed
     assert not verify_experiments_reached_terminal_state(
-        states, ("Protocol Invariant Validation",)
+        states, (ExperimentName.PROTOCOL_INVARIANT_VALIDATION,)
     ).passed
 
 

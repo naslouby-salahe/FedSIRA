@@ -21,12 +21,16 @@ from fedsira.datasets.common import (
     select_spurious_feature_rows,
 )
 from fedsira.domain.enums import (
+    AblationScenario,
+    AblationVariant,
     AdmissionState,
     CapabilityContractScope,
+    ComparisonFamily,
     DatasetId,
     EpistemicFailureType,
     EvaluationInsufficiencyReason,
     ExperimentLifecycleState,
+    ExperimentName,
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -35,7 +39,6 @@ from fedsira.domain.types import (
     ConditionName,
     DomainCount,
     DomainId,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
     MethodName,
@@ -73,13 +76,7 @@ from fedsira.evaluation.statistics import (
     equal_weight_domain_mean,
     match_diagnostic_benign_report_test_rows,
 )
-from fedsira.experiments.definitions import (
-    MECHANISM_ABLATION_NAME,
-    AblationScenario,
-    AblationVariant,
-    ComparisonFamily,
-    experiment_by_name,
-)
+from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, experiment_by_name
 from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,

@@ -21,15 +21,21 @@ from fedsira.datasets.layout import (
 from fedsira.datasets.preprocess import execute_preprocess
 from fedsira.domain.enums import (
     ArtifactFamily,
+    ArtifactInstanceLabel,
+    ComparisonFamily,
     DatasetId,
+    EnvironmentComponent,
+    EnvironmentExpectation,
+    EnvironmentObservation,
     EnvironmentReadinessEffect,
     ExperimentLifecycleState,
+    ExperimentName,
     ProjectStage,
+    RepositoryRootName,
+    RuntimeComponentName,
     WorkspaceDirectoryToken,
 )
-from fedsira.domain.models import (
-    ScientificCell,
-)
+from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     ApplicationExitCode,
     BooleanValue,
@@ -37,8 +43,6 @@ from fedsira.domain.types import (
     DeterministicExecutionReady,
     DoctorArtifactSummary,
     DoctorExperimentSummary,
-    EnvironmentText,
-    ExperimentName,
     FailureMessage,
     FrozenDomainModel,
     NextValidAction,
@@ -49,7 +53,6 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.service import comparison_results_for_experiment
 from fedsira.experiments.collapse import (
-    RESOLVED_CORE_INSTANCE,
     CollapseDecision,
     collapse_decision_from_comparison_families,
     collapse_evaluation_from_records,
@@ -72,7 +75,6 @@ from fedsira.experiments.definitions import (
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-    ComparisonFamily,
     experiment_by_name,
 )
 from fedsira.experiments.engine import (
@@ -108,9 +110,7 @@ from fedsira.runtime import (
     get_structured_logger,
 )
 
-_LOGGER = get_structured_logger("doctor")
-REPOSITORY_LAYOUT_COMPONENT: EnvironmentText = "repository_layout"
-REPOSITORY_LAYOUT_EXPECTATION: EnvironmentText = "configured repository roots exist"
+_LOGGER = get_structured_logger(RuntimeComponentName.DOCTOR)
 _BOUNDARY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -175,16 +175,37 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
         return _diagnose_bound(context, environment_mismatches)
 
 
+REPOSITORY_ROOT_EXPECTATIONS: tuple[tuple[RepositoryRootName, EnvironmentExpectation], ...] = (
+    (RepositoryRootName.SOURCE, EnvironmentExpectation.CONFIGURED_SOURCE_ROOT_EXISTS),
+    (RepositoryRootName.TESTS, EnvironmentExpectation.CONFIGURED_TESTS_ROOT_EXISTS),
+    (RepositoryRootName.RAW_DATA, EnvironmentExpectation.CONFIGURED_RAW_DATA_ROOT_EXISTS),
+    (
+        RepositoryRootName.MANUSCRIPT_RESULTS,
+        EnvironmentExpectation.CONFIGURED_MANUSCRIPT_RESULTS_ROOT_EXISTS,
+    ),
+)
+
+
+def repository_root_expectation(root: RepositoryRootName) -> EnvironmentExpectation:
+    for candidate, expectation in REPOSITORY_ROOT_EXPECTATIONS:
+        if candidate is root:
+            return expectation
+    raise ValueError(f"unsupported repository root: {root}")
+
+
 def _repository_layout_mismatches() -> tuple[EnvironmentMismatch, ...]:
-    return tuple(
-        EnvironmentMismatch(
-            component=REPOSITORY_LAYOUT_COMPONENT,
-            expected=REPOSITORY_LAYOUT_EXPECTATION,
-            actual=failure,
-            readiness_effect=EnvironmentReadinessEffect.BLOCKING,
+    mismatches: list[EnvironmentMismatch] = []
+    for failure in validate_repository_layout():
+        _LOGGER.warning("repository layout mismatch: %s", failure.message)
+        mismatches.append(
+            EnvironmentMismatch(
+                component=EnvironmentComponent.REPOSITORY_LAYOUT,
+                expected=repository_root_expectation(failure.root),
+                actual=EnvironmentObservation.MISSING,
+                readiness_effect=EnvironmentReadinessEffect.BLOCKING,
+            )
         )
-        for failure in validate_repository_layout()
-    )
+    return tuple(mismatches)
 
 
 def _diagnose_bound(
@@ -595,7 +616,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
         artifact_slot_directory(
             ArtifactSlot(
                 family=ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
-                instance=RESOLVED_CORE_INSTANCE,
+                instance=ArtifactInstanceLabel.RESOLVED_CORE,
             )
         ),
         core,

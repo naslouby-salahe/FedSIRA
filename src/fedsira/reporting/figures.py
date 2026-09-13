@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
@@ -10,25 +11,41 @@ from matplotlib.figure import Figure
 
 from fedsira.domain.enums import (
     AdmissionState,
-    CapabilityContractScope,
     CoreMethodIdentity,
+    DelayPhaseMetric,
+    DescriptiveScientificMetric,
     ExperimentLifecycleState,
+    ExperimentName,
+    FigureAxisName,
+    FigureLegendLabel,
+    FigureName,
+    FigurePanelTitle,
+    HeterogeneityRegime,
+    MetricObservationKey,
+    PrimaryScenario,
+    ProtocolSchematicStage,
+    ReportCellLiteral,
     RootCauseMixture,
+    VerifierCondition,
 )
 from fedsira.domain.types import (
     AttackStrength,
-    ExperimentName,
-    FigureName,
+    EvidenceCycleIndex,
+    FigureAnnotationText,
+    FigureAxisLabel,
+    FigureLegendText,
+    FrozenDomainModel,
     MethodName,
     MetricName,
     MetricValue,
     Probability,
+    ProtocolRuleText,
     ReproductionRowCount,
     ScenarioName,
     ScientificCellCount,
-    TextValue,
 )
 from fedsira.evaluation.comparisons import (
+    CapabilityContractScope,
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonResult,
@@ -60,11 +77,7 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_FIGURE_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
-    DescriptiveScientificMetric,
     EpistemicFailureType,
-    HeterogeneityRegime,
-    PrimaryScenario,
-    VerifierCondition,
 )
 from fedsira.experiments.engine import (
     CellExecutionOutcome,
@@ -72,36 +85,75 @@ from fedsira.experiments.engine import (
     ExperimentExecutionResult,
 )
 from fedsira.experiments.planning import ExperimentPlan
-from fedsira.reporting.figure_observations import (
-    EfficiencyMetricObservation,
-    EvidenceStateFraction,
-    efficiency_observation,
-    state_fraction,
-)
 from fedsira.runtime import current_application_context
 
 BoundarySeries: TypeAlias = tuple[
-    tuple[TextValue, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]],
+    tuple[FigureLegendText, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]],
     ...,
 ]
 AxisDraw: TypeAlias = Callable[[Axes], None]
 
+
+class EvidenceStateFraction(FrozenDomainModel):
+    condition: ScenarioName
+    cycle: EvidenceCycleIndex
+    state: AdmissionState
+    fraction: Probability
+
+
+class EfficiencyMetricObservation(FrozenDomainModel):
+    method: MethodName
+    metric: MetricName
+    median: MetricValue
+    first_quartile: MetricValue
+    third_quartile: MetricValue
+    seed_count: ScientificCellCount
+
+
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
-    "FedSIRA Protocol Schematic",
-    "Primary Security-Utility Tradeoff",
-    "Useful Backdoored Source",
-    "Collapse Decision Effects",
-    "Compromised-Reproducer Boundary",
-    "Compromised-Verifier Boundary",
-    "Evidence-Arrival State Trajectory",
-    "Shared Epistemic Failure",
-    "Capability-Granularity Boundary",
-    "Heterogeneity Synthesis Boundary",
-    "Admission-Delay Decomposition",
-    "Efficiency Profile",
-    "Secondary Generalization",
+    FigureName.PROTOCOL_SCHEMATIC,
+    FigureName.PRIMARY_SECURITY_UTILITY_TRADEOFF,
+    FigureName.USEFUL_BACKDOORED_SOURCE,
+    FigureName.COLLAPSE_DECISION_EFFECTS,
+    FigureName.COMPROMISED_REPRODUCER_BOUNDARY,
+    FigureName.COMPROMISED_VERIFIER_BOUNDARY,
+    FigureName.EVIDENCE_ARRIVAL_STATE_TRAJECTORY,
+    FigureName.SHARED_EPISTEMIC_FAILURE,
+    FigureName.CAPABILITY_GRANULARITY_BOUNDARY,
+    FigureName.HETEROGENEITY_SYNTHESIS_BOUNDARY,
+    FigureName.ADMISSION_DELAY_DECOMPOSITION,
+    FigureName.EFFICIENCY_PROFILE,
+    FigureName.SECONDARY_GENERALIZATION,
 )
 FIGURE_ANNOTATION_INSET: Probability = 1 / 100
+PROTOCOL_SCHEMATIC_DESCRIPTION_WIDTH = 12
+
+
+def state_fraction(
+    observations: tuple[EvidenceStateFraction, ...],
+    condition: ScenarioName,
+    cycle: EvidenceCycleIndex,
+    state: AdmissionState,
+) -> Probability:
+    for observation in observations:
+        if (
+            observation.condition == condition
+            and observation.cycle == cycle
+            and observation.state is state
+        ):
+            return observation.fraction
+    return 0.0
+
+
+def efficiency_observation(
+    observations: tuple[EfficiencyMetricObservation, ...],
+    method: MethodName,
+    metric: MetricName,
+) -> EfficiencyMetricObservation:
+    for observation in observations:
+        if observation.method == method and observation.metric == metric:
+            return observation
+    raise ValueError(f"missing efficiency telemetry for {method} / {metric}")
 
 
 def validate_mandatory_figures_covered(
@@ -111,26 +163,60 @@ def validate_mandatory_figures_covered(
     return tuple(name for name in MANDATORY_FIGURE_NAMES if name not in rendered_names)
 
 
+PROTOCOL_SCHEMATIC_STEPS: tuple[tuple[ProtocolSchematicStage, ProtocolRuleText], ...] = (
+    (
+        ProtocolSchematicStage.SOURCE_COMMITMENT,
+        "immutable source artifact committed with direct production weight exactly 0.0",
+    ),
+    (
+        ProtocolSchematicStage.FIXED_CAPABILITY_CONTRACT,
+        "immutable Capability Contract identity published once the opening is complete",
+    ),
+    (
+        ProtocolSchematicStage.NON_SOURCE_REPRODUCTION,
+        "non-source candidate domains reproduced once in Reproducer Order",
+    ),
+    (
+        ProtocolSchematicStage.POST_COMMITMENT_VERIFIER_PANELS,
+        "three-member verifier panels assigned strictly after the reproduction commitment",
+    ),
+    (
+        ProtocolSchematicStage.EXTERNAL_REPRODUCTION_VERIFICATION,
+        "committed reproduction rows certified by independent external reports",
+    ),
+    (
+        ProtocolSchematicStage.KRUM,
+        "source-excluded Krum synthesis whenever the resolved path requires plurality",
+    ),
+    (
+        ProtocolSchematicStage.FINAL_FRESH_GATE,
+        "fresh final-gate domains evaluate the constructed production update",
+    ),
+    (
+        ProtocolSchematicStage.ADMISSION_DORMANCY_OR_REJECTION,
+        "production authority, continued dormancy awaiting evidence, or terminal rejection",
+    ),
+)
+
+
 def render_protocol_schematic(destination: Path) -> Path:
     figure = Figure(figsize=(10, 2.5))
     axis = figure.add_subplot(1, 1, 1)
     axis.axis("off")
-    steps = (
-        "source commitment\n(zero direct weight)", #TODO: add detailed description
-        "fixed Capability\nContract", #TODO: add detailed description
-        "non-source\nreproduction", #TODO: add detailed description
-        "post-commitment\nverifier panels", #TODO: add detailed description
-        "five-row external\nreproduction verification", #TODO: add detailed description
-        "Krum", #TODO: add detailed description
-        "final\nfresh gate", #TODO: add detailed description
-        "admission /\ndormancy / rejection", #TODO: add detailed description
-    )
-    for index, step in enumerate(steps):
+    for index, (stage, description) in enumerate(PROTOCOL_SCHEMATIC_STEPS):
         x_position = index * 1.25
-        axis.text(x_position, 0.5, step, ha="center", va="center")
-        if index < len(steps) - 1:
+        axis.text(x_position, 0.5, stage, ha="center", va="center", fontsize=8)
+        axis.text(
+            x_position,
+            0.25,
+            textwrap.fill(description, PROTOCOL_SCHEMATIC_DESCRIPTION_WIDTH),
+            ha="center",
+            va="center",
+            fontsize=5,
+        )
+        if index < len(PROTOCOL_SCHEMATIC_STEPS) - 1:
             axis.plot((x_position + 0.45, x_position + 0.8), (0.5, 0.5))
-    axis.set_xlim(-0.5, (len(steps) - 1) * 1.25 + 0.5)
+    axis.set_xlim(-0.5, (len(PROTOCOL_SCHEMATIC_STEPS) - 1) * 1.25 + 0.5)
     axis.set_ylim(0.0, 1.0)
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -149,7 +235,7 @@ def render_security_utility_tradeoff(
     )
     for plot_index, metric in enumerate(metrics, start=1):
         axis = figure.add_subplot(1, len(metrics), plot_index)
-        labels: list[MethodName] = []
+        labels: list[FigureLegendText] = []
         effects: list[MetricValue] = []
         lower_errors: list[MetricValue] = []
         upper_errors: list[MetricValue] = []
@@ -222,10 +308,10 @@ def render_evidence_arrival_trajectory(
             )
             axis.step(cycles, fractions, where="post", marker="o", label=state)
         axis.set_title(schedule)
-        axis.set_xlabel("logical evidence cycle") #TODO: convert to enum instead of hardcoded string
+        axis.set_xlabel(FigureAxisName.LOGICAL_EVIDENCE_CYCLE)
         axis.set_ylim(0.0, 1.0)
     if first_axis is not None:
-        first_axis.set_ylabel("fraction of seed instances") #TODO: convert to enum instead of hardcoded string
+        first_axis.set_ylabel(FigureAxisName.FRACTION_OF_SEED_INSTANCES)
         first_axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -287,19 +373,19 @@ def _render_experiment_effects(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     destination: Path,
     title: FigureName,
-    xlabel: TextValue,
-    ylabel: TextValue,
+    xlabel: FigureAxisName,
+    ylabel: FigureAxisName,
     experiments: tuple[ExperimentName, ...],
     metrics: tuple[ComparisonMetric, ...] | None = None,
-    annotation: TextValue | None = None,
+    annotation: FigureAnnotationText | None = None,
 ) -> Path:
     figure = Figure(figsize=(8, 5))
     axis = figure.add_subplot(1, 1, 1)
-    labels: list[MethodName] = []
+    labels: list[FigureLegendText] = []
     effects: list[MetricValue] = []
     lower_errors: list[MetricValue] = []
     upper_errors: list[MetricValue] = []
-    annotations: list[TextValue] = []
+    annotations: list[FigureAnnotationText] = []
     for family in comparison_results:
         for comparison in family.comparisons:
             if comparison.definition.experiment not in experiments:
@@ -442,14 +528,14 @@ def render_useful_backdoored_source(
             capability_threshold,
             color="black",
             linestyle="--",
-            label="target-F1 threshold",
+            label=FigureLegendLabel.TARGET_F1_THRESHOLD,
         )
         axis.legend()
     else:
         raise ValueError("Useful Backdoored Source: missing completed source-exclusion evidence")
-    axis.set_title("Useful Backdoored Source")
-    axis.set_xlabel("post-production ASR (lower is better)")
-    axis.set_ylabel("target F1")
+    axis.set_title(FigureName.USEFUL_BACKDOORED_SOURCE)
+    axis.set_xlabel(FigureAxisName.POST_PRODUCTION_ASR)
+    axis.set_ylabel(FigureAxisName.TARGET_F1)
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
@@ -465,7 +551,7 @@ def render_collapse_decision_effects(
     normalized_effects: list[MetricValue] = []
     lower_errors: list[MetricValue] = []
     upper_errors: list[MetricValue] = []
-    annotations: list[TextValue] = []
+    annotations: list[FigureAnnotationText] = []
     for experiment in COLLAPSE_EXPERIMENT_NAMES:
         matching = tuple(
             comparison
@@ -492,7 +578,9 @@ def render_collapse_decision_effects(
         lower_errors.append((effect - interval[0]) / threshold)
         upper_errors.append((interval[1] - effect) / threshold)
         adjusted_p = (
-            "NA" if comparison.adjusted_p_value is None else f"p={comparison.adjusted_p_value:.4g}"
+            ReportCellLiteral.NOT_AVAILABLE
+            if comparison.adjusted_p_value is None
+            else f"p={comparison.adjusted_p_value:.4g}"
         )
         annotations.append(f"{adjusted_p}; {comparison.comparison_state}")
     if normalized_effects:
@@ -511,9 +599,9 @@ def render_collapse_decision_effects(
         axis.axvline(1.0, color="black", linestyle="--")
     else:
         raise ValueError("Collapse Decision Effects: missing completed collapse evidence")
-    axis.set_title("Collapse Decision Effects")
-    axis.set_xlabel("primary material effect / material threshold")
-    axis.set_ylabel("mechanism")
+    axis.set_title(FigureName.COLLAPSE_DECISION_EFFECTS)
+    axis.set_xlabel(FigureAxisName.PRIMARY_MATERIAL_EFFECT_OVER_THRESHOLD)
+    axis.set_ylabel(FigureAxisName.MECHANISM)
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
@@ -523,7 +611,7 @@ def _outcome_metric_mean(
     outcomes: tuple[CellExecutionOutcome, ...],
     experiment: ExperimentName,
     method: MethodName,
-    condition: TextValue,
+    condition: ScenarioName,
     metric: MetricName,
 ) -> MetricValue | None:
     values = tuple(
@@ -581,7 +669,7 @@ def _experiment_methods(
     )
 
 
-def _condition_compromised_count(condition: TextValue) -> ScientificCellCount:
+def _condition_compromised_count(condition: ScenarioName) -> ScientificCellCount:
     if condition.startswith("Two"):
         return 2
     if condition.startswith("One"):
@@ -592,9 +680,9 @@ def _condition_compromised_count(condition: TextValue) -> ScientificCellCount:
 def _series_panel(
     axis: Axes,
     series: BoundarySeries,
-    xlabel: TextValue,
-    ylabel: TextValue,
-    title: FigureName,
+    xlabel: FigureAxisName,
+    ylabel: FigureAxisName,
+    title: FigureName | FigurePanelTitle,
 ) -> None:
     plotted = False
     for label, x_values, y_values in series:
@@ -617,12 +705,12 @@ def _series_panel(
 
 def _grouped_panel(
     axis: Axes,
-    x_labels: tuple[TextValue, ...], #TODO: convert to enum instead of hardcoded string
-    groups: tuple[TextValue, ...], #TODO: convert to enum instead of hardcoded string
+    x_labels: tuple[FigureAxisLabel, ...],
+    groups: tuple[FigureLegendText, ...],
     values: tuple[tuple[MetricValue | None, ...], ...],
-    xlabel: TextValue, #TODO: convert to enum instead of hardcoded string
-    ylabel: TextValue, #TODO: convert to enum instead of hardcoded string
-    title: FigureName,
+    xlabel: FigureAxisName,
+    ylabel: FigureAxisName,
+    title: FigureName | FigurePanelTitle,
 ) -> None:
     if not any(value is not None for row in values for value in row):
         raise ValueError(f"{title}: missing completed source evidence")
@@ -651,8 +739,7 @@ def _grouped_panel(
 
 def _single_panel_figure(
     destination: Path,
-    panels: tuple[tuple[TextValue #TODO: convert to enum instead of hardcoded string
-                        , AxisDraw], ...],
+    panels: tuple[tuple[FigureName | FigurePanelTitle, AxisDraw], ...],
 ) -> Path:
     figure = Figure(figsize=(6 * len(panels), 5))
     for index, (_title, draw) in enumerate(panels, start=1):
@@ -700,9 +787,9 @@ def render_compromised_reproducer_boundary(
         _series_panel(
             axis,
             series,
-            "compromised reproducer count",
-            "malicious admission rate",
-            "Compromised-Reproducer Boundary",
+            FigureAxisName.COMPROMISED_REPRODUCER_COUNT,
+            FigureAxisName.MALICIOUS_ADMISSION_RATE,
+            FigureName.COMPROMISED_REPRODUCER_BOUNDARY,
         )
         annotation_value = maximum_byzantine_reproduction_rows()
         axis.axvline(annotation_value, color="black", linestyle="--")
@@ -727,18 +814,16 @@ def render_compromised_reproducer_boundary(
                 )
                 for method in _experiment_methods(outcomes, COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
             ),
-            "compromised reproducer count", #TODO: convert to enum instead of hardcoded string
-            "attack success rate", #TODO: convert to enum instead of hardcoded string
-            "Compromised-Reproducer Boundary — ASR", #TODO: convert to enum instead of hardcoded string
+            FigureAxisName.COMPROMISED_REPRODUCER_COUNT,
+            FigureAxisName.ATTACK_SUCCESS_RATE,
+            FigurePanelTitle.COMPROMISED_REPRODUCER_BOUNDARY_ASR,
         )
 
     return _single_panel_figure(
         destination,
         (
-            ("malicious admission", #TODO: convert to enum instead of hardcoded string
-             draw_mar),
-            ("attack success rate", #TODO: convert to enum instead of hardcoded string
-             draw_asr),
+            (FigurePanelTitle.MALICIOUS_ADMISSION, draw_mar),
+            (FigurePanelTitle.ATTACK_SUCCESS_RATE, draw_asr),
         ),
     )
 
@@ -792,9 +877,9 @@ def render_compromised_verifier_boundary(
         _series_panel(
             axis,
             series_for(false_positive_conditions, ComparisonMetric.MALICIOUS_ADMISSION),
-            "compromised verifier count", #TODO: convert to enum instead of hardcoded string
-            "malicious admission rate", #TODO: convert to enum instead of hardcoded string
-            "Compromised-Verifier Boundary — false-positive mode", #TODO: convert to enum instead of hardcoded string
+            FigureAxisName.COMPROMISED_VERIFIER_COUNT,
+            FigureAxisName.MALICIOUS_ADMISSION_RATE,
+            FigurePanelTitle.COMPROMISED_VERIFIER_BOUNDARY_FALSE_POSITIVE_MODE,
         )
         axis.axvline(
             current_application_context().scientific_config.protocol.verification.maximum_byzantine_verifiers_per_panel,
@@ -806,9 +891,9 @@ def render_compromised_verifier_boundary(
         _series_panel(
             axis,
             series_for(false_negative_conditions, ComparisonMetric.LEGITIMATE_ADMISSION),
-            "compromised verifier count",
-            "legitimate admission rate",
-            "Compromised-Verifier Boundary — false-negative mode",
+            FigureAxisName.COMPROMISED_VERIFIER_COUNT,
+            FigureAxisName.LEGITIMATE_ADMISSION_RATE,
+            FigurePanelTitle.COMPROMISED_VERIFIER_BOUNDARY_FALSE_NEGATIVE_MODE,
         )
         axis.axvline(
             current_application_context().scientific_config.protocol.verification.maximum_byzantine_verifiers_per_panel,
@@ -819,10 +904,8 @@ def render_compromised_verifier_boundary(
     return _single_panel_figure(
         destination,
         (
-            ("false positive", #TODO: convert to enum instead of hardcoded string
-             draw_false_positive),
-            ("false negative", #TODO: convert to enum instead of hardcoded string
-             draw_false_negative),
+            (FigurePanelTitle.FALSE_POSITIVE, draw_false_positive),
+            (FigurePanelTitle.FALSE_NEGATIVE, draw_false_negative),
         ),
     )
 
@@ -851,7 +934,7 @@ def render_shared_epistemic_failure(
 
     def clean_oracle_series() -> BoundarySeries:
         series: list[
-            tuple[TextValue, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]]
+            tuple[FigureLegendText, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]]
         ] = []
         for failure_type in failure_types:
             strengths = strengths_for(failure_type)
@@ -880,7 +963,7 @@ def render_shared_epistemic_failure(
 
     def admission_series() -> BoundarySeries:
         series: list[
-            tuple[TextValue, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]]
+            tuple[FigureLegendText, tuple[ScientificCellCount, ...], tuple[MetricValue | None, ...]]
         ] = []
         for failure_type in failure_types:
             strengths = strengths_for(failure_type)
@@ -890,7 +973,7 @@ def render_shared_epistemic_failure(
                 _outcome_metric_mean(
                     outcomes,
                     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-                    str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+                    CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                     f"{failure_type}|{strength:.2f}",
                     ComparisonMetric.LEGITIMATE_ADMISSION,
                 )
@@ -903,9 +986,9 @@ def render_shared_epistemic_failure(
         _series_panel(
             axis,
             clean_oracle_series(),
-            "corruption/confound strength", #TODO: convert to enum instead of hardcoded string
-            "clean-oracle target-F1 difference", #TODO: convert to enum instead of hardcoded string
-            "Shared Epistemic Failure — clean oracle", #TODO: convert to enum instead of hardcoded string
+            FigureAxisName.CORRUPTION_CONFOUND_STRENGTH,
+            FigureAxisName.CLEAN_ORACLE_TARGET_F1_DIFFERENCE,
+            FigurePanelTitle.SHARED_EPISTEMIC_FAILURE_CLEAN_ORACLE,
         )
         axis.axhline(0.0)
 
@@ -913,18 +996,16 @@ def render_shared_epistemic_failure(
         _series_panel(
             axis,
             admission_series(),
-            "corruption/confound strength", #TODO: convert to enum instead of hardcoded string
-            "admission rate under corrupted operational evidence", #TODO: convert to enum instead of hardcoded string
-            "Shared Epistemic Failure — admission", #TODO: convert to enum instead of hardcoded string
+            FigureAxisName.CORRUPTION_CONFOUND_STRENGTH,
+            FigureAxisName.ADMISSION_RATE_UNDER_CORRUPTED_EVIDENCE,
+            FigurePanelTitle.SHARED_EPISTEMIC_FAILURE_ADMISSION,
         )
 
     return _single_panel_figure(
         destination,
         (
-            ("clean oracle", #TODO: convert to enum instead of hardcoded string
-             draw_clean_oracle),
-            ("admission", #TODO: convert to enum instead of hardcoded string
-             draw_admission),
+            (FigurePanelTitle.CLEAN_ORACLE, draw_clean_oracle),
+            (FigurePanelTitle.ADMISSION, draw_admission),
         ),
     )
 
@@ -969,10 +1050,10 @@ def render_capability_granularity_boundary(
             axis,
             granularities,
             mixtures,
-            values_for("false-same-capability-rate"),
-            "Capability Contract granularity",
-            "false same-capability certification rate",
-            "Capability-Granularity Boundary — false equivalence",
+            values_for(ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE),
+            FigureAxisName.CAPABILITY_CONTRACT_GRANULARITY,
+            FigureAxisName.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
+            FigurePanelTitle.CAPABILITY_GRANULARITY_BOUNDARY_FALSE_EQUIVALENCE,
         )
 
     def draw_root_cause(axis: Axes) -> None:
@@ -981,17 +1062,18 @@ def render_capability_granularity_boundary(
             granularities,
             tuple(f"{mixture}: root cause A" for mixture in mixtures)
             + tuple(f"{mixture}: root cause B" for mixture in mixtures),
-            values_for("root-cause-a-target-f1") + values_for("root-cause-b-target-f1"),
-            "Capability Contract granularity", #TODO: convert to enum instead of hardcoded string
-            "target F1", #TODO: convert to enum instead of hardcoded string
-            "Capability-Granularity Boundary — per-root-cause target F1", #TODO: convert to enum instead of hardcoded string
+            values_for(MetricObservationKey.ROOT_CAUSE_A_TARGET_F1)
+            + values_for(MetricObservationKey.ROOT_CAUSE_B_TARGET_F1),
+            FigureAxisName.CAPABILITY_CONTRACT_GRANULARITY,
+            FigureAxisName.TARGET_F1,
+            FigurePanelTitle.CAPABILITY_GRANULARITY_BOUNDARY_ROOT_CAUSE_TARGET_F1,
         )
 
     return _single_panel_figure(
         destination,
         (
-            ("false equivalence", draw_false_equivalence),
-            ("root cause", draw_root_cause),
+            (FigurePanelTitle.FALSE_EQUIVALENCE, draw_false_equivalence),
+            (FigurePanelTitle.ROOT_CAUSE, draw_root_cause),
         ),
     )
 
@@ -1034,9 +1116,9 @@ def render_heterogeneity_synthesis_boundary(
             regimes,
             methods,
             values_for(ComparisonMetric.LEGITIMATE_ADMISSION),
-            "heterogeneity regime",
-            "legitimate admission rate",
-            "Heterogeneity Synthesis Boundary — legitimate admission",
+            FigureAxisName.HETEROGENEITY_REGIME,
+            FigureAxisName.LEGITIMATE_ADMISSION_RATE,
+            FigurePanelTitle.HETEROGENEITY_SYNTHESIS_BOUNDARY_LEGITIMATE_ADMISSION,
         )
 
     def draw_worst_domain(axis: Axes) -> None:
@@ -1045,17 +1127,17 @@ def render_heterogeneity_synthesis_boundary(
             regimes,
             methods,
             values_for(ComparisonMetric.WORST_DOMAIN_TARGET_F1),
-            "heterogeneity regime",
-            "worst-domain target F1",
-            "Heterogeneity Synthesis Boundary — worst-domain target F1",
+            FigureAxisName.HETEROGENEITY_REGIME,
+            FigureAxisName.WORST_DOMAIN_TARGET_F1,
+            FigurePanelTitle.HETEROGENEITY_SYNTHESIS_BOUNDARY_WORST_DOMAIN_TARGET_F1,
         )
 
     del positions
     return _single_panel_figure(
         destination,
         (
-            ("legitimate admission", draw_admission),
-            ("worst-domain target F1", draw_worst_domain),
+            (FigurePanelTitle.LEGITIMATE_ADMISSION, draw_admission),
+            (FigurePanelTitle.WORST_DOMAIN_TARGET_F1, draw_worst_domain),
         ),
     )
 
@@ -1075,11 +1157,11 @@ def render_admission_delay_decomposition(
             frozenset((outcome.cell.method, outcome.cell.condition) for outcome in delay_outcomes)
         )
     )
-    phases: tuple[tuple[MetricName, TextValue], ...] = (
-        ("assignment-seconds", "assignment"),
-        ("reproduce-seconds", "reproduce"),
-        ("verify-seconds", "verify"),
-        ("synthesize-seconds", "synthesize"),
+    phases: tuple[tuple[MetricName, FigureLegendLabel], ...] = (
+        (DelayPhaseMetric.ASSIGNMENT_SECONDS, FigureLegendLabel.ASSIGNMENT),
+        (DelayPhaseMetric.REPRODUCE_SECONDS, FigureLegendLabel.REPRODUCE),
+        (DelayPhaseMetric.VERIFY_SECONDS, FigureLegendLabel.VERIFY),
+        (DelayPhaseMetric.SYNTHESIZE_SECONDS, FigureLegendLabel.SYNTHESIZE),
     )
     bottoms = [0.0] * len(cells)
     for metric, label in phases:
@@ -1119,8 +1201,8 @@ def render_admission_delay_decomposition(
         )
     labels = tuple(f"{method}\n{condition}" for method, condition in cells)
     axis.set_xticks(range(len(cells)), labels, rotation=25, ha="right")
-    axis.set_ylabel("post-evidence wall-clock seconds")
-    axis.set_title("Admission-Delay Decomposition")
+    axis.set_ylabel(FigureAxisName.POST_EVIDENCE_WALL_CLOCK_SECONDS)
+    axis.set_title(FigureName.ADMISSION_DELAY_DECOMPOSITION)
     axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -1134,9 +1216,9 @@ def render_secondary_generalization(
     return _render_experiment_effects(
         comparison_results,
         destination,
-        "Secondary Generalization",
-        "target-F1 paired effect vs predeclared comparator",
-        "method / secondary scenario",
+        FigureName.SECONDARY_GENERALIZATION,
+        FigureAxisName.TARGET_F1_PAIRED_EFFECT_VS_COMPARATOR,
+        FigureAxisName.METHOD_PER_SECONDARY_SCENARIO,
         (SECONDARY_DATASET_GENERALIZATION_NAME,),
         metrics=(ComparisonMetric.TARGET_F1,),
         annotation="Synthetic-domain limitation: data/attack generalization only.",

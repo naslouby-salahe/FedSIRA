@@ -6,9 +6,14 @@ from fedsira.datasets.common import (
     RealAnchor,
     Role,
 )
-from fedsira.domain.enums import LogEvent, SeedNamespace
-from fedsira.domain.types import (
+from fedsira.domain.enums import (
     AlgorithmName,
+    LogEvent,
+    ReproducerCondition,
+    RuntimeComponentName,
+    SeedDerivationLabel,
+)
+from fedsira.domain.types import (
     ArtifactDigest,
     DerivedSeed,
     DomainId,
@@ -26,12 +31,10 @@ from fedsira.domain.types import (
     RepositoryPath,
     RoundIndex,
     SampleId,
-    SeedDerivationLabel,
     TensorDomainModel,
     TrainableParameterCount,
     WallClockSeconds,
 )
-from fedsira.experiments.definitions import ReproducerCondition
 from fedsira.learning.model import (
     FedSIRAClassifier,
     flatten_trainable_parameters,
@@ -218,13 +221,13 @@ def anchor_round_participants(
         for client in round_clients
     )
     drop_seed = derive_uint32(
-        ANCHOR_CLIENT_DROPOUT_SEPARATOR,
+        SeedDerivationLabel.ANCHOR_CLIENT_DROPOUT,
         round_index,
         repr(anchor_config.client_dropout),
     )
     ordered = deterministic_order(
         tuple(client.training_seed for client in universe),
-        ANCHOR_CLIENT_DROPOUT_SEPARATOR,
+        SeedDerivationLabel.ANCHOR_CLIENT_DROPOUT,
         drop_seed,
     )
     retained_count = max(1, int(round(len(universe) * (1.0 - anchor_config.client_dropout))))
@@ -238,12 +241,8 @@ def anchor_round_is_evaluated(
     return (round_index + 1) % anchor_config.evaluation_cadence_rounds == 0
 
 
-ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_FEDAVG"
 ANCHOR_TRAINING_CONDITION_TOKEN = ReproducerCondition.CLEAN
-ANCHOR_LOGGER = get_structured_logger("anchor_training")
-
-
-ANCHOR_CLIENT_DROPOUT_SEPARATOR: SeedDerivationLabel = "ANCHOR_CLIENT_DROPOUT"
+ANCHOR_LOGGER = get_structured_logger(RuntimeComponentName.ANCHOR_TRAINING)
 
 
 class AnchorRoundEvaluationLogFields(FrozenDomainModel):
@@ -267,7 +266,7 @@ def training_seed(
     round_index: RoundIndex,
 ) -> DerivedSeed:
     return local_training_seed(
-        namespace_seed(master_seed, SeedNamespace.LOCAL_TRAINING),
+        namespace_seed(master_seed, SeedDerivationLabel.LOCAL_TRAINING),
         manifest_hash,
         start_checkpoint_identity,
         algorithm_token,
@@ -302,7 +301,9 @@ def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor
     input_width = len(first_rows.features[0])
     output_width = len(adapter.class_tokens)
     manifest_hash = adapter.manifest_hash()
-    seed_job_local_rng_streams(namespace_seed(master_seed, SeedNamespace.MODEL_INITIALIZATION))
+    seed_job_local_rng_streams(
+        namespace_seed(master_seed, SeedDerivationLabel.MODEL_INITIALIZATION)
+    )
     initial_state = model_state_from_classifier(FedSIRAClassifier(input_width, output_width))
     clients_per_round: list[tuple[LocalTrainingClient, ...]] = []
     for round_index in range(config.model.anchor_fedavg.rounds):
@@ -322,7 +323,7 @@ def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor
                         master_seed,
                         manifest_hash,
                         "anchor-start",
-                        ANCHOR_TRAINING_ALGORITHM_TOKEN,
+                        AlgorithmName.ANCHOR_FEDAVG,
                         adapter.domain_token(domain_id),
                         round_index,
                     ),

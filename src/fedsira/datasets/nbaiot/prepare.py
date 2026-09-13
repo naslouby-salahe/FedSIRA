@@ -26,8 +26,6 @@ from fedsira.datasets.common import (
     open_tabular_engine,
     read_csv_relation,
     role_for_normalized_position,
-    role_from_hash_token,
-    role_hash_token,
     sampling_cap_for_role,
     sql_ident,
     sql_string,
@@ -51,7 +49,7 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
-from fedsira.domain.enums import DatasetId, LogEvent
+from fedsira.domain.enums import DatasetId, LogEvent, RuntimeComponentName
 from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
@@ -70,7 +68,7 @@ from fedsira.domain.types import (
     SamplingCap,
     SchemaVersion,
     SourceRowIndex,
-    TextValue,
+    SqlText,
 )
 from fedsira.runtime import (
     current_application_context,
@@ -84,7 +82,7 @@ PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|1"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"
 BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"
 
-NBAIOT_PREPARATION_LOGGER = get_structured_logger("dataset_preparation")
+NBAIOT_PREPARATION_LOGGER = get_structured_logger(RuntimeComponentName.DATASET_PREPARATION)
 
 
 class DiscoveredCsvFile(FrozenDomainModel):
@@ -374,7 +372,7 @@ def assign_stream_roles_and_sample_ids(
                 dataset_file_sha256,
                 domain_hash_token,
                 class_id,
-                role_hash_token(role),
+                role,
                 original_row_indices,
                 cap,
             )
@@ -397,17 +395,17 @@ def assign_stream_roles_and_sample_ids(
     return tuple(assignments)
 
 
-def _nonfinite_predicate(feature_names: tuple[DatasetColumnName, ...]) -> TextValue:
+def _nonfinite_predicate(feature_names: tuple[DatasetColumnName, ...]) -> SqlText:
     return " OR ".join(
         f"({sql_ident(name)} IS NULL OR NOT isfinite({sql_ident(name)}))" for name in feature_names
     )
 
 
-def _unparseable_predicate(feature_names: tuple[DatasetColumnName, ...]) -> TextValue:
+def _unparseable_predicate(feature_names: tuple[DatasetColumnName, ...]) -> SqlText:
     return " OR ".join(f"{sql_ident(name)} IS NULL" for name in feature_names)
 
 
-def _cast_feature_select(feature_names: tuple[DatasetColumnName, ...]) -> TextValue:
+def _cast_feature_select(feature_names: tuple[DatasetColumnName, ...]) -> SqlText:
     casts = ", ".join(
         f"try_cast({sql_ident(name)} AS DOUBLE) AS {sql_ident(name)}" for name in feature_names
     )
@@ -451,7 +449,7 @@ def ingest_primary_numeric_csv(
 
 
 def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> PreparedViewKey:
-    return f"{nbaiot_domain_hash_token(domain)}_{class_id}_{role_hash_token(role)}"
+    return f"{nbaiot_domain_hash_token(domain)}_{class_id}_{role.name}"
 
 
 def _ensure_all_rows(
@@ -541,7 +539,7 @@ def materialize_nbaiot_prepared_views(
                     (
                         item.file_sha256,
                         assignment.original_row_index,
-                        role_hash_token(assignment.role),
+                        assignment.role.name,
                         assignment.sample_id,
                         order,
                     )
@@ -552,7 +550,7 @@ def materialize_nbaiot_prepared_views(
             "SELECT "
             + ", ".join(sql_ident(name) for name in feature_names)
             + " FROM all_rows JOIN selected USING (file_sha256, original_row_index) "
-            f"WHERE selected.role = {sql_string(role_hash_token(Role.ANCHOR_TRAIN))} "
+            f"WHERE selected.role = {sql_string(Role.ANCHOR_TRAIN.name)} "
             f"AND all_rows.class_id != {sql_string(NBAIOT_TARGET_CLASS)}"
         )
         moments = fit_feature_moments(
@@ -589,7 +587,7 @@ def materialize_nbaiot_prepared_views(
         for domain_token, class_token, role_token, view_row_count in identities:
             domain = NBaiotDomain[str(domain_token)]
             class_id = NBaiotClass[str(class_token)]
-            role = role_from_hash_token(str(role_token))
+            role = Role[str(role_token)]
             view_key = _view_key(domain, class_id, role)
             parquet_path = view_parquet_path(prepared_root, view_key)
             query = (
@@ -598,7 +596,7 @@ def materialize_nbaiot_prepared_views(
                 "FROM all_rows JOIN selected USING (file_sha256, original_row_index) "
                 f"WHERE all_rows.domain = {sql_string(domain.name)} "
                 f"AND all_rows.class_id = {sql_string(class_id)} "
-                f"AND selected.role = {sql_string(role_hash_token(role))} "
+                f"AND selected.role = {sql_string(role.name)} "
                 "ORDER BY selected.assignment_order"
             )
             if overwrite or not parquet_path.exists():
@@ -630,7 +628,7 @@ def materialize_nbaiot_prepared_views(
                     "FROM all_rows JOIN selected USING (file_sha256, original_row_index) "
                     f"WHERE all_rows.domain = {sql_string(domain.name)} "
                     f"AND all_rows.class_id = {sql_string(class_id)} "
-                    f"AND selected.role = {sql_string(role_hash_token(role))} "
+                    f"AND selected.role = {sql_string(role.name)} "
                     "ORDER BY selected.assignment_order"
                 ).fetchall()
                 views.append(

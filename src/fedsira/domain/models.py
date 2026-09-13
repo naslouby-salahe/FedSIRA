@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated
 
-from pydantic import Field
-
+from fedsira.domain.enums import ExperimentName
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     ArtifactDigest,
     ByteCount,
     ConditionName,
     ConfusionCount,
+    EncodedBytes,
     ExampleCount,
-    ExperimentName,
     FrozenDomainModel,
     LengthPrefixBytes,
     LogicalEvidenceCycleCount,
@@ -41,8 +39,6 @@ SERVER_ID: MessageEndpoint = "SERVER"
 METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
 TENSOR_METADATA_LENGTH_PREFIX_BYTES: LengthPrefixBytes = 8
 TENSOR_DTYPE: SchemaVersion = "float32"
-
-EncodedBytes = Annotated[bytes, Field()]
 
 
 class MetricResult(FrozenDomainModel):

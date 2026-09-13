@@ -4,6 +4,9 @@ from pathlib import Path
 import pytest
 
 from fedsira.artifacts.store import configuration_digest, repository_revision
+from fedsira.domain.enums import (
+    SmokeCheckName,
+)
 from fedsira.experiments.execution import (
     SMOKE_RECORD_SCHEMA_VERSION,
     PersistedSmokeRecord,
@@ -69,7 +72,11 @@ def test_run_smoke_suite_reuses_an_exact_valid_record_without_overwrite(
     persisted = PersistedSmokeRecord(
         schema_version=SMOKE_RECORD_SCHEMA_VERSION,
         passed=True,
-        checks=(SmokeCheckResult(name="fixture check", passed=True),),
+        checks=(
+            SmokeCheckResult(
+                name=SmokeCheckName.COMPLETE_ARTIFACT_MANIFEST_IS_READABLE, passed=True
+            ),
+        ),
         configuration_digest=configuration_digest(),
         code_revision=repository_revision(),
     )
@@ -102,15 +109,19 @@ def test_run_smoke_suite_recomputes_when_the_configuration_changed(
     stale = PersistedSmokeRecord(
         schema_version=SMOKE_RECORD_SCHEMA_VERSION,
         passed=True,
-        checks=(SmokeCheckResult(name="stale check", passed=True),),
+        checks=(
+            SmokeCheckResult(
+                name=SmokeCheckName.COMPLETE_ARTIFACT_MANIFEST_IS_READABLE, passed=True
+            ),
+        ),
         configuration_digest="0" * 64,
         code_revision=repository_revision(),
     )
     record_path.write_text(stale.model_dump_json(indent=2))
     monkeypatch.setattr("fedsira.experiments.execution.smoke_record_path", lambda: record_path)
     result = run_smoke_suite(overwrite=False)
-    assert "stale check" not in {check.name for check in result.checks}
-    assert "changing one parent identity marks transitive descendants stale" in {
+    assert len(result.checks) > 1
+    assert SmokeCheckName.PARENT_IDENTITY_CHANGE_STALES_DESCENDANTS in {
         check.name for check in result.checks
     }
 
@@ -123,11 +134,15 @@ def test_run_smoke_suite_recomputes_when_the_code_revision_changed(
     stale = PersistedSmokeRecord(
         schema_version=SMOKE_RECORD_SCHEMA_VERSION,
         passed=True,
-        checks=(SmokeCheckResult(name="stale check", passed=True),),
+        checks=(
+            SmokeCheckResult(
+                name=SmokeCheckName.COMPLETE_ARTIFACT_MANIFEST_IS_READABLE, passed=True
+            ),
+        ),
         configuration_digest=configuration_digest(),
         code_revision="deadbeef",
     )
     record_path.write_text(stale.model_dump_json(indent=2))
     monkeypatch.setattr("fedsira.experiments.execution.smoke_record_path", lambda: record_path)
     result = run_smoke_suite(overwrite=False)
-    assert "stale check" not in {check.name for check in result.checks}
+    assert len(result.checks) > 1

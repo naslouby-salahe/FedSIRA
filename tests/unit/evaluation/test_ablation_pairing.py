@@ -6,6 +6,7 @@ import pytest
 from fedsira.artifacts.paths import artifact_slot_directory
 from fedsira.artifacts.store import publish_artifact
 from fedsira.domain.enums import (
+    AblationVariant,
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
@@ -14,11 +15,7 @@ from fedsira.domain.enums import (
 from fedsira.domain.models import ScientificCell
 from fedsira.evaluation.comparisons import ComparisonFamily, ComparisonState, ablation_metric
 from fedsira.evaluation.service import comparison_results_for_experiment
-from fedsira.experiments.definitions import (
-    MECHANISM_ABLATION_NAME,
-    AblationVariant,
-    ablation_scenario_for_variant,
-)
+from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, ablation_scenario_for_variant
 from fedsira.experiments.engine import (
     ABLATION_REFERENCE_PROCEDURE_IDENTITY,
     ABLATION_REFERENCE_SCHEMA_VERSION,
@@ -72,8 +69,8 @@ def _variant_outcomes(metric_value: float) -> tuple[CellExecutionOutcome, ...]:
         CellExecutionOutcome(
             cell=ScientificCell(
                 experiment=MECHANISM_ABLATION_NAME,
-                method=VARIANT.value,
-                condition=scenario.value,
+                method=VARIANT,
+                condition=scenario,
                 master_seed=_master_seed(),
             ),
             terminal_state=ExperimentLifecycleState.COMPLETED,

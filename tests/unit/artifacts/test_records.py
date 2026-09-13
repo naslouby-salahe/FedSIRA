@@ -2,7 +2,12 @@ import pytest
 from pydantic import ValidationError
 
 from fedsira.artifacts.store import ARTIFACT_SCHEMA_VERSION, ArtifactManifest, ArtifactSlot
-from fedsira.domain.enums import ArtifactFamily, ArtifactLifecycleState, ArtifactProducer
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ArtifactLifecycleState,
+    ArtifactProducer,
+    ExperimentName,
+)
 
 
 def make_manifest(**overrides: object) -> ArtifactManifest:
@@ -45,11 +50,11 @@ def test_manifest_family_follows_its_slot() -> None:
         slot=ArtifactSlot(
             family=ArtifactFamily.MODEL_SCORE_ARTIFACT,
             instance="seed-1103",
-            experiment="Primary Confirmatory Evaluation",
+            experiment=ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION,
         )
     )
     assert manifest.family is ArtifactFamily.MODEL_SCORE_ARTIFACT
-    assert manifest.slot.experiment == "Primary Confirmatory Evaluation"
+    assert manifest.slot.experiment == ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
 
 
 def test_manifest_requires_a_schema_version() -> None:

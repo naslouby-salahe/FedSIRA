@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 from io import StringIO
 from pathlib import Path
-from typing import cast
 
 import pandas
 
@@ -12,21 +11,26 @@ from fedsira.domain.enums import (
     AdmissionState,
     ArtifactDependencyKind,
     ArtifactLifecycleState,
+    BoundCondition,
+    DescriptiveScientificMetric,
     ExperimentLifecycleState,
+    ExperimentName,
+    ReportCellLiteral,
+    ReportColumnName,
+    TableName,
+    VerifierCondition,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
     CheckpointIdentity,
-    ConditionName,
-    DatasetColumnName,
-    ExperimentName,
     FrozenDomainModel,
     RelativePathText,
+    ReportColumnText,
+    ReportRowIdentity,
     ReportVerificationFailure,
+    ScenarioName,
     ScientificCellCount,
-    TableName,
-    TextValue,
     VerificationPassed,
 )
 from fedsira.evaluation.comparison_evidence import comparison_evidence_failures
@@ -42,9 +46,6 @@ from fedsira.experiments.definitions import (
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
     STATE_TRAJECTORY_PARQUET_NAME,
-    BoundCondition,
-    DescriptiveScientificMetric,
-    VerifierCondition,
 )
 from fedsira.experiments.engine import (
     TERMINAL_EXPERIMENT_STATES,
@@ -54,7 +55,7 @@ from fedsira.experiments.engine import (
     PersistedExecutionRecord,
 )
 from fedsira.experiments.planning import ExperimentPlan, PlannedExperiment
-from fedsira.reporting.figure_observations import (
+from fedsira.reporting.figures import (
     EfficiencyMetricObservation,
     EvidenceStateFraction,
 )
@@ -121,9 +122,9 @@ def verify_planned_cell_count_satisfied(
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
 
-BOUND_WITHIN_CONDITIONS: tuple[ConditionName, ...] = (
-    str(BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND),
-    str(BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND),
+BOUND_WITHIN_CONDITIONS: tuple[ScenarioName, ...] = (
+    BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND,
+    BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND,
 )
 
 
@@ -139,7 +140,7 @@ def verify_safe_dormancy(
         if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
             continue
         for metric_name, metric_value in record.metrics:
-            if metric_name != str(DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION):
+            if metric_name != DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION:
                 continue
             if metric_value == 1.0:
                 observed.append(f"{record.semantic_key}: permanent singleton admission")
@@ -195,7 +196,7 @@ def verify_byzantine_operating_region(
         if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
             continue
         for metric_name, metric_value in record.metrics:
-            if metric_name != str(ComparisonMetric.MALICIOUS_ADMISSION):
+            if metric_name != ComparisonMetric.MALICIOUS_ADMISSION:
                 continue
             if metric_value == 1.0:
                 admissions.append(f"{record.semantic_key}: malicious admission within bound")
@@ -214,7 +215,7 @@ def verify_experiments_completed(
         if state is not ExperimentLifecycleState.COMPLETED:
             failures.append(
                 f"{experiment}: lifecycle state is "
-                f"{state.value if state is not None else 'unknown'}, expected Completed"
+                f"{state if state is not None else ReportCellLiteral.UNKNOWN}, expected Completed"
             )
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
@@ -229,7 +230,7 @@ def verify_experiments_reached_terminal_state(
         if state is None or state not in TERMINAL_EXPERIMENT_STATES:
             failures.append(
                 f"{experiment}: lifecycle state is "
-                f"{state.value if state is not None else 'unknown'}, not terminal"
+                f"{state if state is not None else ReportCellLiteral.UNKNOWN}, not terminal"
             )
     return CompletenessVerificationResult(passed=not failures, failures=tuple(failures))
 
@@ -271,56 +272,54 @@ def artifact_manifest_dependency_failures(
     return (*unreadable, *unresolved)
 
 
-TABLE_HEADERS: tuple[tuple[TableName #TODO: convert to enum instead of hardcoded string
-                           , tuple[DatasetColumnName #TODO: convert to enum instead of hardcoded string
-                                   , ...]], ...] = (
+TABLE_HEADERS: tuple[tuple[TableName, tuple[ReportColumnText, ...]], ...] = (
     (
-        "Cell Metrics", #TODO: convert to enum instead of hardcoded string
+        TableName.CELL_METRICS,
         (
-            "experiment",  #TODO: convert to enum instead of hardcoded string
-            "method", #TODO: convert to enum instead of hardcoded string
-            "condition", #TODO: convert to enum instead of hardcoded string
-            "master_seed", #TODO: convert to enum instead of hardcoded string
-            "repetition", #TODO: convert to enum instead of hardcoded string
-            "terminal_state", #TODO: convert to enum instead of hardcoded string
-            "metric", #TODO: convert to enum instead of hardcoded string
-            "value", #TODO: convert to enum instead of hardcoded string
+            ReportColumnName.EXPERIMENT,
+            ReportColumnName.METHOD,
+            ReportColumnName.CONDITION,
+            ReportColumnName.MASTER_SEED,
+            ReportColumnName.REPETITION,
+            ReportColumnName.TERMINAL_STATE,
+            ReportColumnName.METRIC,
+            ReportColumnName.VALUE,
         ),
     ),
     (
-        "Statistical Summary", #TODO: convert to enum instead of hardcoded string
+        TableName.STATISTICAL_SUMMARY,
         (
-            "comparison_family", #TODO: convert to enum instead of hardcoded string
-            "comparison", #TODO: convert to enum instead of hardcoded string
-            "metric", #TODO: convert to enum instead of hardcoded string
-            "direction", #TODO: convert to enum instead of hardcoded string
-            "test_kind", #TODO: convert to enum instead of hardcoded string
-            "materiality_direction", #TODO: convert to enum instead of hardcoded string
-            "margin", #TODO: convert to enum instead of hardcoded string
-            "n_pairs", #TODO: convert to enum instead of hardcoded string
-            "mean_difference", #TODO: convert to enum instead of hardcoded string
-            "median_difference", #TODO: convert to enum instead of hardcoded string
-            "paired_dz", #TODO: convert to enum instead of hardcoded string
-            "raw_p", #TODO: convert to enum instead of hardcoded string
-            "holm_p", #TODO: convert to enum instead of hardcoded string
-            "confidence_interval_95", #TODO: convert to enum instead of hardcoded string
-            "materiality_threshold", #TODO: convert to enum instead of hardcoded string
-            "statistical_pass", #TODO: convert to enum instead of hardcoded string
-            "materiality_pass", #TODO: convert to enum instead of hardcoded string
-            "final_comparison_state", #TODO: convert to enum instead of hardcoded string
+            ReportColumnName.COMPARISON_FAMILY,
+            ReportColumnName.COMPARISON,
+            ReportColumnName.METRIC,
+            ReportColumnName.DIRECTION,
+            ReportColumnName.TEST_KIND,
+            ReportColumnName.MATERIALITY_DIRECTION,
+            ReportColumnName.MARGIN,
+            ReportColumnName.N_PAIRS,
+            ReportColumnName.MEAN_DIFFERENCE,
+            ReportColumnName.MEDIAN_DIFFERENCE,
+            ReportColumnName.PAIRED_DZ,
+            ReportColumnName.RAW_P,
+            ReportColumnName.HOLM_P,
+            ReportColumnName.CONFIDENCE_INTERVAL_95,
+            ReportColumnName.MATERIALITY_THRESHOLD,
+            ReportColumnName.STATISTICAL_PASS,
+            ReportColumnName.MATERIALITY_PASS,
+            ReportColumnName.FINAL_COMPARISON_STATE,
         ),
     ),
 )
 
 
-def table_header(name: TableName) -> tuple[DatasetColumnName, ...]:
+def table_header(name: TableName) -> tuple[ReportColumnText, ...]:
     for registered_name, header in TABLE_HEADERS:
         if registered_name == name:
             return header
     raise KeyError(f"no mandatory rendered-table schema is registered for {name!r}")
 
 
-def _table_header(path: Path) -> tuple[DatasetColumnName, ...] | None:
+def _table_header(path: Path) -> tuple[ReportColumnText, ...] | None:
     text = path.read_text(encoding="utf-8").strip()
     if not text:
         return None
@@ -332,8 +331,8 @@ def _table_header(path: Path) -> tuple[DatasetColumnName, ...] | None:
 
 def verify_rendered_table(
     path: Path,
-    expected_header: tuple[DatasetColumnName, ...],
-    required_row_identities: frozenset[tuple[TextValue, ...]],
+    expected_header: tuple[ReportColumnText, ...],
+    required_row_identities: frozenset[ReportRowIdentity],
 ) -> tuple[ReportVerificationFailure, ...]:
     name = path.stem
     if not path.is_file():
@@ -406,8 +405,8 @@ def verify_mandatory_figure_source_data(
         conditions = frozenset(outcome.cell.condition for outcome in completed)
         required = frozenset(
             (
-                VerifierCondition.ONE_FALSE_POSITIVE.value,
-                VerifierCondition.ONE_FALSE_NEGATIVE.value,
+                VerifierCondition.ONE_FALSE_POSITIVE,
+                VerifierCondition.ONE_FALSE_NEGATIVE,
             )
         )
         if not required.issubset(conditions):
@@ -442,17 +441,17 @@ def metric_artifact_is_semantically_complete(
     if path.name == STATE_TRAJECTORY_PARQUET_NAME:
         required_columns = frozenset(
             (
-                "experiment", #TODO: convert to enum instead of hardcoded string
-                "method", #TODO: convert to enum instead of hardcoded string
-                "condition", #TODO: convert to enum instead of hardcoded string
-                "master_seed", #TODO: convert to enum instead of hardcoded string
-                "logical_evidence_cycle", #TODO: convert to enum instead of hardcoded string
-                "admission_state", #TODO: convert to enum instead of hardcoded string
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.MASTER_SEED,
+                ReportColumnName.LOGICAL_EVIDENCE_CYCLE,
+                ReportColumnName.ADMISSION_STATE,
             )
         )
         if not required_columns.issubset(frame.columns) or frame.empty:
             return False
-        experiment_rows = frame[frame["experiment"] == result.experiment]
+        experiment_rows = frame[frame[ReportColumnName.EXPERIMENT] == result.experiment]
         expected_cells = frozenset(
             (outcome.cell.method, outcome.cell.condition, outcome.cell.master_seed)
             for outcome in result.outcomes
@@ -461,30 +460,33 @@ def metric_artifact_is_semantically_complete(
             (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
         )
         return expected_cells.issubset(observed_cells) and all(
-            experiment_rows["admission_state" #TODO: convert to enum instead of hardcoded string
-                            ].notna().tolist()
+            experiment_rows[ReportColumnName.ADMISSION_STATE].notna().tolist()
         )
     required_columns = (
         frozenset(
-            ("experiment", #TODO: convert to enum instead of hardcoded string
-             "method", #TODO: convert to enum instead of hardcoded string
-             "condition", #TODO: convert to enum instead of hardcoded string
-             "metric", #TODO: convert to enum instead of hardcoded string
-             "observation_count", #TODO: convert to enum instead of hardcoded string
-             "mean_value", #TODO: convert to enum instead of hardcoded string
+            (
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.METRIC,
+                ReportColumnName.OBSERVATION_COUNT,
+                ReportColumnName.MEAN_VALUE,
             )
         )
         if path.name == AGGREGATE_METRICS_PARQUET_NAME
-        else frozenset(("experiment", #TODO: convert to enum instead of hardcoded string
-                        "method", #TODO: convert to enum instead of hardcoded string
-                        "condition", #TODO: convert to enum instead of hardcoded string
-                        "master_seed", #TODO: convert to enum instead of hardcoded string
-                        "terminal_state", #TODO: convert to enum instead of hardcoded string
-                       ))
+        else frozenset(
+            (
+                ReportColumnName.EXPERIMENT,
+                ReportColumnName.METHOD,
+                ReportColumnName.CONDITION,
+                ReportColumnName.MASTER_SEED,
+                ReportColumnName.TERMINAL_STATE,
+            )
+        )
     )
     if not required_columns.issubset(frame.columns) or frame.empty:
         return False
-    experiment_rows = frame[frame["experiment"] == result.experiment]
+    experiment_rows = frame[frame[ReportColumnName.EXPERIMENT] == result.experiment]
     if experiment_rows.empty:
         return False
     if path.name == AGGREGATE_METRICS_PARQUET_NAME:
@@ -495,12 +497,11 @@ def metric_artifact_is_semantically_complete(
             (row.method, row.condition) for row in experiment_rows.itertuples()
         )
         return expected_conditions.issubset(observed_conditions) and all(
-            (experiment_rows["observation_count" #TODO: convert to enum instead of hardcoded string
-                             ] > 0).tolist()
+            (experiment_rows[ReportColumnName.OBSERVATION_COUNT] > 0).tolist()
         )
-    terminal_state_values = cast(list[str], experiment_rows["terminal_state"].tolist())
     recorded_terminal_states = frozenset(
-        ExperimentLifecycleState(state) for state in terminal_state_values
+        ExperimentLifecycleState(str(state))
+        for state in experiment_rows[ReportColumnName.TERMINAL_STATE]
     )
     if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
         return False

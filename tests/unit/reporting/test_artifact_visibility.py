@@ -7,9 +7,9 @@ from fedsira.artifacts.paths import (
     preprocessing_root,
     workspace_root_for_family,
 )
-from fedsira.domain.enums import ArtifactFamily
+from fedsira.domain.enums import ArtifactFamily, ExperimentName
 
-PROBE_EXPERIMENT = "Report Gate Probe"
+PROBE_EXPERIMENT = ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
 
 
 def _report_gate_roots() -> tuple[Path, ...]:

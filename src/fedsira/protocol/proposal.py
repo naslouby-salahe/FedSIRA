@@ -18,7 +18,7 @@ from fedsira.domain.enums import (
     AdmissionOpeningMode,
     AdmissionState,
     ProposalEpisode,
-    SeedNamespace,
+    SeedDerivationLabel,
 )
 from fedsira.domain.models import MetricResult, ScientificCell
 from fedsira.domain.types import (
@@ -45,7 +45,6 @@ from fedsira.domain.types import (
     ScreenDomainCount,
     ScreenDomainDecision,
     ScreenLoss,
-    SeedDerivationLabel,
     SourceCommitted,
 )
 from fedsira.evaluation.statistics import match_nearest_within_decile
@@ -60,10 +59,6 @@ from fedsira.runtime import (
     deterministic_order,
     framed_bytes,
 )
-
-SCREEN_DOMAIN_ORDER_SEPARATOR: SeedDerivationLabel = SeedNamespace.SCREEN_DOMAIN_ORDER
-SCREEN_FOLD_SEPARATOR: SeedDerivationLabel = SeedNamespace.SCREEN_FOLD
-SOURCE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.SOURCE_SELECTION
 
 
 class AdmissionOpeningEntry(FrozenDomainModel):
@@ -110,7 +105,7 @@ def source_selection_order(
 ) -> tuple[DomainId, ...]:
     return deterministic_order(
         tuple(eligible_domains),
-        SOURCE_SELECTION_SEPARATOR,
+        SeedDerivationLabel.SOURCE_SELECTION,
         source_selection_namespace_seed,
     )
 
@@ -137,7 +132,7 @@ def screen_domain_order(
 ) -> tuple[DomainId, ...]:
     ordered = deterministic_order(
         tuple(eligible_non_source_domains),
-        SCREEN_DOMAIN_ORDER_SEPARATOR,
+        SeedDerivationLabel.SCREEN_DOMAIN_ORDER,
         screen_domain_order_namespace_seed,
     )
     return ordered[:screen_domain_count]
@@ -149,7 +144,7 @@ def screen_fold_index(
     fold_count: FoldCount,
 ) -> FoldIndex:
     digest = hashlib.sha256(
-        framed_bytes(SCREEN_FOLD_SEPARATOR, screen_fold_seed, sample_id)
+        framed_bytes(SeedDerivationLabel.SCREEN_FOLD, screen_fold_seed, sample_id)
     ).digest()
     return int.from_bytes(digest[0:8], byteorder="big", signed=False) % fold_count
 
@@ -326,9 +321,6 @@ def candidate_screen_transition(
     return AdmissionState.REJECTED
 
 
-SOURCE_SELECTION_SEED_SEPARATOR = "SOURCE_SELECTION_SEED"
-
-
 class OpeningIdentity(FrozenDomainModel):
     capability_identity: CapabilityIdentity
     contract_passes: CapabilityContractSatisfied
@@ -385,7 +377,8 @@ def _source_requires_attack_carrier(cell: ScientificCell) -> BooleanValue:
 
 def source_domain_for_cell(adapter: DatasetAdapter, cell: ScientificCell) -> DomainId | None:
     source_order = source_selection_order(
-        adapter.domain_ids, derive_uint32(SOURCE_SELECTION_SEED_SEPARATOR, cell.master_seed)
+        adapter.domain_ids,
+        derive_uint32(SeedDerivationLabel.SOURCE_SELECTION_SEED, cell.master_seed),
     )
     validate_exactly_one_source_domain((source_order[0],))
     domains_with_target = domains_with_class(

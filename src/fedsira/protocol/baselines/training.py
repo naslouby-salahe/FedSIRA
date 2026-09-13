@@ -18,9 +18,8 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
     nbaiot_adapter,
 )
-from fedsira.domain.enums import AdmissionOpeningMode
+from fedsira.domain.enums import AdmissionOpeningMode, AlgorithmName
 from fedsira.domain.types import (
-    AlgorithmName,
     ArtifactDigest,
     BooleanValue,
     DomainId,
@@ -35,7 +34,6 @@ from fedsira.evaluation.metrics import (
     non_source_domains,
 )
 from fedsira.learning.federated import (
-    ANCHOR_TRAINING_ALGORITHM_TOKEN,
     LocalTrainingClient,
     run_fedavg_round,
     train_one_client_locally,
@@ -102,12 +100,6 @@ def validate_candidate_free_full_path_opening_mode(mode: AdmissionOpeningMode) -
 
 
 Domain = TypeVar("Domain", bound=Hashable)
-
-FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "FEDAVG_REFERENCE"
-SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "SECURE_CONTINUAL_ASSESSMENT"
-RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
-    "RECOVERY_AFTER_SOURCE_ADMISSION"
-)
 
 
 def train_ordinary_fedavg_delta(
@@ -198,7 +190,7 @@ def train_fedavg_reference_delta(
         anchor,
         source_domain,
         fedavg_reference_post_reference_rounds(),
-        FEDAVG_REFERENCE_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.FEDAVG_REFERENCE,
     )
 
 
@@ -214,7 +206,7 @@ def train_secure_continual_assessment_delta(
         anchor,
         source_domain,
         secure_continual_assessment_post_reference_rounds(),
-        SECURE_CONTINUAL_ASSESSMENT_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.SECURE_CONTINUAL_ASSESSMENT,
     )
 
 
@@ -230,12 +222,9 @@ def train_recovery_after_source_admission_delta(
         anchor,
         source_domain,
         recovery_after_source_admission_rounds(),
-        RECOVERY_AFTER_SOURCE_ADMISSION_TRAINING_ALGORITHM_TOKEN,
+        AlgorithmName.RECOVERY_AFTER_SOURCE_ADMISSION,
         exclude_source_from_participants=True,
     )
-
-
-DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN = "DENSITY_CLUSTER_TRIMMED_MEAN"
 
 
 def _flatten_model_state(anchor: RealAnchor, state: ModelState) -> torch.Tensor:
@@ -294,7 +283,7 @@ def train_krum_reference_delta(
                         master_seed,
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
-                        "KRUM_REFERENCE",
+                        AlgorithmName.KRUM_REFERENCE,
                         domain,
                         round_index,
                     ),
@@ -372,7 +361,7 @@ def train_density_cluster_trimmed_mean_delta(
                         master_seed,
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
-                        DENSITY_CLUSTER_TRIMMED_MEAN_TRAINING_ALGORITHM_TOKEN,
+                        AlgorithmName.DENSITY_CLUSTER_TRIMMED_MEAN,
                         domain,
                         round_index,
                     ),
@@ -408,12 +397,6 @@ def train_density_cluster_trimmed_mean_delta(
     return (
         _flatten_model_state(anchor, state) - anchor.flat_parameters if any_round_trained else None
     )
-
-
-CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION" #TODO: convert to enum instead of hardcoded string
-UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN: AlgorithmName = ( #TODO: convert to enum instead of hardcoded string
-    "UPDATE_RECONSTRUCTION_FILTER"
-)
 
 
 def _client_delta_from_role(
@@ -493,7 +476,7 @@ def anchor_round_calibration_updates(
                 round_start_flat,
                 Role.ANCHOR_VALIDATION,
                 1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.ANCHOR_ROUND_CALIBRATION,
             )
             if result is not None:
                 updates.append(result[0])
@@ -519,7 +502,7 @@ def anchor_round_reconstruction_calibration_errors(
                 round_start_flat,
                 Role.ANCHOR_TRAIN,
                 config.model.anchor_fedavg.local_epochs_per_round,
-                ANCHOR_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.ANCHOR_FEDAVG,
             )
             reconstructed = _client_delta_from_role(
                 prepared_root,
@@ -530,7 +513,7 @@ def anchor_round_reconstruction_calibration_errors(
                 round_start_flat,
                 Role.ANCHOR_VALIDATION,
                 1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.ANCHOR_ROUND_CALIBRATION,
             )
             if submitted is not None and reconstructed is not None:
                 errors.append(
@@ -608,7 +591,7 @@ def train_update_reconstruction_filter_delta(
                         master_seed,
                         anchor.dataset_manifest_hash,
                         flat_parameters_identity(anchor.flat_parameters),
-                        UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN,
+                        AlgorithmName.UPDATE_RECONSTRUCTION_FILTER,
                         domain,
                         round_index,
                     ),
@@ -623,7 +606,7 @@ def train_update_reconstruction_filter_delta(
                 current_flat,
                 Role.ANCHOR_VALIDATION,
                 1,
-                CALIBRATION_TRAINING_ALGORITHM_TOKEN,
+                AlgorithmName.ANCHOR_ROUND_CALIBRATION,
             )
             if reconstructed is None:
                 continue

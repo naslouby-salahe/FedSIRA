@@ -9,7 +9,7 @@ import random
 import resource
 import subprocess
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from contextlib import contextmanager
@@ -24,14 +24,22 @@ from pydantic import Field
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, ScientificConfig, load_scientific_config
 from fedsira.domain.enums import (
+    AlgorithmName,
+    CublasWorkspaceConfig,
+    EnvironmentComponent,
+    EnvironmentExpectation,
+    EnvironmentObservation,
     EnvironmentReadinessEffect,
+    EnvironmentVariableName,
     FailureClass,
+    Fp32PrecisionMode,
+    RuntimeComponentName,
     ScientificCellPhase,
-    SeedNamespace,
+    SeedDerivationLabel,
+    StructuredLogField,
 )
 from fedsira.domain.types import (
     UINT32_MODULUS,
-    AlgorithmName,
     ArtifactDigest,
     AutomaticallyRetriable,
     AutomaticRecoveryPermitted,
@@ -39,8 +47,8 @@ from fedsira.domain.types import (
     DatasetManifestDigest,
     DerivedSeed,
     DeterministicInteger,
+    DeterministicOrderKey,
     DomainId,
-    EnvironmentText,
     EpochIndex,
     FailureMessage,
     FramingField,
@@ -52,10 +60,7 @@ from fedsira.domain.types import (
     RarArchivesPresent,
     RetryCount,
     RoundIndex,
-    RuntimeComponentName,
     SampleId,
-    SeedDerivationLabel,
-    TextValue,
     TimeoutSeconds,
     TrainingConditionId,
     WallClockSeconds,
@@ -94,7 +99,9 @@ _APPLICATION_CONTEXT: ContextVar[ApplicationContext | None] = ContextVar(
 
 
 @contextmanager
-def bound_application_context(context: ApplicationContext) -> Iterator[ApplicationContext]:
+def bound_application_context(
+    context: ApplicationContext,
+) -> Generator[ApplicationContext]:
     token = _APPLICATION_CONTEXT.set(context)
     try:
         yield context
@@ -124,8 +131,6 @@ def automatic_recovery_permitted(
 
 
 NAMESPACE_SEED_PREFIX = "FedSIRA|seed_namespace|"
-LOCAL_TRAINING_JOB_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_JOB"
-LOCAL_TRAINING_BATCH_ORDER_SEPARATOR: SeedDerivationLabel = "LOCAL_TRAINING_BATCH_ORDER"
 
 FramedBytes = Annotated[bytes, Field()]
 DigestBytes = Annotated[bytes, Field(min_length=32, max_length=32)]
@@ -150,14 +155,14 @@ def framed_bytes(*fields: FramingField) -> FramedBytes:
     return bytes(encoded)
 
 
-def namespace_seed(master_seed: MasterSeed, namespace: SeedNamespace) -> NamespaceSeed:
+def namespace_seed(master_seed: MasterSeed, namespace: SeedDerivationLabel) -> NamespaceSeed:
     message = f"{NAMESPACE_SEED_PREFIX}{master_seed}|{namespace}"
     digest = hashlib.sha256(message.encode("utf-8")).digest()
     return int.from_bytes(digest[0:8], byteorder="big", signed=False) % UINT32_MODULUS
 
 
 def derive_uint32(
-    separator: SeedDerivationLabel, #TODO: should be enum. Find all usage and put them in the enum
+    separator: SeedDerivationLabel,
     parent: DeterministicInteger,
     *values: FramingField,
 ) -> DerivedSeed:
@@ -175,7 +180,7 @@ def local_training_seed(
     round_index_or_minus_one: RoundIndex,
 ) -> DerivedSeed:
     return derive_uint32(
-        LOCAL_TRAINING_JOB_SEPARATOR,
+        SeedDerivationLabel.LOCAL_TRAINING_JOB,
         local_training_namespace_seed,
         dataset_manifest_hash,
         start_checkpoint_identity,
@@ -191,8 +196,8 @@ def deterministic_order(
     domain_separator: SeedDerivationLabel,
     order_namespace_seed: NamespaceSeed,
 ) -> tuple[OrderItem, ...]:
-    def sort_key(item: OrderItem) -> tuple[DigestBytes, TextValue]:
-        item_text: TextValue = str(item)
+    def sort_key(item: OrderItem) -> tuple[DigestBytes, DeterministicOrderKey]:
+        item_text: DeterministicOrderKey = str(item)
         digest: DigestBytes = hashlib.sha256(
             framed_bytes(domain_separator, order_namespace_seed, item_text)
         ).digest()
@@ -208,7 +213,9 @@ def minibatch_order(
 ) -> tuple[SampleId, ...]:
     def sort_key(sample_id: SampleId) -> tuple[DigestBytes, SampleId]:
         digest: DigestBytes = hashlib.sha256(
-            framed_bytes(LOCAL_TRAINING_BATCH_ORDER_SEPARATOR, training_seed, epoch, sample_id)
+            framed_bytes(
+                SeedDerivationLabel.LOCAL_TRAINING_BATCH_ORDER, training_seed, epoch, sample_id
+            )
         ).digest()
         return digest, sample_id
 
@@ -222,27 +229,24 @@ def seed_job_local_rng_streams(seed: DerivedSeed) -> None:
     _TORCH_CUDA_MANUAL_SEED_ALL(seed)
 
 
-REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
-
-
 class EnvironmentMismatch(FrozenDomainModel):
-    component: EnvironmentText #TODO: convert to enum instead of hardcoded string
-    expected: EnvironmentText #TODO: convert to enum instead of hardcoded string
-    actual: EnvironmentText #TODO: convert to enum instead of hardcoded string
+    component: EnvironmentComponent
+    expected: EnvironmentExpectation
+    actual: EnvironmentObservation
     readiness_effect: EnvironmentReadinessEffect
 
 
 class _Fp32PrecisionController(Protocol):
-    fp32_precision: EnvironmentText
+    fp32_precision: Fp32PrecisionMode
 
 
 def check_gpu_requirements() -> tuple[EnvironmentMismatch, ...]:
     if not torch.cuda.is_available():
         return (
             EnvironmentMismatch(
-                component="gpu_availability",
-                expected="available",
-                actual="unavailable",
+                component=EnvironmentComponent.GPU_AVAILABILITY,
+                expected=EnvironmentExpectation.AVAILABLE,
+                actual=EnvironmentObservation.UNAVAILABLE,
                 readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
@@ -264,18 +268,18 @@ def check_unrar_availability(
     except FileNotFoundError:
         return (
             EnvironmentMismatch(
-                component="unrar_version",
-                expected="available",
-                actual="not installed",
+                component=EnvironmentComponent.UNRAR_VERSION,
+                expected=EnvironmentExpectation.AVAILABLE,
+                actual=EnvironmentObservation.NOT_INSTALLED,
                 readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
     if result.returncode != 0:
         return (
             EnvironmentMismatch(
-                component="unrar_version",
-                expected="available",
-                actual="unavailable",
+                component=EnvironmentComponent.UNRAR_VERSION,
+                expected=EnvironmentExpectation.AVAILABLE,
+                actual=EnvironmentObservation.UNAVAILABLE,
                 readiness_effect=EnvironmentReadinessEffect.ADVISORY,
             ),
         )
@@ -283,17 +287,13 @@ def check_unrar_availability(
 
 
 def configure_deterministic_backend() -> None:
-    os.environ["CUBLAS_WORKSPACE_CONFIG" #TODO: use enum instead of hardcoded string
-               ] = REFERENCE_CUBLAS_WORKSPACE_CONFIG
+    os.environ[EnvironmentVariableName.CUBLAS_WORKSPACE_CONFIG] = CublasWorkspaceConfig.REFERENCE
     torch.use_deterministic_algorithms(True, warn_only=False)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.backends.cuda.matmul.fp32_precision = "ieee"
+    torch.backends.cuda.matmul.fp32_precision = Fp32PrecisionMode.IEEE
     cudnn_conv = cast(_Fp32PrecisionController, torch.backends.cudnn.conv)
-    cudnn_conv.fp32_precision = "ieee"
-
-
-NUMERICAL_RUNTIME_DEPENDENCY = "numerical-runtime"
+    cudnn_conv.fp32_precision = Fp32PrecisionMode.IEEE
 
 
 def numerical_runtime_identity() -> ArtifactDigest:
@@ -301,7 +301,7 @@ def numerical_runtime_identity() -> ArtifactDigest:
         framed_bytes(
             torch.__version__,
             str(torch.version.cuda),
-            REFERENCE_CUBLAS_WORKSPACE_CONFIG,
+            CublasWorkspaceConfig.REFERENCE,
             str(torch.are_deterministic_algorithms_enabled()),
             str(torch.backends.cudnn.deterministic),
             str(torch.backends.cudnn.benchmark),
@@ -338,14 +338,10 @@ class StructuredJsonFormatter(logging.Formatter):
         payload = record.__dict__.copy()
         for reserved_key in self.RESERVED_ATTRIBUTES:
             payload.pop(reserved_key, None)
-        payload["timestamp" #TODO: convert to enum instead of hardcoded string
-                ] = self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z")
-        payload["level" #TODO: convert to enum instead of hardcoded string
-                ] = record.levelname
-        payload["component" #TODO: convert to enum instead of hardcoded string
-                ] = record.name
-        payload["message" #TODO: convert to enum instead of hardcoded string
-                ] = record.getMessage()
+        payload[StructuredLogField.TIMESTAMP] = self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z")
+        payload[StructuredLogField.LEVEL] = record.levelname
+        payload[StructuredLogField.COMPONENT] = record.name
+        payload[StructuredLogField.MESSAGE] = record.getMessage()
         return json.dumps(payload, sort_keys=True, default=str)
 
 
@@ -435,7 +431,7 @@ class OperationTimeoutError(RuntimeError):
 
 
 def run_bounded(
-    operation: RuntimeComponentName, #TODO: convert to enum instead of hardcoded string
+    operation: RuntimeComponentName,
     timeout_seconds: TimeoutSeconds,
     action: Callable[[], OperationResult],
 ) -> OperationResult:

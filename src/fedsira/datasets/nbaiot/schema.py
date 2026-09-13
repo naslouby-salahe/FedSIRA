@@ -3,20 +3,18 @@ from enum import StrEnum
 from pathlib import Path
 
 from fedsira.datasets.common import DatasetAdapter, DatasetSpecification
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import DatasetId, NBaiotTriggerFeature, SeedDerivationLabel
 from fedsira.domain.types import (
     AttackBasename,
     AttackFamilyName,
     DatasetClassToken,
     DatasetManifestDigest,
     DomainId,
-    FeatureName,
     FrozenDomainModel,
     NamespaceSeed,
     PathToken,
     PredictorCount,
     RelativePathText,
-    SeedDerivationLabel,
 )
 from fedsira.runtime import deterministic_order
 
@@ -68,12 +66,7 @@ NBAIOT_DOMAIN_ORDER: tuple[NBaiotDomain, ...] = tuple(NBaiotDomain)
 NBAIOT_CLASS_ORDER: tuple[NBaiotClass, ...] = tuple(NBaiotClass)
 NBAIOT_TARGET_CLASS = NBaiotClass.GAFGYT_COMBO
 NBAIOT_PRIMARY_PREDICTOR_COUNT: PredictorCount = 115
-NBAIOT_TRIGGER_FEATURES: tuple[FeatureName, ...] = (
-    "MI_dir_L0.1_weight",
-    "H_L0.1_weight",
-    "HH_L0.1_magnitude",
-    "HpHp_L0.1_mean",
-)
+NBAIOT_TRIGGER_FEATURES: tuple[NBaiotTriggerFeature, ...] = tuple(NBaiotTriggerFeature)
 _NON_ALPHANUMERIC = re.compile(r"[^0-9a-zA-Z]+")
 
 

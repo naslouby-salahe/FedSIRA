@@ -4,10 +4,14 @@ import pytest
 
 from fedsira.artifacts.paths import artifact_slot_directory
 from fedsira.artifacts.store import ArtifactManifest, read_current_artifact
-from fedsira.domain.enums import ArtifactDependencyKind, ArtifactFamily
+from fedsira.domain.enums import (
+    ArtifactDependencyKind,
+    ArtifactFamily,
+    ArtifactInstanceLabel,
+    ExperimentName,
+    TableName,
+)
 from fedsira.reporting.publication import (
-    REPORT_EXPORT_INSTANCE,
-    SOURCE_DATA_INSTANCE,
     TableFigureExportPayload,
     TableFigureSourceDataPayload,
     publish_table_figure_export,
@@ -21,7 +25,7 @@ from fedsira.reporting.verification import (
     verify_report_export_currency,
 )
 
-EXPERIMENT = "Primary Confirmatory Evaluation"
+EXPERIMENT = ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
 
 
 @pytest.fixture
@@ -31,7 +35,7 @@ def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
 
 
 def _rendered_table(csv_text: str) -> RenderedTable:
-    return RenderedTable(name="Cell Metrics", csv_text=csv_text)
+    return RenderedTable(name=TableName.CELL_METRICS, csv_text=csv_text)
 
 
 def _products(root: Path, csv_text: str) -> tuple[Path, Path]:
@@ -41,7 +45,7 @@ def _products(root: Path, csv_text: str) -> tuple[Path, Path]:
     figures_root.mkdir(parents=True, exist_ok=True)
     table_path = tables_root / "Cell Metrics.csv"
     table_path.write_text(csv_text)
-    figure_path = figures_root / "Security Utility Tradeoff.png"
+    figure_path = figures_root / "Primary Security-Utility Tradeoff.png"
     figure_path.write_bytes(b"png-bytes")
     return table_path, figure_path
 
@@ -67,7 +71,7 @@ def test_source_data_records_table_and_figure_content(isolated_repository: Path)
     manifest, table_path = _publish_source_data(isolated_repository, csv_text)
     assert manifest.family is ArtifactFamily.TABLE_FIGURE_SOURCE_DATA
     slot = table_figure_source_data_slot(EXPERIMENT)
-    assert slot.instance == SOURCE_DATA_INSTANCE
+    assert slot.instance == ArtifactInstanceLabel.SOURCE_DATA
     assert slot.experiment == EXPERIMENT
     current = read_current_artifact(isolated_repository / artifact_slot_directory(slot))
     assert current is not None
@@ -101,7 +105,7 @@ def test_export_records_products_relative_to_the_experiment_root(
         (str(table_path),),
     )
     assert manifest.family is ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT
-    assert manifest.slot.instance == REPORT_EXPORT_INSTANCE
+    assert manifest.slot.instance == ArtifactInstanceLabel.REPORT_EXPORT
     assert manifest.dependencies[0].kind is ArtifactDependencyKind.ARTIFACT
     assert manifest.dependencies[0].digest == source_data.identity
     current = read_current_artifact(
@@ -145,7 +149,12 @@ def test_export_currency_flags_a_stale_source_data_identity(isolated_repository:
         )
         == ()
     )
-    stale = verify_report_export_currency(EXPERIMENT, "0" * 64, isolated_repository, relative)
+    stale = verify_report_export_currency(
+        EXPERIMENT,
+        ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION * 64,
+        isolated_repository,
+        relative,
+    )
     assert any("stale for its source data" in failure for failure in stale)
     missing = verify_report_export_currency(
         EXPERIMENT,

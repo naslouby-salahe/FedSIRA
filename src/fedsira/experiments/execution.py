@@ -36,15 +36,22 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
 )
 from fedsira.domain.enums import (
+    AblationVariant,
     AdmissionState,
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactProducer,
+    BoundCondition,
+    CapabilityContractScope,
     EpistemicFailureType,
     ExperimentLifecycleState,
+    ExperimentName,
     LogEvent,
+    ReportCellLiteral,
     RootCauseMixture,
     ScientificCellPhase,
+    SmokeCheckName,
     TernaryOutcome,
 )
 from fedsira.domain.models import (
@@ -55,10 +62,11 @@ from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
     ComparisonName,
     DatasetClassToken,
+    DomainId,
     ExampleCount,
-    ExperimentName,
     FrozenDomainModel,
     MasterSeed,
+    MethodName,
     MetricValue,
     ModelInputWidth,
     ModelOutputWidth,
@@ -68,12 +76,13 @@ from fedsira.domain.types import (
     Probability,
     ProductionWeight,
     PValue,
+    RelativePathText,
     ResolvedCoreComplete,
     ScenarioName,
     SchemaVersion,
     ScientificCellSemanticKey,
+    SmokeRenderText,
     StatusRenderText,
-    TextValue,
     WallClockSeconds,
 )
 from fedsira.evaluation.comparison_evidence import publish_comparison_evidence
@@ -92,9 +101,6 @@ from fedsira.experiments.byzantine import validate_byzantine_vocabulary
 from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
-    AblationVariant,
-    BoundCondition,
-    CapabilityContractGranularity,
     epistemic_strength_tokens,
     experiment_by_name,
 )
@@ -226,7 +232,7 @@ def materialize_ablation_references(
                 dependencies=(
                     ArtifactDependency(
                         kind=ArtifactDependencyKind.CONTENT,
-                        dependency="prepared-evidence",
+                        dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                         digest=prepared_evidence,
                     ),
                 ),
@@ -367,7 +373,9 @@ def execute_experiment(
     else:
         log_execution_event(LogEvent.COMPARISON_STARTED, ExecutionLogFields(experiment=experiment))
         comparisons = comparison_builder(experiment, definition.dataset, outcome_tuple, store)
-        log_execution_event(LogEvent.COMPARISON_COMPLETED, ExecutionLogFields(experiment=experiment))
+        log_execution_event(
+            LogEvent.COMPARISON_COMPLETED, ExecutionLogFields(experiment=experiment)
+        )
         if comparisons:
             publish_comparison_evidence(
                 experiment,
@@ -438,11 +446,13 @@ def execute_smoke(overwrite: OverwriteExisting) -> None:
         raise SystemExit(1)
 
 
-SmokeRenderText = TextValue
 SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"
 
 _DANMINI = NBaiotDomain.DANMINI_DOORBELL
 _ENNIO = NBaiotDomain.ENNIO_DOORBELL
+_DANMINI_HASH_TOKEN: DomainId = _DANMINI.name
+_DANMINI_BENIGN_CSV_PATH: RelativePathText = f"{_DANMINI}/benign_traffic.csv"
+_DANMINI_TARGET_CSV_PATH: RelativePathText = f"{_DANMINI}/{NBaiotClass.GAFGYT_COMBO.name}.csv"
 
 REQUIRED_CELL_PHASES: frozenset[ScientificCellPhase] = frozenset(
     (
@@ -505,23 +515,23 @@ class ExperimentPrerequisiteState(FrozenDomainModel):
 
 
 def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] | None:
-    if experiment == "Byzantine-Bound Violation": #TODO: use enum not hardcoded string
+    if experiment is ExperimentName.BYZANTINE_BOUND_VIOLATION:
         return frozenset(condition for condition in BoundCondition)
-    if experiment == "Shared Epistemic-Failure Boundary": #TODO: use enum not hardcoded string
+    if experiment is ExperimentName.SHARED_EPISTEMIC_FAILURE_BOUNDARY:
         return frozenset(
             f"{failure_type}|{strength}"
             for failure_type in EpistemicFailureType
             for strength in epistemic_strength_tokens(failure_type)
         )
-    if experiment == "Capability Under-Specification Boundary": #TODO: use enum not hardcoded string
+    if experiment is ExperimentName.CAPABILITY_UNDER_SPECIFICATION_BOUNDARY:
         return frozenset(mixture for mixture in RootCauseMixture)
     return None
 
 
-def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
-    if experiment == "Capability Under-Specification Boundary": #TODO: use enum not hardcoded string
-        return frozenset(granularity for granularity in CapabilityContractGranularity)
-    if experiment == "Mechanism Ablation": #TODO: use enum not hardcoded string
+def _allowed_methods(experiment: ExperimentName) -> frozenset[MethodName] | None:
+    if experiment is ExperimentName.CAPABILITY_UNDER_SPECIFICATION_BOUNDARY:
+        return frozenset(granularity for granularity in CapabilityContractScope)
+    if experiment is ExperimentName.MECHANISM_ABLATION:
         return frozenset(variant for variant in AblationVariant)
     return None
 
@@ -562,7 +572,7 @@ def validate_experiment_prerequisites_met(
             None,
         )
         if state is not ExperimentLifecycleState.COMPLETED:
-            state_text = state if state is not None else "unknown" #TODO: use enum not hardcoded string
+            state_text = state if state is not None else ReportCellLiteral.UNKNOWN
             raise ValueError(
                 f"experiment {experiment} requires prerequisite {prerequisite} "
                 f"to be Completed, found {state_text}"
@@ -603,9 +613,9 @@ def _data_invariants() -> tuple[SmokeCheckResult, ...]:
     stream_row_count = sampling_caps.reproduction_target
     assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256="a" * 64,
-        domain_hash_token="DANMINI_DOORBELL", #TODO: use enum for domain hash token
+        domain_hash_token=_DANMINI_HASH_TOKEN,
         class_id=NBaiotClass.GAFGYT_COMBO,
-        normalized_relative_csv_path="Danmini Doorbell/combo.csv",
+        normalized_relative_csv_path=_DANMINI_TARGET_CSV_PATH,
         stream_row_count=stream_row_count,
         role_intervals=role_intervals,
         sampling_caps_per_domain=sampling_caps,
@@ -616,9 +626,9 @@ def _data_invariants() -> tuple[SmokeCheckResult, ...]:
     )
     supported_assignments = assign_stream_roles_and_sample_ids(
         dataset_file_sha256="a" * 64,
-        domain_hash_token="DANMINI_DOORBELL", #TODO: use enum for domain hash token
+        domain_hash_token=_DANMINI_HASH_TOKEN,
         class_id=NBaiotClass.BENIGN,
-        normalized_relative_csv_path="Danmini Doorbell/benign_traffic.csv", #TODO: use enum
+        normalized_relative_csv_path=_DANMINI_BENIGN_CSV_PATH,
         stream_row_count=stream_row_count,
         role_intervals=role_intervals,
         sampling_caps_per_domain=sampling_caps,
@@ -626,8 +636,10 @@ def _data_invariants() -> tuple[SmokeCheckResult, ...]:
     row_indices = tuple(assignment.original_row_index for assignment in supported_assignments)
     no_overlap = len(row_indices) == len(set(row_indices))
     return (
-        SmokeCheckResult(name="no target sample in anchor roles", passed=no_target_in_anchor),
-        SmokeCheckResult(name="no cross-role sample overlap", passed=no_overlap),
+        SmokeCheckResult(
+            name=SmokeCheckName.NO_TARGET_SAMPLE_IN_ANCHOR_ROLES, passed=no_target_in_anchor
+        ),
+        SmokeCheckResult(name=SmokeCheckName.NO_CROSS_ROLE_SAMPLE_OVERLAP, passed=no_overlap),
     )
 
 
@@ -683,26 +695,23 @@ def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
     expected_probability = 1 / eligible_pool_size
     probability_matches = abs(probability - expected_probability) < tolerance
     return (
-        SmokeCheckResult(name="source cannot be verifier", #TODO: use enum not hardcoded string
-                         passed=source_not_verifier),
+        SmokeCheckResult(name=SmokeCheckName.SOURCE_CANNOT_BE_VERIFIER, passed=source_not_verifier),
         SmokeCheckResult(
-            name="canonical cell phase sequence is well-formed", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.CELL_PHASE_SEQUENCE_WELL_FORMED,
             passed=required_phase_sequence_valid,
         ),
         SmokeCheckResult(
-            name="2 positives with f_V=1 implies at least one honest positive", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.PLURALITY_IMPLIES_HONEST_POSITIVE,
             passed=honest_positive,
         ),
-        SmokeCheckResult(name="Krum n=5 f=1 admissible", #TODO: use enum not hardcoded string
-                         passed=krum_admissible),
-        SmokeCheckResult(name="Krum n=3 f=1 rejected", #TODO: use enum not hardcoded string
-                         passed=krum_three_rejected),
+        SmokeCheckResult(name=SmokeCheckName.KRUM_FIVE_ONE_ADMISSIBLE, passed=krum_admissible),
+        SmokeCheckResult(name=SmokeCheckName.KRUM_THREE_ONE_REJECTED, passed=krum_three_rejected),
         SmokeCheckResult(
-            name="verifier assignment before commitment throws", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.VERIFIER_ASSIGNMENT_BEFORE_COMMITMENT_THROWS,
             passed=commitment_rejected,
         ),
         SmokeCheckResult(
-            name="random committee contamination probability 1/7 for b=2", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.RANDOM_COMMITTEE_CONTAMINATION_PROBABILITY,
             passed=probability_matches,
             detail=f"observed {probability:.12f}",
         ),
@@ -717,11 +726,11 @@ def _mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     holm_matches = holm == HOLM_CHECK_ADJUSTED_P_VALUES
     return (
         SmokeCheckResult(
-            name="exact sign-flip test enumerates all assignments",
+            name=SmokeCheckName.EXACT_SIGN_FLIP_TEST_ENUMERATES_ASSIGNMENTS,
             passed=sign_flip_matches,
             detail=f"p={sign_flip:.10f}",
         ),
-        SmokeCheckResult(name="Holm adjustment matches hand fixture", passed=holm_matches),
+        SmokeCheckResult(name=SmokeCheckName.HOLM_ADJUSTMENT_MATCHES_FIXTURE, passed=holm_matches),
     )
 
 
@@ -814,24 +823,25 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
         "source" in name for name in inspect.signature(run_post_reference_training).parameters
     )
     return (
-        SmokeCheckResult(name="one-batch forward/backward finite", #TODO: use enum not hardcoded string
-                         passed=finite),
+        SmokeCheckResult(name=SmokeCheckName.ONE_BATCH_FORWARD_BACKWARD_FINITE, passed=finite),
         SmokeCheckResult(
-            name="one-round FedAvg matches weighted average fixture", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.ONE_ROUND_FEDAVG_MATCHES_FIXTURE,
             passed=fedavg_matches,
         ),
-        SmokeCheckResult(name="checkpoint restore reproduces predictions", #TODO: use enum not hardcoded string
-                         passed=restore_matches),
         SmokeCheckResult(
-            name="report-test loader cannot be requested by training", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.CHECKPOINT_RESTORE_REPRODUCES_PREDICTIONS,
+            passed=restore_matches,
+        ),
+        SmokeCheckResult(
+            name=SmokeCheckName.REPORT_TEST_LOADER_NOT_REQUESTED_BY_TRAINING,
             passed=report_test_rejected,
         ),
         SmokeCheckResult(
-            name="post-reference minibatch with no supported rows keeps KL defined", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.POST_REFERENCE_MINIBATCH_KEEPS_KL_DEFINED,
             passed=kl_zero,
         ),
         SmokeCheckResult(
-            name="honest reproduction constructor has no source-artifact parameter", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.HONEST_REPRODUCTION_HAS_NO_SOURCE_ARTIFACT,
             passed=constructor_has_no_source,
         ),
     )
@@ -871,27 +881,27 @@ def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
     )
     return (
         SmokeCheckResult(
-            name="source direct production weight cannot become nonzero", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.SOURCE_DIRECT_PRODUCTION_WEIGHT_ZERO,
             passed=source_weight_zero,
         ),
         SmokeCheckResult(
-            name="Abstain cannot be cast to boolean vote", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.ABSTAIN_NOT_CASTABLE_TO_BOOLEAN_VOTE,
             passed=abstain_not_positive,
         ),
         SmokeCheckResult(
-            name="fewer than five certified rows cannot call primary Krum synthesis", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.FEWER_THAN_FIVE_ROWS_CANNOT_SYNTHESIZE,
             passed=five_row_required,
         ),
         SmokeCheckResult(
-            name="final admission without final-gate artifact is impossible", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.FINAL_ADMISSION_REQUIRES_FINAL_GATE_ARTIFACT,
             passed=admission_requires_gate,
         ),
         SmokeCheckResult(
-            name="all eight collapse combinations resolve", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.EIGHT_COLLAPSE_COMBINATIONS_RESOLVE,
             passed=eight_resolved,
         ),
         SmokeCheckResult(
-            name="source/reproducer/verifier/final/report roles are disjoint", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.ROLES_ARE_DISJOINT,
             passed=disjoint_roles,
         ),
     )
@@ -953,22 +963,24 @@ def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     bootstrap_deterministic = first_interval == second_interval
     return (
         SmokeCheckResult(
-            name="random-committee exact probability is 0 for compromised-verifier counts 0/1", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.RANDOM_COMMITTEE_EXACT_PROBABILITY_ZERO,
             passed=abs(zero) < tolerance and abs(one) < tolerance,
         ),
         SmokeCheckResult(
-            name="post-evidence wall-clock components sum to T_post", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.POST_EVIDENCE_COMPONENTS_SUM_TO_TOTAL,
             passed=delay_matches,
         ),
-        SmokeCheckResult(name="type-7 quantiles match NumPy linear fixtures", passed=numpy_matches), #TODO: use enum not hardcoded string
-        SmokeCheckResult(name="sample SD uses ddof=1", passed=sd_matches), #TODO: use enum not hardcoded string
         SmokeCheckResult(
-            name="confusion-derived metrics match hand calculations", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.TYPE_SEVEN_QUANTILES_MATCH_NUMPY, passed=numpy_matches
+        ),
+        SmokeCheckResult(name=SmokeCheckName.SAMPLE_SD_USES_DDOF_ONE, passed=sd_matches),
+        SmokeCheckResult(
+            name=SmokeCheckName.CONFUSION_METRICS_MATCH_HAND_CALCULATIONS,
             passed=confusion_matches,
         ),
-        SmokeCheckResult(name="zero denominators return NA plus reason", passed=zero_is_na), #TODO: use enum not hardcoded string
+        SmokeCheckResult(name=SmokeCheckName.ZERO_DENOMINATORS_RETURN_NA, passed=zero_is_na),
         SmokeCheckResult(
-            name="bootstrap draws are deterministic under the analysis seed", #TODO: use enum not hardcoded string
+            name=SmokeCheckName.BOOTSTRAP_DRAWS_DETERMINISTIC,
             passed=bootstrap_deterministic,
         ),
     )

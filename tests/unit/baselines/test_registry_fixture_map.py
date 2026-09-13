@@ -1,6 +1,8 @@
+from fedsira.domain.enums import (
+    BaselineIdentity,
+)
 from fedsira.protocol.baselines.registry import (
     BASELINE_VALIDATION_FIXTURE_MAP,
-    BaselineIdentity,
     BaselineValidationFixture,
 )
 

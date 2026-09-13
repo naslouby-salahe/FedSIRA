@@ -14,6 +14,7 @@ from fedsira.artifacts.store import (
 )
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactFamilyDirectoryToken,
     ArtifactProducer,
@@ -29,18 +30,14 @@ from fedsira.domain.types import (
     RowCount,
     SampleScoreSequence,
     SchemaVersion,
-    TextValue,
+    ScoringTransformName,
 )
 from fedsira.runtime import REPOSITORY_ROOT, framed_bytes, numerical_runtime_identity
 
 MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"
 MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"
-MODEL_SCORE_MODEL_DEPENDENCY = "model-checkpoint"
 MODEL_SCORE_VIEW_DEPENDENCY = ArtifactFamilyDirectoryToken.PREPARED_ROLE_VIEW
-MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"
-MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"
-MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"
-DEFAULT_SCORING_TRANSFORM: TextValue = "argmax-logits"
+DEFAULT_SCORING_TRANSFORM: ScoringTransformName = "argmax-logits"
 
 
 class DomainClassScore(FrozenDomainModel):
@@ -56,7 +53,7 @@ class ModelScorePayload(FrozenDomainModel):
     schema_version: SchemaVersion
     dataset: DatasetId
     model_identity: ArtifactDigest
-    scoring_transform: TextValue
+    scoring_transform: ScoringTransformName
     class_tokens: tuple[DatasetClassToken, ...]
     shards: tuple[DomainClassScore, ...]
 
@@ -69,7 +66,7 @@ def class_registry_digest(class_tokens: tuple[DatasetClassToken, ...]) -> Artifa
     return hashlib.sha256(framed_bytes(*class_tokens)).hexdigest()
 
 
-def scoring_transform_digest(scoring_transform: TextValue) -> ArtifactDigest:
+def scoring_transform_digest(scoring_transform: ScoringTransformName) -> ArtifactDigest:
     return hashlib.sha256(framed_bytes(scoring_transform)).hexdigest()
 
 
@@ -106,7 +103,7 @@ def model_score_slot(
 def publish_model_score(
     dataset: DatasetId,
     model_identity: ArtifactDigest,
-    scoring_transform: TextValue,
+    scoring_transform: ScoringTransformName,
     class_tokens: tuple[DatasetClassToken, ...],
     shards: tuple[DomainClassScore, ...],
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
@@ -127,7 +124,7 @@ def publish_model_score(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=MODEL_SCORE_MODEL_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.MODEL_CHECKPOINT,
                 digest=model_identity,
             ),
             ArtifactDependency(
@@ -137,17 +134,17 @@ def publish_model_score(
             ),
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.OUTPUT_CLASS_REGISTRY,
                 digest=class_registry_digest(class_tokens),
             ),
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=MODEL_SCORE_TRANSFORM_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.SCORING_TRANSFORM,
                 digest=scoring_transform_digest(scoring_transform),
             ),
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=MODEL_SCORE_RUNTIME_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.NUMERICAL_RUNTIME,
                 digest=numerical_runtime_identity(),
             ),
         ),

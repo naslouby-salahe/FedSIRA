@@ -18,18 +18,26 @@ from fedsira.domain.enums import (
     AdmissionOpeningMode,
     ArtifactDependencyKind,
     ArtifactFamily,
-    ArtifactInstanceToken,
+    ArtifactInstanceLabel,
     ArtifactProducer,
+    BaselineIdentity,
+    ComparisonFamily,
     CoreMethodIdentity,
     ExperimentLifecycleState,
+    ExperimentName,
+    ExternalVerificationCondition,
+    OpeningMode,
+    PluralityCondition,
+    PrimaryScenario,
     ProposalEpisode,
+    ResolvedCoreDecisionToken,
+    SourceExclusionMethod,
     WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
     BooleanValue,
     CollapseDecisionPassed,
     CollapseReason,
-    ExperimentName,
     FinalGateRequired,
     FrozenDomainModel,
     MaterialityDecision,
@@ -57,17 +65,10 @@ from fedsira.experiments.definitions import (
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-    ComparisonFamily,
-    ExternalVerificationCondition,
-    OpeningMode,
-    PluralityCondition,
-    PrimaryScenario,
-    SourceExclusionMethod,
 )
 from fedsira.experiments.engine import (
     PersistedExecutionRecord,
 )
-from fedsira.protocol.baselines.registry import BaselineIdentity
 from fedsira.runtime import current_application_context
 
 
@@ -128,13 +129,15 @@ class ResolvedCore(FrozenDomainModel):
     def decision_identity(self) -> ResolvedCoreIdentity:
         return "|".join(
             (
-                "proposal-assisted" if self.proposal_assistance_survives else "candidate-free", #TODO: use enum not hardcoded strings
-                "plurality" if self.plurality_survives else "single-reproduction",
-                (
-                    "externally-verified"
-                    if self.external_verification_survives
-                    else "unverified-row"
-                ),
+                ResolvedCoreDecisionToken.PROPOSAL_ASSISTED
+                if self.proposal_assistance_survives
+                else ResolvedCoreDecisionToken.CANDIDATE_FREE,
+                ResolvedCoreDecisionToken.PLURALITY
+                if self.plurality_survives
+                else ResolvedCoreDecisionToken.SINGLE_REPRODUCTION,
+                ResolvedCoreDecisionToken.EXTERNALLY_VERIFIED
+                if self.external_verification_survives
+                else ResolvedCoreDecisionToken.UNVERIFIED_ROW,
             )
         )
 
@@ -654,11 +657,10 @@ RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 RESOLVED_CORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|resolved_core|1"
 
 
-RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = ArtifactInstanceToken.RESOLVED_CORE
-
-
 def resolved_core_artifact_slot() -> ArtifactSlot:
-    return ArtifactSlot(family=RESOLVED_CORE_ARTIFACT_FAMILY, instance=RESOLVED_CORE_INSTANCE)
+    return ArtifactSlot(
+        family=RESOLVED_CORE_ARTIFACT_FAMILY, instance=ArtifactInstanceLabel.RESOLVED_CORE
+    )
 
 
 def resolved_core_dependencies(

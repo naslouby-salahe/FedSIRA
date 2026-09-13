@@ -39,7 +39,6 @@ from fedsira.datasets.common import (
     RawDatasetIdentityPayload,
     ScalerMetadata,
     prepared_feature_names,
-    role_hash_token,
 )
 from fedsira.datasets.layout import required_raw_dataset_root
 from fedsira.datasets.nbaiot.prepare import (
@@ -51,21 +50,20 @@ from fedsira.datasets.nbaiot.prepare import (
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
 from fedsira.datasets.role_split import (
-    ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY,
     RoleSplitViewCount,
     publish_role_split_sample_manifest,
 )
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
     LogEvent,
     Role,
-    WorkspaceDirectoryToken,
+    RuntimeComponentName,
 )
 from fedsira.domain.types import (
-    ArtifactDependencyName,
     ArtifactDigest,
     ArtifactReuseDecision,
     DatasetClassToken,
@@ -90,18 +88,15 @@ from fedsira.runtime import (
     run_bounded,
 )
 
-PREPROCESSING_LOGGER = get_structured_logger(WorkspaceDirectoryToken.PREPROCESSING)
+PREPROCESSING_LOGGER = get_structured_logger(RuntimeComponentName.PREPROCESSING)
 
 RAW_DATASET_IDENTITY_SCHEMA_VERSION: SchemaVersion = "fedsira|raw_dataset_identity|1"
 RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|raw_dataset_identity|1"
 SCALER_ARTIFACT_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|scaler|1"
-RAW_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "raw-file-manifest"
-PREPARED_EVIDENCE_DEPENDENCY: ArtifactDependencyName = "prepared-evidence"
 
 DatasetManifestPayload = NBaiotDatasetManifestPayload | CICIoT2023DatasetManifestPayload
 
 
-DATASET_FILE_MANIFEST_DEPENDENCY: ArtifactDependencyName = "dataset-file-manifest"
 DATASET_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|dataset_manifest|1"
 
 
@@ -117,7 +112,7 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=DATASET_FILE_MANIFEST_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.DATASET_FILE_MANIFEST,
                 digest=payload.dataset_file_manifest_hash,
             ),
         ),
@@ -155,7 +150,7 @@ def publish_raw_dataset_identity(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=RAW_FILE_MANIFEST_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.RAW_FILE_MANIFEST,
                 digest=manifest_hash,
             ),
         ),
@@ -180,7 +175,7 @@ def publish_scaler(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency=RAW_FILE_MANIFEST_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.RAW_FILE_MANIFEST,
                 digest=manifest_hash,
             ),
         ),
@@ -228,7 +223,7 @@ def publish_prepared_role_view(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.ARTIFACT,
-                dependency=ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY,
+                dependency=ArtifactDependencyLabel.ROLE_SPLIT_SAMPLE_MANIFEST,
                 digest=role_split_manifest_identity,
             ),
         ),
@@ -287,7 +282,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         tuple(
             RoleSplitViewCount(
                 domain=view.domain.name,
-                class_id=view.class_id.value,
+                class_id=view.class_id,
                 role=view.role,
                 row_count=view.row_count,
             )
@@ -298,7 +293,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         publish_prepared_role_view(
             DatasetId.N_BAIOT,
             role_split_manifest.identity,
-            f"{view.domain.name}_{view.class_id.name}_{role_hash_token(view.role)}",
+            f"{view.domain.name}_{view.class_id.name}_{view.role.name}",
             view.role,
             view.class_id,
             view.domain.name,
@@ -375,8 +370,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         publish_prepared_role_view(
             DatasetId.CICIOT2023,
             role_split_manifest.identity,
-            f"{view.pseudo_domain.display_token}_{view.normalized_label}_"
-            f"{role_hash_token(view.role)}",
+            f"{view.pseudo_domain.display_token}_{view.normalized_label}_" f"{view.role.name}",
             view.role,
             view.normalized_label,
             view.pseudo_domain.display_token,
@@ -405,7 +399,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
             official_expected_predictor_count=OFFICIAL_EXPECTED_PREDICTOR_COUNT,
             predictor_count_matches_official=summary.predictor_count_matches_official,
             class_registry=summary.class_registry,
-            target_family_members=tuple(member.value for member in CICIoT2023TargetFamilyMember),
+            target_family_members=tuple(CICIoT2023TargetFamilyMember),
             pseudo_domain_count=PSEUDO_DOMAIN_COUNT,
         ),
     )
@@ -437,7 +431,7 @@ def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) 
     with bound_application_context(context):
         timeout = context.scientific_config.execution.timeouts_seconds.dataset_preprocessing
         run_bounded(
-            WorkspaceDirectoryToken.PREPROCESSING,
+            RuntimeComponentName.PREPROCESSING,
             timeout,
             lambda: _execute_bound(dataset, overwrite),
         )

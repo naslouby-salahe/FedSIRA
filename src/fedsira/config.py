@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Annotated, Self, TypeAlias
+from typing import Annotated, Self, TypeAlias, Union
 
 import yaml
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -88,7 +88,6 @@ from fedsira.domain.types import (
     TargetF1Change,
     TargetF1Gain,
     Temperature,
-    TextValue,
     TimeoutSeconds,
     TrimCount,
     UciDatasetId,
@@ -96,6 +95,7 @@ from fedsira.domain.types import (
     WarmupPassCount,
     WeightDecay,
     WorkerCount,
+    YamlMappingKey,
 )
 
 
@@ -724,12 +724,18 @@ def validate_scientific_config(config: ScientificConfig) -> None:
         raise ValueError("seeds_and_determinism.analysis_seed must not collide with a master seed")
 
 
-YamlValue: TypeAlias = (
-    "None | bool | int | float | TextValue | Sequence[YamlValue] | Mapping[TextValue, YamlValue]"
-)
+YamlValue: TypeAlias = Union[
+    None,
+    bool,
+    int,
+    float,
+    YamlMappingKey,
+    "Sequence[YamlValue]",
+    "Mapping[YamlMappingKey, YamlValue]",
+]
 
 
-def _read_yaml_mapping(path: Path) -> Mapping[TextValue, YamlValue]:
+def _read_yaml_mapping(path: Path) -> Mapping[YamlMappingKey, YamlValue]:
     try:
         with path.open(encoding="utf-8") as handle:
             parsed: YamlValue = yaml.safe_load(handle)

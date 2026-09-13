@@ -1,5 +1,9 @@
 from fedsira.config import ResourceHorizonConfig
-from fedsira.domain.enums import AdmissionState, CapabilityContractScope
+from fedsira.domain.enums import (
+    AdmissionState,
+    CapabilityContractScope,
+    DescriptiveScientificMetric,
+)
 from fedsira.domain.types import (
     EligibleEvidenceHolderCount,
     EvidenceCycleIndex,
@@ -7,7 +11,6 @@ from fedsira.domain.types import (
     MetricObservation,
     MetricValue,
 )
-from fedsira.experiments.definitions import DescriptiveScientificMetric
 from fedsira.runtime import current_application_context
 
 
