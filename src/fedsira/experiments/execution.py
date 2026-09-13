@@ -172,7 +172,7 @@ def ablation_reference_cell(
 ) -> ScientificCell:
     return ScientificCell(
         experiment=MECHANISM_ABLATION_NAME,
-        method=AblationVariant.FULL_FEDSIRA.value,
+        method=AblationVariant.FULL_FEDSIRA,
         condition=scientific_scenario,
         master_seed=master_seed,
     )
@@ -416,7 +416,7 @@ def render_status() -> StatusRenderText:
             record.terminal_state is ExperimentLifecycleState.COMPLETED for record in records
         )
         lines.append(
-            f"{planned.definition.name:<55} {completed:>4}/{len(planned.cells):<4} {state.value}"
+            f"{planned.definition.name:<55} {completed:>4}/{len(planned.cells):<4} {state}"
         )
     return "\n".join(lines)
 
@@ -505,23 +505,23 @@ class ExperimentPrerequisiteState(FrozenDomainModel):
 
 def _allowed_conditions(experiment: ExperimentName) -> frozenset[ScenarioName] | None:
     if experiment == "Byzantine-Bound Violation":
-        return frozenset(condition.value for condition in BoundCondition)
+        return frozenset(condition for condition in BoundCondition)
     if experiment == "Shared Epistemic-Failure Boundary":
         return frozenset(
-            f"{failure_type.value}|{strength}"
+            f"{failure_type}|{strength}"
             for failure_type in EpistemicFailureType
             for strength in epistemic_strength_tokens(failure_type)
         )
     if experiment == "Capability Under-Specification Boundary":
-        return frozenset(mixture.value for mixture in RootCauseMixture)
+        return frozenset(mixture for mixture in RootCauseMixture)
     return None
 
 
 def _allowed_methods(experiment: ExperimentName) -> frozenset[TextValue] | None:
     if experiment == "Capability Under-Specification Boundary":
-        return frozenset(granularity.value for granularity in CapabilityContractGranularity)
+        return frozenset(granularity for granularity in CapabilityContractGranularity)
     if experiment == "Mechanism Ablation":
-        return frozenset(variant.value for variant in AblationVariant)
+        return frozenset(variant for variant in AblationVariant)
     return None
 
 
@@ -561,7 +561,7 @@ def validate_experiment_prerequisites_met(
             None,
         )
         if state is not ExperimentLifecycleState.COMPLETED:
-            state_text = state.value if state is not None else "unknown"
+            state_text = state if state is not None else "unknown"
             raise ValueError(
                 f"experiment {experiment} requires prerequisite {prerequisite} "
                 f"to be Completed, found {state_text}"
@@ -582,7 +582,7 @@ def validate_cell_phase_sequence(phases: tuple[ScientificCellPhase, ...]) -> Non
         raise ValueError("a cell phase may appear at most once in its execution sequence")
     for phase in phases:
         if phase not in REQUIRED_CELL_PHASES:
-            raise ValueError(f"unknown scientific cell phase {phase.value}")
+            raise ValueError(f"unknown scientific cell phase {phase}")
 
 
 def validate_cell_terminal_record(
@@ -591,7 +591,7 @@ def validate_cell_terminal_record(
 ) -> None:
     if terminal_state not in TERMINAL_CELL_STATES:
         raise ValueError(
-            f"cell {cell.semantic_key} terminal state {terminal_state.value} is not terminal"
+            f"cell {cell.semantic_key} terminal state {terminal_state} is not terminal"
         )
 
 
@@ -768,7 +768,7 @@ def _model_invariants() -> tuple[SmokeCheckResult, ...]:
             )
         )
     )
-    fedavg_matches = bool(torch.allclose(averaged.parameters[0].value, expected))
+    fedavg_matches = torch.allclose(averaged.parameters[0].value, expected)
     model.eval()
     restored = FedSIRAClassifier(input_width, output_width)
     restored.load_state_dict(model.state_dict())

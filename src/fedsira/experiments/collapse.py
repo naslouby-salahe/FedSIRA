@@ -22,6 +22,7 @@ from fedsira.domain.enums import (
     CoreMethodIdentity,
     ExperimentLifecycleState,
     ProposalEpisode,
+    WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
     ArtifactInstanceToken,
@@ -268,7 +269,7 @@ def collapse_evaluation_from_records(
             external_verification_legitimate_admission_degradation=None,
         )
     if experiment == SINGLE_REPRODUCTION_NECESSITY_NAME:
-        conditions = tuple(condition.value for condition in PluralityCondition)
+        conditions = tuple(PluralityCondition)
         return CollapseEvaluationInput(
             plurality_legitimate_admission_degradation=_maximum_constraint(
                 _paired_constraint_means(
@@ -470,7 +471,7 @@ def _best_passed_metric(
             comparison.definition.comparison_name,
         ),
     )
-    return selected.definition.metric.value, selected.adjusted_p_value
+    return selected.definition.metric, selected.adjusted_p_value
 
 
 def _defined_within(
@@ -523,7 +524,7 @@ def _constraints_pass(
             evaluation.external_verification_legitimate_admission_degradation,
             materiality.legitimate_admission_noninferiority_margin,
         )
-    raise ValueError(f"{family.value} is not a collapse family")
+    raise ValueError(f"{family} is not a collapse family")
 
 
 def _decision_kind(family: ComparisonFamily) -> CollapseDecisionKind:
@@ -535,18 +536,18 @@ def _decision_kind(family: ComparisonFamily) -> CollapseDecisionKind:
         return CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
     if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
         return CollapseDecisionKind.EXTERNAL_VERIFICATION
-    raise ValueError(f"{family.value} is not a collapse family")
+    raise ValueError(f"{family} is not a collapse family")
 
 
 def _collapse_comparator(family: ComparisonFamily) -> MethodName:
     if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
-        return str(OpeningMode.CANDIDATE_FREE)
+        return OpeningMode.CANDIDATE_FREE
     if family is ComparisonFamily.PLURALITY_NECESSITY:
-        return str(BaselineIdentity.ONE_INDEPENDENT_RETRAIN)
+        return BaselineIdentity.ONE_INDEPENDENT_RETRAIN
     if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
-        return str(BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE)
+        return BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE
     if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
-        return str(BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM)
+        return BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM
     raise ValueError(f"{family} is not a collapse family")
 
 
@@ -569,7 +570,7 @@ def _positive_metrics(family: ComparisonFamily) -> frozenset[ComparisonMetric]:
         return frozenset(
             (ComparisonMetric.MALICIOUS_ADMISSION, ComparisonMetric.WORST_DOMAIN_TARGET_F1)
         )
-    raise ValueError(f"{family.value} is not a collapse family")
+    raise ValueError(f"{family} is not a collapse family")
 
 
 def collapse_decision_from_comparison_families(
@@ -610,7 +611,7 @@ def _decision_for_kind(
 ) -> CollapseDecision:
     matching = tuple(decision for decision in decisions if decision.kind is kind)
     if len(matching) != 1:
-        raise ValueError(f"expected exactly one collapse decision for {kind.value}")
+        raise ValueError(f"expected exactly one collapse decision for {kind}")
     return matching[0]
 
 
@@ -666,10 +667,10 @@ def resolved_core_dependencies(
     return tuple(
         ArtifactDependency(
             kind=ArtifactDependencyKind.CONTENT,
-            dependency=f"collapse-decision:{decision.kind.value}",
+            dependency=f"collapse-decision:{decision.kind}",
             digest=compute_checksum(decision.model_dump_json().encode("utf-8")),
         )
-        for decision in sorted(decisions, key=lambda item: item.kind.value)
+        for decision in sorted(decisions, key=lambda item: item.kind)
     )
 
 
@@ -686,7 +687,7 @@ def publish_resolved_core(
         dependencies=resolved_core_dependencies(decisions),
         procedure_identity=RESOLVED_CORE_PROCEDURE_IDENTITY,
         slot_directory=slot_directory,
-        staging_root=slot_directory / "staging",
+        staging_root=slot_directory / WorkspaceDirectoryToken.STAGING,
     )
 
 

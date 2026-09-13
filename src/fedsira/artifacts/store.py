@@ -6,8 +6,11 @@ from pathlib import Path
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
     ArtifactFamily,
+    ArtifactFileToken,
     ArtifactLifecycleState,
     ArtifactProducer,
+    GitMetadataToken,
+    WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
     ArtifactComplete,
@@ -37,13 +40,13 @@ from fedsira.runtime import (
 
 ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
 
-ARTIFACT_LOGGER = get_structured_logger("artifacts")
+ARTIFACT_LOGGER = get_structured_logger(WorkspaceDirectoryToken.ARTIFACTS)
 
-ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin" #TODO: these values should be in enum, find them in project and fix them
-ARTIFACT_MANIFEST_SUFFIX = ".manifest.json" #TODO: these values should be in enum, find them in project and fix them
-ARTIFACT_CURRENT_FILE_NAME = "current.json" #TODO: these values should be in enum, find them in project and fix them
+ARTIFACT_PAYLOAD_SUFFIX: ArtifactFileToken = ArtifactFileToken.PAYLOAD_SUFFIX
+ARTIFACT_MANIFEST_SUFFIX: ArtifactFileToken = ArtifactFileToken.MANIFEST_SUFFIX
+ARTIFACT_CURRENT_FILE_NAME: ArtifactFileToken = ArtifactFileToken.CURRENT_FILE
 
-ARTIFACT_LOG_NAME = "artifacts.log" #TODO: these values should be in enum, find them in project and fix them
+ARTIFACT_LOG_NAME: ArtifactFileToken = ArtifactFileToken.LOG_FILE
 
 
 class ArtifactDependency(FrozenDomainModel):
@@ -107,8 +110,8 @@ def configure_artifact_logging(log_path: Path) -> None:
 
 
 def repository_revision() -> TextValue | None:
-    git_root = REPOSITORY_ROOT / ".git" #TODO: these values should be in enum, find them in project and fix them
-    head_path = git_root / "HEAD" #TODO: these values should be in enum, find them in project and fix them
+    git_root = REPOSITORY_ROOT / GitMetadataToken.GIT_DIR
+    head_path = git_root / GitMetadataToken.HEAD
     try:
         head = head_path.read_text(encoding="utf-8").strip()
     except OSError:
@@ -139,7 +142,7 @@ def artifact_identity(
     )
     return hashlib.sha256(
         framed_bytes(
-            slot.family.value,
+            slot.family,
             slot.instance,
             slot.experiment or "",
             ARTIFACT_SCHEMA_VERSION,
@@ -217,7 +220,7 @@ def load_published_manifests(
 def validate_artifact_lifecycle_readable(manifest: ArtifactManifest) -> None:
     if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
         raise ValueError(
-            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state.value}); "
+            f"artifact {manifest.identity} is not Complete ({manifest.lifecycle_state}); "
             "it is never a valid input to downstream science"
         )
 

@@ -10,6 +10,7 @@ from fedsira.config import RoleIntervals, SamplingCapsPerDomain
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
     ArtifactFamily,
+    ArtifactFamilyDirectoryToken,
     ArtifactProducer,
     DatasetId,
     Role,
@@ -98,7 +99,7 @@ def publish_role_split_sample_manifest(
         dependencies=(
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="dataset-manifest",
+                dependency=ArtifactFamilyDirectoryToken.DATASET_MANIFEST,
                 digest=dataset_manifest_hash,
             ),
         ),

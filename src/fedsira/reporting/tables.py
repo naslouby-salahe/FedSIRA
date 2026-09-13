@@ -103,10 +103,10 @@ def _publication_rounding() -> PublicationRoundingConfig:
 
 
 BYTE_VALUED_METRICS: tuple[MetricName, ...] = (
-    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
-    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
-    DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
+    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
+    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
+    DescriptiveScientificMetric.COMMUNICATION_BYTES,
+    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES,
 )
 
 BYTE_UNIT_LABELS: tuple[tuple[ByteUnit, TextValue, ByteCount], ...] = (
@@ -122,9 +122,9 @@ RATE_VALUED_METRICS: tuple[MetricName, ...] = (
     ComparisonMetric.FALSE_LAUNCH,
     ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
     DescriptiveScientificMetric.DORMANT_ADMISSION_RATE,
-    "verifier-abstention-rate",  # TODO: These should be enums from somewhere
-    "reproduction-abstention-rate",  # TODO: These should be enums from somewhere
-    "defined-domain-fraction",  # TODO: These should be enums from somewhere
+    DescriptiveScientificMetric.VERIFIER_ABSTENTION_RATE,
+    DescriptiveScientificMetric.REPRODUCTION_ABSTENTION_RATE,
+    DescriptiveScientificMetric.DEFINED_DOMAIN_FRACTION,
 )
 
 
@@ -200,15 +200,11 @@ def _statistical_summary_row(
     confidence_interval = (
         "NA"
         if comparison.confidence_interval is None
-        else (
-            f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]"
-        )
+        else (f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]")
     )
     margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
     materiality = (
-        "NA"
-        if definition.material_threshold is None
-        else f"{definition.material_threshold:.3f}"
+        "NA" if definition.material_threshold is None else f"{definition.material_threshold:.3f}"
     )
     reference_label = _comparison_reference_label(definition)
     comparison_identity = (
@@ -227,9 +223,7 @@ def _statistical_summary_row(
         margin,
         str(comparison.complete_seed_count),
         format_metric_value(comparison.mean_paired_difference, str(definition.metric)),
-        format_metric_value(
-            comparison.median_paired_difference, str(definition.metric)
-        ),
+        format_metric_value(comparison.median_paired_difference, str(definition.metric)),
         effect,
         format_p_value(comparison.raw_p_value),
         format_p_value(comparison.adjusted_p_value),
@@ -328,19 +322,14 @@ def _collapse_core_action(
     if kind is CollapseDecisionKind.PLURALITY:
         return resolved_core.reproduction_row_requirement.value
     if kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION:
-        return (
-            "source-excluded" if resolved_core.source_excluded else "source-influenced"
-        )
+        return "source-excluded" if resolved_core.source_excluded else "source-influenced"
     if kind is CollapseDecisionKind.EXTERNAL_VERIFICATION:
         return resolved_core.row_verification_mode.value
     raise ValueError(f"unsupported collapse decision kind {kind.value}")
 
 
 def _collapse_observed_outcome(decision: CollapseDecision) -> TextValue:
-    if (
-        decision.kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION
-        and not decision.survives
-    ):
+    if decision.kind is CollapseDecisionKind.DIRECT_SOURCE_EXCLUSION and not decision.survives:
         return "Central Not Supported"
     return "Survives" if decision.survives else "Removed"
 
@@ -526,9 +515,7 @@ def _descriptive_timing_value(
     metric: MetricName,
 ) -> FormattedStatisticText:
     if experiment == EFFICIENCY_MEASUREMENT_NAME:
-        return _outcome_timing_median_iqr(
-            outcomes, experiment, method, scenario, metric
-        )
+        return _outcome_timing_median_iqr(outcomes, experiment, method, scenario, metric)
     return format_metric_value(
         _outcome_metric_mean(outcomes, experiment, method, scenario, metric), metric
     )
@@ -568,9 +555,7 @@ def _outcome_summary_or_comparison(
         sample_standard_deviation = (
             0.0
             if len(values) == 1
-            else math.sqrt(
-                sum((value - mean) ** 2 for value in values) / (len(values) - 1)
-            )
+            else math.sqrt(sum((value - mean) ** 2 for value in values) / (len(values) - 1))
         )
         decimals = _publication_rounding().f1_accuracy_rates_decimals
         return f"{mean:.{decimals}f} ± {sample_standard_deviation:.{decimals}f}"
@@ -764,9 +749,7 @@ def render_source_exclusion_results_table(
         ComparisonMetric.TARGET_F1,
     )
     if target_noninferiority_comparison is not None:
-        target_noninferiority_status = (
-            target_noninferiority_comparison.comparison_state.value
-        )
+        target_noninferiority_status = target_noninferiority_comparison.comparison_state.value
     rows = tuple(
         (
             method,
@@ -784,9 +767,7 @@ def render_source_exclusion_results_table(
                 else source_asr_comparison.mean_paired_difference
             ),
             format_p_value(
-                None
-                if source_asr_comparison is None
-                else source_asr_comparison.adjusted_p_value
+                None if source_asr_comparison is None else source_asr_comparison.adjusted_p_value
             ),
             _comparison_confidence_interval(source_asr_comparison),
             _outcome_summary_or_comparison(
@@ -860,9 +841,7 @@ def render_ablation_results_table(
         scenario = ablation_scenario_for_variant(variant)
         is_reference = variant is AblationVariant.FULL_FEDSIRA
         metric = (
-            ComparisonMetric.ATTACK_SUCCESS_RATE
-            if is_reference
-            else ablation_metric(variant)[0]
+            ComparisonMetric.ATTACK_SUCCESS_RATE if is_reference else ablation_metric(variant)[0]
         )
         comparison = _comparison_result(
             comparison_results,
@@ -881,17 +860,13 @@ def render_ablation_results_table(
                     "reference row"
                     if is_reference
                     else format_metric_value(
-                        None
-                        if comparison is None
-                        else comparison.mean_paired_difference
+                        None if comparison is None else comparison.mean_paired_difference
                     )
                 ),
                 (
                     "reference row"
                     if is_reference
-                    else format_p_value(
-                        None if comparison is None else comparison.adjusted_p_value
-                    )
+                    else format_p_value(None if comparison is None else comparison.adjusted_p_value)
                 ),
                 (
                     "reference row"
@@ -971,9 +946,7 @@ def _byzantine_boundary(
             if bound_condition == condition:
                 return ByzantineBoundaryRow(
                     bound_status=(
-                        "Within Bound"
-                        if condition.endswith("Within Bound")
-                        else "Above Bound"
+                        "Within Bound" if condition.endswith("Within Bound") else "Above Bound"
                     ),
                     compromised_count=_condition_compromised_count(condition),
                     strategy=condition,
@@ -1060,21 +1033,19 @@ def render_byzantine_robustness_table(
                         definition.experiment,
                         definition.method,
                         definition.scientific_scenario,
-                        DescriptiveScientificMetric.CERTIFIED_ROW_YIELD.value,
+                        DescriptiveScientificMetric.CERTIFIED_ROW_YIELD,
                     ),
                     _outcome_metric_text(
                         outcomes,
                         definition.experiment,
                         definition.method,
                         definition.scientific_scenario,
-                        DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
+                        DescriptiveScientificMetric.DORMANT_ADMISSION_RATE,
                     ),
                     str(comparison.complete_seed_count),
                 )
             )
-    rows.sort(
-        key=lambda row: (row[0], row[3] != "Within Bound", int(row[4]), row[1], row[2])
-    )
+    rows.sort(key=lambda row: (row[0], row[3] != "Within Bound", int(row[4]), row[1], row[2]))
     return RenderedTable(
         name="Byzantine Robustness",
         csv_text=csv_text(
@@ -1139,9 +1110,7 @@ def render_failure_boundaries_table(
                     for outcome in outcomes
                 ):
                     continue
-                is_oracle_experiment = (
-                    experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME
-                )
+                is_oracle_experiment = experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME
                 rows.append(
                     (
                         experiment,
@@ -1247,34 +1216,26 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.T_EVIDENCE.value,
+                    DescriptiveScientificMetric.T_EVIDENCE,
                 )
             ),
+            _descriptive_timing_value(outcomes, experiment, method, scenario, "assignment-seconds"),
+            _descriptive_timing_value(outcomes, experiment, method, scenario, "reproduce-seconds"),
+            _descriptive_timing_value(outcomes, experiment, method, scenario, "verify-seconds"),
+            _descriptive_timing_value(outcomes, experiment, method, scenario, "synthesize-seconds"),
             _descriptive_timing_value(
-                outcomes, experiment, method, scenario, "assignment-seconds"
-            ),
-            _descriptive_timing_value(
-                outcomes, experiment, method, scenario, "reproduce-seconds"
-            ),
-            _descriptive_timing_value(
-                outcomes, experiment, method, scenario, "verify-seconds"
-            ),
-            _descriptive_timing_value(
-                outcomes, experiment, method, scenario, "synthesize-seconds"
+                outcomes,
+                experiment,
+                method,
+                scenario,
+                DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
             ),
             _descriptive_timing_value(
                 outcomes,
                 experiment,
                 method,
                 scenario,
-                DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
-            ),
-            _descriptive_timing_value(
-                outcomes,
-                experiment,
-                method,
-                scenario,
-                DescriptiveScientificMetric.GPU_SECONDS.value,
+                DescriptiveScientificMetric.GPU_SECONDS,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1282,9 +1243,9 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+                    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
                 ),
-                DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+                DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1292,9 +1253,9 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+                    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
                 ),
-                DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+                DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1302,9 +1263,9 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
+                    DescriptiveScientificMetric.COMMUNICATION_BYTES,
                 ),
-                DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
+                DescriptiveScientificMetric.COMMUNICATION_BYTES,
             ),
             format_metric_value(
                 _outcome_metric_mean(
@@ -1312,7 +1273,7 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.MODEL_TRANSMISSIONS.value,
+                    DescriptiveScientificMetric.MODEL_TRANSMISSIONS,
                 )
             ),
             format_metric_value(
@@ -1321,9 +1282,9 @@ def render_delay_and_efficiency_table(
                     experiment,
                     method,
                     scenario,
-                    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
+                    DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES,
                 ),
-                DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value,
+                DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES,
             ),
         )
         for experiment, method, scenario in rows_to_render
@@ -1379,9 +1340,7 @@ def render_generalization_results_table(
 ) -> RenderedTable:
     definition = experiment_by_name(SECONDARY_DATASET_GENERALIZATION_NAME)
     references = _generalization_references(comparison_results)
-    reference_label = (
-        ";".join(references) if references else "no predeclared comparator"
-    )
+    reference_label = ";".join(references) if references else "no predeclared comparator"
     rows: list[tuple[TextValue, ...]] = []
     for method in definition.methods:
         for secondary_scenario in SecondaryScenario:
@@ -1452,20 +1411,13 @@ def render_generalization_results_table(
                         if is_reference_row
                         else format_metric_value(
                             None
-                            if comparison is None
-                            or comparison.mean_paired_difference is None
+                            if comparison is None or comparison.mean_paired_difference is None
                             else -comparison.mean_paired_difference
                         )
                     ),
+                    (reference_label if is_reference_row else "not a predeclared comparison"),
                     (
-                        reference_label
-                        if is_reference_row
-                        else "not a predeclared comparison"
-                    ),
-                    (
-                        format_p_value(
-                            None if comparison is None else comparison.adjusted_p_value
-                        )
+                        format_p_value(None if comparison is None else comparison.adjusted_p_value)
                         if is_reference_row
                         else "not a predeclared comparison"
                     ),
@@ -1529,12 +1481,8 @@ def render_cell_metrics(
                     outcome.cell.method,
                     outcome.cell.condition,
                     f"{outcome.cell.master_seed}",
-                    (
-                        ""
-                        if outcome.cell.repetition is None
-                        else f"{outcome.cell.repetition}"
-                    ),
-                    outcome.terminal_state.value,
+                    ("" if outcome.cell.repetition is None else f"{outcome.cell.repetition}"),
+                    str(outcome.terminal_state),
                     metric_name,
                     format_value(metric_value),
                 )

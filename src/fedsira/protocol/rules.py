@@ -23,7 +23,6 @@ from fedsira.domain.types import (
     EvidenceArrivalCycleIndex,
     EvidenceArrivalCycleSequence,
     EvidenceCycleIndex,
-    SeedDerivationLabel,
     KrumCommitteeAdmissible,
     MaximumByzantineReportCount,
     MaximumByzantineReproductionRows,
@@ -33,6 +32,7 @@ from fedsira.domain.types import (
     NewlyAdequateEvidenceExists,
     ObservedPositiveReportCount,
     RequiredReproductionRowCount,
+    SeedDerivationLabel,
     UnderlyingVoteIsPositive,
 )
 from fedsira.runtime import derive_uint32, deterministic_order
@@ -170,7 +170,7 @@ def _dormant_resume_state(dormant_origin: DormantOrigin) -> AdmissionState:
     for origin, resume_state in _DORMANT_RESUME_STATES:
         if origin is dormant_origin:
             return resume_state
-    raise ValueError(f"unknown dormant origin: {dormant_origin.value}")
+    raise ValueError(f"unknown dormant origin: {dormant_origin}")
 
 
 def resume_dormant_admission(

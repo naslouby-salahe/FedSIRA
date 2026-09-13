@@ -9,7 +9,11 @@ from fedsira.datasets.common import (
     ScalerMetadata,
 )
 from fedsira.datasets.preprocess import publish_raw_dataset_identity, publish_scaler
-from fedsira.domain.enums import ArtifactFamily, DatasetId
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ArtifactFamilyDirectoryToken,
+    DatasetId,
+)
 
 
 @pytest.fixture
@@ -30,7 +34,7 @@ def test_raw_dataset_identity_is_published_per_dataset(isolated_repository: Path
         isolated_repository
         / "outputs"
         / "preprocessing"
-        / "raw-dataset-identity"
+        / ArtifactFamilyDirectoryToken.RAW_DATASET_IDENTITY
         / str(DatasetId.N_BAIOT)
     )
     assert current is not None

@@ -138,7 +138,7 @@ def _comparison_pairs(
             master_seed=seed,
             method=definition.method,
         )
-        method_value = metric_value(metric_index, method_key, definition.metric.value)
+        method_value = metric_value(metric_index, method_key, definition.metric)
         if method_value is None:
             continue
         if definition.reference_kind is ComparisonReferenceKind.ZERO:
@@ -151,7 +151,7 @@ def _comparison_pairs(
                 master_seed=seed,
                 method=definition.reference_method,
             )
-            reference_value = metric_value(metric_index, reference_key, definition.metric.value)
+            reference_value = metric_value(metric_index, reference_key, definition.metric)
         if reference_value is None:
             continue
         difference = _benefit_difference(
@@ -183,7 +183,7 @@ def ablation_reference_records(
                         experiment=MECHANISM_ABLATION_NAME,
                         scientific_scenario=reference.scientific_scenario,
                         master_seed=reference.master_seed,
-                        method=AblationVariant.FULL_FEDSIRA.value,
+                        method=AblationVariant.FULL_FEDSIRA,
                     ),
                     metrics=reference.metrics,
                 ),
@@ -225,7 +225,7 @@ def comparison_results_for_experiment(
         if reference_definition.dataset is not dataset:
             raise ValueError(
                 f"comparison reference {reference_experiment} uses "
-                f"{reference_definition.dataset.value}, expected {dataset.value}"
+                f"{reference_definition.dataset}, expected {dataset}"
             )
         metric_index = extend_index_from_records(
             metric_index, dataset, execution_store.read_all_outcomes(reference_experiment)
@@ -419,8 +419,8 @@ class SingleProcessTimingWorker:
             value=(state, communication_bytes_total, transmissions),
             wall_clock_seconds=timer.elapsed_seconds(),
             gpu_seconds=gpu_seconds,
-            peak_gpu_memory_bytes=int(peak_gpu_memory_bytes()),
-            peak_host_rss_bytes=int(peak_host_resident_set_bytes()),
+            peak_gpu_memory_bytes=peak_gpu_memory_bytes(),
+            peak_host_rss_bytes=peak_host_resident_set_bytes(),
         )
 
 

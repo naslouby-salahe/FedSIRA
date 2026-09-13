@@ -53,6 +53,7 @@ from fedsira.domain.enums import (
     FailureClass,
     ScientificCellPhase,
     TernaryOutcome,
+    WorkspaceFileToken,
 )
 from fedsira.domain.models import (
     SERVER_ID,
@@ -868,7 +869,7 @@ class ProtocolCellDispatch:
                         ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT,
                         self._primary_adapter.dataset,
                         cell.master_seed,
-                        source_candidate_stage_identity(episode.value, source_domain),
+                        source_candidate_stage_identity(episode, source_domain),
                         real_anchor.dataset_manifest_hash,
                         real_source_delta,
                         real_anchor.input_width,
@@ -2128,11 +2129,11 @@ class ProtocolCellDispatch:
                     float(delay_decomposition.logical_information_arrival_cycles),
                 ),
                 (
-                    DescriptiveScientificMetric.T_EVIDENCE.value,
+                    DescriptiveScientificMetric.T_EVIDENCE,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
                 ("first-holder-cycle", float(first_holder) if first_holder is not None else None),
-                (DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value, None),
+                (DescriptiveScientificMetric.WALL_CLOCK_SECONDS, None),
                 permanent_singleton_admission(state, holder_counts),
             ),
         )
@@ -2176,7 +2177,7 @@ class ProtocolCellDispatch:
                 *metrics,
                 ("evidence-arrival-cycle", float(tau_k) if tau_k is not None else None),
                 (
-                    DescriptiveScientificMetric.T_EVIDENCE.value,
+                    DescriptiveScientificMetric.T_EVIDENCE,
                     float(t_evidence) if t_evidence is not None else None,
                 ),
                 ("assignment-seconds", phase_durations.assignment_seconds),
@@ -2184,7 +2185,7 @@ class ProtocolCellDispatch:
                 ("verify-seconds", phase_durations.verify_seconds),
                 ("synthesize-seconds", phase_durations.synthesize_seconds),
                 (
-                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
+                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
                     post_evidence_wall_clock_seconds,
                 ),
             ),
@@ -2202,7 +2203,7 @@ class ProtocolCellDispatch:
         else:
             flat_parameters = real_anchor.flat_parameters.detach().cpu().contiguous()
             tensor_payload = numpy.asarray(flat_parameters).tobytes()
-            parameter_shape = (int(flat_parameters.numel()),)
+            parameter_shape = (flat_parameters.numel(),)
             manifest_hash = real_anchor.dataset_manifest_hash
             capability_hash = compute_capability_identity(
                 capability_contract_for_digest(self._primary_adapter, manifest_hash)
@@ -2270,7 +2271,7 @@ class ProtocolCellDispatch:
             cell.repetition,
         )
         diagnostic_root.mkdir(parents=True, exist_ok=True)
-        (diagnostic_root / "timing-observation.json").write_text(
+        (diagnostic_root / WorkspaceFileToken.TIMING_OBSERVATION_JSON).write_text(
             TimingRepetitionObservation(
                 experiment=cell.experiment,
                 method=cell.method,
@@ -2297,22 +2298,22 @@ class ProtocolCellDispatch:
                     ComparisonMetric.POST_EVIDENCE_OVERHEAD,
                     observation.wall_clock_seconds,
                 ),
-                (DescriptiveScientificMetric.COMMUNICATION_BYTES.value, float(bytes_total)),
-                (DescriptiveScientificMetric.MODEL_TRANSMISSIONS.value, float(transmissions)),
+                (DescriptiveScientificMetric.COMMUNICATION_BYTES, float(bytes_total)),
+                (DescriptiveScientificMetric.MODEL_TRANSMISSIONS, float(transmissions)),
                 (
-                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
+                    DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
                     observation.wall_clock_seconds,
                 ),
-                (DescriptiveScientificMetric.GPU_SECONDS.value, observation.gpu_seconds),
+                (DescriptiveScientificMetric.GPU_SECONDS, observation.gpu_seconds),
                 (
-                    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+                    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
                     float(observation.peak_gpu_memory_bytes),
                 ),
                 (
-                    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
+                    DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
                     float(observation.peak_host_rss_bytes),
                 ),
-                (DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES.value, float(storage_bytes)),
+                (DescriptiveScientificMetric.PERSISTENT_STORAGE_BYTES, float(storage_bytes)),
             ),
         )
 

@@ -61,6 +61,7 @@ from fedsira.domain.enums import (
     ArtifactProducer,
     DatasetId,
     Role,
+    WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
     ArtifactDependencyName,
@@ -88,7 +89,7 @@ from fedsira.runtime import (
     run_bounded,
 )
 
-PREPROCESSING_LOGGER = get_structured_logger("preprocessing")
+PREPROCESSING_LOGGER = get_structured_logger(WorkspaceDirectoryToken.PREPROCESSING)
 
 RAW_DATASET_IDENTITY_SCHEMA_VERSION: SchemaVersion = "fedsira|raw_dataset_identity|1"
 RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|raw_dataset_identity|1"
@@ -434,7 +435,11 @@ def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) 
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
         timeout = context.scientific_config.execution.timeouts_seconds.dataset_preprocessing
-        run_bounded("preprocessing", timeout, lambda: _execute_bound(dataset, overwrite))
+        run_bounded(
+            WorkspaceDirectoryToken.PREPROCESSING,
+            timeout,
+            lambda: _execute_bound(dataset, overwrite),
+        )
 
 
 def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:

@@ -13,6 +13,7 @@ from fedsira.artifacts.paths import (
     experiment_result_root,
     experiment_telemetry_root,
     manuscript_figures_root,
+    manuscript_reproducibility_root,
     manuscript_results_root,
     manuscript_tables_root,
     preprocessing_log_path,
@@ -24,7 +25,11 @@ from fedsira.artifacts.store import (
     configure_artifact_logging,
     load_published_manifests,
 )
-from fedsira.domain.enums import ArtifactFamily, ExperimentLifecycleState
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ExperimentLifecycleState,
+    WorkspaceFileToken,
+)
 from fedsira.domain.models import (
     ScientificCell,
 )
@@ -403,7 +408,7 @@ def export_experiment_report(
         tuple(rendered_tables),
         tuple(str(path) for path in figure_paths),
         tuple(str(path) for path in table_paths),
-        tuple(str(path) for path in evidence.paths),
+        evidence.paths,
     )
 
     summary = ExperimentReportSummary(
@@ -414,10 +419,10 @@ def export_experiment_report(
         planned_cell_count=len(result.outcomes),
         execution_digest=result.execution_digest,
     )
-    summary_path = metrics_root / "summary.json"
+    summary_path = metrics_root / WorkspaceFileToken.SUMMARY_JSON
     summary_path.write_text(summary.model_dump_json(indent=2) + "\n")
     exported.append(summary_path)
-    manifest_path = experiment_root / "manifest.json"
+    manifest_path = experiment_root / WorkspaceFileToken.MANIFEST_JSON
     manifest = ExperimentArtifactManifest(
         schema_version=EXPORT_SCHEMA_VERSION,
         experiment=result.experiment,
@@ -533,7 +538,7 @@ def export_project_summary(
 
     project_root = project_summary_root()
     tables_root = manuscript_tables_root(project_root)
-    reproducibility_root = project_root / "reproducibility" / "execution"
+    reproducibility_root = manuscript_reproducibility_root(project_root)
     figures_root = manuscript_figures_root(project_root)
     for directory in (tables_root, reproducibility_root, figures_root):
         directory.mkdir(parents=True, exist_ok=True)
@@ -607,7 +612,7 @@ def export_project_summary(
         pending_mandatory_tables=pending_tables,
         pending_mandatory_figures=pending_figures,
     )
-    reproducibility_path = reproducibility_root / "execution_summary.json"
+    reproducibility_path = reproducibility_root / WorkspaceFileToken.EXECUTION_SUMMARY_JSON
     reproducibility_path.write_text(reproducibility_summary.model_dump_json(indent=2) + "\n")
     exported.append(reproducibility_path)
 
@@ -853,15 +858,15 @@ _TIMING_METRICS: frozenset[MetricName] = frozenset(
         "reproduce-seconds",
         "verify-seconds",
         "synthesize-seconds",
-        DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
+        DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
     )
 )
 _RESOURCE_METRICS: frozenset[MetricName] = frozenset(
     (
-        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
-        DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES.value,
-        DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-        DescriptiveScientificMetric.MODEL_TRANSMISSIONS.value,
+        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
+        DescriptiveScientificMetric.PEAK_HOST_RSS_BYTES,
+        DescriptiveScientificMetric.COMMUNICATION_BYTES,
+        DescriptiveScientificMetric.MODEL_TRANSMISSIONS,
     )
 )
 

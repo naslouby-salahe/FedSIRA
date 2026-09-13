@@ -171,7 +171,7 @@ def render_security_utility_tradeoff(
                 )
         if not labels:
             raise ValueError(
-                f"Primary Security-Utility Tradeoff: missing comparison evidence for {metric.value}"
+                f"Primary Security-Utility Tradeoff: missing comparison evidence for {metric}"
             )
         positions = tuple(range(len(labels)))
         axis.errorbar(
@@ -181,7 +181,7 @@ def render_security_utility_tradeoff(
             fmt="o",
         )
         axis.set_yticks(positions, labels)
-        axis.set_title(metric.value)
+        axis.set_title(metric)
         axis.axvline(0.0)
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -202,8 +202,11 @@ def render_evidence_arrival_trajectory(
         AdmissionState.EXPIRED,
     )
     figure = Figure(figsize=(5 * len(schedules), 4))
+    first_axis = None
     for index, schedule in enumerate(schedules, start=1):
         axis = figure.add_subplot(1, len(schedules), index)
+        if first_axis is None:
+            first_axis = axis
         cycles = tuple(
             sorted(
                 frozenset(
@@ -217,21 +220,22 @@ def render_evidence_arrival_trajectory(
             fractions = tuple(
                 state_fraction(state_fractions, schedule, cycle, state) for cycle in cycles
             )
-            axis.step(cycles, fractions, where="post", marker="o", label=state.value)
+            axis.step(cycles, fractions, where="post", marker="o", label=state)
         axis.set_title(schedule)
         axis.set_xlabel("logical evidence cycle")
         axis.set_ylim(0.0, 1.0)
-    figure.axes[0].set_ylabel("fraction of seed instances")
-    figure.axes[0].legend()
+    if first_axis is not None:
+        first_axis.set_ylabel("fraction of seed instances")
+        first_axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
 
 
 EFFICIENCY_PROFILE_METRICS: tuple[MetricName, ...] = (
-    DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
-    DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+    DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
+    DescriptiveScientificMetric.COMMUNICATION_BYTES,
+    DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
 )
 
 
@@ -490,7 +494,7 @@ def render_collapse_decision_effects(
         adjusted_p = (
             "NA" if comparison.adjusted_p_value is None else f"p={comparison.adjusted_p_value:.4g}"
         )
-        annotations.append(f"{adjusted_p}; {comparison.comparison_state.value}")
+        annotations.append(f"{adjusted_p}; {comparison.comparison_state}")
     if normalized_effects:
         positions = tuple(range(len(normalized_effects)))
         axis.errorbar(
@@ -746,14 +750,14 @@ def render_compromised_verifier_boundary(
     if not completed:
         raise ValueError("Compromised-Verifier Boundary: missing completed source evidence")
     false_positive_conditions = (
-        VerifierCondition.ALL_HONEST.value,
-        VerifierCondition.ONE_FALSE_POSITIVE.value,
-        VerifierCondition.TWO_FALSE_POSITIVES.value,
+        VerifierCondition.ALL_HONEST,
+        VerifierCondition.ONE_FALSE_POSITIVE,
+        VerifierCondition.TWO_FALSE_POSITIVES,
     )
     false_negative_conditions = (
-        VerifierCondition.ALL_HONEST.value,
-        VerifierCondition.ONE_FALSE_NEGATIVE.value,
-        VerifierCondition.TWO_FALSE_NEGATIVES.value,
+        VerifierCondition.ALL_HONEST,
+        VerifierCondition.ONE_FALSE_NEGATIVE,
+        VerifierCondition.TWO_FALSE_NEGATIVES,
     )
     counts = tuple(
         _condition_compromised_count(condition) for condition in false_positive_conditions
@@ -835,7 +839,7 @@ def render_shared_epistemic_failure(
                     for outcome in outcomes
                     if outcome.completed
                     and outcome.cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME
-                    and outcome.cell.condition.startswith(f"{failure_type.value}|")
+                    and outcome.cell.condition.startswith(f"{failure_type}|")
                 )
             )
         )
@@ -850,7 +854,7 @@ def render_shared_epistemic_failure(
                 continue
             differences: list[MetricValue | None] = []
             for strength in strengths:
-                condition = f"{failure_type.value}|{strength:.2f}"
+                condition = f"{failure_type}|{strength:.2f}"
                 comparison = _paired_comparison(
                     comparison_results,
                     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
@@ -862,7 +866,7 @@ def render_shared_epistemic_failure(
                 )
             series.append(
                 (
-                    failure_type.value,
+                    failure_type,
                     tuple(int(value) for value in strengths),
                     tuple(differences),
                 )
@@ -882,12 +886,12 @@ def render_shared_epistemic_failure(
                     outcomes,
                     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
                     str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
-                    f"{failure_type.value}|{strength:.2f}",
+                    f"{failure_type}|{strength:.2f}",
                     ComparisonMetric.LEGITIMATE_ADMISSION,
                 )
                 for strength in strengths
             )
-            series.append((failure_type.value, tuple(int(value) for value in strengths), values))
+            series.append((failure_type, tuple(int(value) for value in strengths), values))
         return tuple(series)
 
     def draw_clean_oracle(axis: Axes) -> None:
@@ -928,12 +932,12 @@ def render_capability_granularity_boundary(
     if not completed:
         raise ValueError("Capability-Granularity Boundary: missing completed source evidence")
     granularities = tuple(
-        scope.value
+        scope
         for scope in CapabilityContractScope
         if any(outcome.cell.method == scope for outcome in completed)
     )
     mixtures = tuple(
-        mixture.value
+        mixture
         for mixture in RootCauseMixture
         if any(outcome.cell.condition == mixture for outcome in completed)
     )
@@ -995,7 +999,7 @@ def render_heterogeneity_synthesis_boundary(
     if not completed:
         raise ValueError("Heterogeneity Synthesis Boundary: missing completed source evidence")
     regimes = tuple(
-        regime.value
+        regime
         for regime in HeterogeneityRegime
         if any(outcome.cell.condition == regime for outcome in completed)
     )
@@ -1091,7 +1095,7 @@ def render_admission_delay_decomposition(
             ADMISSION_DELAY_DECOMPOSITION_NAME,
             method,
             condition,
-            DescriptiveScientificMetric.T_EVIDENCE.value,
+            DescriptiveScientificMetric.T_EVIDENCE,
         )
         for method, condition in cells
     )
@@ -1307,9 +1311,9 @@ def efficiency_telemetry(
     outcomes: tuple[CellExecutionOutcome, ...],
 ) -> tuple[EfficiencyMetricObservation, ...]:
     metric_names: tuple[MetricName, ...] = (
-        DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
-        DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+        DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
+        DescriptiveScientificMetric.COMMUNICATION_BYTES,
+        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
     )
     methods = tuple(sorted(frozenset(outcome.cell.method for outcome in outcomes)))
     observations: list[EfficiencyMetricObservation] = []

@@ -810,9 +810,7 @@ class DatasetAdapter:
         try:
             index = self.specification.domain_ids.index(domain_id)
         except ValueError as error:
-            raise ValueError(
-                f"unknown domain identity for {self.dataset}: {domain_id}"
-            ) from error
+            raise ValueError(f"unknown domain identity for {self.dataset}: {domain_id}") from error
         return self.specification.domain_hash_tokens[index]
 
     def attack_carrier_class_token(self) -> DatasetClassToken:

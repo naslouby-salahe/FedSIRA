@@ -25,6 +25,7 @@ from fedsira.domain.enums import (
     EnvironmentReadinessEffect,
     ExperimentLifecycleState,
     ProjectStage,
+    WorkspaceDirectoryToken,
 )
 from fedsira.domain.models import (
     ScientificCell,
@@ -235,12 +236,16 @@ def _artifact_summary(
 ) -> DoctorArtifactSummary:
     prepared_parts: list[str] = []
     for dataset in DatasetId:
-        status = "prepared" if prepared_dataset_present(dataset) else "missing prepared views"
-        prepared_parts.append(f"{dataset.value} {status}")
+        status = (
+            WorkspaceDirectoryToken.PREPARED
+            if prepared_dataset_present(dataset)
+            else "missing prepared views"
+        )
+        prepared_parts.append(f"{dataset} {status}")
     core_status = "present" if resolved_core_present else "absent"
     return (
         f"{'; '.join(prepared_parts)}; "
-        f"dataset readiness {dataset_readiness.value}; "
+        f"dataset readiness {dataset_readiness}; "
         f"resolved core {core_status}"
     )
 
@@ -444,7 +449,7 @@ def _progress_and_action(
     for guidance in STAGE_GUIDANCE:
         if guidance.stage is project_stage:
             return guidance.progress, guidance.action
-    raise ValueError(f"unmapped project stage: {project_stage.value}")
+    raise ValueError(f"unmapped project stage: {project_stage}")
 
 
 def render(report: DoctorReport, console: Console) -> None:
@@ -470,10 +475,10 @@ def render(report: DoctorReport, console: Console) -> None:
             f"environment advisory: {mismatch.component} "
             f"(expected {mismatch.expected}, found {mismatch.actual})"
         )
-    console.print(f"dataset readiness: {report.dataset_readiness.value}")
+    console.print(f"dataset readiness: {report.dataset_readiness}")
     console.print(f"artifacts: {report.artifact_validity_summary}")
     console.print(f"experiments: {report.experiment_summary}")
-    console.print(f"project stage: {report.project_stage.value}")
+    console.print(f"project stage: {report.project_stage}")
     console.print(f"project progress: {report.project_progress}")
     console.print(f"next valid action: {report.next_valid_action}")
 
@@ -489,18 +494,18 @@ _COLLAPSE_FAMILIES: tuple[ComparisonFamily, ...] = (
 def render_result(result: ExperimentExecutionResult) -> RunRenderText:
     lines: list[RunRenderText] = [
         f"FedSIRA run: {result.experiment}",
-        f"experiment state: {result.lifecycle_state.value}",
+        f"experiment state: {result.lifecycle_state}",
         f"cells: {result.cell_completion_count}/{len(result.outcomes)} completed",
     ]
     for outcome in result.outcomes:
         lines.append(
             f"  {outcome.cell.method:<45} {outcome.cell.condition:<40} "
-            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state.value}"
+            f"seed={outcome.cell.master_seed:>5} -> {outcome.terminal_state}"
         )
     if result.comparison_results:
         lines.extend(("", "comparisons:"))
         for family in result.comparison_results:
-            lines.append(f"  family: {family.family.value}")
+            lines.append(f"  family: {family.family}")
             for comparison in family.comparisons:
                 p_value = (
                     f"p={comparison.adjusted_p_value:.4f}"
@@ -509,7 +514,7 @@ def render_result(result: ExperimentExecutionResult) -> RunRenderText:
                 )
                 lines.append(
                     f"    {comparison.definition.comparison_name:<110} "
-                    f"{comparison.comparison_state.value:<22} {p_value}"
+                    f"{comparison.comparison_state:<22} {p_value}"
                 )
     return "\n".join(lines)
 

@@ -338,10 +338,7 @@ def build_comparison_name(
     metric: ComparisonMetric,
     test_kind: ComparisonTestKind,
 ) -> ComparisonName:
-    return (
-        f"{family}|{experiment}|{scenario}|{method}__vs__{reference}|"
-        f"{metric}|{test_kind}"
-    )
+    return f"{family}|{experiment}|{scenario}|{method}__vs__{reference}|" f"{metric}|{test_kind}"
 
 
 def _reference_label(
@@ -460,32 +457,26 @@ def _matrix(
     )
 
 
-PRIMARY_COMPARATORS: tuple[MethodName, ...] = tuple(
-    str(baseline)
-    for baseline in (
-        BaselineIdentity.FEDAVG_REFERENCE,
-        BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION,
-        BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
-        BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
-        BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION,
-        BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
-        BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
-        BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
-        BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION,
-        BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
-        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
-    )
+PRIMARY_COMPARATORS: tuple[MethodName, ...] = (
+    BaselineIdentity.FEDAVG_REFERENCE,
+    BaselineIdentity.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION,
+    BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
+    BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+    BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+    BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
+    BaselineIdentity.INDEPENDENT_LOCAL_REFERENCE_WITH_SOURCE_ADMISSION,
+    BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
+    BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
+    BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
+    BaselineIdentity.RECOVERY_AFTER_SOURCE_ADMISSION,
+    BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
+    BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
 )
 
-REPRODUCER_COMPARATORS: tuple[MethodName, ...] = tuple(
-    str(baseline)
-    for baseline in (
-        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
-        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
-        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
-    )
+REPRODUCER_COMPARATORS: tuple[MethodName, ...] = (
+    BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+    BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+    BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
 )
 
 
@@ -494,12 +485,12 @@ def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
     materiality = config.metrics_and_statistics.materiality
     family = ComparisonFamily.PROPOSAL_SCREEN_NECESSITY
     experiment = PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME
-    method = str(OpeningMode.PROPOSAL_ASSISTED)
-    reference = str(OpeningMode.CANDIDATE_FREE)
+    method = OpeningMode.PROPOSAL_ASSISTED
+    reference = OpeningMode.CANDIDATE_FREE
     definitions: list[ComparisonDefinition] = []
     for scenario in (
-        str(ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES),
-        str(ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT),
+        ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES,
+        ProposalEpisode.IRRELEVANT_SOURCE_IMPROVEMENT,
     ):
         definitions.append(
             _definition(
@@ -521,7 +512,7 @@ def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _definition(
                     family,
                     experiment,
-                    str(scenario),
+                    scenario,
                     method,
                     reference,
                     _superiority(
@@ -534,7 +525,7 @@ def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _definition(
                     family,
                     experiment,
-                    str(scenario),
+                    scenario,
                     method,
                     reference,
                     _superiority(
@@ -551,7 +542,7 @@ def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
             _definition(
                 family,
                 experiment,
-                str(ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY),
+                ProposalEpisode.LEGITIMATE_TARGET_CAPABILITY,
                 method,
                 reference,
                 _non_inferiority(
@@ -563,7 +554,7 @@ def _proposal_screen_comparisons() -> tuple[ComparisonDefinition, ...]:
             _definition(
                 family,
                 experiment,
-                str(ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT),
+                ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
                 method,
                 reference,
                 _non_inferiority(
@@ -584,11 +575,11 @@ def _plurality_comparisons() -> tuple[ComparisonDefinition, ...]:
         ComparisonFamily.PLURALITY_NECESSITY,
         SINGLE_REPRODUCTION_NECESSITY_NAME,
         (
-            str(PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0),
-            str(PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER),
+            PluralityCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0,
+            PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
         ),
-        str(CoreMethodIdentity.FULL_PLURALITY_PATH),
-        (str(BaselineIdentity.ONE_INDEPENDENT_RETRAIN),),
+        CoreMethodIdentity.FULL_PLURALITY_PATH,
+        (BaselineIdentity.ONE_INDEPENDENT_RETRAIN,),
         (
             _superiority(
                 ComparisonMetric.MALICIOUS_ADMISSION,
@@ -611,9 +602,9 @@ def _source_exclusion_comparisons() -> tuple[ComparisonDefinition, ...]:
         _definition(
             ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-            str(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT),
-            str(SourceExclusionMethod.FULL_FEDSIRA),
-            str(BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE),
+            PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            SourceExclusionMethod.FULL_FEDSIRA,
+            BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
             _superiority(
                 ComparisonMetric.ATTACK_SUCCESS_RATE,
                 ComparisonOrientation.LOWER_IS_BETTER,
@@ -623,9 +614,9 @@ def _source_exclusion_comparisons() -> tuple[ComparisonDefinition, ...]:
         _definition(
             ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT,
             SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
-            str(PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT),
-            str(SourceExclusionMethod.FULL_FEDSIRA),
-            str(BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE),
+            PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            SourceExclusionMethod.FULL_FEDSIRA,
+            BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE,
             _non_inferiority(
                 ComparisonMetric.TARGET_F1,
                 ComparisonOrientation.HIGHER_IS_BETTER,
@@ -642,12 +633,12 @@ def _external_verification_comparisons() -> tuple[ComparisonDefinition, ...]:
         ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY,
         EXTERNAL_VERIFICATION_NECESSITY_NAME,
         (
-            str(ExternalVerificationCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0),
-            str(ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER),
-            str(ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER),
+            ExternalVerificationCondition.HONEST_SITE_SPECIFIC_FEATURE_SHIFT_1_0,
+            ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+            ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
         ),
-        str(SourceExclusionMethod.FULL_FEDSIRA),
-        (str(BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM),),
+        SourceExclusionMethod.FULL_FEDSIRA,
+        (BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,),
         (
             _superiority(
                 ComparisonMetric.MALICIOUS_ADMISSION,
@@ -713,8 +704,8 @@ def _primary_baseline_comparisons() -> tuple[ComparisonDefinition, ...]:
         _definition(
             ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY,
             PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-            str(scenario),
-            str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+            scenario,
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             comparator,
             template,
         )
@@ -770,8 +761,8 @@ def _reproducer_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
             _matrix(
                 ComparisonFamily.REPRODUCER_ROBUSTNESS,
                 COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-                (str(condition),),
-                str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+                (condition,),
+                CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
                 REPRODUCER_COMPARATORS,
                 templates,
             )
@@ -792,16 +783,16 @@ def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _definition(
                     ComparisonFamily.VERIFIER_ROBUSTNESS,
                     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
-                    condition.value,
-                    profile.value,
-                    profile.value,
+                    condition,
+                    profile,
+                    profile,
                     _superiority(
                         ComparisonMetric.MALICIOUS_ADMISSION,
                         ComparisonOrientation.LOWER_IS_BETTER,
                         materiality.malicious_admission_reduction_minimum,
                         materiality_direction=MaterialityDirection.DETERIORATION_AT_LEAST,
                     ),
-                    reference_scenario=VerifierCondition.ALL_HONEST.value,
+                    reference_scenario=VerifierCondition.ALL_HONEST,
                 )
             )
         for condition in (
@@ -812,15 +803,15 @@ def _verifier_robustness_comparisons() -> tuple[ComparisonDefinition, ...]:
                 _definition(
                     ComparisonFamily.VERIFIER_ROBUSTNESS,
                     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
-                    condition.value,
-                    profile.value,
-                    profile.value,
+                    condition,
+                    profile,
+                    profile,
                     _non_inferiority(
                         ComparisonMetric.LEGITIMATE_ADMISSION,
                         ComparisonOrientation.HIGHER_IS_BETTER,
                         materiality.legitimate_admission_noninferiority_margin,
                     ),
-                    reference_scenario=VerifierCondition.ALL_HONEST.value,
+                    reference_scenario=VerifierCondition.ALL_HONEST,
                 )
             )
     return tuple(definitions)
@@ -916,8 +907,8 @@ def _ablation_comparisons() -> tuple[ComparisonDefinition, ...]:
                 ComparisonFamily.MECHANISM_ABLATION,
                 MECHANISM_ABLATION_NAME,
                 ablation_scenario_for_variant(variant),
-                variant.value,
-                AblationVariant.FULL_FEDSIRA.value,
+                variant,
+                AblationVariant.FULL_FEDSIRA,
                 _superiority(
                     metric,
                     orientation,
@@ -958,11 +949,11 @@ def _shared_epistemic_comparisons() -> tuple[ComparisonDefinition, ...]:
             ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
             f"{failure_type}|{strength}",
-            str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
-            str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             template,
             reference_experiment=PRIMARY_CONFIRMATORY_EVALUATION_NAME,
-            reference_scenario=str(PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY),
+            reference_scenario=PrimaryScenario.LEGITIMATE_UNSUPPORTED_CAPABILITY,
         )
         for failure_type in EpistemicFailureType
         for strength in epistemic_strength_tokens(failure_type)
@@ -978,9 +969,9 @@ def _capability_boundary_comparisons() -> tuple[ComparisonDefinition, ...]:
         _definition(
             ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
             CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
-            mixture.value,
-            CapabilityContractGranularity.BROAD_TARGET_ONLY.value,
-            str(CoreMethodIdentity.ZERO_REFERENCE),
+            mixture,
+            CapabilityContractGranularity.BROAD_TARGET_ONLY,
+            CoreMethodIdentity.ZERO_REFERENCE,
             _superiority(
                 ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
                 ComparisonOrientation.HIGHER_IS_BETTER,
@@ -996,10 +987,10 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
     boundary = config.evidence_thresholds.heterogeneity_boundary
     methods = (
-        str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
-        str(BaselineIdentity.ONE_INDEPENDENT_RETRAIN),
-        str(BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM),
-        str(BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE),
+        CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+        BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
     )
     definitions: list[ComparisonDefinition] = []
     for method in methods:
@@ -1011,7 +1002,7 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
                     _definition(
                         ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
                         HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-                        regime.value,
+                        regime,
                         method,
                         method,
                         _non_inferiority(
@@ -1019,12 +1010,12 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
                             ComparisonOrientation.HIGHER_IS_BETTER,
                             boundary.legitimate_admission_change_from_natural_maximum,
                         ),
-                        reference_scenario=HeterogeneityRegime.NATURAL.value,
+                        reference_scenario=HeterogeneityRegime.NATURAL,
                     ),
                     _definition(
                         ComparisonFamily.HETEROGENEITY_FAILURE_BOUNDARY_SECONDARY,
                         HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
-                        regime.value,
+                        regime,
                         method,
                         method,
                         _non_inferiority(
@@ -1032,7 +1023,7 @@ def _heterogeneity_comparisons() -> tuple[ComparisonDefinition, ...]:
                             ComparisonOrientation.HIGHER_IS_BETTER,
                             boundary.worst_domain_target_f1_change_from_natural_maximum,
                         ),
-                        reference_scenario=HeterogeneityRegime.NATURAL.value,
+                        reference_scenario=HeterogeneityRegime.NATURAL,
                     ),
                 )
             )
@@ -1043,15 +1034,15 @@ def _secondary_generalization_comparisons() -> tuple[ComparisonDefinition, ...]:
     config = current_application_context().scientific_config
     boundary = config.evidence_thresholds.secondary_generalization
     references = (
-        str(BaselineIdentity.ONE_INDEPENDENT_RETRAIN),
-        str(BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM),
+        BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+        BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
     )
     definitions = list(
         _matrix(
             ComparisonFamily.SECONDARY_GENERALIZATION,
             SECONDARY_DATASET_GENERALIZATION_NAME,
-            tuple(str(scenario) for scenario in SecondaryScenario),
-            str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+            tuple(SecondaryScenario),
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             references,
             (
                 _non_inferiority(
@@ -1066,8 +1057,8 @@ def _secondary_generalization_comparisons() -> tuple[ComparisonDefinition, ...]:
         _matrix(
             ComparisonFamily.SECONDARY_GENERALIZATION,
             SECONDARY_DATASET_GENERALIZATION_NAME,
-            (str(SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER),),
-            str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
+            (SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,),
+            CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
             references,
             (
                 _non_inferiority(

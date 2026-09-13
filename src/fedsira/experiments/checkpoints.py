@@ -158,14 +158,14 @@ def checkpoint_procedure_identity(family: ArtifactFamily) -> ProcedureIdentity:
     for candidate, identity in CHECKPOINT_PROCEDURE_IDENTITIES:
         if candidate is family:
             return identity
-    raise ValueError(f"artifact family is not a checkpoint family: {family.value}")
+    raise ValueError(f"artifact family is not a checkpoint family: {family}")
 
 
 def checkpoint_producer(family: ArtifactFamily) -> ArtifactProducer:
     for candidate, producer in CHECKPOINT_PRODUCERS:
         if candidate is family:
             return producer
-    raise ValueError(f"artifact family is not a checkpoint family: {family.value}")
+    raise ValueError(f"artifact family is not a checkpoint family: {family}")
 
 
 def checkpoint_slot(

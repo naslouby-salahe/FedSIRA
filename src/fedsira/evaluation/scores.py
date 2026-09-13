@@ -15,6 +15,7 @@ from fedsira.artifacts.store import (
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
     ArtifactFamily,
+    ArtifactFamilyDirectoryToken,
     ArtifactProducer,
     DatasetId,
     Role,
@@ -35,7 +36,7 @@ from fedsira.runtime import REPOSITORY_ROOT, framed_bytes, numerical_runtime_ide
 MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"
 MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"
 MODEL_SCORE_MODEL_DEPENDENCY = "model-checkpoint"
-MODEL_SCORE_VIEW_DEPENDENCY = "prepared-role-view"
+MODEL_SCORE_VIEW_DEPENDENCY = ArtifactFamilyDirectoryToken.PREPARED_ROLE_VIEW
 MODEL_SCORE_CLASS_REGISTRY_DEPENDENCY = "output-class-registry"
 MODEL_SCORE_TRANSFORM_DEPENDENCY = "scoring-transform"
 MODEL_SCORE_RUNTIME_DEPENDENCY = "numerical-runtime"
@@ -78,12 +79,12 @@ def model_score_view_digest(shards: tuple[DomainClassScore, ...]) -> ArtifactDig
             *(
                 field
                 for shard in sorted(
-                    shards, key=lambda item: (item.domain, item.class_id, item.role.value)
+                    shards, key=lambda item: (item.domain, item.class_id, item.role)
                 )
                 for field in (
                     shard.domain,
                     shard.class_id,
-                    shard.role.value,
+                    shard.role,
                     str(shard.sample_count),
                     shard.sample_ids_digest,
                 )

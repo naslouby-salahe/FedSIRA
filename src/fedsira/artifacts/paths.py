@@ -3,7 +3,15 @@ import re
 from pathlib import Path
 
 from fedsira.artifacts.store import ArtifactSlot
-from fedsira.domain.enums import ArtifactFamily, ArtifactPathScope, DatasetId
+from fedsira.domain.enums import (
+    ArtifactFamily,
+    ArtifactFamilyDirectoryToken,
+    ArtifactFileToken,
+    ArtifactPathScope,
+    DatasetId,
+    WorkspaceDirectoryToken,
+    WorkspaceFileToken,
+)
 from fedsira.domain.types import (
     ArtifactInstanceToken,
     ExperimentName,
@@ -62,84 +70,127 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
 )
 RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,))
 
-ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[tuple[ArtifactFamily, TextValue], ...] = (
-    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.SCALER, "scaler"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),#TODO: These hardcoded string should be enum
-    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),#TODO: These hardcoded string should be enum
+ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[
+    tuple[ArtifactFamily, ArtifactFamilyDirectoryToken], ...
+] = (
+    (ArtifactFamily.RAW_DATASET_IDENTITY, ArtifactFamilyDirectoryToken.RAW_DATASET_IDENTITY),
+    (ArtifactFamily.DATASET_MANIFEST, ArtifactFamilyDirectoryToken.DATASET_MANIFEST),
+    (
+        ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST,
+        ArtifactFamilyDirectoryToken.ROLE_SPLIT_SAMPLE_MANIFEST,
+    ),
+    (ArtifactFamily.SCALER, ArtifactFamilyDirectoryToken.SCALER),
+    (ArtifactFamily.PREPARED_ROLE_VIEW, ArtifactFamilyDirectoryToken.PREPARED_ROLE_VIEW),
+    (ArtifactFamily.ANCHOR_CHECKPOINT, ArtifactFamilyDirectoryToken.ANCHOR_CHECKPOINT),
+    (
+        ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT,
+        ArtifactFamilyDirectoryToken.SOURCE_CANDIDATE_CHECKPOINT,
+    ),
+    (ArtifactFamily.REPRODUCTION_CHECKPOINT, ArtifactFamilyDirectoryToken.REPRODUCTION_CHECKPOINT),
+    (ArtifactFamily.BASELINE_CHECKPOINT, ArtifactFamilyDirectoryToken.BASELINE_CHECKPOINT),
+    (ArtifactFamily.MODEL_SCORE_ARTIFACT, ArtifactFamilyDirectoryToken.MODEL_SCORE_ARTIFACT),
+    (
+        ArtifactFamily.SCREEN_MATCHING_ARTIFACT,
+        ArtifactFamilyDirectoryToken.SCREEN_MATCHING_ARTIFACT,
+    ),
+    (
+        ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT,
+        ArtifactFamilyDirectoryToken.BASELINE_CALIBRATION_ARTIFACT,
+    ),
+    (
+        ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
+        ArtifactFamilyDirectoryToken.FIXED_PROTOCOL_CONFIGURATION,
+    ),
+    (
+        ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT,
+        ArtifactFamilyDirectoryToken.VERIFIER_ASSIGNMENT_REPORT,
+    ),
+    (
+        ArtifactFamily.REPRODUCTION_CERTIFICATE,
+        ArtifactFamilyDirectoryToken.REPRODUCTION_CERTIFICATE,
+    ),
+    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, ArtifactFamilyDirectoryToken.KRUM_SYNTHESIZED_UPDATE),
+    (ArtifactFamily.FINAL_GATE_DECISION, ArtifactFamilyDirectoryToken.FINAL_GATE_DECISION),
+    (
+        ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
+        ArtifactFamilyDirectoryToken.DOMAIN_SEED_METRIC_ARTIFACT,
+    ),
+    (
+        ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
+        ArtifactFamilyDirectoryToken.STATISTICAL_COMPARISON_ARTIFACT,
+    ),
+    (
+        ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
+        ArtifactFamilyDirectoryToken.TABLE_FIGURE_SOURCE_DATA,
+    ),
+    (
+        ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,
+        ArtifactFamilyDirectoryToken.TABLE_FIGURE_REPORT_EXPORT,
+    ),
 )
 
 
-def artifact_family_directory_token(family: ArtifactFamily) -> TextValue:
+def artifact_family_directory_token(family: ArtifactFamily) -> ArtifactFamilyDirectoryToken:
     for candidate, token in ARTIFACT_FAMILY_DIRECTORY_TOKENS:
         if candidate is family:
             return token
-    raise ValueError(f"artifact family has no directory token: {family.value}")
+    raise ValueError(f"artifact family has no directory token: {family}")
 
 
 def preprocessing_root() -> Path:
-    return execution_workspace_root() / "preprocessing" #TODO: these values should be in enum, find them in project and fix them
+    return execution_workspace_root() / WorkspaceDirectoryToken.PREPROCESSING
 
 
 def preprocessing_metadata_root() -> Path:
-    return preprocessing_root() / "metadata" #TODO: these values should be in enum, find them in project and fix them
+    return preprocessing_root() / WorkspaceDirectoryToken.METADATA
 
 
 def preprocessing_extraction_cache_root(execution_workspace: Path) -> Path:
-    return execution_workspace / "cache" / "preprocessing" #TODO: these values should be in enum, find them in project and fix them
+    return (
+        execution_workspace / WorkspaceDirectoryToken.CACHE / WorkspaceDirectoryToken.PREPROCESSING
+    )
 
 
 def artifact_staging_root() -> Path:
-    return execution_workspace_root() / "cache" / "staging" #TODO: these values should be in enum, find them in project and fix them
+    return (
+        execution_workspace_root() / WorkspaceDirectoryToken.CACHE / WorkspaceDirectoryToken.STAGING
+    )
 
 
 def artifact_publication_root() -> Path:
-    return execution_workspace_root() / "artifacts" #TODO: these values should be in enum, find them in project and fix them
+    return execution_workspace_root() / WorkspaceDirectoryToken.ARTIFACTS
 
 
 def artifact_log_path() -> Path:
-    return artifact_publication_root() / "logs" / "artifacts.log" #TODO: these values should be in enum, find them in project and fix them
+    return artifact_publication_root() / WorkspaceDirectoryToken.LOGS / ArtifactFileToken.LOG_FILE
 
 
 def execution_outputs_root() -> Path:
-    return execution_workspace_root() / "experiments" #TODO: these values should be in enum, find them in project and fix them
+    return execution_workspace_root() / WorkspaceDirectoryToken.EXPERIMENTS
 
 
 def prepared_evidence_root(dataset: DatasetId) -> Path:
-    return preprocessing_root() / "prepared" / dataset #TODO: these values should be in enum, find them in project and fix them
+    return preprocessing_root() / WorkspaceDirectoryToken.PREPARED / dataset
 
 
 def prepared_feature_root() -> Path:
-    return preprocessing_root() / "features" #TODO: these values should be in enum, find them in project and fix them
+    return preprocessing_root() / WorkspaceDirectoryToken.FEATURES
 
 
 def preprocessing_log_path() -> Path:
-    return preprocessing_root() / "logs" / "preprocessing.log" #TODO: these values should be in enum, find them in project and fix them
+    return (
+        preprocessing_root() / WorkspaceDirectoryToken.LOGS / WorkspaceFileToken.PREPROCESSING_LOG
+    )
 
 
 def smoke_record_path() -> Path:
-    return preprocessing_root() / "validation" / "smoke_record.json" #TODO: these values should be in enum, find them in project and fix them
+    return (
+        preprocessing_root() / WorkspaceDirectoryToken.VALIDATION / WorkspaceFileToken.SMOKE_RECORD
+    )
 
 
 def experiment_execution_root(experiment: ExperimentName) -> Path:
-    return execution_workspace_root() / "experiments" / experiment #TODO: these values should be in enum, find them in project and fix them
+    return execution_workspace_root() / WorkspaceDirectoryToken.EXPERIMENTS / experiment
 
 
 def experiment_repetition_telemetry_root(
@@ -150,8 +201,8 @@ def experiment_repetition_telemetry_root(
 ) -> Path:
     return (
         experiment_execution_root(experiment)
-        / "telemetry" #TODO: these values should be in enum, find them in project and fix them
-        / "repetitions" #TODO: these values should be in enum, find them in project and fix them
+        / WorkspaceDirectoryToken.TELEMETRY
+        / WorkspaceDirectoryToken.REPETITIONS
         / method
         / str(master_seed)
         / str(repetition)
@@ -159,31 +210,39 @@ def experiment_repetition_telemetry_root(
 
 
 def experiment_log_path(experiment: ExperimentName) -> Path:
-    return experiment_execution_root(experiment) / "logs" / "experiment.log" #TODO: these values should be in enum, find them in project and fix them
+    return (
+        experiment_execution_root(experiment)
+        / WorkspaceDirectoryToken.LOGS
+        / WorkspaceFileToken.EXPERIMENT_LOG
+    )
 
 
 def experiment_result_root(experiment: ExperimentName) -> Path:
-    return manuscript_results_root() / "experiments" / experiment #TODO: these values should be in enum, find them in project and fix them
+    return manuscript_results_root() / WorkspaceDirectoryToken.EXPERIMENTS / experiment
 
 
 def manuscript_tables_root(root: Path) -> Path:
-    return root / "tables" / "main" #TODO: these values should be in enum, find them in project and fix them
+    return root / WorkspaceDirectoryToken.TABLES / WorkspaceDirectoryToken.MAIN
 
 
 def manuscript_figures_root(root: Path) -> Path:
-    return root / "figures" / "main" #TODO: these values should be in enum, find them in project and fix them
+    return root / WorkspaceDirectoryToken.FIGURES / WorkspaceDirectoryToken.MAIN
 
 
 def experiment_metrics_root(root: Path) -> Path:
-    return root / "metrics" / "primary" #TODO: these values should be in enum, find them in project and fix them
+    return root / WorkspaceDirectoryToken.METRICS / WorkspaceDirectoryToken.PRIMARY
 
 
 def experiment_telemetry_root(root: Path) -> Path:
-    return root / "telemetry" #TODO: these values should be in enum, find them in project and fix them
+    return root / WorkspaceDirectoryToken.TELEMETRY
 
 
 def project_summary_root() -> Path:
-    return manuscript_results_root() / "project_summary" #TODO: these values should be in enum, find them in project and fix them
+    return manuscript_results_root() / WorkspaceDirectoryToken.PROJECT_SUMMARY
+
+
+def manuscript_reproducibility_root(root: Path) -> Path:
+    return root / WorkspaceDirectoryToken.REPRODUCIBILITY / WorkspaceDirectoryToken.EXECUTION
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
@@ -195,7 +254,7 @@ def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:
         return ArtifactPathScope.EXPERIMENT_ARTIFACT
     if family in RESULT_FAMILIES:
         return ArtifactPathScope.MANUSCRIPT_RESULT
-    raise ValueError(f"unsupported artifact family: {family.value}")
+    raise ValueError(f"unsupported artifact family: {family}")
 
 
 def workspace_root_for_family(
@@ -209,11 +268,11 @@ def workspace_root_for_family(
         return artifact_publication_root()
     if scope is ArtifactPathScope.EXPERIMENT_ARTIFACT:
         if experiment is None:
-            raise ValueError(f"artifact family {family.value} requires an owning experiment name")
+            raise ValueError(f"artifact family {family} requires an owning experiment name")
         return experiment_execution_root(experiment)
     if experiment is None:
-        raise ValueError(f"artifact family {family.value} requires an owning experiment name")
-    return manuscript_results_root() / "experiments" / experiment
+        raise ValueError(f"artifact family {family} requires an owning experiment name")
+    return manuscript_results_root() / WorkspaceDirectoryToken.EXPERIMENTS / experiment
 
 
 def artifact_slot_directory(slot: ArtifactSlot) -> Path:

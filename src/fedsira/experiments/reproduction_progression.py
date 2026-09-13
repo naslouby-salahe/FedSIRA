@@ -6,7 +6,12 @@ import torch
 
 from fedsira.datasets.common import BackdoorScope, DatasetAdapter, HeterogeneityScope, RealAnchor
 from fedsira.datasets.nbaiot.schema import NBaiotDomain
-from fedsira.domain.enums import AblationReproducerStrategy, AdmissionState, ArtifactFamily
+from fedsira.domain.enums import (
+    AblationReproducerStrategy,
+    AdmissionState,
+    ArtifactFamily,
+    ArtifactFamilyDirectoryToken,
+)
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -49,7 +54,7 @@ from fedsira.protocol.rules import reproducer_order_for_cell, reproduction_updat
 from fedsira.runtime import current_application_context
 
 BYZANTINE_VERIFIER_SELECTION_SEPARATOR = "BYZANTINE_VERIFIER_SELECTION"
-ANCHOR_CHECKPOINT_IDENTITY = "anchor-checkpoint"
+ANCHOR_CHECKPOINT_IDENTITY = ArtifactFamilyDirectoryToken.ANCHOR_CHECKPOINT
 SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
 
 

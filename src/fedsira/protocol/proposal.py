@@ -28,7 +28,6 @@ from fedsira.domain.types import (
     CapabilityContractSatisfied,
     CapabilityIdentity,
     DatasetClassToken,
-    SeedDerivationLabel,
     DerivedSeed,
     DomainId,
     EvidenceAdequate,
@@ -46,6 +45,7 @@ from fedsira.domain.types import (
     ScreenDomainCount,
     ScreenDomainDecision,
     ScreenLoss,
+    SeedDerivationLabel,
     SourceCommitted,
 )
 from fedsira.evaluation.statistics import match_nearest_within_decile

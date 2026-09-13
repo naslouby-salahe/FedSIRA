@@ -11,10 +11,10 @@ from fedsira.experiments.definitions import (
 from fedsira.runtime import current_application_context
 
 BYZANTINE_BEHAVIOUR_CONDITIONS: tuple[tuple[ByzantineVerifierBehavior, ConditionName], ...] = (
-    (ByzantineVerifierBehavior.FALSE_POSITIVE, VerifierCondition.ONE_FALSE_POSITIVE.value),
-    (ByzantineVerifierBehavior.FALSE_POSITIVE, VerifierCondition.TWO_FALSE_POSITIVES.value),
-    (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.ONE_FALSE_NEGATIVE.value),
-    (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.TWO_FALSE_NEGATIVES.value),
+    (ByzantineVerifierBehavior.FALSE_POSITIVE, VerifierCondition.ONE_FALSE_POSITIVE),
+    (ByzantineVerifierBehavior.FALSE_POSITIVE, VerifierCondition.TWO_FALSE_POSITIVES),
+    (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.ONE_FALSE_NEGATIVE),
+    (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.TWO_FALSE_NEGATIVES),
 )
 
 
@@ -22,7 +22,7 @@ def validate_byzantine_vocabulary() -> None:
     byzantine = current_application_context().scientific_config.attacks_and_boundaries
     declared_reproducer_counts = tuple(sorted(byzantine.byzantine_reproduction.compromised_counts))
     observed_reproducer_counts = tuple(
-        sorted({compromised_reproducer_count(condition.value) for condition in ReproducerCondition})
+        sorted({compromised_reproducer_count(condition) for condition in ReproducerCondition})
     )
     if observed_reproducer_counts != declared_reproducer_counts:
         raise ValueError(
@@ -32,7 +32,7 @@ def validate_byzantine_vocabulary() -> None:
         )
     declared_verifier_counts = tuple(sorted(byzantine.byzantine_verifier.compromise_counts))
     observed_verifier_counts = tuple(
-        sorted({compromised_verifier_count(condition.value) for condition in VerifierCondition})
+        sorted({compromised_verifier_count(condition) for condition in VerifierCondition})
     )
     if observed_verifier_counts != declared_verifier_counts:
         raise ValueError(

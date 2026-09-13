@@ -32,7 +32,7 @@ def permanent_singleton_admission(
 ) -> MetricObservation:
     sustained = bool(holder_counts) and max(holder_counts) <= 1
     return (
-        DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION.value,
+        DescriptiveScientificMetric.PERMANENT_SINGLETON_ADMISSION,
         float(state is AdmissionState.ADMITTED and sustained),
     )
 

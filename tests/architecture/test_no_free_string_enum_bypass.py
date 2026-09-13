@@ -13,6 +13,8 @@ PRESENTATION_OR_PATH_STRINGS = {
     "Undefined",
     "Pending",
     "preprocessing",
+    "prepared",
+    "primary",
     "BENIGN",
     "CANDIDATE_SCREEN",
     "none",

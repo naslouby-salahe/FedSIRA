@@ -134,7 +134,7 @@ def _publish(
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     slot = ArtifactSlot(
         family=family,
-        instance=artifact_instance_token(str(instance), experiment),
+        instance=artifact_instance_token(instance, experiment),
         experiment=experiment,
     )
     return publish_artifact(

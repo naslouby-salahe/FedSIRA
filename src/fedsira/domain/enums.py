@@ -130,6 +130,76 @@ class ArtifactFamily(StrEnum):
     TABLE_FIGURE_REPORT_EXPORT = "Table/figure/report export"
 
 
+class ArtifactFamilyDirectoryToken(StrEnum):
+    RAW_DATASET_IDENTITY = "raw-dataset-identity"
+    DATASET_MANIFEST = "dataset-manifest"
+    ROLE_SPLIT_SAMPLE_MANIFEST = "role-split-sample-manifest"
+    SCALER = "scaler"
+    PREPARED_ROLE_VIEW = "prepared-role-view"
+    ANCHOR_CHECKPOINT = "anchor-checkpoint"
+    SOURCE_CANDIDATE_CHECKPOINT = "source-candidate-checkpoint"
+    REPRODUCTION_CHECKPOINT = "reproduction-checkpoint"
+    BASELINE_CHECKPOINT = "baseline-checkpoint"
+    MODEL_SCORE_ARTIFACT = "model-score-artifact"
+    SCREEN_MATCHING_ARTIFACT = "screen-matching-artifact"
+    BASELINE_CALIBRATION_ARTIFACT = "baseline-calibration-artifact"
+    FIXED_PROTOCOL_CONFIGURATION = "fixed-protocol-configuration"
+    VERIFIER_ASSIGNMENT_REPORT = "verifier-assignment-report"
+    REPRODUCTION_CERTIFICATE = "reproduction-certificate"
+    KRUM_SYNTHESIZED_UPDATE = "krum-synthesized-update"
+    FINAL_GATE_DECISION = "final-gate-decision"
+    DOMAIN_SEED_METRIC_ARTIFACT = "domain-seed-metric-artifact"
+    STATISTICAL_COMPARISON_ARTIFACT = "statistical-comparison-artifact"
+    TABLE_FIGURE_SOURCE_DATA = "table-figure-source-data"
+    TABLE_FIGURE_REPORT_EXPORT = "table-figure-report-export"
+
+
+class ArtifactFileToken(StrEnum):
+    PAYLOAD_SUFFIX = ".artifact.bin"
+    MANIFEST_SUFFIX = ".manifest.json"
+    CURRENT_FILE = "current.json"
+    LOG_FILE = "artifacts.log"
+
+
+class GitMetadataToken(StrEnum):
+    GIT_DIR = ".git"
+    HEAD = "HEAD"
+
+
+class WorkspaceDirectoryToken(StrEnum):
+    PREPROCESSING = "preprocessing"
+    METADATA = "metadata"
+    CACHE = "cache"
+    STAGING = "staging"
+    ARTIFACTS = "artifacts"
+    LOGS = "logs"
+    EXPERIMENTS = "experiments"
+    PREPARED = "prepared"
+    FEATURES = "features"
+    VALIDATION = "validation"
+    TELEMETRY = "telemetry"
+    REPETITIONS = "repetitions"
+    TABLES = "tables"
+    FIGURES = "figures"
+    METRICS = "metrics"
+    MAIN = "main"
+    PRIMARY = "primary"
+    PROJECT_SUMMARY = "project_summary"
+    RECORDS = "records"
+    REPRODUCIBILITY = "reproducibility"
+    EXECUTION = "execution"
+
+
+class WorkspaceFileToken(StrEnum):
+    SMOKE_RECORD = "smoke_record.json"
+    PREPROCESSING_LOG = "preprocessing.log"
+    EXPERIMENT_LOG = "experiment.log"
+    SUMMARY_JSON = "summary.json"
+    MANIFEST_JSON = "manifest.json"
+    EXECUTION_SUMMARY_JSON = "execution_summary.json"
+    TIMING_OBSERVATION_JSON = "timing-observation.json"
+
+
 class AblationReproducerStrategy(StrEnum):
     NONE = "None"
     MODEL_REPLACEMENT = "Model replacement"

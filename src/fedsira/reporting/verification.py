@@ -383,9 +383,9 @@ def verify_mandatory_figure_source_data(
     if result.experiment == EFFICIENCY_MEASUREMENT_NAME:
         expected_metrics = frozenset(
             (
-                DescriptiveScientificMetric.WALL_CLOCK_SECONDS.value,
-                DescriptiveScientificMetric.COMMUNICATION_BYTES.value,
-                DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES.value,
+                DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
+                DescriptiveScientificMetric.COMMUNICATION_BYTES,
+                DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
             )
         )
         observed_metrics = frozenset(observation.metric for observation in telemetry)

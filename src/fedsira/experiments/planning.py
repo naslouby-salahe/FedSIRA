@@ -23,7 +23,6 @@ from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
-    AblationScenario,
     AblationVariant,
     EfficiencyCondition,
     ExperimentDefinition,
@@ -172,8 +171,7 @@ def _baseline_validation_cells(
 
 
 def _ablation_condition(variant: AblationVariant) -> ConditionName:
-    scenario: AblationScenario = ablation_scenario_for_variant(variant)
-    return scenario.value
+    return ablation_scenario_for_variant(variant)
 
 
 def _ablation_cells(
@@ -183,7 +181,7 @@ def _ablation_cells(
     return tuple(
         ScientificCell(
             experiment=definition.name,
-            method=variant.value,
+            method=variant,
             condition=_ablation_condition(variant),
             master_seed=seed,
         )
@@ -193,7 +191,7 @@ def _ablation_cells(
 
 
 def efficiency_condition() -> ConditionName:
-    return EfficiencyCondition.TIMED.value
+    return EfficiencyCondition.TIMED
 
 
 def _efficiency_cells(
@@ -347,7 +345,7 @@ def render_plan(plan: ExperimentPlan) -> PlanRenderText:
     lines.append("")
     lines.append(f"{'experiment':<55} {'cells':>6}  state")
     for planned in plan.experiments:
-        state = planned.lifecycle_state.value
+        state = planned.lifecycle_state
         suffix = ""
         if planned.definition.name in COLLAPSE_EXPERIMENT_NAMES:
             suffix = "  [collapse]"

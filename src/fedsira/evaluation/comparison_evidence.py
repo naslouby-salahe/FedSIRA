@@ -41,7 +41,7 @@ def metric_evidence_digest(
 ) -> ArtifactDigest:
     fields: list[FramingField] = []
     for record in sorted(records, key=lambda item: item.semantic_key):
-        fields.extend((record.semantic_key, record.terminal_state.value))
+        fields.extend((record.semantic_key, record.terminal_state))
         for metric_name, metric_value in record.metrics:
             fields.extend(
                 (

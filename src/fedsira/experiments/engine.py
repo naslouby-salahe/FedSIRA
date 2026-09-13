@@ -16,6 +16,7 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
+    WorkspaceDirectoryToken,
 )
 from fedsira.domain.models import (
     PreparedEvidenceCounts,
@@ -68,7 +69,7 @@ if TYPE_CHECKING:
 EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"
 ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
 ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
-EXECUTION_LOGGER = get_structured_logger("execution")
+EXECUTION_LOGGER = get_structured_logger(WorkspaceDirectoryToken.EXECUTION)
 
 
 class CellPhaseLogFields(FrozenDomainModel):
@@ -391,7 +392,12 @@ class ExecutionRecordStore:
         self._workspace_root = workspace_root
 
     def _record_directory(self, experiment: ExperimentName) -> Path:
-        return self._workspace_root / "experiments" / experiment / "records"
+        return (
+            self._workspace_root
+            / WorkspaceDirectoryToken.EXPERIMENTS
+            / experiment
+            / WorkspaceDirectoryToken.RECORDS
+        )
 
     def write_outcome(self, outcome: CellExecutionOutcome, provenance: ExecutionProvenance) -> None:
         directory = self._record_directory(outcome.cell.experiment)
