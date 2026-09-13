@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from io import StringIO
 from pathlib import Path
+from typing import cast
 
 import pandas
 
@@ -500,8 +501,8 @@ def metric_artifact_is_semantically_complete(
             (experiment_rows[ReportColumnName.OBSERVATION_COUNT] > 0).tolist()
         )
     recorded_terminal_states = frozenset(
-        ExperimentLifecycleState(str(state))
-        for state in experiment_rows[ReportColumnName.TERMINAL_STATE]
+        ExperimentLifecycleState(cast(str, state))
+        for state in experiment_rows[ReportColumnName.TERMINAL_STATE].tolist()
     )
     if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
         return False

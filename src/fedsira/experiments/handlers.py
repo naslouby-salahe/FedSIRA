@@ -484,7 +484,7 @@ class ProtocolCellDispatch:
                 condition=ProposalEpisode.GENERIC_HARD_SUPPORTED_EXAMPLES,
             )
             return self._execute_opening_cell(
-                opening_cell, evidence, screen_predicate_variant=variant
+                opening_cell, evidence, screen_predicate_variant=cast(AblationVariant, variant)
             )
         state = self._advance_protocol(cell, evidence)
         claim_metrics = self._ablation_claim_metrics(cell, state)
