@@ -63,27 +63,27 @@ EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
 RESULT_FAMILIES: frozenset[ArtifactFamily] = frozenset((ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT,))
 
 ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[tuple[ArtifactFamily, TextValue], ...] = (
-    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),
-    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),
-    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),
-    (ArtifactFamily.SCALER, "scaler"),
-    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),
-    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),
-    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),
-    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),
-    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),
-    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),
-    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),
-    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),
-    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),
-    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),
-    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),
-    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),
-    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),
-    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),
-    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),
-    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),
-    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),
+    (ArtifactFamily.RAW_DATASET_IDENTITY, "raw-dataset-identity"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.DATASET_MANIFEST, "dataset-manifest"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.ROLE_SPLIT_SAMPLE_MANIFEST, "role-split-sample-manifest"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.SCALER, "scaler"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.PREPARED_ROLE_VIEW, "prepared-role-view"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.ANCHOR_CHECKPOINT, "anchor-checkpoint"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.SOURCE_CANDIDATE_CHECKPOINT, "source-candidate-checkpoint"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.REPRODUCTION_CHECKPOINT, "reproduction-checkpoint"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.BASELINE_CHECKPOINT, "baseline-checkpoint"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.MODEL_SCORE_ARTIFACT, "model-score-artifact"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.SCREEN_MATCHING_ARTIFACT, "screen-matching-artifact"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT, "baseline-calibration-artifact"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION, "fixed-protocol-configuration"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.VERIFIER_ASSIGNMENT_REPORT, "verifier-assignment-report"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.REPRODUCTION_CERTIFICATE, "reproduction-certificate"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.KRUM_SYNTHESIZED_UPDATE, "krum-synthesized-update"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.FINAL_GATE_DECISION, "final-gate-decision"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT, "domain-seed-metric-artifact"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT, "statistical-comparison-artifact"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.TABLE_FIGURE_SOURCE_DATA, "table-figure-source-data"),#TODO: These hardcoded string should be enum
+    (ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT, "table-figure-report-export"),#TODO: These hardcoded string should be enum
 )
 
 
@@ -95,51 +95,51 @@ def artifact_family_directory_token(family: ArtifactFamily) -> TextValue:
 
 
 def preprocessing_root() -> Path:
-    return execution_workspace_root() / "preprocessing"
+    return execution_workspace_root() / "preprocessing" #TODO: these values should be in enum, find them in project and fix them
 
 
 def preprocessing_metadata_root() -> Path:
-    return preprocessing_root() / "metadata"
+    return preprocessing_root() / "metadata" #TODO: these values should be in enum, find them in project and fix them
 
 
 def preprocessing_extraction_cache_root(execution_workspace: Path) -> Path:
-    return execution_workspace / "cache" / "preprocessing"
+    return execution_workspace / "cache" / "preprocessing" #TODO: these values should be in enum, find them in project and fix them
 
 
 def artifact_staging_root() -> Path:
-    return execution_workspace_root() / "cache" / "staging"
+    return execution_workspace_root() / "cache" / "staging" #TODO: these values should be in enum, find them in project and fix them
 
 
 def artifact_publication_root() -> Path:
-    return execution_workspace_root() / "artifacts"
+    return execution_workspace_root() / "artifacts" #TODO: these values should be in enum, find them in project and fix them
 
 
 def artifact_log_path() -> Path:
-    return artifact_publication_root() / "logs" / "artifacts.log"
+    return artifact_publication_root() / "logs" / "artifacts.log" #TODO: these values should be in enum, find them in project and fix them
 
 
 def execution_outputs_root() -> Path:
-    return execution_workspace_root() / "experiments"
+    return execution_workspace_root() / "experiments" #TODO: these values should be in enum, find them in project and fix them
 
 
 def prepared_evidence_root(dataset: DatasetId) -> Path:
-    return preprocessing_root() / "prepared" / dataset
+    return preprocessing_root() / "prepared" / dataset #TODO: these values should be in enum, find them in project and fix them
 
 
 def prepared_feature_root() -> Path:
-    return preprocessing_root() / "features"
+    return preprocessing_root() / "features" #TODO: these values should be in enum, find them in project and fix them
 
 
 def preprocessing_log_path() -> Path:
-    return preprocessing_root() / "logs" / "preprocessing.log"
+    return preprocessing_root() / "logs" / "preprocessing.log" #TODO: these values should be in enum, find them in project and fix them
 
 
 def smoke_record_path() -> Path:
-    return preprocessing_root() / "validation" / "smoke_record.json"
+    return preprocessing_root() / "validation" / "smoke_record.json" #TODO: these values should be in enum, find them in project and fix them
 
 
 def experiment_execution_root(experiment: ExperimentName) -> Path:
-    return execution_workspace_root() / "experiments" / experiment
+    return execution_workspace_root() / "experiments" / experiment #TODO: these values should be in enum, find them in project and fix them
 
 
 def experiment_repetition_telemetry_root(
@@ -150,8 +150,8 @@ def experiment_repetition_telemetry_root(
 ) -> Path:
     return (
         experiment_execution_root(experiment)
-        / "telemetry"
-        / "repetitions"
+        / "telemetry" #TODO: these values should be in enum, find them in project and fix them
+        / "repetitions" #TODO: these values should be in enum, find them in project and fix them
         / method
         / str(master_seed)
         / str(repetition)
@@ -159,31 +159,31 @@ def experiment_repetition_telemetry_root(
 
 
 def experiment_log_path(experiment: ExperimentName) -> Path:
-    return experiment_execution_root(experiment) / "logs" / "experiment.log"
+    return experiment_execution_root(experiment) / "logs" / "experiment.log" #TODO: these values should be in enum, find them in project and fix them
 
 
 def experiment_result_root(experiment: ExperimentName) -> Path:
-    return manuscript_results_root() / "experiments" / experiment
+    return manuscript_results_root() / "experiments" / experiment #TODO: these values should be in enum, find them in project and fix them
 
 
 def manuscript_tables_root(root: Path) -> Path:
-    return root / "tables" / "main"
+    return root / "tables" / "main" #TODO: these values should be in enum, find them in project and fix them
 
 
 def manuscript_figures_root(root: Path) -> Path:
-    return root / "figures" / "main"
+    return root / "figures" / "main" #TODO: these values should be in enum, find them in project and fix them
 
 
 def experiment_metrics_root(root: Path) -> Path:
-    return root / "metrics" / "primary"
+    return root / "metrics" / "primary" #TODO: these values should be in enum, find them in project and fix them
 
 
 def experiment_telemetry_root(root: Path) -> Path:
-    return root / "telemetry"
+    return root / "telemetry" #TODO: these values should be in enum, find them in project and fix them
 
 
 def project_summary_root() -> Path:
-    return manuscript_results_root() / "project_summary"
+    return manuscript_results_root() / "project_summary" #TODO: these values should be in enum, find them in project and fix them
 
 
 def path_scope_for_family(family: ArtifactFamily) -> ArtifactPathScope:

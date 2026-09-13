@@ -540,14 +540,14 @@ def _decision_kind(family: ComparisonFamily) -> CollapseDecisionKind:
 
 def _collapse_comparator(family: ComparisonFamily) -> MethodName:
     if family is ComparisonFamily.PROPOSAL_SCREEN_NECESSITY:
-        return OpeningMode.CANDIDATE_FREE.value
+        return str(OpeningMode.CANDIDATE_FREE)
     if family is ComparisonFamily.PLURALITY_NECESSITY:
-        return BaselineIdentity.ONE_INDEPENDENT_RETRAIN.value
+        return str(BaselineIdentity.ONE_INDEPENDENT_RETRAIN)
     if family is ComparisonFamily.SOURCE_EXCLUSION_CENTRAL_EFFECT:
-        return BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE.value
+        return str(BaselineIdentity.SOURCE_UPDATE_SANITIZATION_REFERENCE)
     if family is ComparisonFamily.EXTERNAL_VERIFICATION_NECESSITY:
-        return BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM.value
-    raise ValueError(f"{family.value} is not a collapse family")
+        return str(BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM)
+    raise ValueError(f"{family} is not a collapse family")
 
 
 def _positive_metrics(family: ComparisonFamily) -> frozenset[ComparisonMetric]:

@@ -122,8 +122,8 @@ def verify_planned_cell_count_satisfied(
 
 
 BOUND_WITHIN_CONDITIONS: tuple[ConditionName, ...] = (
-    BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND.value,
-    BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND.value,
+    str(BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND),
+    str(BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND),
 )
 
 

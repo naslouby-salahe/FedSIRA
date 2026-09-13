@@ -118,12 +118,12 @@ RoleInterval = Annotated[
 
 
 class SupportedRoleIntervals(FrozenConfigModel):
-    anchor_train: RoleInterval = Field(alias=Role.ANCHOR_TRAIN.value)
-    anchor_validation: RoleInterval = Field(alias=Role.ANCHOR_VALIDATION.value)
-    post_reference_replay: RoleInterval = Field(alias=Role.POST_REFERENCE_REPLAY.value)
-    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
-    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
-    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
+    anchor_train: RoleInterval = Field(alias=Role.ANCHOR_TRAIN)
+    anchor_validation: RoleInterval = Field(alias=Role.ANCHOR_VALIDATION)
+    post_reference_replay: RoleInterval = Field(alias=Role.POST_REFERENCE_REPLAY)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST)
 
     def interval_for(self, role: Role) -> RoleInterval:
         if role is Role.ANCHOR_TRAIN:
@@ -138,16 +138,16 @@ class SupportedRoleIntervals(FrozenConfigModel):
             return self.final_gate
         if role is Role.REPORT_TEST:
             return self.report_test
-        raise ValueError(f"unsupported supported-data role: {role.value}")
+        raise ValueError(f"unsupported supported-data role: {role}")
 
 
 class TargetRoleIntervals(FrozenConfigModel):
-    source_proposal: RoleInterval = Field(alias=Role.SOURCE_PROPOSAL.value)
-    candidate_screen: RoleInterval = Field(alias=Role.CANDIDATE_SCREEN.value)
-    reproduction: RoleInterval = Field(alias=Role.REPRODUCTION.value)
-    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION.value)
-    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE.value)
-    report_test: RoleInterval = Field(alias=Role.REPORT_TEST.value)
+    source_proposal: RoleInterval = Field(alias=Role.SOURCE_PROPOSAL)
+    candidate_screen: RoleInterval = Field(alias=Role.CANDIDATE_SCREEN)
+    reproduction: RoleInterval = Field(alias=Role.REPRODUCTION)
+    row_verification: RoleInterval = Field(alias=Role.ROW_VERIFICATION)
+    final_gate: RoleInterval = Field(alias=Role.FINAL_GATE)
+    report_test: RoleInterval = Field(alias=Role.REPORT_TEST)
 
     def interval_for(self, role: Role) -> RoleInterval:
         if role is Role.SOURCE_PROPOSAL:
@@ -162,7 +162,7 @@ class TargetRoleIntervals(FrozenConfigModel):
             return self.final_gate
         if role is Role.REPORT_TEST:
             return self.report_test
-        raise ValueError(f"unsupported target-data role: {role.value}")
+        raise ValueError(f"unsupported target-data role: {role}")
 
 
 class RoleIntervals(FrozenConfigModel):

@@ -39,11 +39,11 @@ ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
 
 ARTIFACT_LOGGER = get_structured_logger("artifacts")
 
-ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin"
-ARTIFACT_MANIFEST_SUFFIX = ".manifest.json"
-ARTIFACT_CURRENT_FILE_NAME = "current.json"
+ARTIFACT_PAYLOAD_SUFFIX = ".artifact.bin" #TODO: these values should be in enum, find them in project and fix them
+ARTIFACT_MANIFEST_SUFFIX = ".manifest.json" #TODO: these values should be in enum, find them in project and fix them
+ARTIFACT_CURRENT_FILE_NAME = "current.json" #TODO: these values should be in enum, find them in project and fix them
 
-ARTIFACT_LOG_NAME = "artifacts.log"
+ARTIFACT_LOG_NAME = "artifacts.log" #TODO: these values should be in enum, find them in project and fix them
 
 
 class ArtifactDependency(FrozenDomainModel):
@@ -107,8 +107,8 @@ def configure_artifact_logging(log_path: Path) -> None:
 
 
 def repository_revision() -> TextValue | None:
-    git_root = REPOSITORY_ROOT / ".git"
-    head_path = git_root / "HEAD"
+    git_root = REPOSITORY_ROOT / ".git" #TODO: these values should be in enum, find them in project and fix them
+    head_path = git_root / "HEAD" #TODO: these values should be in enum, find them in project and fix them
     try:
         head = head_path.read_text(encoding="utf-8").strip()
     except OSError:

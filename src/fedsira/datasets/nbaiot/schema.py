@@ -132,19 +132,19 @@ class NBaiotDatasetManifestPayload(FrozenDomainModel):
 def specification() -> DatasetSpecification:
     return DatasetSpecification(
         dataset=DatasetId.N_BAIOT,
-        class_tokens=tuple(item.value for item in NBAIOT_CLASS_ORDER),
-        domain_ids=tuple(item.value for item in NBAIOT_DOMAIN_ORDER),
+        class_tokens=tuple(item for item in NBAIOT_CLASS_ORDER),
+        domain_ids=tuple(item for item in NBAIOT_DOMAIN_ORDER),
         domain_hash_tokens=tuple(nbaiot_domain_hash_token(item) for item in NBAIOT_DOMAIN_ORDER),
-        attack_carrier_class=NBaiotClass.GAFGYT_UDP.value,
+        attack_carrier_class=NBaiotClass.GAFGYT_UDP,
         trigger_feature_names=NBAIOT_TRIGGER_FEATURES,
-        target_class=NBAIOT_TARGET_CLASS.value,
-        benign_class="BENIGN",
+        target_class=NBAIOT_TARGET_CLASS,
+        benign_class=NBaiotClass.BENIGN,
         supported_class_tokens=tuple(
-            item.value for item in NBAIOT_CLASS_ORDER if item is not NBAIOT_TARGET_CLASS
+            item for item in NBAIOT_CLASS_ORDER if item is not NBAIOT_TARGET_CLASS
         ),
         expected_predictor_count=NBAIOT_PRIMARY_PREDICTOR_COUNT,
         domain_proxy_semantics="physical device proxy",
-        raw_data_relative=DatasetId.N_BAIOT.value,
+        raw_data_relative=DatasetId.N_BAIOT,
     )
 
 

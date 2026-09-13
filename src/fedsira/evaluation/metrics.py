@@ -668,11 +668,11 @@ def report_metric_set(
         ("macro-f1", standard_macro_f1),
         ("weighted-f1", standard_weighted_f1),
         ("balanced-accuracy", standard_balanced_accuracy),
-        (ComparisonMetric.TARGET_F1.value, current_target_f1),
+        (str(ComparisonMetric.TARGET_F1), current_target_f1),
         ("target-f1-gain", gain),
-        (ComparisonMetric.SUPPORTED_MACRO_F1_HARM.value, supported_harm),
-        (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE.value, benign_far_increase),
-        (ComparisonMetric.ATTACK_SUCCESS_RATE.value, asr),
+        (str(ComparisonMetric.SUPPORTED_MACRO_F1_HARM), supported_harm),
+        (str(ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE), benign_far_increase),
+        (str(ComparisonMetric.ATTACK_SUCCESS_RATE), asr),
         ("verifier-abstention-rate", verifier_abstention_rate(0, 0)),
         ("reproduction-abstention-rate", reproduction_abstention_rate(0, 0)),
         *class_metrics,
@@ -842,7 +842,7 @@ def evaluate_domain(
             under_represented = True
             break
     return DomainTargetMetrics(
-        target_f1=metric_value(report, ComparisonMetric.TARGET_F1.value),
+        target_f1=metric_value(report, str(ComparisonMetric.TARGET_F1)),
         supported_macro_f1=(
             MetricResult(value=None, denominator=0) if under_represented else macro_f1(supported_f1)
         ),
@@ -1006,28 +1006,28 @@ def metrics_from_state(
     return (
         ("terminal-state", _state_encoding(state)),
         (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_admission_value),
-        (ComparisonMetric.TARGET_F1, target_f1.value),
+        (str(ComparisonMetric.TARGET_F1), target_f1.value),
         ("target-f1-gain", undefined.value),
-        (ComparisonMetric.SUPPORTED_MACRO_F1_HARM, supported_macro_f1_harm_value.value),
-        (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, benign_far_increase_value.value),
-        (ComparisonMetric.ATTACK_SUCCESS_RATE, asr.value),
+        (str(ComparisonMetric.SUPPORTED_MACRO_F1_HARM), supported_macro_f1_harm_value.value),
+        (str(ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE), benign_far_increase_value.value),
+        (str(ComparisonMetric.ATTACK_SUCCESS_RATE), asr.value),
         ("accuracy", undefined.value),
         ("macro-f1", undefined.value),
         ("weighted-f1", undefined.value),
         ("balanced-accuracy", undefined.value),
         ("verifier-abstention-rate", undefined.value),
         ("reproduction-abstention-rate", undefined.value),
-        (ComparisonMetric.WORST_DOMAIN_TARGET_F1, worst_domain.value),
+        (str(ComparisonMetric.WORST_DOMAIN_TARGET_F1), worst_domain.value),
         ("p10-domain-target-f1", p10_domain.value),
         ("domain-disparity", disparity.value),
         ("domain-iqr", iqr.value),
         ("coefficient-of-variation", cv.value),
         ("equal-weight-domain-mean-target-f1", equal_weight_mean.value),
-        (ComparisonMetric.REPRODUCTION_ATTEMPTS, undefined.value),
-        (ComparisonMetric.FALSE_LAUNCH, undefined.value),
-        (ComparisonMetric.POST_EVIDENCE_OVERHEAD, undefined.value),
+        (str(ComparisonMetric.REPRODUCTION_ATTEMPTS), undefined.value),
+        (str(ComparisonMetric.FALSE_LAUNCH), undefined.value),
+        (str(ComparisonMetric.POST_EVIDENCE_OVERHEAD), undefined.value),
         (
-            DescriptiveScientificMetric.DORMANT_ADMISSION_RATE.value,
+            str(DescriptiveScientificMetric.DORMANT_ADMISSION_RATE),
             dormant_admission_rate(
                 dormant_admission_count=1 if is_dormant else 0, eligible_admission_count=1
             ).value,

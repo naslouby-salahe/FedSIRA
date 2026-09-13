@@ -195,6 +195,37 @@ def test_no_enum_value_unwrap_inside_comparisons() -> None:
     assert not offenders, f"Enum .value unwraps inside comparisons: {offenders}"
 
 
+def enum_value_access_violations(tree: ast.Module) -> list[str]:
+    found: list[str] = []
+    enum_names = _enum_class_names(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "value":
+            if isinstance(node.value, ast.Name):
+                if node.value.id in enum_names:
+                    found.append(f"{node.lineno}")
+            elif isinstance(node.value, ast.Attribute):
+                parts: list[str] = []
+                current = node.value
+                while isinstance(current, ast.Attribute):
+                    parts.append(current.attr)
+                    current = current.value
+                if isinstance(current, ast.Name):
+                    parts.append(current.id)
+                if parts and parts[-1] in enum_names:
+                    found.append(f"{node.lineno}")
+    return found
+
+
+def test_no_enum_value_access_outside_boundaries() -> None:
+    offenders: list[str] = []
+    for path in iter_python_files(SRC_ROOT):
+        if path == CANONICAL_TYPES_PATH:
+            continue
+        for lineno in enum_value_access_violations(parse(path)):
+            offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}")
+    assert not offenders, f"Enum .value access outside boundaries: {offenders}"
+
+
 def test_no_redundant_same_base_scalar_casts() -> None:
     offenders: list[str] = []
     for path in iter_python_files(SRC_ROOT):
@@ -344,3 +375,18 @@ def test_new_source_file_with_forbidden_alias_is_flagged_by_full_tree_scan() -> 
         if probe.exists():
             probe.unlink()
     assert not probe.exists()
+
+
+def test_enum_value_access_mutation_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text(
+            "from enum import StrEnum\n"
+            "class Mode(StrEnum):\n"
+            "    LOCAL = 'local'\n"
+            "def handler() -> str:\n"
+            "    return Mode.LOCAL.value\n",
+            encoding="utf-8",
+        )
+        violations = enum_value_access_violations(parse(path))
+        assert violations == ["5"]

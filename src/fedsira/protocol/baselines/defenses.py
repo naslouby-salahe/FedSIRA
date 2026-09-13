@@ -55,6 +55,7 @@ from fedsira.domain.types import (
     MemberIndex,
     MetricValue,
     NamespaceSeed,
+    SeedDerivationLabel,
     NonAbstainingReproductionSeries,
     NumericalEpsilon,
     OptionalParameterSimilarity,
@@ -191,7 +192,7 @@ def secure_continual_assessment_post_reference_rounds() -> FederatedRoundCount:
     return baselines.secure_continual_assessment_post_reference_rounds
 
 
-CLIENT_SAMPLING_SEPARATOR = SeedNamespace.CLIENT_SAMPLING.value
+CLIENT_SAMPLING_SEPARATOR: SeedDerivationLabel = SeedNamespace.CLIENT_SAMPLING
 Domain = TypeVar("Domain")
 
 
@@ -265,7 +266,7 @@ def krum_reference_round_participants(
     return selected
 
 
-DOMAIN_PARTITION_SEPARATOR = SeedNamespace.DOMAIN_PARTITION.value
+DOMAIN_PARTITION_SEPARATOR: SeedDerivationLabel = SeedNamespace.DOMAIN_PARTITION
 CERTIFIED_ENSEMBLE_ANCHOR_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "CERTIFIED_ENSEMBLE_ANCHOR"
 CERTIFIED_ENSEMBLE_POST_REFERENCE_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
     "CERTIFIED_ENSEMBLE_POST_REFERENCE"

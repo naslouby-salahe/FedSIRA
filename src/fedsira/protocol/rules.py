@@ -23,6 +23,7 @@ from fedsira.domain.types import (
     EvidenceArrivalCycleIndex,
     EvidenceArrivalCycleSequence,
     EvidenceCycleIndex,
+    SeedDerivationLabel,
     KrumCommitteeAdmissible,
     MaximumByzantineReportCount,
     MaximumByzantineReproductionRows,
@@ -190,7 +191,7 @@ def resolve_ternary_outcome(
     return TernaryOutcome.NEGATIVE
 
 
-REPRODUCER_ORDER_SEPARATOR = SeedNamespace.REPRODUCER_ORDER.value
+REPRODUCER_ORDER_SEPARATOR: SeedDerivationLabel = SeedNamespace.REPRODUCER_ORDER
 
 
 _GRADUAL_TO_QUORUM_BREAKPOINTS: tuple[

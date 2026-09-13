@@ -148,7 +148,7 @@ class _TensorMetadataWire(FrozenDomainModel):
 
 
 def parameter_tensor_name(kind: TensorParameterKind, parameter_name: ParameterName) -> TensorName:
-    return f"{kind.value}.{parameter_name}"
+    return f"{kind}.{parameter_name}"
 
 
 def _wire_bytes(model: FrozenDomainModel) -> EncodedBytes:

@@ -881,7 +881,7 @@ def render_shared_epistemic_failure(
                 _outcome_metric_mean(
                     outcomes,
                     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
-                    CoreMethodIdentity.RESOLVED_FEDSIRA_CORE.value,
+                    str(CoreMethodIdentity.RESOLVED_FEDSIRA_CORE),
                     f"{failure_type.value}|{strength:.2f}",
                     ComparisonMetric.LEGITIMATE_ADMISSION,
                 )

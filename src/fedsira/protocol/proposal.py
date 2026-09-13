@@ -28,6 +28,7 @@ from fedsira.domain.types import (
     CapabilityContractSatisfied,
     CapabilityIdentity,
     DatasetClassToken,
+    SeedDerivationLabel,
     DerivedSeed,
     DomainId,
     EvidenceAdequate,
@@ -60,9 +61,9 @@ from fedsira.runtime import (
     framed_bytes,
 )
 
-SCREEN_DOMAIN_ORDER_SEPARATOR = SeedNamespace.SCREEN_DOMAIN_ORDER.value
-SCREEN_FOLD_SEPARATOR = SeedNamespace.SCREEN_FOLD.value
-SOURCE_SELECTION_SEPARATOR = SeedNamespace.SOURCE_SELECTION.value
+SCREEN_DOMAIN_ORDER_SEPARATOR: SeedDerivationLabel = SeedNamespace.SCREEN_DOMAIN_ORDER
+SCREEN_FOLD_SEPARATOR: SeedDerivationLabel = SeedNamespace.SCREEN_FOLD
+SOURCE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.SOURCE_SELECTION
 
 
 class AdmissionOpeningEntry(FrozenDomainModel):

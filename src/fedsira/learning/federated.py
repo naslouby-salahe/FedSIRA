@@ -220,14 +220,14 @@ def anchor_round_participants(
     drop_seed = derive_uint32(
         ANCHOR_CLIENT_DROPOUT_SEPARATOR,
         round_index,
-        repr(float(anchor_config.client_dropout)),
+        repr(anchor_config.client_dropout),
     )
     ordered = deterministic_order(
         tuple(client.training_seed for client in universe),
         ANCHOR_CLIENT_DROPOUT_SEPARATOR,
         drop_seed,
     )
-    retained_count = max(1, int(round(len(universe) * (1.0 - float(anchor_config.client_dropout)))))
+    retained_count = max(1, int(round(len(universe) * (1.0 - anchor_config.client_dropout))))
     retained_seeds = frozenset(ordered[:retained_count])
     return tuple(client for client in universe if client.training_seed in retained_seeds)
 

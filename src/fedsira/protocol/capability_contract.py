@@ -101,7 +101,7 @@ def compute_capability_identity(contract: CapabilityContract) -> ArtifactDigest:
             str(contract.target_f1_gain_over_anchor_minimum),
             str(contract.supported_macro_f1_drop_maximum),
             str(contract.benign_false_alarm_rate_increase_maximum),
-            contract.scope.dataset_id.value,
+            str(contract.scope.dataset_id),
             contract.scope.domain_count,
             contract.scope.feature_schema_hash,
         )

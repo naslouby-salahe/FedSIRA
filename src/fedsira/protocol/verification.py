@@ -24,6 +24,7 @@ from fedsira.domain.types import (
     OneVotePerDomain,
     ReproductionRowCertified,
     ResolvedRowRequirementReached,
+    SeedDerivationLabel,
     TimestampValid,
     VerifierCount,
     VerifierEligible,
@@ -46,9 +47,9 @@ from fedsira.protocol.proposal import (
 from fedsira.protocol.rules import resolve_ternary_outcome
 from fedsira.runtime import current_application_context, derive_uint32, deterministic_order
 
-VERIFIER_ASSIGNMENT_SEPARATOR = SeedNamespace.VERIFIER_ASSIGNMENT.value
-BYZANTINE_SELECTION_SEPARATOR = SeedNamespace.BYZANTINE_SELECTION.value
-COMMITTEE_DRAW_SEPARATOR = SeedNamespace.COMMITTEE_DRAW.value
+VERIFIER_ASSIGNMENT_SEPARATOR: SeedDerivationLabel = SeedNamespace.VERIFIER_ASSIGNMENT
+BYZANTINE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.BYZANTINE_SELECTION
+COMMITTEE_DRAW_SEPARATOR: SeedDerivationLabel = SeedNamespace.COMMITTEE_DRAW
 
 
 def verifier_is_eligible(

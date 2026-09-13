@@ -653,7 +653,7 @@ def dataset_specification(dataset: DatasetId) -> DatasetSpecification:
         from fedsira.datasets.ciciot2023.schema import specification
 
         return specification()
-    raise ValueError(f"no dataset specification for {dataset.value}")
+    raise ValueError(f"no dataset specification for {dataset}")
 
 
 def prepared_domain_summaries(
@@ -676,10 +676,10 @@ def prepared_domain_summaries(
             f"PSEUDO_DOMAIN_{int(domain) + 1}" if dataset is DatasetId.CICIOT2023 else str(domain)
         )
         if domain_id not in specification.domain_ids:
-            raise ValueError(f"unexpected {dataset.value} domain {domain_id!r} in {sidecar}")
+            raise ValueError(f"unexpected {dataset} domain {domain_id!r} in {sidecar}")
         counts[domain_id][(role_from_hash_token(str(role)), str(class_token))] += row_count
     if not counts:
-        raise ValueError(f"no prepared-view evidence exists for {dataset.value}")
+        raise ValueError(f"no prepared-view evidence exists for {dataset}")
     return tuple(
         PreparedDomainSummary(
             domain_id=domain_id,
@@ -811,14 +811,14 @@ class DatasetAdapter:
             index = self.specification.domain_ids.index(domain_id)
         except ValueError as error:
             raise ValueError(
-                f"unknown domain identity for {self.dataset.value}: {domain_id}"
+                f"unknown domain identity for {self.dataset}: {domain_id}"
             ) from error
         return self.specification.domain_hash_tokens[index]
 
     def attack_carrier_class_token(self) -> DatasetClassToken:
         carrier = self.specification.attack_carrier_class
         if carrier is None:
-            raise ValueError(f"{self.dataset.value} declares no attack carrier class")
+            raise ValueError(f"{self.dataset} declares no attack carrier class")
         return carrier
 
     def view_key(
@@ -912,7 +912,7 @@ class DatasetAdapter:
         return None if not combined_features else torch.cat(combined_features, dim=0).mean(dim=0)
 
 
-ATTACK_GENERATION_SEPARATOR = SeedNamespace.ATTACK_GENERATION.value
+ATTACK_GENERATION_SEPARATOR: SeedDerivationLabel = SeedNamespace.ATTACK_GENERATION
 
 
 def fraction_to_attack_count(
@@ -1032,7 +1032,7 @@ def balanced_capability_selection(
     attack_generation_namespace_seed: NamespaceSeed,
 ) -> tuple[tuple[SampleId, ...], tuple[SampleId, ...]]:
     selected_count = min(len(root_cause_a_row_ids), len(root_cause_b_row_ids))
-    separator = SeedNamespace.ATTACK_GENERATION.value
+    separator: SeedDerivationLabel = SeedNamespace.ATTACK_GENERATION
     ordered_a = deterministic_order(
         tuple(root_cause_a_row_ids), separator, attack_generation_namespace_seed
     )
@@ -1089,7 +1089,7 @@ def apply_attacker_induced_common_context(
     return apply_trigger_transform(standardized_features, trigger_feature_indices, trigger_value)
 
 
-QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY.value
+QUANTITY_SKEW_SEPARATOR: SeedDerivationLabel = SeedNamespace.HETEROGENEITY
 
 
 HETEROGENEITY_FEATURE_ORDER_SEPARATOR: SeedDerivationLabel = "HETEROGENEITY_FEATURE_ORDER"
