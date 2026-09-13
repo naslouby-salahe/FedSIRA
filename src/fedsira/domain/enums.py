@@ -1,6 +1,53 @@
 from enum import StrEnum
 
 
+class LogEvent(StrEnum):
+    DATASET_INGEST = "dataset.ingest"
+    DATASET_ROLES = "dataset.roles"
+    DATASET_INGEST_COMPLETED = "dataset.ingest.completed"
+    DATASET_SHARD_WIDTH_EXCLUDED = "dataset.shard.width.excluded"
+    DATASET_SCALER_FITTED = "dataset.scaler.fitted"
+    DATASET_VIEW_WRITTEN = "dataset.view.written"
+    DATASET_PREPROCESSING_STARTED = "dataset.preprocessing.started"
+    DATASET_PREPROCESSING_COMPLETED = "dataset.preprocessing.completed"
+    EXPERIMENT_STARTED = "experiment.started"
+    EXPERIMENT_CONFIGURATION_RESOLVED = "experiment.configuration.resolved"
+    EXPERIMENT_PLAN_CREATED = "experiment.plan.created"
+    EXPERIMENT_PREREQUISITES_VALIDATED = "experiment.prerequisites.validated"
+    EXPERIMENT_PROGRESS = "experiment.progress"
+    EXPERIMENT_COMPLETED = "experiment.completed"
+    EXPERIMENT_FAILED = "experiment.failed"
+    CELL_STARTED = "cell.started"
+    CELL_COMPLETED = "cell.completed"
+    CELL_REUSED = "cell.reused"
+    CELL_RECORD_PERSISTED = "cell.record.persisted"
+    CELL_METRIC_COMPUTED = "cell.metric.computed"
+    CELL_REUSE_REJECTED = "cell.reuse.rejected"
+    CELL_PHASE_STARTED = "cell.phase.started"
+    CELL_PHASE_TIMEOUT = "cell.phase.timeout"
+    CELL_PHASE_COMPLETED = "cell.phase.completed"
+    ABLATION_REFERENCE_REUSED = "ablation.reference.reused"
+    ABLATION_REFERENCE_PUBLISHED = "ablation.reference.published"
+    ABLATION_REFERENCES_MATERIALIZED = "ablation.references.materialized"
+    COMPARISON_STARTED = "comparison.started"
+    COMPARISON_COMPLETED = "comparison.completed"
+    COMPARISON_EVIDENCE_PERSISTED = "comparison.evidence.persisted"
+    REPORT_STARTED = "report.started"
+    REPORT_COMPLETED = "report.completed"
+    REPORT_TABLE_STARTED = "report.table.started"
+    REPORT_EXPERIMENT_ARTIFACTS_RENDERED = "report.experiment.artifacts.rendered"
+    REPORT_PROJECT_TABLES_STARTED = "report.project.tables.started"
+    REPORT_TABLE_GENERATED = "report.table.generated"
+    REPORT_TABLES_COMPLETED = "report.tables.completed"
+    REPORT_FIGURE_STARTED = "report.figure.started"
+    REPORT_FIGURE_GENERATED = "report.figure.generated"
+    ANCHOR_ROUND_EVALUATED = "anchor.round.evaluated"
+    ANCHOR_TRAINING_STARTED = "anchor.training.started"
+    ANCHOR_TRAINING_COMPLETED = "anchor.training.completed"
+    ARTIFACT_REUSED = "artifact.reused"
+    ARTIFACT_PUBLISHED = "artifact.published"
+
+
 class DatasetId(StrEnum):
     N_BAIOT = "N-BaIoT"
     CICIOT2023 = "CICIoT2023"
@@ -27,7 +74,7 @@ class CICIoT2023Acquisition(StrEnum):
     PER_ATTACK_SHARDS = "Per-attack shards"
 
 
-class SeedNamespace(StrEnum):
+class SeedNamespace(StrEnum): #TODO: to be removed since this will become SeedDerivationLabel enum
     DATA_SPLIT = "DATA_SPLIT"
     DOMAIN_PARTITION = "DOMAIN_PARTITION"
     MODEL_INITIALIZATION = "MODEL_INITIALIZATION"
@@ -43,6 +90,10 @@ class SeedNamespace(StrEnum):
     LOCAL_TRAINING = "LOCAL_TRAINING"
     COMMITTEE_DRAW = "COMMITTEE_DRAW"
     HETEROGENEITY = "HETEROGENEITY"
+    SCREEN_FOLD_SEED = "SCREEN_FOLD_SEED"
+    ATTACK_GENERATION_SEED = "ATTACK_GENERATION_SEED"
+    HETEROGENEITY_SEED = "HETEROGENEITY_SEED"
+    REPRODUCER_ORDER_SEED = "REPRODUCER_ORDER_SEED"
 
 
 class ArtifactLifecycleState(StrEnum):
@@ -159,6 +210,22 @@ class ArtifactFileToken(StrEnum):
     MANIFEST_SUFFIX = ".manifest.json"
     CURRENT_FILE = "current.json"
     LOG_FILE = "artifacts.log"
+
+
+class ArtifactInstanceToken(StrEnum):
+    ROLE_SPLIT = "role-split"
+    RESOLVED_CORE = "resolved-fedsira-core"
+    COMPARISONS = "comparisons"
+    SOURCE_DATA = "source-data"
+    REPORT_EXPORT = "report-export"
+    SMOKE_INVARIANT = "smoke-invariant"
+    SMOKE_PARENT = "smoke-parent"
+    SMOKE_DESCENDANT = "smoke-descendant"
+
+
+class ArtifactDependencyName(StrEnum):
+    RAW_DATASET = "raw-dataset"
+    PARENT = "parent"
 
 
 class GitMetadataToken(StrEnum):

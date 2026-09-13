@@ -60,6 +60,7 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
+    LogEvent,
     Role,
     WorkspaceDirectoryToken,
 )
@@ -246,7 +247,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     )
     log_structured_event(
         PREPROCESSING_LOGGER,
-        "dataset.preprocessing.started",
+        LogEvent.DATASET_PREPROCESSING_STARTED,
         DatasetPreparationLogFields(dataset=DatasetId.N_BAIOT),
     )
     discovered = discover_primary_csv_files(raw_root, extraction_cache_root)
@@ -317,7 +318,7 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     )
     log_structured_event(
         PREPROCESSING_LOGGER,
-        "dataset.preprocessing.completed",
+        LogEvent.DATASET_PREPROCESSING_COMPLETED,
         DatasetPreparationLogFields(
             dataset=DatasetId.N_BAIOT,
             dataset_file_manifest_hash=manifest_hash,
@@ -334,7 +335,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     csv_root = required_raw_dataset_root(DatasetId.CICIOT2023)
     log_structured_event(
         PREPROCESSING_LOGGER,
-        "dataset.preprocessing.started",
+        LogEvent.DATASET_PREPROCESSING_STARTED,
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023),
     )
     discovered = discover_secondary_csv_files(csv_root, config.datasets.secondary.acquisition)
@@ -413,7 +414,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     )
     log_structured_event(
         PREPROCESSING_LOGGER,
-        "dataset.preprocessing.completed",
+        LogEvent.DATASET_PREPROCESSING_COMPLETED,
         DatasetPreparationLogFields(
             dataset=DatasetId.CICIOT2023,
             dataset_file_manifest_hash=summary.dataset_manifest_hash,

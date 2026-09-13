@@ -6,7 +6,7 @@ from fedsira.datasets.common import (
     RealAnchor,
     Role,
 )
-from fedsira.domain.enums import SeedNamespace
+from fedsira.domain.enums import LogEvent, SeedNamespace
 from fedsira.domain.types import (
     AlgorithmName,
     ArtifactDigest,
@@ -188,7 +188,7 @@ def run_anchor_fedavg_training(
             validation_model = FedSIRAClassifier(input_width, output_width)
             load_model_state(validation_model, state)
             ANCHOR_LOGGER.info(
-                "anchor.round.evaluated",
+                LogEvent.ANCHOR_ROUND_EVALUATED,
                 extra=AnchorRoundEvaluationLogFields(
                     round_index=round_index,
                     validation_parameters=float(
@@ -288,7 +288,7 @@ def _flatten_model_state(
 def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor | None:
     timer = ElapsedTimer()
     ANCHOR_LOGGER.info(
-        "anchor.training.started",
+        LogEvent.ANCHOR_TRAINING_STARTED,
         extra=AnchorTrainingLogFields(
             master_seed=master_seed, prepared_root=adapter.prepared_root.as_posix()
         ).model_dump(),
@@ -350,7 +350,7 @@ def train_anchor(adapter: DatasetAdapter, master_seed: MasterSeed) -> RealAnchor
         if round_index % checkpoint_cadence == 0
     )
     ANCHOR_LOGGER.info(
-        "anchor.training.completed",
+        LogEvent.ANCHOR_TRAINING_COMPLETED,
         extra=AnchorTrainingLogFields(
             master_seed=master_seed,
             prepared_root=adapter.prepared_root.as_posix(),

@@ -271,41 +271,43 @@ def artifact_manifest_dependency_failures(
     return (*unreadable, *unresolved)
 
 
-TABLE_HEADERS: tuple[tuple[TableName, tuple[DatasetColumnName, ...]], ...] = (
+TABLE_HEADERS: tuple[tuple[TableName #TODO: convert to enum instead of hardcoded string
+                           , tuple[DatasetColumnName #TODO: convert to enum instead of hardcoded string
+                                   , ...]], ...] = (
     (
-        "Cell Metrics",
+        "Cell Metrics", #TODO: convert to enum instead of hardcoded string
         (
-            "experiment",
-            "method",
-            "condition",
-            "master_seed",
-            "repetition",
-            "terminal_state",
-            "metric",
-            "value",
+            "experiment",  #TODO: convert to enum instead of hardcoded string
+            "method", #TODO: convert to enum instead of hardcoded string
+            "condition", #TODO: convert to enum instead of hardcoded string
+            "master_seed", #TODO: convert to enum instead of hardcoded string
+            "repetition", #TODO: convert to enum instead of hardcoded string
+            "terminal_state", #TODO: convert to enum instead of hardcoded string
+            "metric", #TODO: convert to enum instead of hardcoded string
+            "value", #TODO: convert to enum instead of hardcoded string
         ),
     ),
     (
-        "Statistical Summary",
+        "Statistical Summary", #TODO: convert to enum instead of hardcoded string
         (
-            "comparison_family",
-            "comparison",
-            "metric",
-            "direction",
-            "test_kind",
-            "materiality_direction",
-            "margin",
-            "n_pairs",
-            "mean_difference",
-            "median_difference",
-            "paired_dz",
-            "raw_p",
-            "holm_p",
-            "confidence_interval_95",
-            "materiality_threshold",
-            "statistical_pass",
-            "materiality_pass",
-            "final_comparison_state",
+            "comparison_family", #TODO: convert to enum instead of hardcoded string
+            "comparison", #TODO: convert to enum instead of hardcoded string
+            "metric", #TODO: convert to enum instead of hardcoded string
+            "direction", #TODO: convert to enum instead of hardcoded string
+            "test_kind", #TODO: convert to enum instead of hardcoded string
+            "materiality_direction", #TODO: convert to enum instead of hardcoded string
+            "margin", #TODO: convert to enum instead of hardcoded string
+            "n_pairs", #TODO: convert to enum instead of hardcoded string
+            "mean_difference", #TODO: convert to enum instead of hardcoded string
+            "median_difference", #TODO: convert to enum instead of hardcoded string
+            "paired_dz", #TODO: convert to enum instead of hardcoded string
+            "raw_p", #TODO: convert to enum instead of hardcoded string
+            "holm_p", #TODO: convert to enum instead of hardcoded string
+            "confidence_interval_95", #TODO: convert to enum instead of hardcoded string
+            "materiality_threshold", #TODO: convert to enum instead of hardcoded string
+            "statistical_pass", #TODO: convert to enum instead of hardcoded string
+            "materiality_pass", #TODO: convert to enum instead of hardcoded string
+            "final_comparison_state", #TODO: convert to enum instead of hardcoded string
         ),
     ),
 )
@@ -440,12 +442,12 @@ def metric_artifact_is_semantically_complete(
     if path.name == STATE_TRAJECTORY_PARQUET_NAME:
         required_columns = frozenset(
             (
-                "experiment",
-                "method",
-                "condition",
-                "master_seed",
-                "logical_evidence_cycle",
-                "admission_state",
+                "experiment", #TODO: convert to enum instead of hardcoded string
+                "method", #TODO: convert to enum instead of hardcoded string
+                "condition", #TODO: convert to enum instead of hardcoded string
+                "master_seed", #TODO: convert to enum instead of hardcoded string
+                "logical_evidence_cycle", #TODO: convert to enum instead of hardcoded string
+                "admission_state", #TODO: convert to enum instead of hardcoded string
             )
         )
         if not required_columns.issubset(frame.columns) or frame.empty:
@@ -459,14 +461,26 @@ def metric_artifact_is_semantically_complete(
             (row.method, row.condition, row.master_seed) for row in experiment_rows.itertuples()
         )
         return expected_cells.issubset(observed_cells) and all(
-            experiment_rows["admission_state"].notna().tolist()
+            experiment_rows["admission_state" #TODO: convert to enum instead of hardcoded string
+                            ].notna().tolist()
         )
     required_columns = (
         frozenset(
-            ("experiment", "method", "condition", "metric", "observation_count", "mean_value")
+            ("experiment", #TODO: convert to enum instead of hardcoded string
+             "method", #TODO: convert to enum instead of hardcoded string
+             "condition", #TODO: convert to enum instead of hardcoded string
+             "metric", #TODO: convert to enum instead of hardcoded string
+             "observation_count", #TODO: convert to enum instead of hardcoded string
+             "mean_value", #TODO: convert to enum instead of hardcoded string
+            )
         )
         if path.name == AGGREGATE_METRICS_PARQUET_NAME
-        else frozenset(("experiment", "method", "condition", "master_seed", "terminal_state"))
+        else frozenset(("experiment", #TODO: convert to enum instead of hardcoded string
+                        "method", #TODO: convert to enum instead of hardcoded string
+                        "condition", #TODO: convert to enum instead of hardcoded string
+                        "master_seed", #TODO: convert to enum instead of hardcoded string
+                        "terminal_state", #TODO: convert to enum instead of hardcoded string
+                       ))
     )
     if not required_columns.issubset(frame.columns) or frame.empty:
         return False
@@ -481,7 +495,8 @@ def metric_artifact_is_semantically_complete(
             (row.method, row.condition) for row in experiment_rows.itertuples()
         )
         return expected_conditions.issubset(observed_conditions) and all(
-            (experiment_rows["observation_count"] > 0).tolist()
+            (experiment_rows["observation_count" #TODO: convert to enum instead of hardcoded string
+                             ] > 0).tolist()
         )
     terminal_state_values = cast(list[str], experiment_rows["terminal_state"].tolist())
     recorded_terminal_states = frozenset(

@@ -315,6 +315,6 @@ def reproducer_order_for_cell(
     ordered_tokens = deterministic_order(
         tokens,
         REPRODUCER_ORDER_SEPARATOR,
-        derive_uint32("REPRODUCER_ORDER_SEED", cell.master_seed),
+        derive_uint32(SeedNamespace.REPRODUCER_ORDER_SEED, cell.master_seed),
     )
     return tuple(tokens[tokens.index(token)] for token in ordered_tokens)

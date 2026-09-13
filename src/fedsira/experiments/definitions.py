@@ -96,6 +96,18 @@ class DescriptiveScientificMetric(StrEnum):
     VERIFIER_ABSTENTION_RATE = "verifier-abstention-rate"
     REPRODUCTION_ABSTENTION_RATE = "reproduction-abstention-rate"
     DEFINED_DOMAIN_FRACTION = "defined-domain-fraction"
+    TERMINAL_STATE = "terminal-state"
+    ACCURACY = "accuracy"
+    MACRO_F1 = "macro-f1"
+    WEIGHTED_F1 = "weighted-f1"
+    BALANCED_ACCURACY = "balanced-accuracy"
+    TARGET_F1_GAIN = "target-f1-gain"
+    P10_DOMAIN_TARGET_F1 = "p10-domain-target-f1"
+    DOMAIN_DISPARITY = "domain-disparity"
+    DOMAIN_IQR = "domain-iqr"
+    COEFFICIENT_OF_VARIATION = "coefficient-of-variation"
+    EQUAL_WEIGHT_DOMAIN_MEAN_TARGET_F1 = "equal-weight-domain-mean-target-f1"
+
 
 
 ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric

@@ -75,16 +75,16 @@ def render_experiment_plan_table(plan: ExperimentPlan) -> RenderedTable:
         name="Experiment Plan",
         csv_text=_csv_text(
             (
-                "experiment",
-                "class",
-                "methods",
-                "scenarios_or_variants",
-                "seeds",
-                "nominal_run_count",
-                "primary_metrics",
-                "claim_family",
-                "prerequisite",
-                "downstream_role",
+                "experiment", #TODO: convert to enum instead of hardcoded string
+                "class", #TODO: convert to enum instead of hardcoded string
+                "methods", #TODO: convert to enum instead of hardcoded string
+                "scenarios_or_variants", #TODO: convert to enum instead of hardcoded string
+                "seeds", #TODO: convert to enum instead of hardcoded string
+                "nominal_run_count", #TODO: convert to enum instead of hardcoded string
+                "primary_metrics", #TODO: convert to enum instead of hardcoded string
+                "claim_family", #TODO: convert to enum instead of hardcoded string
+                "prerequisite", #TODO: convert to enum instead of hardcoded string
+                "downstream_role", #TODO: convert to enum instead of hardcoded string
             ),
             rows,
         ),

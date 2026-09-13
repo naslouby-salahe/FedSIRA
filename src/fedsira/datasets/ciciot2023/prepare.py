@@ -48,7 +48,7 @@ from fedsira.datasets.common import (
     view_parquet_path,
     write_json_payload,
 )
-from fedsira.domain.enums import CICIoT2023Acquisition, DatasetId
+from fedsira.domain.enums import CICIoT2023Acquisition, DatasetId, LogEvent
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
@@ -471,7 +471,7 @@ def _ingest_shard(
 ) -> tuple[RowCount, tuple[ClassLabel, ...]]:
     log_structured_event(
         CICIOT_PREPARATION_LOGGER,
-        "dataset.ingest",
+        LogEvent.DATASET_INGEST,
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023, file=item.relative_path),
     )
     physical_row_count: RowCount | None = None
@@ -489,7 +489,7 @@ def _ingest_shard(
             ) from error
         log_structured_event(
             CICIOT_PREPARATION_LOGGER,
-            "dataset.shard.width.excluded",
+            LogEvent.DATASET_SHARD_WIDTH_EXCLUDED,
             DatasetPreparationLogFields(
                 dataset=DatasetId.CICIOT2023,
                 file=item.relative_path,
@@ -709,7 +709,7 @@ def _write_secondary_views(
         )
         log_structured_event(
             CICIOT_PREPARATION_LOGGER,
-            "dataset.view.written",
+            LogEvent.DATASET_VIEW_WRITTEN,
             DatasetPreparationLogFields(
                 dataset=DatasetId.CICIOT2023, view=view_key, rows=row_count
             ),
@@ -781,7 +781,7 @@ def materialize_ciciot2023_prepared_views(
         class_registry = build_class_registry(normalized_labels)
         log_structured_event(
             CICIOT_PREPARATION_LOGGER,
-            "dataset.ingest.completed",
+            LogEvent.DATASET_INGEST_COMPLETED,
             DatasetPreparationLogFields(
                 dataset=DatasetId.CICIOT2023,
                 raw_rows=raw_row_count,
@@ -805,7 +805,7 @@ def materialize_ciciot2023_prepared_views(
         )
         log_structured_event(
             CICIOT_PREPARATION_LOGGER,
-            "dataset.scaler.fitted",
+            LogEvent.DATASET_SCALER_FITTED,
             DatasetPreparationLogFields(
                 dataset=DatasetId.CICIOT2023, training_rows=moments.training_row_count
             ),

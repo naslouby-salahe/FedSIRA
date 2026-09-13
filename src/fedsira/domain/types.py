@@ -27,12 +27,7 @@ ExperimentSlug = Annotated[
     StringConstraints(min_length=1, max_length=128, pattern=r"^[a-z][a-z0-9-]*$"),
 ]
 ArtifactPayloadBytes: TypeAlias = bytes
-ArtifactDependencyName = TextValue
 ProcedureIdentity = TextValue
-ArtifactInstanceToken = Annotated[
-    str,
-    StringConstraints(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$"),
-]
 ArtifactDigest = Annotated[
     str,
     StringConstraints(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
@@ -48,28 +43,28 @@ Doi = Annotated[
 ]
 ArtifactFileName = TextValue
 RepositoryPath = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
-ExperimentName = TextValue
-MethodName = TextValue
-ConditionName = TextValue
-ScenarioName = TextValue
-MetricName = TextValue
+ExperimentName = TextValue #TODO: convert to enum
+MethodName = TextValue #TODO: convert to enum
+ConditionName = TextValue #TODO: convert to enum
+ScenarioName = TextValue #TODO: convert to enum
+MetricName = TextValue #TODO: convert to enum
 DomainId = TextValue
 ClassLabel = TextValue
 DatasetClassToken = ClassLabel
-DatasetColumnName = TextValue
-FeatureName = TextValue
-RoleToken = TextValue
-AlgorithmName = TextValue
-ParameterName = TextValue
+DatasetColumnName = TextValue #TODO: convert to enum instead of hardcoded string
+FeatureName = TextValue #TODO: convert to enum instead of hardcoded string
+RoleToken = TextValue #TODO: convert to enum instead of hardcoded string
+AlgorithmName = TextValue #TODO: convert to enum
+ParameterName = TextValue #TODO: convert to enum
 MessageEndpoint = TextValue
-EnvironmentText = TextValue
+EnvironmentText = TextValue #TODO: convert to enum
 FailureMessage = TextValue
 FixtureCaseName = TextValue
 ComparisonName = TextValue
 ComparisonState = TextValue
 CheckpointIdentity = TextValue
 TrainingConditionId = TextValue
-SeedDerivationLabel = TextValue
+SeedDerivationLabel = TextValue #TODO: convert to enum
 SampleId = TextValue
 SampleIdPrefix = TextValue
 SampleRowIndex = NonNegativeInt
@@ -78,7 +73,7 @@ BatchRowIndexSequence: TypeAlias = tuple[tuple[SampleRowIndex, ...], ...]
 SamplingSelectionDigest = Annotated[bytes, Field(min_length=32, max_length=32)]
 RelativePathText = TextValue
 PathToken = TextValue
-ModuleName = TextValue
+ModuleName = TextValue #TODO: convert to enum instead of hardcoded string
 SchemaVersion = TextValue
 ExecutionSchemaVersion = SchemaVersion
 CapabilityIdentity = ArtifactDigest
@@ -89,10 +84,10 @@ AttackBasename = TextValue
 ReproductionRowId = TextValue
 ScientificCellSemanticKey = TextValue
 CellPhaseIdentity = TextValue
-RuntimeComponentName = TextValue
+RuntimeComponentName = TextValue #TODO: convert to enum
 TensorName = TextValue
 FigureName = TextValue
-TableName = TextValue
+TableName = TextValue #TODO: convert to enum instead of hardcoded string
 ReportVerificationFailure = TextValue
 PreparedViewKey = TextValue
 DoctorArtifactSummary = TextValue
@@ -129,7 +124,7 @@ FeatureCount = PositiveInt
 ScreenDomainCount = PositiveInt
 VerifierCount = PositiveInt
 CommitteeSize = PositiveInt
-ReviewerCount = PositiveInt
+ReviewerCount = PositiveInt #TODO: convert to enum
 ReproductionRowCount = NonNegativeInt
 CompromisedReproducerCount = NonNegativeInt
 ScientificCellCount = NonNegativeInt

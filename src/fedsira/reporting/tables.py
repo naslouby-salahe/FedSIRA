@@ -193,18 +193,21 @@ def _statistical_summary_row(
     definition = comparison.definition
     effect_decimals = _publication_rounding().effect_size_decimals
     effect = (
-        "NA"
+        "NA" #TODO: convert to enum instead of hardcoded string
         if comparison.paired_standardized_effect is None
         else f"{comparison.paired_standardized_effect:.{effect_decimals}f}"
     )
     confidence_interval = (
-        "NA"
+        "NA" #TODO: convert to enum instead of hardcoded string
         if comparison.confidence_interval is None
         else (f"[{comparison.confidence_interval[0]:.3f},{comparison.confidence_interval[1]:.3f}]")
     )
-    margin = "NA" if definition.margin is None else f"{definition.margin:.3f}"
+    margin = "NA" #TODO: convert to enum instead of hardcoded string
+    if definition.margin is not None:
+        margin = f"{definition.margin:.3f}"
     materiality = (
-        "NA" if definition.material_threshold is None else f"{definition.material_threshold:.3f}"
+        "NA" #TODO: convert to enum instead of hardcoded string
+        if definition.material_threshold is None else f"{definition.material_threshold:.3f}"
     )
     reference_label = _comparison_reference_label(definition)
     comparison_identity = (
@@ -229,8 +232,10 @@ def _statistical_summary_row(
         format_p_value(comparison.adjusted_p_value),
         confidence_interval,
         materiality,
-        "pass" if comparison.comparison_state is ComparisonState.PASSED else "fail",
-        "pass" if comparison.materiality_passes is not False else "fail",
+        "pass"  #TODO: convert to enum instead of hardcoded string
+         if comparison.comparison_state is ComparisonState.PASSED else "fail", #TODO: convert to enum instead of hardcoded string
+        "pass" #TODO: convert to enum instead of hardcoded string
+            if comparison.materiality_passes is not False else "fail", #TODO: convert to enum instead of hardcoded string
         str(comparison.comparison_state),
     )
 
@@ -244,7 +249,7 @@ def render_statistical_summary_table(
         for comparison in family.comparisons
     )
     return RenderedTable(
-        name="Statistical Summary",
+        name="Statistical Summary", #TODO: convert to enum instead of hardcoded string
         csv_text=csv_text(
             (
                 "comparison_family",
@@ -1433,18 +1438,18 @@ def render_generalization_results_table(
         name="Generalization Results",
         csv_text=csv_text(
             (
-                "method",
-                "scenario",
-                "target_f1_or_gain",
-                "supported_harm",
-                "benign_false_alarm_rate_increase",
-                "malicious_admission",
-                "legitimate_admission",
-                "paired_effect_vs_fedsira",
-                "predeclared_comparator",
-                "adjusted_p",
-                "materiality_pass",
-                "scope_label",
+                "method", #TODO: convert to enum instead of hardcoded string
+                "scenario", #TODO: convert to enum instead of hardcoded string
+                "target_f1_or_gain", #TODO: convert to enum instead of hardcoded string
+                "supported_harm", #TODO: convert to enum instead of hardcoded string
+                "benign_false_alarm_rate_increase", #TODO: convert to enum instead of hardcoded string
+                "malicious_admission", #TODO: convert to enum instead of hardcoded string
+                "legitimate_admission", #TODO: convert to enum instead of hardcoded string
+                "paired_effect_vs_fedsira", #TODO: convert to enum instead of hardcoded string
+                "predeclared_comparator", #TODO: convert to enum instead of hardcoded string
+                "adjusted_p", #TODO: convert to enum instead of hardcoded string
+                "materiality_pass", #TODO: convert to enum instead of hardcoded string
+                "scope_label", #TODO: convert to enum instead of hardcoded string
             ),
             tuple(rows),
         ),
@@ -1491,14 +1496,14 @@ def render_cell_metrics(
         name=table_name,
         csv_text=csv_text(
             (
-                "experiment",
-                "method",
-                "condition",
-                "master_seed",
-                "repetition",
-                "terminal_state",
-                "metric",
-                "value",
+                "experiment", #TODO: convert to enum instead of hardcoded string
+                "method", #TODO: convert to enum instead of hardcoded string
+                "condition", #TODO: convert to enum instead of hardcoded string
+                "master_seed", #TODO: convert to enum instead of hardcoded string
+                "repetition", #TODO: convert to enum instead of hardcoded string
+                "terminal_state", #TODO: convert to enum instead of hardcoded string
+                "metric", #TODO: convert to enum instead of hardcoded string
+                "value", #TODO: convert to enum instead of hardcoded string
             ),
             tuple(rows),
         ),

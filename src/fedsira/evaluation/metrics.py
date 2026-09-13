@@ -26,6 +26,7 @@ from fedsira.datasets.common import (
 from fedsira.domain.enums import (
     AdmissionState,
     RootCause,
+    SeedNamespace,
 )
 from fedsira.domain.models import (
     ConfusionCounts,
@@ -664,18 +665,18 @@ def report_metric_set(
         class_metrics.append((f"{token}:fnr", false_negative_rate_for_class(counts)))
         class_metrics.append((f"{token}:tnr", true_negative_rate_for_class(counts)))
     return (
-        ("accuracy", standard_accuracy),
-        ("macro-f1", standard_macro_f1),
-        ("weighted-f1", standard_weighted_f1),
-        ("balanced-accuracy", standard_balanced_accuracy),
-        (str(ComparisonMetric.TARGET_F1), current_target_f1),
-        ("target-f1-gain", gain),
-        (str(ComparisonMetric.SUPPORTED_MACRO_F1_HARM), supported_harm),
-        (str(ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE), benign_far_increase),
-        (str(ComparisonMetric.ATTACK_SUCCESS_RATE), asr),
-        (str(DescriptiveScientificMetric.VERIFIER_ABSTENTION_RATE), verifier_abstention_rate(0, 0)),
+        (DescriptiveScientificMetric.ACCURACY, standard_accuracy),
+        (DescriptiveScientificMetric.MACRO_F1, standard_macro_f1),
+        (DescriptiveScientificMetric.WEIGHTED_F1, standard_weighted_f1),
+        (DescriptiveScientificMetric.BALANCED_ACCURACY, standard_balanced_accuracy),
+        (ComparisonMetric.TARGET_F1, current_target_f1),
+        (DescriptiveScientificMetric.TARGET_F1_GAIN, gain),
+        (ComparisonMetric.SUPPORTED_MACRO_F1_HARM, supported_harm),
+        (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, benign_far_increase),
+        (ComparisonMetric.ATTACK_SUCCESS_RATE, asr),
+        (DescriptiveScientificMetric.VERIFIER_ABSTENTION_RATE, verifier_abstention_rate(0, 0)),
         (
-            str(DescriptiveScientificMetric.REPRODUCTION_ABSTENTION_RATE),
+            DescriptiveScientificMetric.REPRODUCTION_ABSTENTION_RATE,
             reproduction_abstention_rate(0, 0),
         ),
         *class_metrics,
@@ -1007,25 +1008,25 @@ def metrics_from_state(
         cv = real_report.coefficient_of_variation
         equal_weight_mean = real_report.target_f1
     return (
-        ("terminal-state", _state_encoding(state)),
+        (DescriptiveScientificMetric.TERMINAL_STATE, _state_encoding(state)),
         (ComparisonMetric.LEGITIMATE_ADMISSION, legitimate_admission_value),
         (ComparisonMetric.TARGET_F1, target_f1.value),
-        ("target-f1-gain", undefined.value),
+        (DescriptiveScientificMetric.TARGET_F1_GAIN, undefined.value),
         (ComparisonMetric.SUPPORTED_MACRO_F1_HARM, supported_macro_f1_harm_value.value),
         (ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, benign_far_increase_value.value),
         (ComparisonMetric.ATTACK_SUCCESS_RATE, asr.value),
-        ("accuracy", undefined.value),
-        ("macro-f1", undefined.value),
-        ("weighted-f1", undefined.value),
-        ("balanced-accuracy", undefined.value),
+        (DescriptiveScientificMetric.ACCURACY, undefined.value),
+        (DescriptiveScientificMetric.MACRO_F1, undefined.value),
+        (DescriptiveScientificMetric.WEIGHTED_F1, undefined.value),
+        (DescriptiveScientificMetric.BALANCED_ACCURACY, undefined.value),
         (DescriptiveScientificMetric.VERIFIER_ABSTENTION_RATE, undefined.value),
         (DescriptiveScientificMetric.REPRODUCTION_ABSTENTION_RATE, undefined.value),
         (ComparisonMetric.WORST_DOMAIN_TARGET_F1, worst_domain.value),
-        ("p10-domain-target-f1", p10_domain.value),
-        ("domain-disparity", disparity.value),
-        ("domain-iqr", iqr.value),
-        ("coefficient-of-variation", cv.value),
-        ("equal-weight-domain-mean-target-f1", equal_weight_mean.value),
+        (DescriptiveScientificMetric.P10_DOMAIN_TARGET_F1, p10_domain.value),
+        (DescriptiveScientificMetric.DOMAIN_DISPARITY, disparity.value),
+        (DescriptiveScientificMetric.DOMAIN_IQR, iqr.value),
+        (DescriptiveScientificMetric.COEFFICIENT_OF_VARIATION, cv.value),
+        (DescriptiveScientificMetric.EQUAL_WEIGHT_DOMAIN_MEAN_TARGET_F1, equal_weight_mean.value),
         (ComparisonMetric.REPRODUCTION_ATTEMPTS, undefined.value),
         (ComparisonMetric.FALSE_LAUNCH, undefined.value),
         (ComparisonMetric.POST_EVIDENCE_OVERHEAD, undefined.value),
@@ -1101,7 +1102,7 @@ def compute_screen_differential(
     control_anchor_loss = per_sample_cross_entropy(anchor_model, control_features, control_labels)
     control_source_loss = per_sample_cross_entropy(source_model, control_features, control_labels)
     config = current_application_context().scientific_config
-    screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", master_seed)
+    screen_fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, master_seed)
     fold_count = config.protocol.proposal_screen.fold_count
     fold_assignment: OrderedDict[ArtifactDigest, FoldIndex] = OrderedDict()
     target_observations: list[ScreenLossObservation] = []

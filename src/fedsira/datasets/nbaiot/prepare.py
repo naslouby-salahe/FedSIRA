@@ -51,7 +51,7 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
-from fedsira.domain.enums import DatasetId
+from fedsira.domain.enums import DatasetId, LogEvent
 from fedsira.domain.types import (
     ArtifactDigest,
     DatasetClassToken,
@@ -498,7 +498,7 @@ def materialize_nbaiot_prepared_views(
         for item in discovered:
             log_structured_event(
                 NBAIOT_PREPARATION_LOGGER,
-                "dataset.ingest",
+                LogEvent.DATASET_INGEST,
                 DatasetPreparationLogFields(
                     dataset=DatasetId.N_BAIOT,
                     domain=item.domain.name,
@@ -527,7 +527,7 @@ def materialize_nbaiot_prepared_views(
             )
             log_structured_event(
                 NBAIOT_PREPARATION_LOGGER,
-                "dataset.roles",
+                LogEvent.DATASET_ROLES,
                 DatasetPreparationLogFields(
                     dataset=DatasetId.N_BAIOT,
                     file=item.relative_path,
@@ -562,7 +562,7 @@ def materialize_nbaiot_prepared_views(
         )
         log_structured_event(
             NBAIOT_PREPARATION_LOGGER,
-            "dataset.scaler.fitted",
+            LogEvent.DATASET_SCALER_FITTED,
             DatasetPreparationLogFields(
                 dataset=DatasetId.N_BAIOT,
                 training_rows=moments.training_row_count,
@@ -616,7 +616,7 @@ def materialize_nbaiot_prepared_views(
             )
             log_structured_event(
                 NBAIOT_PREPARATION_LOGGER,
-                "dataset.view.written",
+                LogEvent.DATASET_VIEW_WRITTEN,
                 DatasetPreparationLogFields(
                     dataset=DatasetId.N_BAIOT,
                     view=view_key,

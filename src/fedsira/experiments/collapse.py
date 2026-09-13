@@ -18,6 +18,7 @@ from fedsira.domain.enums import (
     AdmissionOpeningMode,
     ArtifactDependencyKind,
     ArtifactFamily,
+    ArtifactInstanceToken,
     ArtifactProducer,
     CoreMethodIdentity,
     ExperimentLifecycleState,
@@ -25,7 +26,6 @@ from fedsira.domain.enums import (
     WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
-    ArtifactInstanceToken,
     BooleanValue,
     CollapseDecisionPassed,
     CollapseReason,
@@ -128,7 +128,7 @@ class ResolvedCore(FrozenDomainModel):
     def decision_identity(self) -> ResolvedCoreIdentity:
         return "|".join(
             (
-                "proposal-assisted" if self.proposal_assistance_survives else "candidate-free",
+                "proposal-assisted" if self.proposal_assistance_survives else "candidate-free", #TODO: use enum not hardcoded strings
                 "plurality" if self.plurality_survives else "single-reproduction",
                 (
                     "externally-verified"
@@ -654,7 +654,7 @@ RESOLVED_CORE_ARTIFACT_FAMILY = ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
 RESOLVED_CORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|resolved_core|1"
 
 
-RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = "resolved-fedsira-core"
+RESOLVED_CORE_INSTANCE: ArtifactInstanceToken = ArtifactInstanceToken.RESOLVED_CORE
 
 
 def resolved_core_artifact_slot() -> ArtifactSlot:

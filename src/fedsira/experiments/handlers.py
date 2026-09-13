@@ -52,6 +52,7 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     FailureClass,
     ScientificCellPhase,
+    SeedNamespace,
     TernaryOutcome,
     WorkspaceFileToken,
 )
@@ -494,8 +495,10 @@ class ProtocolCellDispatch:
                     )
                 except ValueError:
                     row_results = ()
-                extra.append(("parameter-similarity-committed-rows", float(len(committed_rows))))
-                extra.append(("parameter-similarity-certified-rows", float(sum(row_results))))
+                extra.append(("parameter-similarity-committed-rows", #TODO: use enum not hardcoded string
+                              float(len(committed_rows))))
+                extra.append(("parameter-similarity-certified-rows", #TODO: use enum not hardcoded string
+                              float(sum(row_results))))
         elif variant == AblationVariant.GENERIC_THREE_ROW_THRESHOLD:
             validate_three_row_coordinate_median_committee_size(
                 row_requirement(cell, self._resolved_core),
@@ -505,7 +508,8 @@ class ProtocolCellDispatch:
                 raise ValueError(
                     "Generic Three-Row Threshold requires the Krum n=3,f=1 branch to be Invalid"
                 )
-            extra.append(("krum-n3-f1-invalid", 1.0))
+            extra.append(("krum-n3-f1-invalid", #TODO: use enum not hardcoded string
+                          1.0))
         elif variant == AblationVariant.CAPABILITY_CONTRACT_GRANULARITY:
             validate_group_without_target_member_uses_supported_only(
                 evidence.reproduction_target_count > 0, evidence.reproduction_target_count
@@ -531,7 +535,7 @@ class ProtocolCellDispatch:
                     real_anchor,
                     candidate_domains,
                 )
-                balanced_selection_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+                balanced_selection_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
                 broad_certified_count = 0
                 false_same_count = 0
                 for domain, delta in committee_deltas.items():
@@ -564,13 +568,13 @@ class ProtocolCellDispatch:
                         false_same_count += 1
                 extra.append(
                     (
-                        "capability-contract-granularity-broad-certified-rows",
+                        "capability-contract-granularity-broad-certified-rows", #TODO: use enum not hardcoded string
                         float(broad_certified_count),
                     )
                 )
                 extra.append(
                     (
-                        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE,
+                        ComparisonMetric.FALSE_SAME_CAPABILITY_CERTIFICATION_RATE, #TODO: use enum not hardcoded string
                         false_same_count / broad_certified_count
                         if broad_certified_count > 0
                         else None,
@@ -655,13 +659,13 @@ class ProtocolCellDispatch:
                 )
                 extra.append(
                     (
-                        "root-cause-a-target-f1",
+                        "root-cause-a-target-f1", #TODO: use enum not hardcoded string
                         capability_summary.root_cause_a_target_f1.value,
                     )
                 )
                 extra.append(
                     (
-                        "root-cause-b-target-f1",
+                        "root-cause-b-target-f1", #TODO: use enum not hardcoded string
                         capability_summary.root_cause_b_target_f1.value,
                     )
                 )
@@ -677,7 +681,7 @@ class ProtocolCellDispatch:
                     capability_contract_config=config.capability_contract,
                 )
             extra.append(
-                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID))
+                ("proposal-oracle-label", float(oracle_label is ProposalOracleLabel.ORACLE_VALID)) #TODO: use enum not hardcoded string
             )
             empty_row_ids: frozenset[ArtifactDigest] = frozenset()
             if real_anchor is not None:
@@ -703,7 +707,7 @@ class ProtocolCellDispatch:
             failure_type_token, strength_token = cell.condition.split("|")
             failure_type = EpistemicFailureType(failure_type_token)
             strength = float(strength_token)
-            attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+            attack_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
             real_anchor = self.real_anchor(cell.master_seed)
             real_feature_names = (
                 prepared_feature_names(self._primary_adapter.prepared_root)
@@ -741,7 +745,7 @@ class ProtocolCellDispatch:
                 extra.append(
                     ("defined-domain-count", float(epistemic_summary.defined_domain_count))
                 )
-                extra.append(("target-f1-gain", epistemic_summary.target_f1_gain.value))
+                extra.append((DescriptiveScientificMetric.TARGET_F1_GAIN, epistemic_summary.target_f1_gain.value))
                 extra.append(
                     ("supported-macro-f1-drop", epistemic_summary.supported_macro_f1_drop.value)
                 )
@@ -754,7 +758,7 @@ class ProtocolCellDispatch:
                 extra.append(("diagnostic-marker-value", epistemic_summary.diagnostic_marker.value))
                 extra.append(
                     (
-                        "diagnostic-marker-insufficient",
+                        "diagnostic-marker-insufficient", #TODO: use enum not hardcoded string
                         1.0 if epistemic_summary.diagnostic_marker.value is None else 0.0,
                     )
                 )
@@ -766,7 +770,7 @@ class ProtocolCellDispatch:
                 )
             else:
                 extra.append(("defined-domain-count", 0.0))
-                extra.append(("target-f1-gain", None))
+                extra.append((DescriptiveScientificMetric.TARGET_F1_GAIN, None))
                 extra.append(("supported-macro-f1-drop", None))
                 extra.append((ComparisonMetric.BENIGN_FALSE_ALARM_RATE_INCREASE, None))
                 extra.append(("diagnostic-marker-value", None))
@@ -774,7 +778,7 @@ class ProtocolCellDispatch:
                 extra.append(("proposal-oracle-label", 0.0))
         if cell.experiment == HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME:
             regime = cell.condition
-            heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
+            heterogeneity_seed = derive_uint32(SeedNamespace.HETEROGENEITY_SEED, cell.master_seed)
             if regime == HeterogeneityRegime.QUANTITY_SKEW:
                 multiplier_by_domain = quantity_skew_multiplier_by_domain(
                     self._primary_adapter,
@@ -914,7 +918,7 @@ class ProtocolCellDispatch:
             state = candidate_screen_transition(
                 opening_mode, screen_results, config.protocol.admission_opening
             )
-        screen_fold_seed = derive_uint32("SCREEN_FOLD_SEED", cell.master_seed)
+        screen_fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, cell.master_seed)
         fold_sample_id = (
             first_target_sample_id(
                 self._primary_adapter, NBaiotDomain(screen_results[0].domain), Role.CANDIDATE_SCREEN
@@ -1793,7 +1797,7 @@ class ProtocolCellDispatch:
         config = current_application_context().scientific_config
         condition = cell.condition
         compromised_count = compromised_reproducer_count(condition)
-        attack_seed = derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed)
+        attack_seed = derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed)
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(self._primary_adapter, cell)
         carrier_rows = (
@@ -2611,7 +2615,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         )
         validate_declared_source_backdoor_poison_fraction(poison_fraction)
         return BackdoorScope(
-            attack_generation_seed=derive_uint32("ATTACK_GENERATION_SEED", cell.master_seed),
+            attack_generation_seed=derive_uint32(SeedNamespace.ATTACK_GENERATION_SEED, cell.master_seed),
             poison_fraction=poison_fraction,
             trigger_feature_indices=trigger_indices,
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
@@ -2625,7 +2629,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
             return None
-        heterogeneity_seed = derive_uint32("HETEROGENEITY_SEED", cell.master_seed)
+        heterogeneity_seed = derive_uint32(SeedNamespace.HETEROGENEITY_SEED, cell.master_seed)
         selected_feature_names = select_heterogeneity_shift_features(
             real_feature_names,
             heterogeneity_seed,

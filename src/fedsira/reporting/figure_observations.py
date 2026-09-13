@@ -11,7 +11,7 @@ from fedsira.domain.types import (
     ScenarioName,
     ScientificCellCount,
 )
-
+#TODO:  move this whole file to figures.py instead of having it separate
 
 class EvidenceStateFraction(FrozenDomainModel):
     condition: ScenarioName

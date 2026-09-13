@@ -5,18 +5,19 @@ from pathlib import Path
 
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
+    ArtifactDependencyName,
     ArtifactFamily,
     ArtifactFileToken,
+    ArtifactInstanceToken,
     ArtifactLifecycleState,
     ArtifactProducer,
     GitMetadataToken,
+    LogEvent,
     WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
     ArtifactComplete,
-    ArtifactDependencyName,
     ArtifactDigest,
-    ArtifactInstanceToken,
     ArtifactPayloadBytes,
     ArtifactReuseDecision,
     ByteCount,
@@ -342,7 +343,7 @@ def read_current_artifact(
 
 class ArtifactLogFields(FrozenDomainModel):
     artifact_family: ArtifactFamily
-    artifact_instance: ArtifactInstanceToken
+    artifact_instance: ArtifactInstanceToken | TextValue
     artifact_identity: ArtifactDigest
 
 
@@ -383,7 +384,7 @@ def publish_artifact(
                     identity=identity,
                 ).model_dump_json(),
             )
-            _log_artifact_event("artifact.reused", slot, identity)
+            _log_artifact_event(LogEvent.ARTIFACT_REUSED, slot, identity)
             return existing, True
     staged_manifest = ArtifactManifest(
         schema_version=ARTIFACT_SCHEMA_VERSION,
@@ -405,5 +406,5 @@ def publish_artifact(
         staged_manifest,
         payload,
     )
-    _log_artifact_event("artifact.published", slot, identity)
+    _log_artifact_event(LogEvent.ARTIFACT_PUBLISHED, slot, identity)
     return (published, False)

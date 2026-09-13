@@ -47,9 +47,9 @@ from fedsira.protocol.proposal import (
 from fedsira.protocol.rules import resolve_ternary_outcome
 from fedsira.runtime import current_application_context, derive_uint32, deterministic_order
 
-VERIFIER_ASSIGNMENT_SEPARATOR: SeedDerivationLabel = SeedNamespace.VERIFIER_ASSIGNMENT
-BYZANTINE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.BYZANTINE_SELECTION
-COMMITTEE_DRAW_SEPARATOR: SeedDerivationLabel = SeedNamespace.COMMITTEE_DRAW
+VERIFIER_ASSIGNMENT_SEPARATOR: SeedDerivationLabel = SeedNamespace.VERIFIER_ASSIGNMENT #TODO: convert to enum instead of hardcoded string
+BYZANTINE_SELECTION_SEPARATOR: SeedDerivationLabel = SeedNamespace.BYZANTINE_SELECTION #TODO: convert to enum instead of hardcoded string
+COMMITTEE_DRAW_SEPARATOR: SeedDerivationLabel = SeedNamespace.COMMITTEE_DRAW #TODO: convert to enum instead of hardcoded string
 
 
 def verifier_is_eligible(
@@ -153,7 +153,7 @@ def verification_pending_transition(
     return AdmissionState.REPRODUCTION_PENDING
 
 
-VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE"
+VERIFIER_ASSIGNMENT_NAMESPACE_SEPARATOR = "VERIFIER_ASSIGNMENT_NAMESPACE" #TODO: convert to enum instead of hardcoded string
 
 
 def verifier_panel(

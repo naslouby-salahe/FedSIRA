@@ -15,6 +15,7 @@ from fedsira.domain.enums import (
     DatasetId,
     ExperimentLifecycleState,
     FailureClass,
+    LogEvent,
     ScientificCellPhase,
     WorkspaceDirectoryToken,
 )
@@ -292,18 +293,19 @@ def _execute_cell_phase_with_timeout(
     timeout_seconds: TimeoutSeconds,
 ) -> CellExecutionOutcome:
     EXECUTION_LOGGER.info(
-        "cell.phase.started",
+        LogEvent.CELL_PHASE_STARTED,
         extra=CellPhaseLogFields(
             cell=cell.semantic_key, timeout_seconds=timeout_seconds
         ).model_dump(),
     )
     try:
         outcome = run_bounded(
-            "scientific_cell_phase", timeout_seconds, lambda: executor.execute_cell(cell)
+            "scientific_cell_phase", #TODO: use enum not hardcoded string
+            timeout_seconds, lambda: executor.execute_cell(cell)
         )
     except OperationTimeoutError:
         EXECUTION_LOGGER.info(
-            "cell.phase.timeout",
+            LogEvent.CELL_PHASE_TIMEOUT,
             extra=CellPhaseLogFields(
                 cell=cell.semantic_key, timeout_seconds=timeout_seconds
             ).model_dump(),
@@ -321,7 +323,7 @@ def _execute_cell_phase_with_timeout(
             ),
         )
     EXECUTION_LOGGER.info(
-        "cell.phase.completed", extra=CellPhaseLogFields(cell=cell.semantic_key).model_dump()
+        LogEvent.CELL_PHASE_COMPLETED, extra=CellPhaseLogFields(cell=cell.semantic_key).model_dump()
     )
     return outcome
 
@@ -455,7 +457,7 @@ class ExecutionRecordStore:
             return None
         if record.provenance != provenance:
             log_execution_event(
-                "cell.reuse.rejected",
+                LogEvent.CELL_REUSE_REJECTED,
                 ExecutionLogFields(experiment=experiment, cell=semantic_key),
             )
             return None

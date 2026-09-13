@@ -12,11 +12,11 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactFamilyDirectoryToken,
     ArtifactProducer,
+    ArtifactInstanceToken,
     DatasetId,
     Role,
 )
 from fedsira.domain.types import (
-    ArtifactInstanceToken,
     DatasetClassToken,
     DatasetManifestDigest,
     DomainId,
@@ -32,7 +32,7 @@ ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = (
     "fedsira|role_split_sample_manifest|1"
 )
 ROLE_SPLIT_SAMPLE_MANIFEST_DEPENDENCY = "role-split-manifest"
-ROLE_SPLIT_MANIFEST_INSTANCE: ArtifactInstanceToken = "role-split"
+ROLE_SPLIT_MANIFEST_INSTANCE: ArtifactInstanceToken = ArtifactInstanceToken.ROLE_SPLIT
 
 
 class RoleSplitViewCount(FrozenDomainModel):

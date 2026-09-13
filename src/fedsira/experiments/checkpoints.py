@@ -52,7 +52,7 @@ class CheckpointPayload(FrozenDomainModel):
     dataset: DatasetId
     family: ArtifactFamily
     master_seed: MasterSeed
-    stage_identity: TextValue
+    stage_identity: TextValue #TODO: Consider creating a dedicated type for stage identity to improve type safety and clarity.
     dataset_manifest_hash: DatasetManifestDigest
     model_input_width: ModelInputWidth
     model_output_width: ModelOutputWidth
@@ -98,7 +98,7 @@ def publish_anchor_checkpoints(
             (
                 ArtifactDependency(
                     kind=ArtifactDependencyKind.CONTENT,
-                    dependency="prepared-evidence",
+                    dependency="prepared-evidence", #TODO: use enum for dependency types
                     digest=anchor.dataset_manifest_hash,
                 ),
             ),
@@ -138,7 +138,7 @@ def publish_trained_update(
         (
             ArtifactDependency(
                 kind=ArtifactDependencyKind.CONTENT,
-                dependency="prepared-evidence",
+                dependency="prepared-evidence", #TODO: use enum for dependency types
                 digest=dataset_manifest_hash,
             ),
         ),
@@ -146,11 +146,13 @@ def publish_trained_update(
     return manifest
 
 
-def source_candidate_stage_identity(episode: TextValue, source_domain: DomainId) -> TextValue:
+def source_candidate_stage_identity(episode: TextValue #TODO: Consider creating a dedicated type for episode to improve type safety and clarity. And find all TextValue usage outside of types and fix that
+                                    , source_domain: DomainId) -> TextValue: #TODO: Consider creating or using a better type for the return of this method.
     return f"source-candidate-{episode}-{source_domain}"
 
 
-def reproduction_stage_identity(domain: DomainId, condition: TextValue) -> TextValue:
+def reproduction_stage_identity(domain: DomainId, condition: TextValue  #TODO: Consider creating a dedicated type for condition to improve type safety and clarity.
+                                ) -> TextValue: #TODO: Consider creating or using a better type for the return of this method.
     return f"reproduction-{domain}-{condition}"
 
 
@@ -177,7 +179,7 @@ def checkpoint_slot(
 
 
 def checkpoint_stage_instance(
-    master_seed: MasterSeed, stage_identity: TextValue
+    master_seed: MasterSeed, stage_identity: TextValue #TODO: Consider creating a dedicated type for stage identity to improve type safety and clarity.
 ) -> ArtifactInstanceToken:
     return f"seed-{master_seed}-{stage_identity}"
 

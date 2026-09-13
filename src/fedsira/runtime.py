@@ -157,7 +157,7 @@ def namespace_seed(master_seed: MasterSeed, namespace: SeedNamespace) -> Namespa
 
 
 def derive_uint32(
-    separator: SeedDerivationLabel,
+    separator: SeedDerivationLabel, #TODO: should be enum. Find all usage and put them in the enum
     parent: DeterministicInteger,
     *values: FramingField,
 ) -> DerivedSeed:
@@ -226,9 +226,9 @@ REFERENCE_CUBLAS_WORKSPACE_CONFIG: EnvironmentText = ":4096:8"
 
 
 class EnvironmentMismatch(FrozenDomainModel):
-    component: EnvironmentText
-    expected: EnvironmentText
-    actual: EnvironmentText
+    component: EnvironmentText #TODO: convert to enum instead of hardcoded string
+    expected: EnvironmentText #TODO: convert to enum instead of hardcoded string
+    actual: EnvironmentText #TODO: convert to enum instead of hardcoded string
     readiness_effect: EnvironmentReadinessEffect
 
 
@@ -283,7 +283,8 @@ def check_unrar_availability(
 
 
 def configure_deterministic_backend() -> None:
-    os.environ["CUBLAS_WORKSPACE_CONFIG"] = REFERENCE_CUBLAS_WORKSPACE_CONFIG
+    os.environ["CUBLAS_WORKSPACE_CONFIG" #TODO: use enum instead of hardcoded string
+               ] = REFERENCE_CUBLAS_WORKSPACE_CONFIG
     torch.use_deterministic_algorithms(True, warn_only=False)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
@@ -337,10 +338,14 @@ class StructuredJsonFormatter(logging.Formatter):
         payload = record.__dict__.copy()
         for reserved_key in self.RESERVED_ATTRIBUTES:
             payload.pop(reserved_key, None)
-        payload["timestamp"] = self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z")
-        payload["level"] = record.levelname
-        payload["component"] = record.name
-        payload["message"] = record.getMessage()
+        payload["timestamp" #TODO: convert to enum instead of hardcoded string
+                ] = self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z")
+        payload["level" #TODO: convert to enum instead of hardcoded string
+                ] = record.levelname
+        payload["component" #TODO: convert to enum instead of hardcoded string
+                ] = record.name
+        payload["message" #TODO: convert to enum instead of hardcoded string
+                ] = record.getMessage()
         return json.dumps(payload, sort_keys=True, default=str)
 
 
@@ -430,7 +435,7 @@ class OperationTimeoutError(RuntimeError):
 
 
 def run_bounded(
-    operation: RuntimeComponentName,
+    operation: RuntimeComponentName, #TODO: convert to enum instead of hardcoded string
     timeout_seconds: TimeoutSeconds,
     action: Callable[[], OperationResult],
 ) -> OperationResult:

@@ -128,7 +128,7 @@ def select_compromised_reproducers(
     return tuple(feasible_in_order[:requested_compromised_count])
 
 
-COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH"
+COMMITMENT_HASH_SEPARATOR = "COMMITMENT_HASH" #TODO: convert to enum instead of hardcoded string. It already exists. Just added there
 
 
 def commitment_digest(

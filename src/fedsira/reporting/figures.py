@@ -116,14 +116,14 @@ def render_protocol_schematic(destination: Path) -> Path:
     axis = figure.add_subplot(1, 1, 1)
     axis.axis("off")
     steps = (
-        "source commitment\n(zero direct weight)",
-        "fixed Capability\nContract",
-        "non-source\nreproduction",
-        "post-commitment\nverifier panels",
-        "five-row external\nreproduction verification",
-        "Krum",
-        "final\nfresh gate",
-        "admission /\ndormancy / rejection",
+        "source commitment\n(zero direct weight)", #TODO: add detailed description
+        "fixed Capability\nContract", #TODO: add detailed description
+        "non-source\nreproduction", #TODO: add detailed description
+        "post-commitment\nverifier panels", #TODO: add detailed description
+        "five-row external\nreproduction verification", #TODO: add detailed description
+        "Krum", #TODO: add detailed description
+        "final\nfresh gate", #TODO: add detailed description
+        "admission /\ndormancy / rejection", #TODO: add detailed description
     )
     for index, step in enumerate(steps):
         x_position = index * 1.25
@@ -222,10 +222,10 @@ def render_evidence_arrival_trajectory(
             )
             axis.step(cycles, fractions, where="post", marker="o", label=state)
         axis.set_title(schedule)
-        axis.set_xlabel("logical evidence cycle")
+        axis.set_xlabel("logical evidence cycle") #TODO: convert to enum instead of hardcoded string
         axis.set_ylim(0.0, 1.0)
     if first_axis is not None:
-        first_axis.set_ylabel("fraction of seed instances")
+        first_axis.set_ylabel("fraction of seed instances") #TODO: convert to enum instead of hardcoded string
         first_axis.legend()
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
@@ -617,11 +617,11 @@ def _series_panel(
 
 def _grouped_panel(
     axis: Axes,
-    x_labels: tuple[TextValue, ...],
-    groups: tuple[TextValue, ...],
+    x_labels: tuple[TextValue, ...], #TODO: convert to enum instead of hardcoded string
+    groups: tuple[TextValue, ...], #TODO: convert to enum instead of hardcoded string
     values: tuple[tuple[MetricValue | None, ...], ...],
-    xlabel: TextValue,
-    ylabel: TextValue,
+    xlabel: TextValue, #TODO: convert to enum instead of hardcoded string
+    ylabel: TextValue, #TODO: convert to enum instead of hardcoded string
     title: FigureName,
 ) -> None:
     if not any(value is not None for row in values for value in row):
@@ -651,7 +651,8 @@ def _grouped_panel(
 
 def _single_panel_figure(
     destination: Path,
-    panels: tuple[tuple[TextValue, AxisDraw], ...],
+    panels: tuple[tuple[TextValue #TODO: convert to enum instead of hardcoded string
+                        , AxisDraw], ...],
 ) -> Path:
     figure = Figure(figsize=(6 * len(panels), 5))
     for index, (_title, draw) in enumerate(panels, start=1):
@@ -726,16 +727,18 @@ def render_compromised_reproducer_boundary(
                 )
                 for method in _experiment_methods(outcomes, COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
             ),
-            "compromised reproducer count",
-            "attack success rate",
-            "Compromised-Reproducer Boundary — ASR",
+            "compromised reproducer count", #TODO: convert to enum instead of hardcoded string
+            "attack success rate", #TODO: convert to enum instead of hardcoded string
+            "Compromised-Reproducer Boundary — ASR", #TODO: convert to enum instead of hardcoded string
         )
 
     return _single_panel_figure(
         destination,
         (
-            ("malicious admission", draw_mar),
-            ("attack success rate", draw_asr),
+            ("malicious admission", #TODO: convert to enum instead of hardcoded string
+             draw_mar),
+            ("attack success rate", #TODO: convert to enum instead of hardcoded string
+             draw_asr),
         ),
     )
 
@@ -789,9 +792,9 @@ def render_compromised_verifier_boundary(
         _series_panel(
             axis,
             series_for(false_positive_conditions, ComparisonMetric.MALICIOUS_ADMISSION),
-            "compromised verifier count",
-            "malicious admission rate",
-            "Compromised-Verifier Boundary — false-positive mode",
+            "compromised verifier count", #TODO: convert to enum instead of hardcoded string
+            "malicious admission rate", #TODO: convert to enum instead of hardcoded string
+            "Compromised-Verifier Boundary — false-positive mode", #TODO: convert to enum instead of hardcoded string
         )
         axis.axvline(
             current_application_context().scientific_config.protocol.verification.maximum_byzantine_verifiers_per_panel,
@@ -816,8 +819,10 @@ def render_compromised_verifier_boundary(
     return _single_panel_figure(
         destination,
         (
-            ("false positive", draw_false_positive),
-            ("false negative", draw_false_negative),
+            ("false positive", #TODO: convert to enum instead of hardcoded string
+             draw_false_positive),
+            ("false negative", #TODO: convert to enum instead of hardcoded string
+             draw_false_negative),
         ),
     )
 
@@ -898,9 +903,9 @@ def render_shared_epistemic_failure(
         _series_panel(
             axis,
             clean_oracle_series(),
-            "corruption/confound strength",
-            "clean-oracle target-F1 difference",
-            "Shared Epistemic Failure — clean oracle",
+            "corruption/confound strength", #TODO: convert to enum instead of hardcoded string
+            "clean-oracle target-F1 difference", #TODO: convert to enum instead of hardcoded string
+            "Shared Epistemic Failure — clean oracle", #TODO: convert to enum instead of hardcoded string
         )
         axis.axhline(0.0)
 
@@ -908,16 +913,18 @@ def render_shared_epistemic_failure(
         _series_panel(
             axis,
             admission_series(),
-            "corruption/confound strength",
-            "admission rate under corrupted operational evidence",
-            "Shared Epistemic Failure — admission",
+            "corruption/confound strength", #TODO: convert to enum instead of hardcoded string
+            "admission rate under corrupted operational evidence", #TODO: convert to enum instead of hardcoded string
+            "Shared Epistemic Failure — admission", #TODO: convert to enum instead of hardcoded string
         )
 
     return _single_panel_figure(
         destination,
         (
-            ("clean oracle", draw_clean_oracle),
-            ("admission", draw_admission),
+            ("clean oracle", #TODO: convert to enum instead of hardcoded string
+             draw_clean_oracle),
+            ("admission", #TODO: convert to enum instead of hardcoded string
+             draw_admission),
         ),
     )
 
@@ -975,9 +982,9 @@ def render_capability_granularity_boundary(
             tuple(f"{mixture}: root cause A" for mixture in mixtures)
             + tuple(f"{mixture}: root cause B" for mixture in mixtures),
             values_for("root-cause-a-target-f1") + values_for("root-cause-b-target-f1"),
-            "Capability Contract granularity",
-            "target F1",
-            "Capability-Granularity Boundary — per-root-cause target F1",
+            "Capability Contract granularity", #TODO: convert to enum instead of hardcoded string
+            "target F1", #TODO: convert to enum instead of hardcoded string
+            "Capability-Granularity Boundary — per-root-cause target F1", #TODO: convert to enum instead of hardcoded string
         )
 
     return _single_panel_figure(

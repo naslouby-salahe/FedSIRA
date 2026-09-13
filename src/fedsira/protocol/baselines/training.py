@@ -410,8 +410,8 @@ def train_density_cluster_trimmed_mean_delta(
     )
 
 
-CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION"
-UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN: AlgorithmName = (
+CALIBRATION_TRAINING_ALGORITHM_TOKEN: AlgorithmName = "ANCHOR_ROUND_CALIBRATION" #TODO: convert to enum instead of hardcoded string
+UPDATE_RECONSTRUCTION_FILTER_TRAINING_ALGORITHM_TOKEN: AlgorithmName = ( #TODO: convert to enum instead of hardcoded string
     "UPDATE_RECONSTRUCTION_FILTER"
 )
 

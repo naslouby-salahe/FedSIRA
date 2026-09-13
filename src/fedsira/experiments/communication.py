@@ -2,7 +2,7 @@ from fedsira.domain.models import CommunicationMessageType
 from fedsira.domain.types import CommunicationMessageCount
 
 
-def efficiency_message_counts() -> (
+def efficiency_message_counts() -> ( #TODO: move this to where it's called. I don't need a separate file for this
     tuple[
         tuple[CommunicationMessageType, CommunicationMessageCount],
         ...,

@@ -19,6 +19,7 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
+    SeedNamespace,
 )
 from fedsira.domain.models import MetricResult
 from fedsira.domain.types import (
@@ -144,7 +145,7 @@ def evaluate_screen_domain(
     config = current_application_context().scientific_config
     dataset = adapter.specification.dataset
     fold_count = config.protocol.proposal_screen.fold_count
-    fold_seed = derive_uint32("SCREEN_FOLD_SEED", master_seed)
+    fold_seed = derive_uint32(SeedNamespace.SCREEN_FOLD_SEED, master_seed)
     anchor_model_identity = flat_parameters_identity(anchor.flat_parameters)
     candidate_model_identity = (
         NO_CANDIDATE_MODEL_IDENTITY
