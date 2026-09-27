@@ -151,6 +151,7 @@ class ComparisonResult(FrozenDomainModel):
     confidence_interval: tuple[ConfidenceIntervalBound, ConfidenceIntervalBound] | None
     materiality_passes: MaterialityDecision | None
     comparison_state: ComparisonState
+    paired_master_seeds: tuple[MasterSeed, ...] = ()
 
 
 class ComparisonFamilyResult(FrozenDomainModel):
@@ -168,7 +169,7 @@ class ComparisonTemplate(FrozenDomainModel):
     material_threshold: MaterialThreshold | None = None
 
 
-def _effect_size(values: tuple[PairedDifference, ...]) -> EffectSize | None:
+def paired_standardized_effect_size(values: tuple[PairedDifference, ...]) -> EffectSize | None:
     minimum_paired_sample_count = 2
     if len(values) < minimum_paired_sample_count:
         return None
@@ -231,7 +232,7 @@ def evaluate_comparison(
         complete_seed_count=count,
         mean_paired_difference=mean,
         median_paired_difference=median,
-        paired_standardized_effect=_effect_size(paired_differences),
+        paired_standardized_effect=paired_standardized_effect_size(paired_differences),
         raw_p_value=raw_p_value,
         adjusted_p_value=raw_p_value,
         confidence_interval=interval,
@@ -282,6 +283,7 @@ def _adjusted_result(
             confidence_interval=result.confidence_interval,
             materiality_passes=result.materiality_passes,
             comparison_state=result.comparison_state,
+            paired_master_seeds=result.paired_master_seeds,
         )
     materiality_passes = _materiality_passes(
         result.definition,
@@ -302,6 +304,7 @@ def _adjusted_result(
         confidence_interval=result.confidence_interval,
         materiality_passes=materiality_passes,
         comparison_state=(ComparisonState.PASSED if passes else ComparisonState.FAILED),
+        paired_master_seeds=result.paired_master_seeds,
     )
 
 

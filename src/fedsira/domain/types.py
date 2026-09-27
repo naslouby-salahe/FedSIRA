@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Literal, Self, TypeAlias
+from typing import Annotated, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from fedsira.domain.enums import (
     AblationVariant,
@@ -88,6 +88,7 @@ AttackFamilyName = TextValue
 AttackBasename = TextValue
 ReproductionRowId = TextValue
 ScientificCellSemanticKey = TextValue
+ScientificCellSemanticKeyTuple: TypeAlias = tuple[ScientificCellSemanticKey, ...]
 CellPhaseIdentity = TextValue
 TensorName = TextValue
 ReportVerificationFailure = TextValue
@@ -415,24 +416,6 @@ class TensorDomainModel(FrozenDomainModel):
         protected_namespaces=(),
         arbitrary_types_allowed=True,
     )
-
-
-class SeedBundle(FrozenDomainModel):
-    master_seeds: tuple[MasterSeed, ...]
-    analysis_seed: MasterSeed
-    smoke_seed: MasterSeed
-
-    @model_validator(mode="after")
-    def _validate_seed_authorities(self) -> Self:
-        if not self.master_seeds:
-            raise ValueError("master_seeds must not be empty")
-        if len(set(self.master_seeds)) != len(self.master_seeds):
-            raise ValueError("master_seeds must not contain duplicates")
-        return self
-
-    @property
-    def confirmatory_seed_count(self) -> SeedCount:
-        return len(self.master_seeds)
 
 
 CellHandlerName = TextValue

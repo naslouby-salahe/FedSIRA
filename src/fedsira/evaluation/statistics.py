@@ -47,6 +47,13 @@ def enumerate_sign_flip_assignments(
     return tuple(itertools.product((1, -1), repeat=sample_count))
 
 
+def mean_of_defined_values(values: tuple[MetricValue | None, ...]) -> MetricValue | None:
+    defined = tuple(value for value in values if value is not None)
+    if not defined:
+        return None
+    return sum(defined) / len(defined)
+
+
 def _signed_mean(
     signs: SignFlipAssignment,
     differences: tuple[PairedDifference, ...],

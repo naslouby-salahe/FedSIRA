@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE = ROOT / "docs/.audit/prepared-output-reuse-baseline-overwrite-20260926.json"
+OUTPUT = ROOT / "docs/.audit/prepared-output-reuse-comparison-overwrite-20260926.json"
+PREPARED = ROOT / "outputs/preprocessing/prepared"
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def main() -> None:
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    comparison: dict[str, Any] = {"datasets": {}, "passed": True}
+    for dataset, record in baseline["datasets"].items():
+        entries = []
+        for before in record["entries"]:
+            parquet = PREPARED / dataset / before["parquet"]
+            sidecar = PREPARED / dataset / before["sidecar"]
+            after = {
+                "parquet_sha256": sha256(parquet),
+                "parquet_mtime_ns": parquet.stat().st_mtime_ns,
+                "sidecar_sha256": sha256(sidecar),
+                "sidecar_mtime_ns": sidecar.stat().st_mtime_ns,
+            }
+            same_bytes = (
+                before["parquet_sha256"] == after["parquet_sha256"]
+                and before["sidecar_sha256"] == after["sidecar_sha256"]
+            )
+            same_mtimes = (
+                before["parquet_mtime_ns"] == after["parquet_mtime_ns"]
+                and before["sidecar_mtime_ns"] == after["sidecar_mtime_ns"]
+            )
+            entries.append(
+                {
+                    "parquet": before["parquet"],
+                    "byte_identical": same_bytes,
+                    "mtime_identical": same_mtimes,
+                }
+            )
+        byte_identical = sum(item["byte_identical"] for item in entries)
+        mtime_identical = sum(item["mtime_identical"] for item in entries)
+        passed = byte_identical == len(entries) and mtime_identical == len(entries)
+        comparison["datasets"][dataset] = {
+            "view_pairs": len(entries),
+            "byte_identical_pairs": byte_identical,
+            "mtime_identical_pairs": mtime_identical,
+            "changed_pairs": [
+                item for item in entries if not item["byte_identical"] or not item["mtime_identical"]
+            ],
+            "passed": passed,
+        }
+        comparison["passed"] = comparison["passed"] and passed
+    OUTPUT.write_text(json.dumps(comparison, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(comparison, indent=2))
+    if not comparison["passed"]:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

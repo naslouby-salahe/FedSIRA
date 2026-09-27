@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -14,12 +15,14 @@ from fedsira.domain.enums import (
     ArtifactFamilyDirectoryToken,
     DatasetId,
 )
+from fedsira.runtime import bound_application_context, current_application_context
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    monkeypatch.setattr("fedsira.datasets.preprocess.REPOSITORY_ROOT", tmp_path)
-    return tmp_path
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
+    context = current_application_context().model_copy(update={"repository_root": tmp_path})
+    with bound_application_context(context):
+        yield tmp_path
 
 
 def test_raw_dataset_identity_is_published_per_dataset(isolated_repository: Path) -> None:

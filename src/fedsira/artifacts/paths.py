@@ -24,15 +24,29 @@ from fedsira.domain.types import (
 from fedsira.runtime import current_application_context, framed_bytes
 
 
+def current_repository_root() -> Path:
+    return current_application_context().repository_root
+
+
 def execution_workspace_root() -> Path:
-    return Path(
-        current_application_context().scientific_config.execution.repository_layout.execution_workspace
+    context = current_application_context()
+    configured_root = Path(
+        context.scientific_config.execution.repository_layout.execution_workspace
+    )
+    return (
+        configured_root
+        if configured_root.is_absolute()
+        else context.repository_root / configured_root
     )
 
 
 def manuscript_results_root() -> Path:
-    return Path(
-        current_application_context().scientific_config.execution.repository_layout.manuscript_results
+    context = current_application_context()
+    configured_root = Path(context.scientific_config.execution.repository_layout.manuscript_results)
+    return (
+        configured_root
+        if configured_root.is_absolute()
+        else context.repository_root / configured_root
     )
 
 
@@ -181,6 +195,10 @@ def preprocessing_log_path() -> Path:
     return (
         preprocessing_root() / WorkspaceDirectoryToken.LOGS / WorkspaceFileToken.PREPROCESSING_LOG
     )
+
+
+def reporting_log_path() -> Path:
+    return preprocessing_root() / WorkspaceDirectoryToken.LOGS / WorkspaceFileToken.REPORT_LOG
 
 
 def smoke_record_path() -> Path:

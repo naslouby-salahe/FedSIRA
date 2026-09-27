@@ -1,0 +1,1285 @@
+from __future__ import annotations
+
+import ast
+import csv
+import json
+import re
+from collections import defaultdict, deque
+from itertools import combinations
+from io import StringIO
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GRAPH_PATH = ROOT / "graphify-out" / "graph.json"
+OUT = Path(__file__).resolve().parent
+COMMAND_METHODS = {
+    "doctor": "doctor",
+    "preprocess": "preprocess",
+    "plan": "plan",
+    "smoke": "smoke",
+    "run_experiment": "run",
+    "status": "status",
+    "report": "report",
+}
+
+
+def production_callables() -> tuple[dict[str, dict[str, object]], list[dict[str, object]]]:
+    graph = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
+    nodes = {
+        node["id"]: node
+        for node in graph["nodes"]
+        if str(node.get("source_file", "")).startswith("src/fedsira/")
+        and node.get("_callable")
+        and str(node.get("label", "")).endswith("()")
+    }
+    return graph, nodes
+
+
+def ast_inventory() -> tuple[int, int, int]:
+    function_count = 0
+    method_count = 0
+    class_count = 0
+    for path in sorted((ROOT / "src" / "fedsira").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        class_body_functions = {
+            id(member)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ClassDef)
+            for member in node.body
+            if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef)
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                class_count += 1
+            elif isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+                if id(node) in class_body_functions:
+                    method_count += 1
+                else:
+                    function_count += 1
+    return function_count, method_count, class_count
+
+
+def source_verified_self_call_edges(
+    nodes: dict[str, dict[str, object]],
+) -> set[tuple[str, str]]:
+    """Resolve direct self/cls method calls that Graphify leaves implicit."""
+    ids_by_source_line = {
+        (str(node.get("source_file")), str(node.get("source_location"))): node_id
+        for node_id, node in nodes.items()
+    }
+    edges: set[tuple[str, str]] = set()
+
+    class Visitor(ast.NodeVisitor):
+        def __init__(
+            self,
+            source: str,
+            method_lines: dict[tuple[tuple[str, ...], str], int],
+            base_names: dict[tuple[str, ...], tuple[str, ...]],
+            class_paths_by_name: dict[str, tuple[tuple[str, ...], ...]],
+        ) -> None:
+            self.source = source
+            self.method_lines = method_lines
+            self.base_names = base_names
+            self.class_paths_by_name = class_paths_by_name
+            self.class_stack: list[str] = []
+            self.function_stack: list[str] = []
+            self.function_lines: list[int] = []
+
+        def resolve_method_line(
+            self,
+            class_path: tuple[str, ...],
+            method_name: str,
+            visited: frozenset[tuple[str, ...]] = frozenset(),
+        ) -> int | None:
+            direct = self.method_lines.get((class_path, method_name))
+            if direct is not None:
+                return direct
+            if class_path in visited:
+                return None
+            next_visited = visited | {class_path}
+            for base_name in self.base_names.get(class_path, ()):
+                base_paths = self.class_paths_by_name.get(base_name, ())
+                if len(base_paths) != 1:
+                    continue
+                inherited = self.resolve_method_line(
+                    base_paths[0], method_name, next_visited
+                )
+                if inherited is not None:
+                    return inherited
+            return None
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            self.class_stack.append(node.name)
+            self.generic_visit(node)
+            self.class_stack.pop()
+
+        def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            self.function_stack.append(node.name)
+            self.function_lines.append(node.lineno)
+            self.generic_visit(node)
+            self.function_stack.pop()
+            self.function_lines.pop()
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self.visit_FunctionDef(node)
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if (
+                self.class_stack
+                and self.function_stack
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in {"self", "cls"}
+            ):
+                caller = ids_by_source_line.get(
+                    (self.source, f"L{self.function_lines[-1]}")
+                )
+                callee_line = self.resolve_method_line(
+                    tuple(self.class_stack), node.func.attr
+                )
+                callee = (
+                    ids_by_source_line.get((self.source, f"L{callee_line}"))
+                    if callee_line is not None
+                    else None
+                )
+                if caller is not None and callee is not None:
+                    edges.add((caller, callee))
+            self.generic_visit(node)
+
+    for path in sorted((ROOT / "src" / "fedsira").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        method_lines: dict[tuple[tuple[str, ...], str], int] = {}
+        base_names: dict[tuple[str, ...], tuple[str, ...]] = {}
+        class_paths_by_name_lists: defaultdict[str, list[tuple[str, ...]]] = defaultdict(list)
+
+        def collect_methods(
+            body: list[ast.stmt], parents: tuple[str, ...] = ()
+        ) -> None:
+            for statement in body:
+                if not isinstance(statement, ast.ClassDef):
+                    continue
+                class_path = (*parents, statement.name)
+                class_paths_by_name_lists[statement.name].append(class_path)
+                base_names[class_path] = tuple(
+                    base.id if isinstance(base, ast.Name) else base.attr
+                    for base in statement.bases
+                    if isinstance(base, ast.Name | ast.Attribute)
+                )
+                for member in statement.body:
+                    if isinstance(member, ast.FunctionDef | ast.AsyncFunctionDef):
+                        method_lines[(class_path, member.name)] = member.lineno
+                collect_methods(statement.body, class_path)
+
+        collect_methods(tree.body)
+        class_paths_by_name = {
+            name: tuple(paths) for name, paths in class_paths_by_name_lists.items()
+        }
+        Visitor(
+            path.relative_to(ROOT).as_posix(),
+            method_lines,
+            base_names,
+            class_paths_by_name,
+        ).visit(tree)
+    return edges
+
+
+def source_verified_inherited_outcome_edges(
+    nodes: dict[str, dict[str, object]],
+) -> set[tuple[str, str]]:
+    """Resolve outcome calls through ProtocolCellExecutor's declared MRO."""
+    handlers_path = ROOT / "src" / "fedsira" / "experiments" / "handlers.py"
+    outcomes_path = ROOT / "src" / "fedsira" / "protocol" / "baselines" / "outcomes.py"
+    handlers_tree = ast.parse(handlers_path.read_text(encoding="utf-8"))
+    outcomes_tree = ast.parse(outcomes_path.read_text(encoding="utf-8"))
+    handler_classes = {
+        item.name: item
+        for item in handlers_tree.body
+        if isinstance(item, ast.ClassDef)
+    }
+    executor = handler_classes["ProtocolCellExecutor"]
+    dispatch = handler_classes["ProtocolCellDispatch"]
+    executor_bases = tuple(
+        base.id for base in executor.bases if isinstance(base, ast.Name)
+    )
+    if executor_bases.index("ProtocolBaselineOutcomes") > executor_bases.index(
+        "ProtocolCellDispatch"
+    ):
+        raise RuntimeError("baseline outcome mixin no longer precedes dispatch in executor MRO")
+    outcomes = next(
+        item
+        for item in outcomes_tree.body
+        if isinstance(item, ast.ClassDef) and item.name == "ProtocolBaselineOutcomes"
+    )
+
+    def concrete_methods(class_node: ast.ClassDef) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
+        return {
+            item.name: item
+            for item in class_node.body
+            if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+            and not (
+                len(item.body) == 1
+                and isinstance(item.body[0], ast.Expr)
+                and isinstance(item.body[0].value, ast.Constant)
+                and item.body[0].value.value is Ellipsis
+            )
+        }
+
+    executor_methods = concrete_methods(executor)
+    dispatch_methods = concrete_methods(dispatch)
+    outcome_methods = concrete_methods(outcomes)
+    outcome_methods = {
+        name: method
+        for name, method in outcome_methods.items()
+        if name not in executor_methods
+    }
+    by_source_line = {
+        (str(node.get("source_file")), str(node.get("source_location"))): node_id
+        for node_id, node in nodes.items()
+    }
+    edges: set[tuple[str, str]] = set()
+    for caller_method in dispatch_methods.values():
+        caller_id = by_source_line.get(
+            ("src/fedsira/experiments/handlers.py", f"L{caller_method.lineno}")
+        )
+        if caller_id is None:
+            continue
+        called_outcomes = {
+            item.func.attr
+            for item in ast.walk(caller_method)
+            if isinstance(item, ast.Call)
+            and isinstance(item.func, ast.Attribute)
+            and isinstance(item.func.value, ast.Name)
+            and item.func.value.id in {"self", "cls"}
+            and item.func.attr in outcome_methods
+        }
+        for method_name in called_outcomes:
+            callee_method = outcome_methods[method_name]
+            callee_id = by_source_line.get(
+                (
+                    "src/fedsira/protocol/baselines/outcomes.py",
+                    f"L{callee_method.lineno}",
+                )
+            )
+            if callee_id is not None and callee_id != caller_id:
+                edges.add((caller_id, callee_id))
+        # ProtocolCellExecutor's concrete implementation wins over the
+        # ProtocolCellDispatch interface method through its actual MRO.
+        for item in ast.walk(caller_method):
+            if (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Attribute)
+                and isinstance(item.func.value, ast.Name)
+                and item.func.value.id in {"self", "cls"}
+                and item.func.attr in executor_methods
+            ):
+                callee_method = executor_methods[item.func.attr]
+                callee_id = by_source_line.get(
+                    ("src/fedsira/experiments/handlers.py", f"L{callee_method.lineno}")
+                )
+                if caller_id is not None and callee_id is not None and callee_id != caller_id:
+                    edges.add((caller_id, callee_id))
+    # Calls made inside the outcome mixin receive the concrete executor
+    # override at runtime because ProtocolBaselineOutcomes is in its MRO.
+    for caller_method in outcome_methods.values():
+        caller_id = by_source_line.get(
+            ("src/fedsira/protocol/baselines/outcomes.py", f"L{caller_method.lineno}")
+        )
+        for item in ast.walk(caller_method):
+            if (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Attribute)
+                and isinstance(item.func.value, ast.Name)
+                and item.func.value.id in {"self", "cls"}
+                and item.func.attr in executor_methods
+            ):
+                callee_method = executor_methods[item.func.attr]
+                callee_id = by_source_line.get(
+                    ("src/fedsira/experiments/handlers.py", f"L{callee_method.lineno}")
+                )
+                if caller_id is not None and callee_id is not None and callee_id != caller_id:
+                    edges.add((caller_id, callee_id))
+    return edges
+
+
+def source_verified_pydantic_validator_edges(
+    nodes: dict[str, dict[str, object]],
+) -> set[tuple[str, str]]:
+    """Resolve Pydantic callbacks invoked during schema loading/model construction."""
+    config_source = "src/fedsira/config.py"
+    by_source_line = {
+        (str(node.get("source_file")), str(node.get("source_location"))): node_id
+        for node_id, node in nodes.items()
+    }
+    loader_id = next(
+        (
+            node_id
+            for node_id, node in nodes.items()
+            if node.get("source_file") == config_source
+            and node.get("label") == "load_scientific_config()"
+        ),
+        None,
+    )
+    if loader_id is None:
+        raise RuntimeError("Graphify did not resolve load_scientific_config")
+    edges: set[tuple[str, str]] = set()
+    source_root = ROOT / "src" / "fedsira"
+    for path in sorted(source_root.rglob("*.py")):
+        source = path.relative_to(ROOT).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        validator_methods: dict[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]] = {}
+        for class_node in (item for item in tree.body if isinstance(item, ast.ClassDef)):
+            methods = tuple(
+                method
+                for method in class_node.body
+                if isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef)
+                and any(
+                    isinstance(decorator, ast.Call)
+                    and isinstance(decorator.func, ast.Name)
+                    and decorator.func.id in {"model_validator", "field_validator"}
+                    for decorator in method.decorator_list
+                )
+            )
+            if methods:
+                validator_methods[class_node.name] = methods
+                if source == config_source:
+                    for method in methods:
+                        validator_id = by_source_line.get((source, f"L{method.lineno}"))
+                        if validator_id is not None:
+                            edges.add((loader_id, validator_id))
+        if source == config_source:
+            definitions = {
+                item.name: item
+                for item in tree.body
+                if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+            }
+            for item in ast.walk(tree):
+                if (
+                    isinstance(item, ast.Call)
+                    and isinstance(item.func, ast.Name)
+                    and item.func.id == "AfterValidator"
+                    and item.args
+                    and isinstance(item.args[0], ast.Name)
+                ):
+                    callback = definitions.get(item.args[0].id)
+                    if callback is not None:
+                        callback_id = by_source_line.get((source, f"L{callback.lineno}"))
+                        if callback_id is not None:
+                            edges.add((loader_id, callback_id))
+
+        class ConstructionVisitor(ast.NodeVisitor):
+            def __init__(self) -> None:
+                self.function_lines: list[int] = []
+
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                self.function_lines.append(node.lineno)
+                self.generic_visit(node)
+                self.function_lines.pop()
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                self.visit_FunctionDef(node)
+
+            def visit_Call(self, node: ast.Call) -> None:
+                if self.function_lines and isinstance(node.func, ast.Name):
+                    caller_id = by_source_line.get((source, f"L{self.function_lines[-1]}"))
+                    validator_class = validator_methods.get(node.func.id, ())
+                    if caller_id is not None:
+                        for method in validator_class:
+                            validator_id = by_source_line.get((source, f"L{method.lineno}"))
+                            if validator_id is not None and validator_id != caller_id:
+                                edges.add((caller_id, validator_id))
+                self.generic_visit(node)
+
+        ConstructionVisitor().visit(tree)
+    return edges
+
+
+def source_verified_typed_attribute_dispatch_edges(
+    nodes: dict[str, dict[str, object]],
+) -> set[tuple[str, str, str]]:
+    """Resolve typed method and descriptor dispatch omitted by Graphify."""
+    source_root = ROOT / "src" / "fedsira"
+    class_definitions: dict[str, list[tuple[str, ast.ClassDef]]] = defaultdict(list)
+    trees: dict[str, ast.Module] = {}
+    for path in sorted(source_root.rglob("*.py")):
+        source = path.relative_to(ROOT).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        trees[source] = tree
+        for item in ast.walk(tree):
+            if isinstance(item, ast.ClassDef):
+                class_definitions[item.name].append((source, item))
+    properties: dict[tuple[str, str], str] = {}
+    methods: dict[tuple[str, str], str] = {}
+    classes_by_source_name: dict[tuple[str, str], ast.ClassDef] = {}
+    for source, tree in trees.items():
+        for item in ast.walk(tree):
+            if not isinstance(item, ast.ClassDef):
+                continue
+            classes_by_source_name[(source, item.name)] = item
+            for method in item.body:
+                if not isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef):
+                    continue
+                method_id = next(
+                    (
+                        candidate_id
+                        for candidate_id, candidate in nodes.items()
+                        if candidate.get("source_file") == source
+                        and candidate.get("source_location") == f"L{method.lineno}"
+                    ),
+                    None,
+                )
+                if method_id is not None:
+                    methods[(item.name, method.name)] = method_id
+                if any(
+                    isinstance(decorator, ast.Name) and decorator.id == "property"
+                    for decorator in method.decorator_list
+                ):
+                    node_id = next(
+                        (
+                            candidate_id
+                            for candidate_id, candidate in nodes.items()
+                            if candidate.get("source_file") == source
+                            and candidate.get("source_location") == f"L{method.lineno}"
+                        ),
+                        None,
+                    )
+                    if node_id is not None:
+                        properties[(item.name, method.name)] = node_id
+    by_source_line = {
+        (str(node.get("source_file")), str(node.get("source_location"))): node_id
+        for node_id, node in nodes.items()
+    }
+
+    def annotation_name(annotation: ast.expr | None) -> str | None:
+        if isinstance(annotation, ast.Name):
+            return annotation.id
+        if isinstance(annotation, ast.Attribute):
+            return annotation.attr
+        if isinstance(annotation, ast.Subscript):
+            return annotation_name(annotation.slice)
+        if isinstance(annotation, ast.Tuple):
+            return next(
+                (name for item in annotation.elts if (name := annotation_name(item))),
+                None,
+            )
+        return None
+
+    field_types: dict[tuple[str, str], str] = {}
+    module_function_returns: dict[str, list[str]] = defaultdict(list)
+    method_returns: dict[tuple[str, str], str] = {}
+    for tree in trees.values():
+        for class_node in (item for item in tree.body if isinstance(item, ast.ClassDef)):
+            for field in class_node.body:
+                if isinstance(field, ast.AnnAssign) and isinstance(field.target, ast.Name):
+                    field_type = annotation_name(field.annotation)
+                    if field_type is not None:
+                        field_types[(class_node.name, field.target.id)] = field_type
+                elif isinstance(field, ast.FunctionDef | ast.AsyncFunctionDef):
+                    return_type = annotation_name(field.returns)
+                    if return_type is not None:
+                        method_returns[(class_node.name, field.name)] = return_type
+            for method in class_node.body:
+                if isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef):
+                    return_type = annotation_name(method.returns)
+                    if return_type is not None:
+                        method_returns[(class_node.name, method.name)] = return_type
+        for function in (
+            item
+            for item in tree.body
+            if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+        ):
+            return_type = annotation_name(function.returns)
+            if return_type is not None:
+                module_function_returns[function.name].append(return_type)
+
+    def infer_expression_type(
+        expression: ast.expr,
+        local_types: dict[str, str | None],
+        class_name: str | None,
+    ) -> str | None:
+        if isinstance(expression, ast.Name):
+            if expression.id in {"self", "cls"}:
+                return class_name
+            if expression.id in local_types:
+                return local_types[expression.id]
+            if len(class_definitions.get(expression.id, ())) == 1:
+                return expression.id
+            return None
+        if isinstance(expression, ast.Attribute):
+            parent_type = infer_expression_type(expression.value, local_types, class_name)
+            return field_types.get((parent_type or "", expression.attr))
+        if isinstance(expression, ast.Call):
+            if isinstance(expression.func, ast.Name):
+                if len(class_definitions.get(expression.func.id, ())) == 1:
+                    return expression.func.id
+                possible_returns = module_function_returns.get(expression.func.id, ())
+                if possible_returns and len(set(possible_returns)) == 1:
+                    return possible_returns[0]
+            elif isinstance(expression.func, ast.Attribute):
+                parent_type = infer_expression_type(
+                    expression.func.value, local_types, class_name
+                )
+                return method_returns.get((parent_type or "", expression.func.attr))
+        return None
+
+    edges: set[tuple[str, str, str]] = set()
+    handler_tree = trees.get("src/fedsira/experiments/handlers.py")
+    executor_class = (
+        next(
+            (
+                item
+                for item in handler_tree.body
+                if isinstance(item, ast.ClassDef) and item.name == "ProtocolCellExecutor"
+            ),
+            None,
+        )
+        if handler_tree is not None
+        else None
+    )
+    dispatch_class = (
+        next(
+            (
+                item
+                for item in handler_tree.body
+                if isinstance(item, ast.ClassDef) and item.name == "ProtocolCellDispatch"
+            ),
+            None,
+        )
+        if handler_tree is not None
+        else None
+    )
+    dispatch_receiver_types: dict[str, str] = {}
+    if executor_class is not None and dispatch_class is not None:
+        executor_bases = {
+            base.id for base in executor_class.bases if isinstance(base, ast.Name)
+        }
+        if "ProtocolCellDispatch" in executor_bases:
+            executor_initializer = next(
+                (
+                    item
+                    for item in executor_class.body
+                    if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+                    and item.name == "__init__"
+                ),
+                None,
+            )
+            if executor_initializer is not None:
+                for item in ast.walk(executor_initializer):
+                    if (
+                        isinstance(item, ast.Assign)
+                        and isinstance(item.value, ast.Call)
+                        and isinstance(item.value.func, ast.Name)
+                    ):
+                        for target in item.targets:
+                            if (
+                                isinstance(target, ast.Attribute)
+                                and isinstance(target.value, ast.Name)
+                                and target.value.id == "self"
+                            ):
+                                dispatch_receiver_types[target.attr] = item.value.func.id
+    for source, tree in trees.items():
+        for class_node in (item for item in tree.body if isinstance(item, ast.ClassDef)):
+            class_method_nodes = {
+                method.name: method
+                for method in class_node.body
+                if isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef)
+            }
+            instance_attribute_types: dict[str, str] = {}
+            initializer = class_method_nodes.get("__init__")
+            if initializer is not None:
+                for item in ast.walk(initializer):
+                    if (
+                        isinstance(item, ast.Assign)
+                        and isinstance(item.value, ast.Call)
+                        and isinstance(item.value.func, ast.Name)
+                    ):
+                        for target in item.targets:
+                            if (
+                                isinstance(target, ast.Attribute)
+                                and isinstance(target.value, ast.Name)
+                                and target.value.id == "self"
+                            ):
+                                inferred_type = infer_expression_type(
+                                    item.value, {}, class_node.name
+                                )
+                                if inferred_type is not None:
+                                    instance_attribute_types[target.attr] = inferred_type
+                    elif (
+                        isinstance(item, ast.AnnAssign)
+                        and isinstance(item.target, ast.Attribute)
+                        and isinstance(item.target.value, ast.Name)
+                        and item.target.value.id == "self"
+                    ):
+                        inferred_type = annotation_name(item.annotation)
+                        if inferred_type is not None:
+                            instance_attribute_types[item.target.attr] = inferred_type
+            if class_node.name == "ProtocolCellDispatch":
+                instance_attribute_types.update(dispatch_receiver_types)
+            for attribute, type_name in instance_attribute_types.items():
+                field_types[(class_node.name, attribute)] = type_name
+            for method in class_method_nodes.values():
+                caller_id = by_source_line.get((source, f"L{method.lineno}"))
+                if caller_id is None:
+                    continue
+                local_types = {
+                    argument.arg: annotation_name(argument.annotation)
+                    for argument in (*method.args.posonlyargs, *method.args.args, *method.args.kwonlyargs)
+                    if argument.arg not in {"self", "cls"}
+                    and annotation_name(argument.annotation) is not None
+                }
+                local_types.update(instance_attribute_types)
+                called_attributes = {
+                    id(call.func)
+                    for call in ast.walk(method)
+                    if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+                }
+                for item in ast.walk(method):
+                    if (
+                        isinstance(item, ast.AnnAssign)
+                        and isinstance(item.target, ast.Name)
+                    ):
+                        name = annotation_name(item.annotation)
+                        if name is not None:
+                            local_types[item.target.id] = name
+                    elif (
+                        isinstance(item, ast.Assign)
+                        and item.targets
+                    ):
+                        for target in item.targets:
+                            if isinstance(target, ast.Name):
+                                inferred_type = infer_expression_type(
+                                    item.value, local_types, class_node.name
+                                )
+                                if inferred_type is not None:
+                                    local_types[target.id] = inferred_type
+                for item in ast.walk(method):
+                    if not isinstance(item, ast.Attribute) or isinstance(item.ctx, ast.Store):
+                        continue
+                    receiver_type = infer_expression_type(
+                        item.value, local_types, class_node.name
+                    )
+                    if id(item) in called_attributes:
+                        method_target = methods.get((receiver_type or "", item.attr))
+                        if (
+                            method_target is not None
+                            and len(class_definitions.get(receiver_type or "", ())) == 1
+                            and method_target != caller_id
+                        ):
+                            edges.add(
+                                (caller_id, method_target, "typed Python instance method dispatch")
+                            )
+                    target_id = properties.get((receiver_type or "", item.attr))
+                    if target_id is None or target_id == caller_id:
+                        continue
+                    if len(class_definitions.get(receiver_type or "", ())) != 1:
+                        continue
+                    edges.add((caller_id, target_id, "typed Python property descriptor access"))
+        for function in (
+            item
+            for item in tree.body
+            if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef)
+        ):
+            caller_id = by_source_line.get((source, f"L{function.lineno}"))
+            if caller_id is None:
+                continue
+            local_types = {
+                argument.arg: annotation_name(argument.annotation)
+                for argument in (
+                    *function.args.posonlyargs,
+                    *function.args.args,
+                    *function.args.kwonlyargs,
+                )
+                if annotation_name(argument.annotation) is not None
+            }
+            for item in ast.walk(function):
+                if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                    name = annotation_name(item.annotation)
+                    if name is not None:
+                        local_types[item.target.id] = name
+                elif (
+                    isinstance(item, ast.Assign)
+                    and item.targets
+                ):
+                    for target in item.targets:
+                        if isinstance(target, ast.Name):
+                            inferred_type = infer_expression_type(item.value, local_types, None)
+                            if inferred_type is not None:
+                                local_types[target.id] = inferred_type
+                elif isinstance(item, ast.comprehension) and isinstance(item.target, ast.Name):
+                    if isinstance(item.iter, ast.Name) and item.iter.id in local_types:
+                        local_types[item.target.id] = local_types[item.iter.id]
+                elif isinstance(item, (ast.For, ast.AsyncFor)) and isinstance(
+                    item.target, ast.Name
+                ):
+                    if isinstance(item.iter, ast.Name) and item.iter.id in local_types:
+                        local_types[item.target.id] = local_types[item.iter.id]
+            called_attributes = {
+                id(call.func)
+                for call in ast.walk(function)
+                if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+            }
+            for item in ast.walk(function):
+                if not isinstance(item, ast.Attribute) or isinstance(item.ctx, ast.Store):
+                    continue
+                receiver_type = infer_expression_type(item.value, local_types, None)
+                if len(class_definitions.get(receiver_type or "", ())) != 1:
+                    continue
+                if id(item) in called_attributes:
+                    method_target = methods.get((receiver_type or "", item.attr))
+                    if method_target is not None and method_target != caller_id:
+                        edges.add(
+                            (caller_id, method_target, "typed Python instance method dispatch")
+                        )
+                property_target = properties.get((receiver_type or "", item.attr))
+                if property_target is not None and property_target != caller_id:
+                    edges.add(
+                        (caller_id, property_target, "typed Python property descriptor access")
+                    )
+    return edges
+
+
+def source_verified_constructor_dispatch_edges(
+    nodes: dict[str, dict[str, object]],
+) -> set[tuple[str, str, str]]:
+    """Resolve explicit class construction to Python's implicit __init__ call."""
+    source_root = ROOT / "src" / "fedsira"
+    initializers: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    trees: dict[str, ast.Module] = {}
+    for path in sorted(source_root.rglob("*.py")):
+        source = path.relative_to(ROOT).as_posix()
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        trees[source] = tree
+        for class_node in (item for item in tree.body if isinstance(item, ast.ClassDef)):
+            initializer = next(
+                (
+                    method
+                    for method in class_node.body
+                    if isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef)
+                    and method.name == "__init__"
+                ),
+                None,
+            )
+            if initializer is not None:
+                initializers[class_node.name].append((source, initializer.lineno))
+    by_source_line = {
+        (str(node.get("source_file")), str(node.get("source_location"))): node_id
+        for node_id, node in nodes.items()
+    }
+    edges: set[tuple[str, str, str]] = set()
+
+    class Visitor(ast.NodeVisitor):
+        def __init__(self, source: str) -> None:
+            self.source = source
+            self.function_lines: list[int] = []
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self.function_lines.append(node.lineno)
+            self.generic_visit(node)
+            self.function_lines.pop()
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self.visit_FunctionDef(node)
+
+        def visit_Call(self, node: ast.Call) -> None:
+            if self.function_lines and isinstance(node.func, ast.Name):
+                candidates = initializers.get(node.func.id, ())
+                caller = by_source_line.get(
+                    (self.source, f"L{self.function_lines[-1]}")
+                )
+                if len(candidates) == 1 and caller is not None:
+                    callee = by_source_line.get(
+                        (candidates[0][0], f"L{candidates[0][1]}")
+                    )
+                    if callee is not None and callee != caller:
+                        edges.add((caller, callee, "implicit Python constructor dispatch"))
+            self.generic_visit(node)
+
+    for source, tree in trees.items():
+        Visitor(source).visit(tree)
+    return edges
+
+
+def acyclic_call_depth(root: str, adjacency: dict[str, set[str]]) -> int:
+    depths: dict[str, int] = {}
+    active: set[str] = set()
+
+    def depth(node_id: str) -> int:
+        if node_id in depths:
+            return depths[node_id]
+        if node_id in active:
+            return 0
+        active.add(node_id)
+        result = max(
+            (1 + depth(target) for target in adjacency.get(node_id, ())),
+            default=0,
+        )
+        active.remove(node_id)
+        depths[node_id] = result
+        return result
+
+    return depth(root)
+
+
+def main() -> None:
+    graph, nodes = production_callables()
+    by_source_label = {
+        (str(node.get("source_file")), str(node.get("label"))): node_id
+        for node_id, node in nodes.items()
+    }
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    for link in graph["links"]:
+        if (
+            link.get("relation") in ("calls", "indirect_call")
+            and link.get("source") in nodes
+            and link.get("target") in nodes
+        ):
+            adjacency[link["source"]].add(link["target"])
+    static_adjacency = {node_id: set(callees) for node_id, callees in adjacency.items()}
+    verified_method_edges = source_verified_self_call_edges(nodes)
+    verified_method_edges.update(source_verified_inherited_outcome_edges(nodes))
+    missing_verified_method_edges = {
+        (caller, callee)
+        for caller, callee in verified_method_edges
+        if callee not in adjacency.get(caller, set())
+    }
+    for caller, callee in missing_verified_method_edges:
+        adjacency[caller].add(callee)
+    pydantic_validator_edges = source_verified_pydantic_validator_edges(nodes)
+    missing_pydantic_validator_edges = {
+        (caller, callee)
+        for caller, callee in pydantic_validator_edges
+        if callee not in adjacency.get(caller, set())
+    }
+    for caller, callee in missing_pydantic_validator_edges:
+        adjacency[caller].add(callee)
+    property_dispatch_edges = source_verified_typed_attribute_dispatch_edges(nodes)
+    missing_property_dispatch_edges = {
+        (caller, callee, basis)
+        for caller, callee, basis in property_dispatch_edges
+        if callee not in adjacency.get(caller, set())
+    }
+    for caller, callee, _basis in missing_property_dispatch_edges:
+        adjacency[caller].add(callee)
+    constructor_dispatch_edges = source_verified_constructor_dispatch_edges(nodes)
+    missing_constructor_dispatch_edges = {
+        (caller, callee, basis)
+        for caller, callee, basis in constructor_dispatch_edges
+        if callee not in adjacency.get(caller, set())
+    }
+    for caller, callee, _basis in missing_constructor_dispatch_edges:
+        adjacency[caller].add(callee)
+
+    cli_ids = {
+        str(node.get("label", "")).removesuffix("()"): node_id
+        for node_id, node in nodes.items()
+        if node.get("source_file") == "src/fedsira/cli.py"
+    }
+    handler_registrations = re.findall(
+        r'handler\s*=\s*"(_execute_[A-Za-z0-9_]+)"',
+        (ROOT / "src" / "fedsira" / "experiments" / "handlers.py").read_text(encoding="utf-8"),
+    )
+    dynamic_handlers = tuple(sorted(set(handler_registrations)))
+    dispatch_id = by_source_label.get(
+        ("src/fedsira/experiments/handlers.py", "._execute_cell_protocol()")
+    )
+    execution_id = by_source_label.get(
+        ("src/fedsira/experiments/execution.py", "execute_experiment()")
+    )
+    executor_cell_id = by_source_label.get(
+        ("src/fedsira/experiments/handlers.py", ".execute_cell()")
+    )
+    if execution_id is not None and executor_cell_id is not None:
+        # `execute_experiment` accepts the CellExecutor protocol; production
+        # `_execute_bound` supplies ProtocolCellExecutor explicitly.
+        adjacency[execution_id].add(executor_cell_id)
+    if dispatch_id is not None:
+        for handler in dynamic_handlers:
+            handler_id = by_source_label.get(
+                ("src/fedsira/experiments/handlers.py", f".{handler}()")
+            )
+            if handler_id is not None:
+                adjacency[dispatch_id].add(handler_id)
+
+    rows: list[tuple[str, int, int, int, int, int]] = []
+    union: set[str] = set()
+    reachable_by_command: dict[str, set[str]] = {}
+    for cli_name, application_method in COMMAND_METHODS.items():
+        root_id = cli_ids.get(cli_name)
+        application_id = by_source_label.get(
+            ("src/fedsira/application.py", f".{application_method}()")
+        )
+        if root_id is None or application_id is None:
+            raise RuntimeError(f"could not resolve CLI/application pair for {cli_name}")
+        adjacency[root_id].add(application_id)
+        distances = {root_id: 0}
+        pending = deque((root_id,))
+        while pending:
+            current = pending.popleft()
+            for target in adjacency.get(current, ()):
+                if target not in distances:
+                    distances[target] = distances[current] + 1
+                    pending.append(target)
+        reached = set(distances)
+        reachable_by_command[cli_name] = reached
+        shared = len(reached & union)
+        union.update(reached)
+        leaves = sum(not (adjacency.get(node_id, set()) & reached) for node_id in reached)
+        rows.append(
+            (
+                cli_name,
+                len(adjacency[root_id]),
+                len(reached),
+                shared,
+                leaves,
+                acyclic_call_depth(root_id, adjacency),
+            )
+        )
+
+    run_root = cli_ids["run_experiment"]
+    dispatcher_handlers = {
+        node_id
+        for (source, label), node_id in by_source_label.items()
+        if source == "src/fedsira/experiments/handlers.py"
+        and label.removeprefix(".").removesuffix("()") in dynamic_handlers
+    }
+    handler_source = (ROOT / "src" / "fedsira" / "experiments" / "handlers.py").read_text(
+        encoding="utf-8"
+    )
+    registrations = re.findall(
+        r"CellHandlerRegistration\(\s*experiment=(\w+),.*?handler=\"(_execute_[A-Za-z0-9_]+)\"\s*,?\s*\)",
+        handler_source,
+        re.DOTALL,
+    )
+    experiment_rows: list[tuple[str, int, int, int]] = []
+    experiment_paths: dict[str, set[str]] = {}
+    experiment_prefixes: dict[str, set[str]] = {}
+    for experiment, handler in registrations:
+        handler_id = by_source_label.get(("src/fedsira/experiments/handlers.py", f".{handler}()"))
+        if handler_id is None or dispatch_id is None:
+            continue
+        shared_prefix_graph = {
+            node_id: set(callees) for node_id, callees in adjacency.items()
+        }
+        shared_prefix_graph[dispatch_id] = set()
+        prefix_distances = {run_root: 0}
+        pending = deque((run_root,))
+        while pending:
+            current = pending.popleft()
+            for target in shared_prefix_graph.get(current, ()):
+                if target not in prefix_distances:
+                    prefix_distances[target] = prefix_distances[current] + 1
+                    pending.append(target)
+        prefix = set(prefix_distances) | {dispatch_id}
+        experiment_prefixes[experiment] = prefix
+        handler_distances = {handler_id: 0}
+        pending = deque((handler_id,))
+        while pending:
+            current = pending.popleft()
+            targets = adjacency.get(current, set())
+            if current == dispatch_id:
+                targets = targets - dispatcher_handlers
+            for target in targets:
+                if target not in handler_distances:
+                    handler_distances[target] = handler_distances[current] + 1
+                    pending.append(target)
+        handler_reached = set(handler_distances)
+        reached = prefix | handler_reached
+        experiment_paths[experiment] = reached
+        leaves = sum(not (adjacency.get(node_id, set()) & reached) for node_id in reached)
+        experiment_rows.append(
+            (
+                experiment,
+                len(reached),
+                leaves,
+                acyclic_call_depth(run_root, shared_prefix_graph)
+                + acyclic_call_depth(handler_id, adjacency)
+                + 1,
+            )
+        )
+
+    graph_functions = sum(not str(node["label"]).startswith(".") for node in nodes.values())
+    graph_methods = len(nodes) - graph_functions
+    run_reached = reachable_by_command["run_experiment"]
+    registered_handler_ids = {
+        by_source_label.get(("src/fedsira/experiments/handlers.py", f".{handler}()"))
+        for handler in dynamic_handlers
+    }
+    reachable_handler_count = len(registered_handler_ids.intersection(run_reached))
+    dispatcher_reachable = dispatch_id in run_reached
+    static_union: set[str] = set()
+    for cli_name in COMMAND_METHODS:
+        root_id = cli_ids[cli_name]
+        pending = deque((root_id,))
+        reached_static = {root_id}
+        while pending:
+            current = pending.popleft()
+            for target in static_adjacency.get(current, ()):
+                if target not in reached_static:
+                    reached_static.add(target)
+                    pending.append(target)
+        static_union.update(reached_static)
+    framework_reachable = len(union - static_union)
+    terminal_union = sum(not (adjacency.get(node_id, set()) & union) for node_id in union)
+    unreachable = set(nodes) - union
+    unreachable_functions = sum(
+        not str(nodes[node_id]["label"]).startswith(".") for node_id in unreachable
+    )
+    unreachable_methods = len(unreachable) - unreachable_functions
+    ast_functions, ast_methods, class_count = ast_inventory()
+    graph_node_count = len(graph["nodes"])
+    graph_edge_count = len(graph["links"])
+    community_count = len({node.get("community") for node in graph["nodes"]})
+    indirect_edge_count = sum(link.get("relation") == "indirect_call" for link in graph["links"])
+    report = [
+        "# Fresh Graphify callable inventory — final pass",
+        "",
+        f"- Graphify nodes: {graph_node_count}; edges: {graph_edge_count}; "
+        f"communities: {community_count}.",
+        f"- Production callables: {len(nodes)} ({graph_functions} functions, "
+        f"{graph_methods} class methods by Graphify labels).",
+        f"- Independent AST inventory: {ast_functions} functions, "
+        f"{ast_methods} direct class methods, {class_count} classes.",
+        f"- Public CLI entry points: {len(cli_ids)}; {len(handler_registrations)} "
+        f"experiment registrations map to {len(dynamic_handlers)} distinct handlers.",
+        f"- Dynamic-dispatch check: dispatcher reachable from `run`: {dispatcher_reachable}; "
+        f"registered handlers reachable after registry-edge injection: "
+        f"{reachable_handler_count}/{len(dynamic_handlers)}.",
+        f"- Source-verified lexical and inherited-mixin method edges absent from Graphify: {len(missing_verified_method_edges)}; ledger: `source-verified-method-call-edges.csv`.",
+        f"- Pydantic validator callbacks dispatched during config loading but omitted by Graphify: {len(missing_pydantic_validator_edges)}.",
+        f"- Typed method/property dispatch edges omitted by Graphify: {len(missing_property_dispatch_edges)}; framework edge classes are in `source-verified-framework-dispatch-edges.csv`.",
+        f"- Implicit constructor dispatch edges omitted by Graphify: {len(missing_constructor_dispatch_edges)}; framework edge classes are in `source-verified-framework-dispatch-edges.csv`.",
+        "- Graphify omits Typer-to-`FedSIRAApplication` instance-method edges. "
+        "The analyzer injects the verified CLI/application pairs and registry-resolved "
+        "protocol handlers under `_execute_cell_protocol()`.",
+        "- Reachability follows Graphify `calls` and `indirect_call` edges. "
+        "Unreachable callables require review; they are not presumed dead code.",
+        "",
+        "## Per-command reachability",
+        "",
+        "| CLI | Direct callees | Unique transitive callables | Shared | Terminal leaves | "
+        "Maximum acyclic call depth |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    report.extend(
+        f"| `{name}` | {direct} | {count} | {shared} | {leaves} | {depth} |"
+        for name, direct, count, shared, leaves, depth in rows
+    )
+    report.extend(
+        (
+            "",
+            "## Prospective experiment workflow counts",
+            "",
+            "Each count retains the shared `run` planning/execution path and narrows dynamic "
+            "handler dispatch to the registered handler. The handlers were analyzed "
+            "prospectively; no experiment was executed.",
+            "",
+            "| Experiment registration | Unique transitive callables | Terminal leaves | "
+            "Maximum acyclic call depth |",
+            "|---|---:|---:|---:|",
+        )
+    )
+    report.extend(
+        f"| `{experiment}` | {count} | {leaves} | {depth} |"
+        for experiment, count, leaves, depth in experiment_rows
+    )
+    overlap_rows = []
+    ordered_experiments = tuple(sorted(experiment_paths))
+    for first, second in combinations(ordered_experiments, 2):
+        first_path = experiment_paths[first]
+        second_path = experiment_paths[second]
+        shared_path = first_path & second_path
+        shared_prefix = experiment_prefixes[first] & experiment_prefixes[second]
+        union_path = first_path | second_path
+        overlap_rows.append(
+            (
+                first,
+                second,
+                len(first_path),
+                len(second_path),
+                len(shared_path),
+                len(shared_prefix),
+                len(shared_path - shared_prefix),
+                len(union_path),
+                len(shared_path) / len(union_path) if union_path else 1.0,
+            )
+        )
+    overlap_csv = StringIO()
+    overlap_writer = csv.writer(overlap_csv, lineterminator="\n")
+    overlap_writer.writerow(
+        (
+            "experiment_a",
+            "experiment_b",
+            "callables_a",
+            "callables_b",
+            "pairwise_shared_callables",
+            "shared_prefix_callables",
+            "shared_handler_tail_callables",
+            "union_callables",
+            "jaccard_overlap",
+        )
+    )
+    overlap_writer.writerows(overlap_rows)
+    (OUT / "experiment-path-overlaps.csv").write_text(overlap_csv.getvalue(), encoding="utf-8")
+    method_edge_csv = StringIO()
+    method_edge_writer = csv.writer(method_edge_csv, lineterminator="\n")
+    method_edge_writer.writerow(("caller_graph_id", "callee_graph_id"))
+    method_edge_writer.writerows(sorted(missing_verified_method_edges))
+    (OUT / "source-verified-method-call-edges.csv").write_text(
+        method_edge_csv.getvalue(), encoding="utf-8"
+    )
+    framework_edge_csv = StringIO()
+    framework_edge_writer = csv.writer(framework_edge_csv, lineterminator="\n")
+    framework_edge_writer.writerow(("caller_graph_id", "callee_graph_id", "dispatch_basis"))
+    framework_edge_writer.writerows(
+        sorted(
+            (
+                caller,
+                callee,
+                "Pydantic model/field validator metadata",
+            )
+            for caller, callee in missing_pydantic_validator_edges
+        )
+        + sorted(missing_property_dispatch_edges)
+        + sorted(missing_constructor_dispatch_edges)
+    )
+    (OUT / "source-verified-framework-dispatch-edges.csv").write_text(
+        framework_edge_csv.getvalue(), encoding="utf-8"
+    )
+    maximum_overlap = max(overlap_rows, key=lambda row: row[4], default=None)
+    subsystem_for_node = {
+        node_id: (
+            ".".join(
+                part.removesuffix(".py")
+                for part in str(nodes[node_id].get("source_file", ""))
+                .removeprefix("src/fedsira/")
+                .split("/")[:-1]
+            )
+            or "fedsira-core"
+        )
+        for path in experiment_paths.values()
+        for node_id in path
+    }
+    subsystems = tuple(sorted(set(subsystem_for_node.values())))
+    subsystem_rows = []
+    for experiment in ordered_experiments:
+        path = experiment_paths[experiment]
+        counts = {subsystem: 0 for subsystem in subsystems}
+        for node_id in path:
+            counts[subsystem_for_node[node_id]] += 1
+        subsystem_rows.append((experiment, len(path), counts))
+    subsystem_csv = StringIO()
+    subsystem_writer = csv.writer(subsystem_csv, lineterminator="\n")
+    subsystem_writer.writerow(("experiment", "workflow_callables", *subsystems))
+    subsystem_writer.writerows(
+        (experiment, total, *(counts[subsystem] for subsystem in subsystems))
+        for experiment, total, counts in subsystem_rows
+    )
+    (OUT / "experiment-subsystem-reachability.csv").write_text(
+        subsystem_csv.getvalue(), encoding="utf-8"
+    )
+
+    def scientific_subsystem(node_id: str) -> str:
+        source = str(nodes[node_id].get("source_file", ""))
+        relative = source.removeprefix("src/fedsira/")
+        if relative.startswith("datasets/"):
+            return "data/roles"
+        if relative.startswith("learning/"):
+            return "learning"
+        if relative.startswith("artifacts/"):
+            return "artifact management"
+        if relative.startswith("reporting/"):
+            return "reporting"
+        if relative == "protocol/proposal.py":
+            return "proposal/opening"
+        if relative == "protocol/reproduction.py" or relative == "experiments/reproduction_progression.py":
+            return "reproduction"
+        if relative == "protocol/verification.py":
+            return "verification"
+        if relative == "protocol/synthesis.py":
+            return "synthesis"
+        if relative == "protocol/attacks.py" or relative.startswith("protocol/baselines/"):
+            return "attacks/baselines"
+        if relative == "evaluation/metrics.py":
+            return "metrics"
+        if relative == "evaluation/statistics.py":
+            return "statistics"
+        if relative.startswith("protocol/"):
+            return "protocol state/contracts"
+        if relative.startswith("evaluation/"):
+            return "evaluation support"
+        if relative.startswith("experiments/"):
+            return "execution/workflow"
+        return "shared runtime/application"
+
+    scientific_counts: dict[str, dict[str, int]] = {}
+    for experiment in ordered_experiments:
+        counts: defaultdict[str, int] = defaultdict(int)
+        for node_id in experiment_paths[experiment]:
+            counts[scientific_subsystem(node_id)] += 1
+        scientific_counts[experiment] = dict(counts)
+    scientific_subsystems = tuple(
+        sorted({subsystem for counts in scientific_counts.values() for subsystem in counts})
+    )
+    scientific_csv = StringIO()
+    scientific_writer = csv.writer(scientific_csv, lineterminator="\n")
+    scientific_writer.writerow(("experiment", *scientific_subsystems))
+    for experiment in ordered_experiments:
+        counts = scientific_counts[experiment]
+        scientific_writer.writerow(
+            (experiment, *(counts.get(subsystem, 0) for subsystem in scientific_subsystems))
+        )
+    (OUT / "experiment-scientific-subsystems.csv").write_text(
+        scientific_csv.getvalue(), encoding="utf-8"
+    )
+    report.extend(
+        (
+            "",
+            "## Union",
+            "",
+            f"- Reachable production callables across all CLI commands: {len(union)}.",
+            f"- Static graph callables outside the CLI union: {len(nodes) - len(union)}.",
+            f"- Outside-union functions: {unreachable_functions}; methods: {unreachable_methods}.",
+            f"- Current `indirect_call` edges: {indirect_edge_count}.",
+            "- Additional callables reachable through verified framework/dynamic edges: "
+            f"{framework_reachable}.",
+            f"- Unique terminal leaves across the CLI union: {terminal_union}.",
+            f"- Prospective experiment paths analyzed: {len(experiment_rows)}.",
+            f"- Pairwise experiment-path overlaps: {len(overlap_rows)}; complete counts and shared-prefix/tail splits are in `experiment-path-overlaps.csv`.",
+            f"- Experiment-by-subsystem reachability: {len(subsystem_rows)} registrations × {len(subsystems)} source subsystems; callable counts are in `experiment-subsystem-reachability.csv`.",
+            f"- Scientific subsystem trace: {len(ordered_experiments)} registrations × {len(scientific_subsystems)} reviewed source categories; counts are in `experiment-scientific-subsystems.csv`.",
+            (
+                f"- Largest pairwise shared path: {maximum_overlap[0]} × {maximum_overlap[1]} "
+                f"({maximum_overlap[4]} callables; {maximum_overlap[5]} shared prefix)."
+                if maximum_overlap is not None
+                else "- No pairwise experiment paths were available."
+            ),
+            "- The unresolved set was checked against decorators, Pydantic model/enum "
+            "declarations, public registry accessors, and framework dispatch before "
+            "dead-code disposition.",
+            "",
+        )
+    )
+    (OUT / "callable-inventory.md").write_text("\n".join(report), encoding="utf-8")
+    unreachable_inventory = [
+        "# Production callables outside the prospective CLI union",
+        "",
+        f"Count: {len(unreachable)} ({unreachable_functions} functions, "
+        f"{unreachable_methods} class methods). Static absence is not proof of dead code.",
+        "",
+        "| Source | Callable | Graphify id |",
+        "|---|---|---|",
+    ]
+    unreachable_inventory.extend(
+        f"| `{nodes[node_id].get('source_file', '')}` | "
+        f"`{nodes[node_id].get('label', '')}` | `{node_id}` |"
+        for node_id in sorted(
+            unreachable,
+            key=lambda item: (str(nodes[item].get("source_file")), str(nodes[item].get("label"))),
+        )
+    )
+    (OUT / "unreachable-callables.md").write_text(
+        "\n".join(unreachable_inventory) + "\n", encoding="utf-8"
+    )
+
+
+if __name__ == "__main__":
+    main()

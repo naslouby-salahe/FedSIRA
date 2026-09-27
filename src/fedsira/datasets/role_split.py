@@ -1,9 +1,18 @@
-from fedsira.artifacts.paths import artifact_slot_directory, artifact_staging_root
+import hashlib
+
+from fedsira.artifacts.paths import (
+    artifact_slot_directory,
+    artifact_staging_root,
+    current_repository_root,
+)
 from fedsira.artifacts.store import (
+    ArtifactConfigurationComponent,
+    ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactManifest,
     ArtifactReuseDecision,
     ArtifactSlot,
+    configuration_scope_dependency,
     publish_artifact,
 )
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain
@@ -17,6 +26,7 @@ from fedsira.domain.enums import (
     Role,
 )
 from fedsira.domain.types import (
+    ArtifactDigest,
     DatasetClassToken,
     DatasetManifestDigest,
     DomainId,
@@ -25,12 +35,60 @@ from fedsira.domain.types import (
     RowCount,
     SchemaVersion,
 )
-from fedsira.runtime import REPOSITORY_ROOT, current_application_context
+from fedsira.runtime import current_application_context, framed_bytes
 
 ROLE_SPLIT_SAMPLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|role_split_sample_manifest|1"
 ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY: ProcedureIdentity = (
     "fedsira|role_split_sample_manifest|1"
 )
+
+
+def dataset_preprocessing_configuration(dataset: DatasetId) -> ArtifactConfigurationScope:
+    datasets = current_application_context().scientific_config.datasets
+    if dataset is DatasetId.N_BAIOT:
+        return ArtifactConfigurationScope(
+            scope="dataset-preprocessing",
+            components=(
+                ArtifactConfigurationComponent(
+                    name=ArtifactDependencyLabel.DATASET_PREPROCESSING,
+                    configuration=datasets.primary.model_dump_json(by_alias=True),
+                ),
+            ),
+        )
+    return ArtifactConfigurationScope(
+        scope="dataset-preprocessing",
+        components=(
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.PRIMARY_ROLE_INTERVALS,
+                configuration=datasets.primary.role_intervals.model_dump_json(by_alias=True),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.PRIMARY_SAMPLING_CAPS,
+                configuration=datasets.primary.sampling_caps_per_domain.model_dump_json(
+                    by_alias=True
+                ),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.SECONDARY_DATASET,
+                configuration=datasets.secondary.model_dump_json(by_alias=True),
+            ),
+        ),
+    )
+
+
+def prepared_view_cache_identity(
+    dataset: DatasetId,
+    dataset_manifest_hash: DatasetManifestDigest,
+) -> ArtifactDigest:
+    configuration = dataset_preprocessing_configuration(dataset)
+    return hashlib.sha256(
+        framed_bytes(
+            "fedsira|prepared_view_cache|2",
+            dataset,
+            dataset_manifest_hash,
+            configuration.model_dump_json(),
+        )
+    ).hexdigest()
 
 
 class RoleSplitViewCount(FrozenDomainModel):
@@ -98,8 +156,14 @@ def publish_role_split_sample_manifest(
                 dependency=ArtifactDependencyLabel.DATASET_MANIFEST,
                 digest=dataset_manifest_hash,
             ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope=f"preprocessing:{dataset}",
+                    components=dataset_preprocessing_configuration(dataset).components,
+                )
+            ),
         ),
         procedure_identity=ROLE_SPLIT_SAMPLE_MANIFEST_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )

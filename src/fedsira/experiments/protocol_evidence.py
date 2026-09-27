@@ -6,10 +6,13 @@ from fedsira.artifacts.paths import (
     artifact_staging_root,
 )
 from fedsira.artifacts.store import (
+    ArtifactConfigurationComponent,
+    ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactManifest,
     ArtifactReuseDecision,
     ArtifactSlot,
+    configuration_scope_dependency,
     publish_artifact,
 )
 from fedsira.datasets.common import RealAnchor, flat_parameters_identity
@@ -40,7 +43,7 @@ from fedsira.domain.types import (
     SchemaVersion,
     ScientificCellCount,
 )
-from fedsira.runtime import REPOSITORY_ROOT, current_application_context
+from fedsira.runtime import current_application_context
 
 PROTOCOL_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|protocol_evidence|1"
 
@@ -140,8 +143,9 @@ def _publish(
         payload=payload.model_dump_json().encode("utf-8"),
         dependencies=dependencies,
         procedure_identity=procedure_identity,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_application_context().repository_root
+        / artifact_slot_directory(slot),
+        staging_root=current_application_context().repository_root / artifact_staging_root(),
     )
 
 
@@ -159,6 +163,17 @@ def publish_verifier_assignment_report(
                 kind=ArtifactDependencyKind.CONTENT,
                 dependency=ArtifactDependencyLabel.COMMITMENT_IDENTITY,
                 digest=payload.commitment_identity,
+            ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope="verification",
+                    components=(
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.EVIDENCE_VERIFICATION,
+                            configuration=current_application_context().scientific_config.protocol.verification.model_dump_json(),
+                        ),
+                    ),
+                )
             ),
         ),
         VERIFIER_ASSIGNMENT_PROCEDURE_IDENTITY,
@@ -180,6 +195,17 @@ def publish_reproduction_certificate(
                 dependency=ArtifactDependencyLabel.CERTIFIED_ROW_REPORTS,
                 digest=payload.commitment_identity,
             ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope="verification",
+                    components=(
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.EVIDENCE_VERIFICATION,
+                            configuration=current_application_context().scientific_config.protocol.verification.model_dump_json(),
+                        ),
+                    ),
+                )
+            ),
         ),
         REPRODUCTION_CERTIFICATE_PROCEDURE_IDENTITY,
     )
@@ -200,6 +226,17 @@ def publish_krum_synthesized_update(
                 dependency=ArtifactDependencyLabel.CERTIFIED_REPRODUCTION_ROWS,
                 digest=payload.selected_update_identity,
             ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope="synthesis",
+                    components=(
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.EVIDENCE_SYNTHESIS,
+                            configuration=current_application_context().scientific_config.protocol.synthesis.model_dump_json(),
+                        ),
+                    ),
+                )
+            ),
         ),
         KRUM_SYNTHESIS_PROCEDURE_IDENTITY,
     )
@@ -208,6 +245,7 @@ def publish_krum_synthesized_update(
 def publish_final_gate_decision(
     payload: FinalGateDecisionPayload,
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
+    config = current_application_context().scientific_config
     return _publish(
         ArtifactFamily.FINAL_GATE_DECISION,
         payload.production_model_identity,
@@ -219,6 +257,21 @@ def publish_final_gate_decision(
                 kind=ArtifactDependencyKind.CONTENT,
                 dependency=ArtifactDependencyLabel.PRODUCTION_MODEL,
                 digest=payload.production_model_identity,
+            ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope="final-gate",
+                    components=(
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.CAPABILITY_CONTRACT,
+                            configuration=config.capability_contract.model_dump_json(),
+                        ),
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.FINAL_GATE_CONFIGURATION,
+                            configuration=config.protocol.final_gate.model_dump_json(),
+                        ),
+                    ),
+                ),
             ),
         ),
         FINAL_GATE_PROCEDURE_IDENTITY,
@@ -239,6 +292,17 @@ def publish_baseline_calibration(
                 kind=ArtifactDependencyKind.CONTENT,
                 dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                 digest=payload.dataset_manifest_hash,
+            ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope=f"baseline-calibration:{payload.baseline}",
+                    components=(
+                        ArtifactConfigurationComponent(
+                            name=ArtifactDependencyLabel.BASELINE_CALIBRATION,
+                            configuration=current_application_context().scientific_config.baselines.model_dump_json(),
+                        ),
+                    ),
+                )
             ),
         ),
         BASELINE_CALIBRATION_PROCEDURE_IDENTITY,

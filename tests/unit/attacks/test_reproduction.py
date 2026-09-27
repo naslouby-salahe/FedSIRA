@@ -5,7 +5,6 @@ from fedsira.learning.model import FedSIRAClassifier, flatten_trainable_paramete
 from fedsira.learning.training import build_loss_function, build_optimizer
 from fedsira.protocol.attacks import (
     scale_model_replacement_delta,
-    select_model_replacement_carrier_rows,
     source_copy_update,
     verifier_aware_training_step,
 )
@@ -22,17 +21,6 @@ def test_source_copy_update_is_source_minus_baseline() -> None:
     source = torch.tensor([1.0, 2.0, 3.0])
     baseline = torch.tensor([0.5, 0.5, 0.5])
     assert torch.allclose(source_copy_update(source, baseline), torch.tensor([0.5, 1.5, 2.5]))
-
-
-def test_select_model_replacement_carrier_rows_uses_configured_10_percent() -> None:
-    rows = [f"row-{i}" for i in range(30)]
-    selected = select_model_replacement_carrier_rows(
-        rows,
-        CONFIG.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
-        42,
-    )
-    assert selected is not None
-    assert len(selected) == 3
 
 
 def test_scale_model_replacement_delta_uses_configured_scale() -> None:

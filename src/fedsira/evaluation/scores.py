@@ -1,4 +1,7 @@
 import hashlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 
 from fedsira.artifacts.paths import (
     artifact_instance_token,
@@ -32,12 +35,33 @@ from fedsira.domain.types import (
     SchemaVersion,
     ScoringTransformName,
 )
-from fedsira.runtime import REPOSITORY_ROOT, framed_bytes, numerical_runtime_identity
+from fedsira.runtime import current_application_context, framed_bytes, numerical_runtime_identity
 
 MODEL_SCORE_SCHEMA_VERSION: SchemaVersion = "fedsira|model_score|1"
 MODEL_SCORE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|model_score|1"
 MODEL_SCORE_VIEW_DEPENDENCY = ArtifactFamilyDirectoryToken.PREPARED_ROLE_VIEW
 DEFAULT_SCORING_TRANSFORM: ScoringTransformName = "argmax-logits"
+
+_ACTIVE_MODEL_SCORE_ARTIFACTS: ContextVar[list[ArtifactDigest] | None] = ContextVar(
+    "active_model_score_artifacts",
+    default=None,
+)
+
+
+@contextmanager
+def capture_model_score_artifacts() -> Iterator[list[ArtifactDigest]]:
+    identities: list[ArtifactDigest] = []
+    token: Token[list[ArtifactDigest] | None] = _ACTIVE_MODEL_SCORE_ARTIFACTS.set(identities)
+    try:
+        yield identities
+    finally:
+        _ACTIVE_MODEL_SCORE_ARTIFACTS.reset(token)
+
+
+def _record_model_score_artifact(identity: ArtifactDigest) -> None:
+    active = _ACTIVE_MODEL_SCORE_ARTIFACTS.get()
+    if active is not None:
+        active.append(identity)
 
 
 class DomainClassScore(FrozenDomainModel):
@@ -117,7 +141,7 @@ def publish_model_score(
         shards=shards,
     )
     slot = model_score_slot(model_identity, view_digest)
-    return publish_artifact(
+    manifest, reused = publish_artifact(
         slot=slot,
         producer=ArtifactProducer.SCORING_PRODUCER,
         payload=payload.model_dump_json().encode("utf-8"),
@@ -149,6 +173,9 @@ def publish_model_score(
             ),
         ),
         procedure_identity=MODEL_SCORE_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_application_context().repository_root
+        / artifact_slot_directory(slot),
+        staging_root=current_application_context().repository_root / artifact_staging_root(),
     )
+    _record_model_score_artifact(manifest.identity)
+    return manifest, reused

@@ -2,8 +2,9 @@ import pytest
 import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
-from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER, NBaiotDomain
+from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
 from fedsira.domain.enums import AdmissionState
+from fedsira.domain.types import DomainId
 from fedsira.protocol.reproduction import (
     ReproductionAttempt,
     compute_reproduction_commitment_hash,
@@ -59,22 +60,37 @@ def test_consumed_domain_retained_even_if_certification_later_fails() -> None:
 
 
 def test_next_reproducer_domain_skips_consumed_and_inadequate_domains() -> None:
-    order = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
+    order: tuple[DomainId, ...] = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
     consumed = frozenset({DOMAIN_A})
     adequate = frozenset({DOMAIN_B, DOMAIN_C})
     assert next_reproducer_domain(order, consumed, adequate) == DOMAIN_B
 
 
 def test_next_reproducer_domain_never_reorders_by_adequacy() -> None:
-    order = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
-    consumed: frozenset[NBaiotDomain] = frozenset()
+    order: tuple[DomainId, ...] = (DOMAIN_A, DOMAIN_B, DOMAIN_C)
+    consumed: frozenset[DomainId] = frozenset()
     adequate = frozenset({DOMAIN_C})
     assert next_reproducer_domain(order, consumed, adequate) == DOMAIN_C
 
 
 def test_next_reproducer_domain_returns_none_when_exhausted() -> None:
-    order = (DOMAIN_A,)
+    order: tuple[DomainId, ...] = (DOMAIN_A,)
     assert next_reproducer_domain(order, frozenset({DOMAIN_A}), frozenset({DOMAIN_A})) is None
+
+
+def test_primary_reproduction_capacity_consumes_each_of_eight_non_source_domains_once() -> None:
+    source_domain: DomainId = NBAIOT_DOMAIN_ORDER[0]
+    adequate_domains = frozenset(NBAIOT_DOMAIN_ORDER[1:])
+    consumed: frozenset[DomainId] = frozenset()
+    selected: list[DomainId] = []
+
+    while domain := next_reproducer_domain(NBAIOT_DOMAIN_ORDER, consumed, adequate_domains):
+        selected.append(domain)
+        consumed = frozenset((*consumed, domain))
+
+    assert len(selected) == 8
+    assert len(set(selected)) == 8
+    assert source_domain not in selected
 
 
 def test_handle_inadequate_domain_does_not_consume() -> None:

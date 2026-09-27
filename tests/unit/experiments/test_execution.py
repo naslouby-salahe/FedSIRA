@@ -1,11 +1,14 @@
 from pathlib import Path
+from typing import cast
 
 import pydantic
 import pytest
 
 from fedsira.domain.enums import (
+    DatasetId,
     ExperimentLifecycleState,
     ExperimentName,
+    FailureClass,
     ScientificCellPhase,
     SourceExclusionMethod,
 )
@@ -15,12 +18,17 @@ from fedsira.domain.models import (
 from fedsira.domain.types import ConditionName, MasterSeed, MethodName
 from fedsira.experiments.definitions import experiment_registry
 from fedsira.experiments.engine import (
+    EXECUTION_RECORD_SCHEMA_VERSION,
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
+    CellExecutor,
+    ExecutionLogFields,
     ExecutionProvenance,
     ExecutionRecordStore,
     PersistedExecutionRecord,
+    derive_current_experiment_lifecycle,
     derive_experiment_lifecycle,
+    execute_cell_with_retry,
 )
 from fedsira.experiments.execution import (
     ExperimentPrerequisiteState,
@@ -33,6 +41,7 @@ from fedsira.experiments.execution import (
 from fedsira.experiments.planning import (
     build_plan,
 )
+from fedsira.runtime import FailureDetail
 
 
 def _cell(
@@ -59,10 +68,10 @@ def _completed_outcome(cell: ScientificCell) -> CellExecutionOutcome:
 
 
 def _override_workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def path_factory(_value: str) -> Path:
+    def workspace_factory() -> Path:
         return tmp_path
 
-    monkeypatch.setattr("fedsira.experiments.execution.Path", path_factory)
+    monkeypatch.setattr("fedsira.experiments.execution.execution_workspace_root", workspace_factory)
 
 
 def test_terminal_experiment_states_are_exact() -> None:
@@ -90,6 +99,107 @@ def test_derive_experiment_lifecycle_empty_post_core_experiment_is_blocked() -> 
     assert derive_experiment_lifecycle(planned, ()) is ExperimentLifecycleState.BLOCKED
 
 
+def test_data_validation_status_requires_current_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = build_plan(resolved_core_complete=False)
+    planned = plan.experiment(ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION)
+    cell = planned.cells[0]
+    stale_record = PersistedExecutionRecord(
+        schema_version="fedsira|execution_record|2",
+        semantic_key=cell.semantic_key,
+        experiment=cell.experiment,
+        method=cell.method,
+        condition=cell.condition,
+        master_seed=cell.master_seed,
+        terminal_state=ExperimentLifecycleState.COMPLETED,
+        metrics=(("terminal-state", 1.0),),
+        failure=None,
+        provenance=None,
+    )
+    current_provenance = _provenance()
+
+    def current_provenance_for_dataset(_dataset: DatasetId) -> ExecutionProvenance:
+        return current_provenance
+
+    monkeypatch.setattr(
+        "fedsira.experiments.engine.current_execution_provenance",
+        current_provenance_for_dataset,
+    )
+    assert (
+        derive_current_experiment_lifecycle(
+            planned, (stale_record,), ExperimentLifecycleState.READY
+        )
+        is ExperimentLifecycleState.READY
+    )
+    assert (
+        derive_current_experiment_lifecycle(
+            planned, (stale_record,), ExperimentLifecycleState.COMPLETED
+        )
+        is ExperimentLifecycleState.READY
+    )
+    current_record = stale_record.model_copy(
+        update={
+            "schema_version": EXECUTION_RECORD_SCHEMA_VERSION,
+            "provenance": current_provenance,
+        }
+    )
+    assert (
+        derive_current_experiment_lifecycle(
+            planned, (current_record,), ExperimentLifecycleState.COMPLETED
+        )
+        is ExperimentLifecycleState.COMPLETED
+    )
+
+
+def test_other_experiment_status_also_requires_current_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = build_plan(resolved_core_complete=False)
+    planned = plan.experiment(ExperimentName.PROTOCOL_INVARIANT_VALIDATION)
+    cell = planned.cells[0]
+    current_provenance = _provenance()
+    stale_record = PersistedExecutionRecord(
+        schema_version="fedsira|execution_record|2",
+        semantic_key=cell.semantic_key,
+        experiment=cell.experiment,
+        method=cell.method,
+        condition=cell.condition,
+        master_seed=cell.master_seed,
+        terminal_state=ExperimentLifecycleState.COMPLETED,
+        metrics=(("terminal-state", 1.0),),
+        failure=None,
+        provenance=None,
+    )
+
+    def current_provenance_for_dataset(_dataset: DatasetId) -> ExecutionProvenance:
+        return current_provenance
+
+    monkeypatch.setattr(
+        "fedsira.experiments.engine.current_execution_provenance",
+        current_provenance_for_dataset,
+    )
+
+    assert (
+        derive_current_experiment_lifecycle(
+            planned, (stale_record,), ExperimentLifecycleState.COMPLETED
+        )
+        is ExperimentLifecycleState.READY
+    )
+    current_record = stale_record.model_copy(
+        update={
+            "schema_version": EXECUTION_RECORD_SCHEMA_VERSION,
+            "provenance": current_provenance,
+        }
+    )
+    assert (
+        derive_current_experiment_lifecycle(
+            planned, (current_record,), ExperimentLifecycleState.COMPLETED
+        )
+        is ExperimentLifecycleState.COMPLETED
+    )
+
+
 def _provenance() -> ExecutionProvenance:
     return ExecutionProvenance(
         configuration_digest="a" * 64,
@@ -106,14 +216,99 @@ def test_record_store_round_trip(tmp_path: Path) -> None:
         "All Honest",
         1,
     )
-    outcome = _completed_outcome(cell)
+    outcome = _completed_outcome(cell).model_copy(update={"scoring_artifact_ids": ("c" * 64,)})
     store.write_outcome(outcome, _provenance())
     restored = store.read_outcome(cell.experiment, cell.semantic_key)
     assert restored is not None
     assert isinstance(restored, PersistedExecutionRecord)
     assert restored.terminal_state is ExperimentLifecycleState.COMPLETED
     assert restored.semantic_key == cell.semantic_key
+    assert restored.scoring_artifact_ids == ("c" * 64,)
     assert len(store.read_all_outcomes(cell.experiment)) == 1
+
+
+def test_semantic_key_excludes_reuse_provenance() -> None:
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
+    first = _provenance()
+    changed = first.model_copy(
+        update={
+            "configuration_digest": "c" * 64,
+            "code_revision": "deadbeef",
+            "dataset_manifest_hash": "d" * 64,
+        }
+    )
+
+    assert cell.semantic_key == "Single-Reproduction Necessity|Full FedSIRA|All Honest|1|"
+    assert first != changed
+
+
+def test_infrastructure_retry_reuses_the_same_scientific_cell(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
+    calls: list[ScientificCell] = []
+
+    def phase(
+        _cell: ScientificCell, _executor: CellExecutor, _timeout: float
+    ) -> CellExecutionOutcome:
+        calls.append(_cell)
+        if len(calls) == 1:
+            return CellExecutionOutcome(
+                cell=_cell,
+                terminal_state=ExperimentLifecycleState.FAILED,
+                failure=FailureDetail(
+                    failure_class=FailureClass.INFRASTRUCTURE_INTERRUPTION,
+                    message="fixture interruption",
+                    cell_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
+                ),
+            )
+        return _completed_outcome(_cell)
+
+    monkeypatch.setattr("fedsira.experiments.engine._execute_cell_phase_with_timeout", phase)
+    outcome = execute_cell_with_retry(cell, cast(CellExecutor, object()))
+
+    assert outcome.terminal_state is ExperimentLifecycleState.COMPLETED
+    assert calls == [cell, cell]
+    assert calls[0].semantic_key == calls[1].semantic_key
+
+
+def test_cell_terminal_log_fields_include_bounded_failure_context() -> None:
+    cell = _cell(
+        ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+        SourceExclusionMethod.FULL_FEDSIRA,
+        "All Honest",
+        1,
+    )
+    failure = FailureDetail(
+        failure_class=FailureClass.DATA_INVALID,
+        message="x" * 400,
+        cell_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
+    )
+
+    fields = ExecutionLogFields(
+        experiment=cell.experiment,
+        dataset=DatasetId.N_BAIOT,
+        cell=cell.semantic_key,
+    )
+    terminal = fields.with_cell_terminal_state(ExperimentLifecycleState.FAILED, 1, failure)
+    metric = terminal.with_metric("accuracy")
+
+    assert terminal.failure_class is FailureClass.DATA_INVALID
+    assert terminal.dataset is DatasetId.N_BAIOT
+    assert terminal.failure_phase is ScientificCellPhase.PROTOCOL_EVALUATION
+    assert terminal.failure_message == "x" * 256
+    assert metric.failure_class is terminal.failure_class
+    assert metric.failure_phase is terminal.failure_phase
 
 
 def test_record_store_read_missing_returns_none(tmp_path: Path) -> None:

@@ -1,6 +1,14 @@
 import time
 
-from fedsira.runtime import ElapsedTimer, peak_host_resident_set_bytes
+import pytest
+
+from fedsira.domain.enums import RuntimeComponentName
+from fedsira.runtime import (
+    ElapsedTimer,
+    OperationTimeoutError,
+    peak_host_resident_set_bytes,
+    run_bounded,
+)
 
 
 def test_elapsed_timer_is_non_negative() -> None:
@@ -23,3 +31,10 @@ def test_elapsed_timer_fresh_instance_restarts() -> None:
 
 def test_peak_host_resident_set_bytes_is_positive() -> None:
     assert peak_host_resident_set_bytes() > 0
+
+
+def test_run_bounded_returns_promptly_when_a_main_thread_operation_times_out() -> None:
+    started_at = time.monotonic()
+    with pytest.raises(OperationTimeoutError):
+        run_bounded(RuntimeComponentName.PREPROCESSING, 1, lambda: time.sleep(2))
+    assert time.monotonic() - started_at < 1.5

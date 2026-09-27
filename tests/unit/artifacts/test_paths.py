@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from fedsira.artifacts.paths import (
@@ -15,6 +17,21 @@ def test_preprocessing_family_maps_to_execution_workspace_preprocessing() -> Non
         workspace_root_for_family(ArtifactFamily.SCALER)
         == execution_workspace_root() / "preprocessing"
     )
+
+
+def test_execution_workspace_is_repository_anchored_when_cwd_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = execution_workspace_root()
+    expected_results = manuscript_results_root()
+
+    monkeypatch.chdir(tmp_path)
+
+    assert execution_workspace_root() == expected
+    assert expected.is_absolute()
+    assert manuscript_results_root() == expected_results
+    assert expected_results.is_absolute()
 
 
 def test_project_artifact_family_maps_to_execution_workspace_artifacts() -> None:

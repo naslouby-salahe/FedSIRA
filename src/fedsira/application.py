@@ -6,6 +6,8 @@ from rich.console import Console
 
 from fedsira.artifacts.paths import (
     artifact_slot_directory,
+    current_repository_root,
+    execution_workspace_root,
     manuscript_tables_root,
     project_summary_root,
     smoke_record_path,
@@ -35,7 +37,6 @@ from fedsira.domain.enums import (
     RuntimeComponentName,
     WorkspaceDirectoryToken,
 )
-from fedsira.domain.models import ScientificCell
 from fedsira.domain.types import (
     ApplicationExitCode,
     BooleanValue,
@@ -51,7 +52,10 @@ from fedsira.domain.types import (
     ResolvedCoreComplete,
     RunRenderText,
 )
-from fedsira.evaluation.service import comparison_results_for_experiment
+from fedsira.evaluation.service import (
+    build_comparison_results_for_experiment,
+    read_comparison_results_for_experiment,
+)
 from fedsira.experiments.collapse import (
     CollapseDecision,
     collapse_decision_from_comparison_families,
@@ -78,10 +82,10 @@ from fedsira.experiments.definitions import (
     experiment_by_name,
 )
 from fedsira.experiments.engine import (
-    CellExecutionOutcome,
     ExecutionRecordStore,
     ExperimentExecutionResult,
-    derive_experiment_lifecycle,
+    current_execution_records,
+    derive_current_experiment_lifecycle,
 )
 from fedsira.experiments.execution import (
     PersistedSmokeRecord,
@@ -129,7 +133,9 @@ _DELAY_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
 
 
 def resolved_core_directory() -> Path:
-    return REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
+    return current_repository_root() / workspace_root_for_family(
+        ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION
+    )
 
 
 class DoctorReport(FrozenDomainModel):
@@ -168,7 +174,9 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
             project_progress="doctor blocked by invalid configuration",
             next_valid_action="fix configs/fedsira.yaml until validation succeeds",
         )
-    raw_data_root = REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+    raw_data_root = (
+        context.repository_root / context.scientific_config.execution.repository_layout.raw_data
+    )
     raw_archives_present = rar_archives_present(raw_data_root)
     with bound_application_context(context):
         environment_mismatches = collect_environment_mismatches(raw_archives_present)
@@ -213,10 +221,7 @@ def _diagnose_bound(
     environment_mismatches: tuple[EnvironmentMismatch, ...],
 ) -> DoctorReport:
     environment_mismatches = environment_mismatches + _repository_layout_mismatches()
-    workspace = (
-        REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.execution_workspace
-    )
-    store = ExecutionRecordStore(workspace)
+    store = ExecutionRecordStore(execution_workspace_root())
     resolved_core = read_resolved_core(resolved_core_directory())
     plan = build_plan(
         resolved_core_complete=resolved_core is not None,
@@ -276,7 +281,7 @@ def _experiment_state(
 ) -> ExperimentLifecycleState:
     planned = plan.experiment(name)
     records = store.read_all_outcomes(name)
-    return derive_experiment_lifecycle(planned, records)
+    return derive_current_experiment_lifecycle(planned, records, dataset_readiness())
 
 
 def _experiment_summary(
@@ -306,7 +311,7 @@ def _experiment_summary(
 
 
 def _smoke_complete() -> BooleanValue:
-    record_path = REPOSITORY_ROOT / smoke_record_path()
+    record_path = current_repository_root() / smoke_record_path()
     if not record_path.is_file():
         return False
     record = PersistedSmokeRecord.model_validate_json(record_path.read_text(encoding="utf-8"))
@@ -363,7 +368,7 @@ def _project_stage(
         ExperimentLifecycleState.COMPLETED
     ):
         return ProjectStage.SECONDARY_GENERALIZATION
-    if not (REPOSITORY_ROOT / manuscript_tables_root(project_summary_root())).exists():
+    if not (current_repository_root() / manuscript_tables_root(project_summary_root())).exists():
         return ProjectStage.STATISTICAL_EVIDENCE_COMPLETION
     return ProjectStage.REPORT_EXPORT
 
@@ -557,10 +562,15 @@ def _collapse_experiment_completed(
         master_seeds=config.seeds_and_determinism.master_seeds,
         smoke_seed=config.seeds_and_determinism.smoke_seed,
     ).experiment(experiment)
-    lifecycle = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
+    records = current_execution_records(
+        planned,
+        store.read_planned_outcomes(planned),
+        dataset_readiness(),
+    )
+    lifecycle = derive_current_experiment_lifecycle(planned, records, dataset_readiness())
     return (
         lifecycle is ExperimentLifecycleState.COMPLETED
-        and len(store.read_all_outcomes(experiment)) == definition.nominal_cell_count
+        and len(records) == definition.nominal_cell_count
     )
 
 
@@ -568,33 +578,26 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
     if experiment not in COLLAPSE_EXPERIMENT_NAMES:
         return
     config = current_application_context().scientific_config
-    store = ExecutionRecordStore(
-        REPOSITORY_ROOT / Path(config.execution.repository_layout.execution_workspace)
-    )
+    store = ExecutionRecordStore(execution_workspace_root())
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
         if not _collapse_experiment_completed(collapse_experiment, store):
             return
     decisions: list[CollapseDecision] = []
+    plan = build_plan(
+        resolved_core_complete=False,
+        master_seeds=config.seeds_and_determinism.master_seeds,
+        smoke_seed=config.seeds_and_determinism.smoke_seed,
+    )
     for collapse_experiment in COLLAPSE_EXPERIMENT_NAMES:
-        records = store.read_all_outcomes(collapse_experiment)
-        outcomes = tuple(
-            CellExecutionOutcome(
-                cell=ScientificCell(
-                    experiment=record.experiment,
-                    method=record.method,
-                    condition=record.condition,
-                    master_seed=record.master_seed,
-                ),
-                terminal_state=record.terminal_state,
-                failure=None,
-                metrics=record.metrics,
-            )
-            for record in records
+        planned = plan.experiment(collapse_experiment)
+        records = current_execution_records(
+            planned,
+            store.read_all_outcomes(collapse_experiment),
+            dataset_readiness(),
         )
-        definition = experiment_by_name(collapse_experiment)
-        comparison_results = comparison_results_for_experiment(
-            collapse_experiment, definition.dataset, outcomes, store
-        )
+        comparison_results = read_comparison_results_for_experiment(collapse_experiment, records)
+        if not comparison_results:
+            return
         family = _collapse_family_for_experiment(collapse_experiment)
         if family is None:
             return
@@ -628,7 +631,7 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
 def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
     if result.lifecycle_state is not ExperimentLifecycleState.COMPLETED:
         return
-    experiment_root = REPOSITORY_ROOT / workspace_root_for_family(
+    experiment_root = current_repository_root() / workspace_root_for_family(
         ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
         result.experiment,
     )
@@ -645,7 +648,8 @@ def execute_run(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
         raw_data_root = (
-            REPOSITORY_ROOT / context.scientific_config.execution.repository_layout.raw_data
+            current_repository_root()
+            / context.scientific_config.execution.repository_layout.raw_data
         )
         mismatches = blocking_environment_mismatches(
             collect_environment_mismatches(rar_archives_present(raw_data_root))
@@ -662,7 +666,7 @@ def _execute_bound(name: ExperimentName, overwrite: OverwriteExisting) -> None:
     result = execute_experiment(
         name,
         ProtocolCellExecutor(resolved_core=resolved_core),
-        comparison_results_for_experiment,
+        build_comparison_results_for_experiment,
         overwrite=overwrite,
         resolved_core_complete=resolved_core is not None,
     )

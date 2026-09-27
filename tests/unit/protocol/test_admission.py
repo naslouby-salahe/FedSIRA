@@ -99,3 +99,25 @@ def test_final_gate_predicates_pass_requires_all_four_thresholds_and_no_invarian
         FINAL_GATE_CONFIG,
     )
     assert not fails_on_na
+
+
+@pytest.mark.parametrize(
+    ("median", "minimum", "supported_drop", "benign_far"),
+    (
+        (0.0, 1.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0, 0.0),
+        (1.0, 1.0, FINAL_GATE_CONFIG.supported_macro_f1_drop_maximum + 0.001, 0.0),
+        (1.0, 1.0, 0.0, FINAL_GATE_CONFIG.benign_false_alarm_rate_increase_maximum + 0.001),
+    ),
+)
+def test_final_gate_predicates_reject_each_individual_threshold_failure(
+    median: float, minimum: float, supported_drop: float, benign_far: float
+) -> None:
+    assert not final_gate_predicates_pass(
+        MetricResult(value=median, denominator=8),
+        MetricResult(value=minimum, denominator=8),
+        MetricResult(value=supported_drop, denominator=8),
+        MetricResult(value=benign_far, denominator=8),
+        True,
+        FINAL_GATE_CONFIG,
+    )

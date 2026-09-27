@@ -49,9 +49,11 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
+from fedsira.datasets.role_split import prepared_view_cache_identity
 from fedsira.domain.enums import DatasetId, LogEvent, RuntimeComponentName
 from fedsira.domain.types import (
     ArtifactDigest,
+    BooleanValue,
     DatasetClassToken,
     DatasetColumnName,
     DatasetFileDigest,
@@ -78,7 +80,7 @@ from fedsira.runtime import (
 )
 
 NBAIOT_SAMPLE_ID_PREFIX: SampleIdPrefix = "NBAIOT_SAMPLE_ID_V1"
-PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|1"
+PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_prepared_view|2"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"
 BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"
 
@@ -115,10 +117,31 @@ class PreparedView(FrozenDomainModel):
 
 class PreparedViewMetadata(FrozenDomainModel):
     schema_version: SchemaVersion
+    cache_identity: ArtifactDigest
+    parquet_sha256: ArtifactDigest
     domain: NBaiotDomain
     class_id: NBaiotClass
     role: Role
     row_count: RowCount
+
+
+def _cached_view_is_reusable(
+    parquet_path: Path,
+    metadata_path: Path,
+    cache_identity: ArtifactDigest,
+    row_count: RowCount,
+) -> BooleanValue:
+    if not parquet_path.is_file() or not metadata_path.is_file():
+        return False
+    try:
+        metadata = PreparedViewMetadata.model_validate_json(metadata_path.read_text())
+    except (OSError, ValueError):
+        return False
+    return (
+        metadata.cache_identity == cache_identity
+        and metadata.row_count == row_count
+        and metadata.parquet_sha256 == compute_file_checksum(parquet_path)
+    )
 
 
 def extract_rar_archive(archive_path: Path, destination_directory: Path) -> None:
@@ -489,6 +512,9 @@ def materialize_nbaiot_prepared_views(
     config = current_application_context().scientific_config
     if not discovered:
         raise ValueError("N-BaIoT discovery produced no CSV files")
+    cache_identity = prepared_view_cache_identity(
+        DatasetId.N_BAIOT, compute_dataset_manifest_hash(discovered)
+    )
     feature_names = read_predictor_header(discovered[0].absolute_path)
     validate_predictor_schema(feature_names)
     connection = open_tabular_engine()
@@ -590,6 +616,7 @@ def materialize_nbaiot_prepared_views(
             role = Role[str(role_token)]
             view_key = _view_key(domain, class_id, role)
             parquet_path = view_parquet_path(prepared_root, view_key)
+            metadata_path = (prepared_root / view_key).with_suffix(".json")
             query = (
                 "SELECT selected.sample_id AS sample_id, all_rows.class_id AS label, "
                 f"{standardized} "
@@ -599,19 +626,24 @@ def materialize_nbaiot_prepared_views(
                 f"AND selected.role = {sql_string(role.name)} "
                 "ORDER BY selected.assignment_order"
             )
-            if overwrite or not parquet_path.exists():
-                copy_query_to_parquet(connection, query, parquet_path)
-            write_json_payload(
-                (prepared_root / view_key).with_suffix(".json"),
-                PreparedViewMetadata(
-                    schema_version=PREPARED_VIEW_SCHEMA_VERSION,
-                    domain=domain,
-                    class_id=class_id,
-                    role=role,
-                    row_count=int(view_row_count),
-                ),
-                overwrite,
+            reusable = not overwrite and _cached_view_is_reusable(
+                parquet_path, metadata_path, cache_identity, int(view_row_count)
             )
+            if not reusable:
+                copy_query_to_parquet(connection, query, parquet_path)
+                write_json_payload(
+                    metadata_path,
+                    PreparedViewMetadata(
+                        schema_version=PREPARED_VIEW_SCHEMA_VERSION,
+                        domain=domain,
+                        class_id=class_id,
+                        role=role,
+                        row_count=int(view_row_count),
+                        cache_identity=cache_identity,
+                        parquet_sha256=compute_file_checksum(parquet_path),
+                    ),
+                    True,
+                )
             log_structured_event(
                 NBAIOT_PREPARATION_LOGGER,
                 LogEvent.DATASET_VIEW_WRITTEN,

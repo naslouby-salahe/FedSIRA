@@ -1,3 +1,4 @@
+import math
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,8 +14,13 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
 )
 from fedsira.domain.models import ScientificCell
-from fedsira.evaluation.comparisons import ComparisonFamily, ComparisonState, ablation_metric
-from fedsira.evaluation.service import comparison_results_for_experiment
+from fedsira.evaluation.comparisons import (
+    ComparisonFamily,
+    ComparisonState,
+    ablation_metric,
+    paired_standardized_effect_size,
+)
+from fedsira.evaluation.service import build_comparison_results_for_experiment
 from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, ablation_scenario_for_variant
 from fedsira.experiments.engine import (
     ABLATION_REFERENCE_PROCEDURE_IDENTITY,
@@ -22,27 +28,29 @@ from fedsira.experiments.engine import (
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedAblationReference,
+    ablation_reference_dependencies,
     ablation_reference_slot,
 )
-from fedsira.runtime import current_application_context
+from fedsira.runtime import bound_application_context, current_application_context
 
 VARIANT = AblationVariant.NO_PROPOSAL_SCREEN
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Path]:
-    monkeypatch.setattr("fedsira.evaluation.service.REPOSITORY_ROOT", tmp_path)
-    yield tmp_path
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
+    context = current_application_context().model_copy(update={"repository_root": tmp_path})
+    with bound_application_context(context):
+        yield tmp_path
 
 
 def _master_seed() -> int:
     return current_application_context().scientific_config.seeds_and_determinism.master_seeds[0]
 
 
-def _publish_reference(repository: Path, metric_value: float) -> None:
+def _publish_reference(repository: Path, metric_value: float, seed: int | None = None) -> None:
     scenario = ablation_scenario_for_variant(VARIANT)
     metric, _orientation = ablation_metric(VARIANT)
-    seed = _master_seed()
+    seed = _master_seed() if seed is None else seed
     slot = ablation_reference_slot(scenario.value, seed)
     publish_artifact(
         slot=slot,
@@ -55,7 +63,7 @@ def _publish_reference(repository: Path, metric_value: float) -> None:
         )
         .model_dump_json()
         .encode("utf-8"),
-        dependencies=(),
+        dependencies=ablation_reference_dependencies(DatasetId.N_BAIOT),
         procedure_identity=ABLATION_REFERENCE_PROCEDURE_IDENTITY,
         slot_directory=repository / artifact_slot_directory(slot),
         staging_root=repository / "staging",
@@ -81,7 +89,7 @@ def _variant_outcomes(metric_value: float) -> tuple[CellExecutionOutcome, ...]:
 
 
 def _variant_comparison(repository: Path, metric_value: float):
-    families = comparison_results_for_experiment(
+    families = build_comparison_results_for_experiment(
         MECHANISM_ABLATION_NAME,
         DatasetId.N_BAIOT,
         _variant_outcomes(metric_value),
@@ -105,6 +113,48 @@ def test_paired_comparison_is_defined_only_from_the_persisted_reference(
     assert with_reference.definition.reference_method == AblationVariant.FULL_FEDSIRA.value
 
 
+def test_inference_requires_nine_of_ten_complete_seed_pairs(isolated_repository: Path) -> None:
+    seeds = current_application_context().scientific_config.seeds_and_determinism.master_seeds
+    scenario = ablation_scenario_for_variant(VARIANT)
+    metric, _orientation = ablation_metric(VARIANT)
+    outcomes = tuple(
+        CellExecutionOutcome(
+            cell=ScientificCell(
+                experiment=MECHANISM_ABLATION_NAME,
+                method=VARIANT,
+                condition=scenario,
+                master_seed=seed,
+            ),
+            terminal_state=ExperimentLifecycleState.COMPLETED,
+            failure=None,
+            metrics=((metric.value, 0.5),),
+        )
+        for seed in seeds
+    )
+    store = ExecutionRecordStore(isolated_repository / "execution")
+
+    for complete_count in (8, 9, 10):
+        _publish_reference(isolated_repository, 0.5, seed=seeds[complete_count - 1])
+        if complete_count > 1:
+            for seed in seeds[: complete_count - 1]:
+                _publish_reference(isolated_repository, 0.5, seed=seed)
+        family = next(
+            item
+            for item in build_comparison_results_for_experiment(
+                MECHANISM_ABLATION_NAME, DatasetId.N_BAIOT, outcomes, store
+            )
+            if item.family is ComparisonFamily.MECHANISM_ABLATION
+        )
+        result = next(
+            item for item in family.comparisons if item.definition.method == VARIANT.value
+        )
+        assert result.complete_seed_count == complete_count
+        if complete_count == 8:
+            assert result.comparison_state is ComparisonState.INCONCLUSIVE_TECHNICAL
+        else:
+            assert result.comparison_state is not ComparisonState.INCONCLUSIVE_TECHNICAL
+
+
 def test_reference_slot_is_the_only_source_of_the_reference_row(isolated_repository: Path) -> None:
     scenario = ablation_scenario_for_variant(VARIANT)
     slot = ablation_reference_slot(scenario.value, _master_seed())
@@ -113,3 +163,12 @@ def test_reference_slot_is_the_only_source_of_the_reference_row(isolated_reposit
     assert not (isolated_repository / artifact_slot_directory(slot)).exists()
     _publish_reference(isolated_repository, 1.0)
     assert (isolated_repository / artifact_slot_directory(slot)).is_dir()
+
+
+def test_paired_effect_size_uses_sample_standard_deviation_and_handles_zero_variance() -> None:
+    effect = paired_standardized_effect_size((1.0, 3.0))
+    assert effect is not None
+    assert math.isclose(effect, math.sqrt(2.0))
+    assert paired_standardized_effect_size((2.0, 2.0)) == math.inf
+    assert paired_standardized_effect_size((-2.0, -2.0)) == -math.inf
+    assert paired_standardized_effect_size((0.0, 0.0)) == 0.0

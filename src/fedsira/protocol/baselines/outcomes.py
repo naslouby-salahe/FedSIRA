@@ -36,6 +36,7 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.metrics import (
     RealReportSummary,
+    benign_false_alarm_rate_increase,
     evaluate_domain,
     non_source_domains,
     supported_macro_f1_harm,
@@ -292,14 +293,8 @@ class ProtocolBaselineOutcomes:
         supported_macro_f1_drop = supported_macro_f1_harm(
             anchor_verification.supported_macro_f1, admitted_verification.supported_macro_f1
         )
-        benign_far_increase = (
-            MetricResult(
-                value=admitted_verification.benign_far.value - anchor_verification.benign_far.value,
-                denominator=1,
-            )
-            if admitted_verification.benign_far.value is not None
-            and anchor_verification.benign_far.value is not None
-            else MetricResult(value=None, denominator=0)
+        benign_far_increase = benign_false_alarm_rate_increase(
+            admitted_verification.benign_far, anchor_verification.benign_far
         )
         triggered_rate = triggered_to_benign_rate(
             nbaiot_adapter(self._prepared_root),
@@ -468,18 +463,11 @@ class ProtocolBaselineOutcomes:
                     anchor_metrics.supported_macro_f1, local_metrics.supported_macro_f1
                 )
             )
-            if (
-                anchor_metrics.benign_far.value is not None
-                and local_metrics.benign_far.value is not None
-            ):
-                benign_far_increases.append(
-                    MetricResult(
-                        value=local_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                        denominator=1,
-                    )
+            benign_far_increases.append(
+                benign_false_alarm_rate_increase(
+                    local_metrics.benign_far, anchor_metrics.benign_far
                 )
-            else:
-                benign_far_increases.append(MetricResult(value=None, denominator=0))
+            )
         predicates_pass = final_gate_predicates_pass(
             median_domain_target_f1(target_f1_values),
             worst_domain_target_f1(tuple(target_f1_values)),
@@ -527,18 +515,11 @@ class ProtocolBaselineOutcomes:
                     anchor_metrics.supported_macro_f1, ensemble_metrics.supported_macro_f1
                 )
             )
-            if (
-                anchor_metrics.benign_far.value is not None
-                and ensemble_metrics.benign_far.value is not None
-            ):
-                benign_far_increases.append(
-                    MetricResult(
-                        value=ensemble_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                        denominator=1,
-                    )
+            benign_far_increases.append(
+                benign_false_alarm_rate_increase(
+                    ensemble_metrics.benign_far, anchor_metrics.benign_far
                 )
-            else:
-                benign_far_increases.append(MetricResult(value=None, denominator=0))
+            )
         predicates_pass = final_gate_predicates_pass(
             median_domain_target_f1(target_f1_values),
             worst_domain_target_f1(tuple(target_f1_values)),
@@ -619,13 +600,9 @@ class ProtocolBaselineOutcomes:
                 supported_macro_f1_harm(
                     anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
                 ),
-                MetricResult(
-                    value=source_screen.benign_far.value - anchor_screen.benign_far.value,
-                    denominator=1,
-                )
-                if source_screen.benign_far.value is not None
-                and anchor_screen.benign_far.value is not None
-                else MetricResult(value=None, denominator=0),
+                benign_false_alarm_rate_increase(
+                    source_screen.benign_far, anchor_screen.benign_far
+                ),
             )
         )
         eligible_reviewer_domains = tuple(

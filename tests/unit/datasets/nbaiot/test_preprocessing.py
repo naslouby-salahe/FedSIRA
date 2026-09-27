@@ -9,13 +9,16 @@ import pytest
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import (
     DatasetExclusionReason,
+    PreparedViewSidecar,
     Role,
+    compute_file_checksum,
     open_tabular_engine,
     view_parquet_path,
 )
 from fedsira.datasets.nbaiot.prepare import (
     DiscoveredCsvFile,
     PreparedView,
+    PreparedViewMetadata,
     RoleSamplingCap,
     assign_stream_roles_and_sample_ids,
     ingest_primary_numeric_csv,
@@ -283,7 +286,7 @@ def _discovered_csv(path: Path) -> DiscoveredCsvFile:
         domain=NBaiotDomain.DANMINI_DOORBELL,
         class_id=NBaiotClass.BENIGN,
         relative_path="benign_traffic.csv",
-        file_sha256="a" * 64,
+        file_sha256=compute_file_checksum(path),
         absolute_path=path,
     )
 
@@ -344,6 +347,43 @@ def test_materialization_is_deterministic(tmp_path: Path) -> None:
     assert moments_one.standard_deviations == moments_two.standard_deviations
 
 
+def test_materialization_reuses_only_current_valid_prepared_views(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    csv_path = tmp_path / "benign.csv"
+    _write_benign_csv(csv_path, 6000)
+    prepared_root, scaler_root = _storage(tmp_path)
+    discovered = (_discovered_csv(csv_path),)
+    first_views, _ = materialize_nbaiot_prepared_views(
+        discovered, prepared_root, scaler_root, overwrite=True
+    )
+    first_path = first_views[0].parquet_path
+    first_metadata_path = first_path.with_suffix(".json")
+    first_metadata = PreparedViewMetadata.model_validate_json(first_metadata_path.read_text())
+
+    def unexpected_rewrite(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("unchanged valid prepared views should be reused")
+
+    monkeypatch.setattr("fedsira.datasets.nbaiot.prepare.copy_query_to_parquet", unexpected_rewrite)
+    materialize_nbaiot_prepared_views(discovered, prepared_root, scaler_root)
+    monkeypatch.undo()
+
+    original_contents = csv_path.read_text()
+    updated_contents = original_contents.replace("0.0,0.0", "1.0,0.0", 1)
+    assert updated_contents != original_contents
+    csv_path.write_text(updated_contents)
+    updated_views, _ = materialize_nbaiot_prepared_views(
+        (_discovered_csv(csv_path),), prepared_root, scaler_root
+    )
+    updated_metadata = PreparedViewMetadata.model_validate_json(first_metadata_path.read_text())
+    consumer_sidecar = PreparedViewSidecar.model_validate_json(first_metadata_path.read_text())
+    assert updated_views[0].parquet_path == first_path
+    assert updated_metadata.cache_identity != first_metadata.cache_identity
+    assert updated_metadata.parquet_sha256 != first_metadata.parquet_sha256
+    assert consumer_sidecar.cache_identity == updated_metadata.cache_identity
+    assert consumer_sidecar.parquet_sha256 == updated_metadata.parquet_sha256
+
+
 def test_materialization_writes_readable_prepared_row_parquet(tmp_path: Path) -> None:
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
@@ -376,13 +416,15 @@ def test_materialization_standardized_features_are_finite_and_clipped(tmp_path: 
     csv_path = tmp_path / "benign.csv"
     _write_benign_csv(csv_path, 6000)
     prepared_root, scaler_root = _storage(tmp_path)
-    views, _moments = materialize_nbaiot_prepared_views(
+    views, moments = materialize_nbaiot_prepared_views(
         (_discovered_csv(csv_path),),
         prepared_root,
         scaler_root,
         overwrite=True,
     )
     assert views
+    anchor_train_views = tuple(view for view in views if view.role is Role.ANCHOR_TRAIN)
+    assert moments.training_row_count == sum(view.row_count for view in anchor_train_views)
     scaling = current_application_context().scientific_config.datasets.primary.scaling
     connection = duckdb.connect()
     for view in views:
@@ -390,5 +432,9 @@ def test_materialization_standardized_features_are_finite_and_clipped(tmp_path: 
             "SELECT * EXCLUDE (sample_id, label) FROM read_parquet(?)",
             [view.parquet_path.as_posix()],
         ).fetch_df()
-        assert numpy.asarray(frame, dtype=float).min() >= scaling.clip_min
-        assert numpy.asarray(frame, dtype=float).max() <= scaling.clip_max
+        values = numpy.asarray(frame, dtype=float)
+        assert numpy.isfinite(values).all()
+        assert values.min() >= scaling.clip_min
+        assert values.max() <= scaling.clip_max
+        if view.role is Role.ANCHOR_TRAIN:
+            assert numpy.allclose(values.mean(axis=0), 0.0, atol=1e-6)

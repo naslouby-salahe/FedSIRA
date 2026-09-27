@@ -68,10 +68,15 @@ def test_select_krum_update_picks_minimum_score() -> None:
     assert abs(float(selected.update_vector.item()) - 0.1) < 1e-9
 
 
-def test_select_krum_update_breaks_ties_by_ascending_domain_hash_token() -> None:
-    committee = [_row(0, 0.0), _row(1, 0.0), _row(2, 5.0), _row(3, 10.0), _row(4, 15.0)]
+def test_select_krum_update_breaks_ties_by_ascending_domain_id_independent_of_input_order() -> None:
+    committee = [_row(1, 0.0), _row(0, 0.0), _row(2, 5.0), _row(3, 10.0), _row(4, 15.0)]
+    expected_domain = min(row.reproducer_domain for row in committee[:2])
+
     selected = select_krum_update(committee, maximum_byzantine_rows=1)
-    assert selected.reproducer_domain == NBAIOT_DOMAIN_ORDER[0]
+    reversed_selected = select_krum_update(tuple(reversed(committee)), maximum_byzantine_rows=1)
+
+    assert selected.reproducer_domain == expected_domain
+    assert reversed_selected.reproducer_domain == expected_domain
 
 
 def test_select_krum_update_rejects_inadmissible_committee_size() -> None:

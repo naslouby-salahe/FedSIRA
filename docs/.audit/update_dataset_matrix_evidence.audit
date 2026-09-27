@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+UPDATES = {
+    "DATA-015": {
+        "evidence": "Production logs, raw identity, role manifest, and independent output validation confirm 309 selected shards, 31 canonical classes, nine synthetic pseudo-domains, and salt 730201; alternate labeled shards are explicitly excluded.",
+        "finding": "Production confirmed the configured Per-attack shards acquisition: 309 selected shards, 31 canonical classes, salt 730201, nine synthetic pseudo-domains, role manifest and prepared views; all raw identities are unchanged. Evidence: docs/.audit/final-evidence.md and docs/.audit/raw-dataset-inventory-verification-20260926.json.",
+    },
+    "PRE-015": {
+        "evidence": "Production reruns reused role/split identities N-BaIoT 9d81ea5c and CIC 8350105f; all 534 + 1,674 prepared pairs retained identical SHA-256 and nanosecond mtimes. See both preprocess-rerun-comparison records.",
+        "finding": "Both production reruns reused the same raw and role/split manifest identities (N-BaIoT 9d81ea5c…, CIC 8350105f…). Independent SHA-256 and mtime comparisons found all 2,208 sidecar/Parquet pairs unchanged; see nbaiot-preprocess-rerun-comparison-20260926.json and ciciot-preprocess-rerun-comparison-20260926.json.",
+    },
+    "PRE-016": {
+        "evidence": "The independent verifier found zero duplicate or null stable IDs across all prepared views; CIC IDs exactly match its role manifest and retained IDs are disjoint from exclusions. See prepared-output-verification-production-20260926.json.",
+        "finding": "The independent verifier found zero duplicate or null stable IDs across all views for both datasets. CIC 7,720,601 prepared IDs exactly equal its role manifest and none intersects the 1,040 excluded IDs; this proves all forbidden prepared-role intersections are empty. See docs/.audit/prepared-output-verification-production-20260926.json.",
+    },
+    "PRE-017": {
+        "approach": "Production preprocessing ran twice for each dataset against unchanged inputs; compare identities, payload checksums, modification times, and reuse events.",
+        "finding": "Both unchanged-input CLI reruns reported dataset_manifest_reused=true; all 2,208 prepared sidecar/Parquet pairs retained exact SHA-256 and nanosecond mtimes. Artifact logs report role manifests, scalers, and every prepared CIC role view reused. Comparison records are in docs/.audit/; stale-source/config/digest regressions also pass.",
+    },
+    "WIRE-004": {
+        "approach": "Graphify and source call-path evidence plus successful production CLI executions for both configured datasets.",
+        "finding": "Fresh fedsira preprocess N-BaIoT and fedsira preprocess CICIoT2023 executions traversed the declared dynamic dispatch and published/reused current raw, role/split, scaler, exclusion, and prepared-view artifacts. Current manifests and output audits are indexed in docs/.audit/final-evidence.md.",
+    },
+}
+
+
+def main() -> None:
+    path = Path(__file__).resolve().parents[1] / "Audit Matrix.md"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    seen: set[str] = set()
+    for index, line in enumerate(lines):
+        if not line.startswith("| "):
+            continue
+        fields = line.split("|")
+        if len(fields) < 12:
+            continue
+        identifier = fields[1].strip()
+        update = UPDATES.get(identifier)
+        if update is None:
+            continue
+        if "approach" in update:
+            fields[6] = f" {update['approach']} "
+        if "evidence" in update:
+            fields[7] = f" {update['evidence']} "
+        if "finding" in update:
+            fields[10] = f" {update['finding']} "
+        lines[index] = "|".join(fields)
+        seen.add(identifier)
+    if seen != set(UPDATES):
+        raise RuntimeError(f"matrix update mismatch: missing={set(UPDATES) - seen}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"updated evidence fields for {len(seen)} requirements")
+
+
+if __name__ == "__main__":
+    main()

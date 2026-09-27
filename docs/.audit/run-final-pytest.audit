@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set +e
+cd /home/naslouby/Projects/FedSIRA
+.venv/bin/pytest -q > docs/.audit/final-pytest-20260925.log 2>&1
+status=$?
+printf '%s\n' "$status" > docs/.audit/final-pytest-20260925.exit
+exit "$status"

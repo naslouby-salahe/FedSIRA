@@ -8,6 +8,11 @@ FORBIDDEN_TYPE_NAMES = {"Any", "Dict", "dict", "object"}
 
 
 def annotation_occurrences(annotation: ast.expr) -> list[str]:
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return []
     return sorted(
         node.id
         for node in ast.walk(annotation)
@@ -25,7 +30,7 @@ def annotation_violations(tree: ast.Module) -> list[str]:
             annotation = node.returns
         if annotation is not None:
             found.extend(annotation_occurrences(annotation))
-    return found
+    return sorted(found)
 
 
 def forbidden_symbol_violations(tree: ast.Module) -> list[str]:
@@ -101,6 +106,15 @@ def test_parameterized_dict_annotation_is_detected() -> None:
         offending = Path(tmp) / "offending.py"
         offending.write_text("def handler(value: dict[str, int]) -> None:\n    return None\n")
         assert annotation_violations(parse(offending)) == ["dict"]
+
+
+def test_stringified_forbidden_annotations_are_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        offending = Path(tmp) / "offending.py"
+        offending.write_text(
+            "def handler(value: 'dict[str, Any]') -> 'object':\n" "    return value\n"
+        )
+        assert annotation_violations(parse(offending)) == ["Any", "dict", "object"]
 
 
 def test_dictionary_construction_is_detected() -> None:

@@ -196,6 +196,8 @@ class PreparedViewSidecar(FrozenDomainModel):
     role: Role
     row_count: RowCount
     schema_version: SchemaVersion
+    cache_identity: ArtifactDigest | None = None
+    parquet_sha256: DatasetFileDigest | None = None
 
 
 SCALER_METADATA_SCHEMA_VERSION: SchemaVersion = "fedsira|scaler_metadata|1"
@@ -527,10 +529,6 @@ def remember_prepared_rows(path: Path, rows: PreparedRows) -> None:
         _PREPARED_ROWS_CACHE.popitem(last=False)
 
 
-def clear_prepared_rows_cache() -> None:
-    _PREPARED_ROWS_CACHE.clear()
-
-
 def view_parquet_path(prepared_root: Path, view_key: PreparedViewKey) -> Path:
     return prepared_root / f"{view_key}.parquet"
 
@@ -578,6 +576,8 @@ class DatasetPreparationLogFields(FrozenDomainModel):
     view: PreparedViewKey | None = None
     path: RelativePathText | None = None
     raw_rows: RowCount | None = None
+    completed_shards: RowCount | None = None
+    total_shards: RowCount | None = None
     retained_rows: RowCount | None = None
     excluded_rows: RowCount | None = None
     class_count: ClassCount | None = None

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedsira.artifacts.paths import workspace_root_for_family
+from fedsira.artifacts.paths import current_repository_root, workspace_root_for_family
 from fedsira.domain.enums import (
     AblationVariant,
     ArtifactFamily,
@@ -369,7 +369,8 @@ def execute_plan() -> None:
     context = ApplicationContext.load(REPOSITORY_ROOT)
     with bound_application_context(context):
         resolved_core = read_resolved_core(
-            REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
+            current_repository_root()
+            / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
         )
         plan = resolve_plan(resolved_core_complete=resolved_core is not None)
         print(render_plan(plan))

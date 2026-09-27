@@ -70,6 +70,22 @@ def test_current_publication_is_loaded(tmp_path: Path) -> None:
     assert invalid == ()
 
 
+def test_obsolete_current_schema_is_rejected_as_invalid_evidence(tmp_path: Path) -> None:
+    identity = "6" * 64
+    obsolete = _manifest_text(identity).replace(
+        ARTIFACT_SCHEMA_VERSION,
+        "fedsira|artifact_manifest|3",
+    )
+    _write_manifest(tmp_path, identity, obsolete)
+    _point_current_at(tmp_path, identity)
+
+    manifests, invalid = load_published_manifests((tmp_path,))
+
+    assert manifests == ()
+    assert len(invalid) == 1
+    assert "obsolete" in invalid[0].failure
+
+
 def test_unreadable_historical_identity_does_not_block_the_gate(tmp_path: Path) -> None:
     current = "2" * 64
     _write_manifest(tmp_path, current, _manifest_text(current))

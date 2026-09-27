@@ -2,7 +2,6 @@ import pytest
 
 from fedsira.domain.enums import (
     ArtifactLifecycleState,
-    CellPhaseState,
     DatasetId,
     ExperimentLifecycleState,
     FailureClass,
@@ -57,16 +56,6 @@ def test_experiment_lifecycle_state_members() -> None:
         "Not Started",
         "Blocked",
         "Ready",
-        "Running",
-        "Completed",
-        "Failed",
-        "Invalid",
-    }
-
-
-def test_cell_phase_state_members() -> None:
-    assert {member.value for member in CellPhaseState} == {
-        "Planned",
         "Running",
         "Completed",
         "Failed",

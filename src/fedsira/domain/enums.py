@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class LogEvent(StrEnum):
     DATASET_INGEST = "dataset.ingest"
+    DATASET_INGEST_PROGRESS = "dataset.ingest.progress"
     DATASET_ROLES = "dataset.roles"
     DATASET_INGEST_COMPLETED = "dataset.ingest.completed"
     DATASET_SHARD_WIDTH_EXCLUDED = "dataset.shard.width.excluded"
@@ -79,14 +80,6 @@ class ArtifactLifecycleState(StrEnum):
     COMPLETE = "Complete"
 
 
-class CellPhaseState(StrEnum):
-    PLANNED = "Planned"
-    RUNNING = "Running"
-    COMPLETED = "Completed"
-    FAILED = "Failed"
-    INVALID = "Invalid"
-
-
 class ExperimentLifecycleState(StrEnum):
     NOT_STARTED = "Not Started"
     BLOCKED = "Blocked"
@@ -95,6 +88,38 @@ class ExperimentLifecycleState(StrEnum):
     COMPLETED = "Completed"
     FAILED = "Failed"
     INVALID = "Invalid"
+
+
+class ClaimId(StrEnum):
+    UNSUPPORTED_CAPABILITY_PROBLEM = "Unsupported Capability Problem"
+    PRE_EVIDENCE_INFORMATION_LIMIT = "Pre-Evidence Information Limit"
+    AUTHORITY_TRANSITION = "Authority Transition"
+    DIRECT_SOURCE_EXCLUSION = "Direct Source Exclusion"
+    CONDITIONAL_NON_INTERFERENCE = "Conditional Non-Interference"
+    MALICIOUS_SOURCE_SALVAGE = "Malicious Source Salvage"
+    PROPOSAL_ASSISTANCE_VALUE = "Proposal Assistance Value"
+    PLURALITY_NECESSITY = "Plurality Necessity"
+    EXTERNAL_VERIFICATION_NECESSITY = "External Verification Necessity"
+    MECHANISM_NECESSITY = "Mechanism Necessity"
+    BYZANTINE_OPERATING_REGION = "Byzantine Operating Region"
+    SAFE_DORMANCY = "Safe Dormancy"
+    REPRODUCIBILITY_IS_NOT_TRUTH = "Reproducibility Is Not Truth"
+    CAPABILITY_GRANULARITY_BOUNDARY = "Capability-Granularity Boundary"
+    HETEROGENEITY_BOUNDARY = "Heterogeneity Boundary"
+    INFORMATION_ARRIVAL_DELAY = "Information-Arrival Delay"
+    POST_EVIDENCE_EFFICIENCY = "Post-Evidence Efficiency"
+    SECONDARY_GENERALIZATION = "Secondary Generalization"
+    IOT_IDS_APPLICATION = "IoT IDS Application"
+
+
+class ClaimState(StrEnum):
+    SUPPORTED = "Supported"
+    PARTIALLY_SUPPORTED = "Partially Supported"
+    CONDITIONAL = "Conditional"
+    MECHANISM_ONLY = "Mechanism Only"
+    NULL_RESULT = "Null Result"
+    NOT_SUPPORTED = "Not Supported"
+    NOT_TESTED = "Not Tested"
 
 
 class ProjectStage(StrEnum):
@@ -223,6 +248,32 @@ class ArtifactDependencyLabel(StrEnum):
     COMMITMENT_IDENTITY = "commitment-identity"
     CERTIFIED_ROW_REPORTS = "certified-row-reports"
     CERTIFIED_REPRODUCTION_ROWS = "certified-reproduction-rows"
+    PRIMARY_ROLE_INTERVALS = "primary-role-intervals"
+    PRIMARY_SAMPLING_CAPS = "primary-sampling-caps"
+    SECONDARY_DATASET = "secondary-dataset"
+    CAPABILITY_CONTRACT = "capability-contract"
+    MODEL_CONFIGURATION = "model-configuration"
+    PROTOCOL_CONFIGURATION = "protocol-configuration"
+    ATTACK_CONFIGURATION = "attack-configuration"
+    BASELINE_CONFIGURATION = "baseline-configuration"
+    METRIC_AGGREGATION = "metric-aggregation"
+    DATA_LOADER = "data-loader"
+    OPTIMIZER_CONFIGURATION = "optimizer-configuration"
+    TRAINING_CONFIGURATION = "training-configuration"
+    ANCHOR_FEDAVG_CONFIGURATION = "anchor-fedavg-configuration"
+    POST_REFERENCE_CONFIGURATION = "post-reference-configuration"
+    VERIFIER_AWARE_OVERRIDE = "verifier-aware-override"
+    PROPOSAL_SCREEN_CONFIGURATION = "proposal-screen-configuration"
+    ADMISSION_OPENING_CONFIGURATION = "admission-opening-configuration"
+    SCREEN_FOLD = "screen-fold"
+    FINAL_GATE_CONFIGURATION = "final-gate-configuration"
+    EVIDENCE_VERIFICATION = "evidence-verification"
+    EVIDENCE_SYNTHESIS = "evidence-synthesis"
+    BASELINE_CALIBRATION = "baseline-calibration"
+    STATISTICAL_ANALYSIS = "statistical-analysis-config"
+    DATASET_PREPROCESSING = "dataset-preprocessing-config"
+    CHECKPOINT_TRAINING = "checkpoint-training"
+    ABLATION_REFERENCE = "ablation-reference-config"
 
 
 class GitMetadataToken(StrEnum):
@@ -257,6 +308,7 @@ class WorkspaceDirectoryToken(StrEnum):
 class WorkspaceFileToken(StrEnum):
     SMOKE_RECORD = "smoke_record.json"
     PREPROCESSING_LOG = "preprocessing.log"
+    REPORT_LOG = "reporting.log"
     EXPERIMENT_LOG = "experiment.log"
     SUMMARY_JSON = "summary.json"
     MANIFEST_JSON = "manifest.json"
@@ -716,22 +768,27 @@ class ReportColumnName(StrEnum):
     CERTIFIED_ROW_REQUIREMENT = "certified_row_requirement"
     CERTIFIED_YIELD = "certified_yield"
     CHECKPOINT_RULE = "checkpoint_rule"
+    CELL_SEMANTIC_KEY = "cell_semantic_key"
     CI_METHOD = "ci_method"
     CLAIM_FAMILY = "claim_family"
     CLASS = "class"
     CLEAN_ORACLE_ERROR = "clean_oracle_error"
+    CODE_REVISION = "code_revision"
     COMMUNICATION_BYTES = "communication_bytes"
     COMPARATOR = "comparator"
     COMPARISON = "comparison"
     COMPARISON_FAMILY = "comparison_family"
     COMPLETE_SEED_COUNT = "complete_seed_count"
     COMPLETE_SEEDS = "complete_seeds"
+    COMPARISON_ARTIFACT_ID = "comparison_artifact_id"
     COMPROMISED_COUNT = "compromised_count"
     CONDITION = "condition"
+    CONFIGURATION_DIGEST = "configuration_digest"
     CONFIDENCE_INTERVAL_95 = "confidence_interval_95"
     CORE_ACTION = "core_action"
     DATA_ROLES = "data_roles"
     DATASET = "dataset"
+    DATASET_MANIFEST_HASH = "dataset_manifest_hash"
     DEVICE_TYPE = "device_type"
     DIFFERENCE_FROM_FULL_REFERENCE = "difference_from_full_reference"
     DIRECTION = "direction"
@@ -785,6 +842,7 @@ class ReportColumnName(StrEnum):
     N_PAIRS = "n_pairs"
     NOMINAL_RUN_COUNT = "nominal_run_count"
     OBSERVATION_COUNT = "observation_count"
+    OBSERVATION_ID = "observation_id"
     OBSERVED_OUTCOME = "observed_outcome"
     OPTIMIZER = "optimizer"
     PAIRED_DZ = "paired_dz"
@@ -827,6 +885,9 @@ class ReportColumnName(StrEnum):
     STATE = "state"
     STATISTICAL_PASS = "statistical_pass"
     STORAGE_BYTES = "storage_bytes"
+    SCORING_ARTIFACT_IDS = "scoring_artifact_ids"
+    SOURCE_CELL_SEMANTIC_KEYS = "source_cell_semantic_keys"
+    SOURCE_OBSERVATION_IDS = "source_observation_ids"
     STRATEGY = "strategy"
     STRENGTH = "strength"
     SUPPORTED_F1_HARM = "supported_f1_harm"

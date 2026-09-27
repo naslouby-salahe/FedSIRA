@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,12 +16,20 @@ from fedsira.evaluation.scores import (
     publish_model_score,
     sample_ids_digest,
 )
+from fedsira.runtime import (
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
+)
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    monkeypatch.setattr("fedsira.evaluation.scores.REPOSITORY_ROOT", tmp_path)
-    return tmp_path
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
+    context: ApplicationContext = current_application_context().model_copy(
+        update={"repository_root": tmp_path}
+    )
+    with bound_application_context(context):
+        yield tmp_path
 
 
 def _shards(predicted: tuple[int, ...]) -> tuple[DomainClassScore, ...]:

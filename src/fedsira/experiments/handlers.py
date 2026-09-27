@@ -9,7 +9,11 @@ from typing import Protocol, cast
 import numpy
 import torch
 
-from fedsira.artifacts.paths import experiment_repetition_telemetry_root, prepared_evidence_root
+from fedsira.artifacts.paths import (
+    current_repository_root,
+    experiment_repetition_telemetry_root,
+    prepared_evidence_root,
+)
 from fedsira.datasets.ciciot2023.schema import TARGET_LABEL as CICIOT2023_TARGET_LABEL
 from fedsira.datasets.common import (
     BackdoorScope,
@@ -98,6 +102,7 @@ from fedsira.domain.types import (
     MasterSeed,
     MetricObservation,
     MetricValue,
+    Probability,
     ReproductionAttemptCount,
 )
 from fedsira.evaluation.comparisons import (
@@ -106,6 +111,7 @@ from fedsira.evaluation.comparisons import (
 )
 from fedsira.evaluation.metrics import (
     RealReportSummary,
+    benign_false_alarm_rate_increase,
     boundary_metric_set,
     clean_proposal_oracle_label,
     compute_screen_differential,
@@ -120,6 +126,7 @@ from fedsira.evaluation.metrics import (
     supported_macro_f1_harm,
     target_capability_gain,
 )
+from fedsira.evaluation.scores import capture_model_score_artifacts
 from fedsira.evaluation.screen_evidence import evaluate_screen_domain
 from fedsira.evaluation.service import (
     SingleProcessTimingWorker,
@@ -211,6 +218,7 @@ from fedsira.experiments.protocol_evidence import (
     record_verification_evidence,
 )
 from fedsira.experiments.reproduction_progression import (
+    model_replacement_attack_feasible_domains,
     reproduction_progression,
 )
 from fedsira.learning.federated import train_anchor
@@ -227,7 +235,6 @@ from fedsira.protocol.admission import (
 )
 from fedsira.protocol.attacks import (
     resolve_byzantine_verifier_vote,
-    select_model_replacement_carrier_rows,
     source_copy_update,
     validate_declared_source_backdoor_poison_fraction,
 )
@@ -270,7 +277,6 @@ from fedsira.protocol.capability_contract import (
     compute_capability_identity,
     reproduction_evidence_is_adequate,
     validate_source_excluded_production_weight,
-    verification_evidence_is_adequate,
 )
 from fedsira.protocol.proposal import (
     OpeningStageOutcome,
@@ -292,16 +298,12 @@ from fedsira.protocol.reproduction import (
 from fedsira.protocol.rules import (
     apply_logical_cycle_expiry,
     compute_t_evidence,
-    deduplicate_reports_by_proxy,
     diagnostic_at_least_two_byzantine_probability,
     first_cycle_with_minimum_eligible_evidence_holders,
     first_holder_cycle_for_domain,
     holder_count_at_cycle,
     krum_committee_is_admissible,
-    minimum_honest_positive_count,
-    report_for_domain,
     reproducer_order_for_cell,
-    resolve_ternary_outcome,
     resume_dormant_admission,
     validate_no_safety_completion_before_tau_k,
 )
@@ -323,7 +325,6 @@ from fedsira.protocol.verification import (
     verifier_panel,
 )
 from fedsira.runtime import (
-    REPOSITORY_ROOT,
     ElapsedTimer,
     FailureDetail,
     current_application_context,
@@ -363,11 +364,20 @@ class ProtocolCellDispatch:
     _last_compromised_reproducers: frozenset[DomainId]
     _last_ablation_strategy: AblationReproducerStrategy
     _last_reproduction_attempts: ReproductionAttemptCount
+    _last_certified_attempts: ReproductionAttemptCount
+    _last_verifier_report_count: ReproductionAttemptCount
+    _last_verifier_abstention_count: ReproductionAttemptCount
     _last_opening_stage: OpeningStageOutcome | None
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None: ...
 
     def backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None: ...
+
+    def source_backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None: ...
+
+    def _configured_backdoor_scope(
+        self, cell: ScientificCell, poison_fraction: Probability
+    ) -> BackdoorScope | None: ...
 
     def heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None: ...
 
@@ -921,7 +931,7 @@ class ProtocolCellDispatch:
                     cell.master_seed,
                     real_anchor,
                     source_domain,
-                    backdoor_scope=self.backdoor_scope_for_cell(screen_cell),
+                    backdoor_scope=self.source_backdoor_scope_for_cell(screen_cell),
                 )
                 if real_source_delta is not None:
                     publish_trained_update(
@@ -933,6 +943,7 @@ class ProtocolCellDispatch:
                         real_source_delta,
                         real_anchor.input_width,
                         real_anchor.output_width,
+                        self._primary_adapter.class_tokens,
                     )
         if real_anchor is None or source_domain is None:
             state = AdmissionState.DORMANT
@@ -1200,7 +1211,7 @@ class ProtocolCellDispatch:
         return tuple(observations)
 
     def _deployed_source_asr(self, cell: ScientificCell) -> MetricValue | None:
-        backdoor_scope = self.backdoor_scope_for_cell(cell)
+        backdoor_scope = self.source_backdoor_scope_for_cell(cell)
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(self._primary_adapter, cell)
         if backdoor_scope is None or real_anchor is None or source_domain is None:
@@ -1224,7 +1235,7 @@ class ProtocolCellDispatch:
         ).value
 
     def _ablation_production_asr(self, cell: ScientificCell) -> MetricValue | None:
-        backdoor_scope = self.backdoor_scope_for_cell(cell)
+        backdoor_scope = self.source_backdoor_scope_for_cell(cell)
         if backdoor_scope is None:
             return None
         real_anchor = self.real_anchor(cell.master_seed)
@@ -1311,12 +1322,16 @@ class ProtocolCellDispatch:
         cell: ScientificCell,
         evidence: PreparedEvidenceCounts,
         opening_resolved: BooleanValue = False,
+        verifier_condition_override: VerifierCondition | None = None,
     ) -> AdmissionState:
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
         self._last_committee_deltas = OrderedDict()
         self._last_compromised_reproducers = frozenset()
         self._last_ablation_strategy = AblationReproducerStrategy.NONE
         self._last_reproduction_attempts = 0
+        self._last_certified_attempts = 0
+        self._last_verifier_report_count = 0
+        self._last_verifier_abstention_count = 0
         if not opening_resolved:
             self._last_opening_stage = None
             stage = self._ablation_opening_stage(cell)
@@ -1426,14 +1441,22 @@ class ProtocolCellDispatch:
             single_verifier_active = False
         else:
             external_verification_active = (
-                cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
-                and cell.method == SourceExclusionMethod.FULL_FEDSIRA
+                (
+                    cell.experiment == EXTERNAL_VERIFICATION_NECESSITY_NAME
+                    and cell.method == SourceExclusionMethod.FULL_FEDSIRA
+                )
+                or cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME
+                or (
+                    cell.experiment == BYZANTINE_BOUND_VIOLATION_NAME
+                    and verifier_condition_override is not None
+                )
             )
             single_verifier_active = False
         required_row_count = row_requirement(cell, self._resolved_core)
         screened_source_delta = (
             self._last_opening_stage.source_delta if self._last_opening_stage is not None else None
         )
+        source_backdoor_scope = self.source_backdoor_scope_for_cell(cell)
         source_delta = (
             screened_source_delta
             if screened_source_delta is not None
@@ -1442,17 +1465,25 @@ class ProtocolCellDispatch:
                 cell.master_seed,
                 real_anchor,
                 source_domain,
-                backdoor_scope=self.backdoor_scope_for_cell(cell),
+                backdoor_scope=source_backdoor_scope,
             )
             if source_domain is not None
             and (
                 no_origin_exclusion_active
                 or byzantine_reproducer_copies_source_active
-                or self.backdoor_scope_for_cell(cell) is not None
+                or source_backdoor_scope is not None
             )
             else None
         )
         heterogeneity_scope = self.heterogeneity_scope_for_cell(cell)
+        verifier_robustness_condition = verifier_condition_override or (
+            VerifierCondition(cell.condition)
+            if cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME
+            else None
+        )
+        if verifier_condition_override is not None:
+            external_verification_active = True
+            single_verifier_active = False
         backdoor_scope = self.backdoor_scope_for_cell(cell)
         ablation_scenario = (
             ablation_scenario_for_condition(cell.condition)
@@ -1465,6 +1496,29 @@ class ProtocolCellDispatch:
             else AblationReproducerStrategy.NONE
         )
         compromised_reproducers = self._ablation_compromised_reproducers(cell, ablation_strategy)
+        if verifier_robustness_condition in (
+            VerifierCondition.ONE_FALSE_POSITIVE,
+            VerifierCondition.TWO_FALSE_POSITIVES,
+        ):
+            model_replacement_cell = replace(
+                cell, condition=ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR
+            )
+            backdoor_scope = self.backdoor_scope_for_cell(model_replacement_cell)
+            selected_reproducers = select_compromised_reproducers(
+                reproducer_order_for_cell(self._primary_adapter, cell),
+                model_replacement_attack_feasible_domains(self._primary_adapter),
+                1,
+            )
+            if selected_reproducers is None or backdoor_scope is None:
+                raise ValueError(
+                    "compromised-verifier fixture lacks its declared model-replacement row"
+                )
+            compromised_reproducers = frozenset(
+                NBaiotDomain(domain) for domain in selected_reproducers
+            )
+            ablation_strategy = AblationReproducerStrategy.MODEL_REPLACEMENT
+        self._last_compromised_reproducers = compromised_reproducers
+        self._last_ablation_strategy = ablation_strategy
         if single_verifier_active:
             reproduction_timer = ElapsedTimer()
             progression_state, attempts, commitment_hashes, updates = single_verifier_progression(
@@ -1502,6 +1556,8 @@ class ProtocolCellDispatch:
                 verification_timer = ElapsedTimer()
                 certified_positive_report_count = 0
                 certified_attempts = 0
+                verifier_report_count = 0
+                verifier_abstention_count = 0
                 for attempt, commitment_hash in zip(attempts, commitment_hashes, strict=False):
                     if not attempt.was_trained:
                         continue
@@ -1509,8 +1565,51 @@ class ProtocolCellDispatch:
                     if attempt_domain not in updates:
                         continue
                     candidate_flat = real_anchor.flat_parameters + updates[attempt_domain]
+                    compromised_verifiers: frozenset[DomainId] = frozenset()
                     if same_context_verification_active:
                         panel = self._same_context_verifier_panel(source_domain, attempt_domain)
+                    elif verifier_robustness_condition is not None:
+                        eligible_verifiers = tuple(
+                            domain
+                            for domain in self._primary_adapter.domain_ids
+                            if verifier_is_eligible(domain, source_domain, attempt.domain)
+                        )
+                        verifier_order = byzantine_selection_order(
+                            eligible_verifiers,
+                            derive_uint32(
+                                SeedDerivationLabel.BYZANTINE_VERIFIER_SELECTION,
+                                cell.master_seed,
+                            ),
+                        )
+                        compromised_verifier_total = compromised_verifier_count(
+                            verifier_robustness_condition
+                        )
+                        compromised_verifiers = select_compromised_verifiers(
+                            verifier_order, compromised_verifier_total
+                        )
+                        if cell.method == VerifierProfile.DETERMINISTIC_BOUND or (
+                            cell.experiment == BYZANTINE_BOUND_VIOLATION_NAME
+                            and verifier_condition_override is not None
+                        ):
+                            panel = construct_above_bound_panel(
+                                verifier_order[:compromised_verifier_total],
+                                tuple(
+                                    domain
+                                    for domain in verifier_order
+                                    if domain not in compromised_verifiers
+                                ),
+                                config.protocol.verification.panel_size,
+                            )
+                        else:
+                            panel = diagnostic_committee_panel(
+                                eligible_verifiers,
+                                committee_draw_namespace_seed=derive_uint32(
+                                    SeedDerivationLabel.VERIFIER_ROW_SEED,
+                                    cell.master_seed,
+                                    commitment_hash,
+                                ),
+                                panel_size=config.protocol.verification.panel_size,
+                            )
                     else:
                         panel = verifier_panel(
                             self._primary_adapter,
@@ -1523,8 +1622,28 @@ class ProtocolCellDispatch:
                         )
                     if not panel_votes_are_one_per_domain(panel):
                         return AdmissionState.DORMANT
+                    malicious_row = attempt_domain in compromised_reproducers
+                    is_false_negative = verifier_robustness_condition in (
+                        VerifierCondition.ONE_FALSE_NEGATIVE,
+                        VerifierCondition.TWO_FALSE_NEGATIVES,
+                    )
+                    is_false_positive = verifier_robustness_condition in (
+                        VerifierCondition.ONE_FALSE_POSITIVE,
+                        VerifierCondition.TWO_FALSE_POSITIVES,
+                    )
                     reports = tuple(
-                        honest_verifier_report(
+                        resolve_byzantine_verifier_vote(ByzantineVerifierBehavior.FALSE_NEGATIVE)
+                        if verifier_robustness_condition is not None
+                        and verifier_domain in compromised_verifiers
+                        and is_false_negative
+                        else resolve_byzantine_verifier_vote(
+                            ByzantineVerifierBehavior.FALSE_POSITIVE
+                        )
+                        if verifier_robustness_condition is not None
+                        and verifier_domain in compromised_verifiers
+                        and is_false_positive
+                        and malicious_row
+                        else honest_verifier_report(
                             self._primary_adapter,
                             real_anchor,
                             candidate_flat,
@@ -1537,6 +1656,10 @@ class ProtocolCellDispatch:
                         reports,
                         panel_size=config.protocol.verification.panel_size,
                         required_positive_reports=config.protocol.verification.required_positive_reports,
+                    )
+                    verifier_report_count += len(reports)
+                    verifier_abstention_count += sum(
+                        1 for report in reports if report is TernaryOutcome.ABSTAIN
                     )
                     record_verification_evidence(
                         cell=cell,
@@ -1569,11 +1692,32 @@ class ProtocolCellDispatch:
                     certified_attempts >= required_row_count,
                     config.protocol.verification,
                 )
+                self._last_certified_attempts = certified_attempts
+                self._last_verifier_report_count = verifier_report_count
+                self._last_verifier_abstention_count = verifier_abstention_count
                 self._last_protocol_phase_durations = (
                     self._last_protocol_phase_durations.with_verify_seconds(
                         verification_timer.elapsed_seconds()
                     )
                 )
+        if (
+            progression_state is AdmissionState.SYNTHESIS_PENDING
+            and verifier_robustness_condition is not None
+            and cell.method is VerifierProfile.RANDOM_COMMITTEE_DIAGNOSTIC
+        ):
+            eligible_verifier_count = sum(
+                1
+                for domain in self._primary_adapter.domain_ids
+                if verifier_is_eligible(domain, source_domain, attempts[0].domain)
+            )
+            contamination_probability = diagnostic_at_least_two_byzantine_probability(
+                eligible_verifier_count,
+                compromised_verifier_count(verifier_robustness_condition),
+                config.protocol.verification.panel_size,
+            )
+            diagnostic_profile = config.protocol.diagnostic_random_verifier_profile
+            if contamination_probability > diagnostic_profile.tolerated_contamination_risk:
+                progression_state = AdmissionState.DORMANT
         if progression_state is AdmissionState.SYNTHESIS_PENDING:
             synthesis_timer = ElapsedTimer()
             plurality_synthesis_active = (
@@ -1591,6 +1735,8 @@ class ProtocolCellDispatch:
                 or no_final_synthesis_gate_active
                 or no_origin_exclusion_active
                 or byzantine_reproducer_copies_source_active
+                or cell.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME
+                or verifier_condition_override is not None
             )
             (
                 state,
@@ -1683,7 +1829,7 @@ class ProtocolCellDispatch:
         if cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
             real_anchor = self.real_anchor(cell.master_seed)
             source_domain = source_domain_for_cell(self._primary_adapter, cell)
-            backdoor_scope = self.backdoor_scope_for_cell(cell)
+            backdoor_scope = self.source_backdoor_scope_for_cell(cell)
             if (
                 real_anchor is not None
                 and source_domain is not None
@@ -1850,24 +1996,16 @@ class ProtocolCellDispatch:
         return (state, metrics)
 
     def _execute_reproducer_robustness_cell(
-        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+        self,
+        cell: ScientificCell,
+        evidence: PreparedEvidenceCounts,
+        condition_override: ReproducerCondition | None = None,
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         config = current_application_context().scientific_config
-        condition = cell.condition
+        condition = condition_override or ReproducerCondition(cell.condition)
         compromised_count = compromised_reproducer_count(condition)
-        attack_seed = derive_uint32(SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed)
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(self._primary_adapter, cell)
-        carrier_rows = (
-            nbaiot_adapter(self._primary_adapter.prepared_root).load_rows(
-                source_domain,
-                self._primary_adapter.attack_carrier_class_token(),
-                Role.POST_REFERENCE_REPLAY,
-            )
-            if source_domain is not None
-            else None
-        )
-        carrier_ids = carrier_rows.sample_ids if carrier_rows is not None else ()
         if condition in (
             ReproducerCondition.ONE_SOURCE_COPY,
             ReproducerCondition.TWO_SOURCE_COPIES,
@@ -1886,30 +2024,46 @@ class ProtocolCellDispatch:
                 source_copy_update(
                     real_anchor.flat_parameters + source_delta, real_anchor.flat_parameters
                 )
-        elif condition in (
-            ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
-            ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
-            ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
-            ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
-        ):
-            select_model_replacement_carrier_rows(
-                carrier_ids,
-                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
-                attack_seed,
-            )
         if compromised_count == 0:
             state = self._advance_protocol(cell, evidence)
         else:
+            attack_feasible_domains = frozenset(self._primary_adapter.domain_ids)
+            if condition in (
+                ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+                ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+                ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+                ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+            ):
+                attack_feasible_domains = model_replacement_attack_feasible_domains(
+                    self._primary_adapter
+                )
             selected = select_compromised_reproducers(
                 reproducer_order_for_cell(self._primary_adapter, cell),
-                frozenset(self._primary_adapter.domain_ids),
+                attack_feasible_domains,
                 compromised_count,
             )
-            compromised_reproducers: frozenset[DomainId] = (
-                frozenset(NBaiotDomain(domain) for domain in selected)
-                if selected is not None
-                else frozenset()
+            if selected is None:
+                raise ValueError(
+                    "planned compromised-reproducer count exceeds attack-feasible domains"
+                )
+            compromised_reproducers = frozenset(NBaiotDomain(domain) for domain in selected)
+            reproducer_strategy = (
+                AblationReproducerStrategy.MODEL_REPLACEMENT
+                if condition
+                in (
+                    ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+                    ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+                )
+                else AblationReproducerStrategy.VERIFIER_AWARE
+                if condition
+                in (
+                    ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+                    ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+                )
+                else AblationReproducerStrategy.NONE
             )
+            self._last_compromised_reproducers = compromised_reproducers
+            self._last_ablation_strategy = reproducer_strategy
             required_row_count = row_requirement(cell)
             progression_state, attempts, _commitment_hashes, updates = reproduction_progression(
                 cell,
@@ -1919,8 +2073,11 @@ class ProtocolCellDispatch:
                 compromised_reproducers,
                 self._primary_adapter,
                 real_anchor,
-                backdoor_scope=self.backdoor_scope_for_cell(cell),
+                strategy=reproducer_strategy,
+                backdoor_scope=self.backdoor_scope_for_cell(replace(cell, condition=condition)),
             )
+            self._last_committee_deltas = updates
+            self._last_reproduction_attempts = len(attempts)
             if (
                 progression_state is AdmissionState.SYNTHESIS_PENDING
                 and krum_committee_is_admissible(
@@ -1960,154 +2117,93 @@ class ProtocolCellDispatch:
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
         )
-        return (state, metrics)
+        malicious_admission: MetricValue | None = (
+            float(
+                state is AdmissionState.ADMITTED and self._ablation_production_is_compromised(cell)
+            )
+            if compromised_count
+            else None
+        )
+        return (state, (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission)))
 
     def _execute_verifier_robustness_cell(
-        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+        self,
+        cell: ScientificCell,
+        evidence: PreparedEvidenceCounts,
+        condition_override: VerifierCondition | None = None,
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
-        config = current_application_context().scientific_config
-        condition = cell.condition
-        profile = cell.method
-        is_deterministic = profile == VerifierProfile.DETERMINISTIC_BOUND
-        if not verification_evidence_is_adequate(
-            evidence.reproduction_target_count,
-            evidence.reproduction_supported_count,
-            config.capability_contract.evidence_minima,
-        ):
-            state = AdmissionState.DORMANT
-        else:
-            source_domain = source_domain_for_cell(self._primary_adapter, cell)
-            reproducer_domain = reproducer_order_for_cell(self._primary_adapter, cell)[0]
-            eligible_verifiers = tuple(
-                domain
-                for domain in self._primary_adapter.domain_ids
-                if verifier_is_eligible(domain, source_domain, reproducer_domain)
-            )
-            byzantine_order = byzantine_selection_order(
-                eligible_verifiers,
-                derive_uint32(SeedDerivationLabel.BYZANTINE_VERIFIER_SELECTION, cell.master_seed),
-            )
-            compromised_count = compromised_verifier_count(condition)
-            compromised_verifiers = select_compromised_verifiers(byzantine_order, compromised_count)
-            compromised_domains = byzantine_order[:compromised_count]
-            honest_post_commitment_order = tuple(
-                domain for domain in byzantine_order if domain not in compromised_verifiers
-            )
-            if is_deterministic:
-                panel = construct_above_bound_panel(
-                    compromised_domains,
-                    honest_post_commitment_order,
-                    config.protocol.verification.panel_size,
-                )
-            else:
-                panel = diagnostic_committee_panel(
-                    eligible_verifiers,
-                    committee_draw_namespace_seed=derive_uint32(
-                        SeedDerivationLabel.VERIFIER_ROW_SEED, cell.master_seed
-                    ),
-                    panel_size=config.protocol.verification.panel_size,
-                )
-            if not panel_votes_are_one_per_domain(panel):
-                state = AdmissionState.DORMANT
-            else:
-                false_negative_domains: frozenset[DomainId] = (
-                    frozenset(NBaiotDomain(domain) for domain in panel[:compromised_count])
-                    if condition
-                    in (
-                        VerifierCondition.ONE_FALSE_NEGATIVE,
-                        VerifierCondition.TWO_FALSE_NEGATIVES,
-                    )
-                    else frozenset()
-                )
-                false_positive_active = condition in (
-                    VerifierCondition.ONE_FALSE_POSITIVE,
-                    VerifierCondition.TWO_FALSE_POSITIVES,
-                )
-                compromised_domains_set = frozenset(panel[:compromised_count])
-                byzantine_behavior = (
-                    ByzantineVerifierBehavior.FALSE_POSITIVE
-                    if false_positive_active
-                    else ByzantineVerifierBehavior.FALSE_NEGATIVE
-                )
-                byzantine_vote = resolve_byzantine_verifier_vote(byzantine_behavior)
-                deduplicated = deduplicate_reports_by_proxy(
-                    tuple(
-                        (
-                            domain,
-                            byzantine_vote
-                            if domain in compromised_domains_set
-                            else resolve_ternary_outcome(
-                                True, domain not in false_negative_domains
-                            ),
-                        )
-                        for domain in panel
-                    )
-                )
-                reports = tuple(report_for_domain(deduplicated, domain) for domain in panel)
-                certified = reproduction_row_is_certified(
-                    reports,
-                    panel_size=config.protocol.verification.panel_size,
-                    required_positive_reports=config.protocol.verification.required_positive_reports,
-                )
-                honest_positive_bound = minimum_honest_positive_count(
-                    sum(1 for report in reports if report is TernaryOutcome.POSITIVE),
-                    compromised_count,
-                )
-                if is_deterministic:
-                    diagnostic_passes = True
-                else:
-                    contamination_probability = diagnostic_at_least_two_byzantine_probability(
-                        len(eligible_verifiers),
-                        compromised_count,
-                        config.protocol.verification.panel_size,
-                    )
-                    diagnostic_profile = config.protocol.diagnostic_random_verifier_profile
-                    diagnostic_passes = (
-                        contamination_probability <= diagnostic_profile.tolerated_contamination_risk
-                    )
-                minimum_gate_domains = (
-                    config.protocol.final_gate.minimum_adequate_non_source_domains
-                )
-                state = (
-                    AdmissionState.ADMITTED
-                    if diagnostic_passes
-                    and certified
-                    and (evidence.final_gate_adequate_domain_count >= minimum_gate_domains)
-                    and (honest_positive_bound >= 1)
-                    else AdmissionState.DORMANT
-                )
+        state = self._advance_protocol(
+            cell, evidence, verifier_condition_override=condition_override
+        )
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
         )
-        return (state, metrics)
+        condition = condition_override or VerifierCondition(cell.condition)
+        malicious_case = condition in (
+            VerifierCondition.ONE_FALSE_POSITIVE,
+            VerifierCondition.TWO_FALSE_POSITIVES,
+        )
+        malicious_admission: MetricValue | None = (
+            float(
+                state is AdmissionState.ADMITTED and self._ablation_production_is_compromised(cell)
+            )
+            if malicious_case
+            else None
+        )
+        certified_yield: MetricValue | None = (
+            self._last_certified_attempts / self._last_reproduction_attempts
+            if self._last_reproduction_attempts
+            else None
+        )
+        verifier_abstention_rate: MetricValue | None = (
+            self._last_verifier_abstention_count / self._last_verifier_report_count
+            if self._last_verifier_report_count
+            else None
+        )
+        metrics = observations_with_replacements(
+            metrics,
+            (
+                (DescriptiveScientificMetric.CERTIFIED_ROW_YIELD, certified_yield),
+                (DescriptiveScientificMetric.VERIFIER_ABSTENTION_RATE, verifier_abstention_rate),
+            ),
+        )
+        return (state, (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission)))
 
     def _execute_byzantine_bound_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
         condition = BoundCondition(cell.condition)
         if condition is BoundCondition.ONE_BYZANTINE_REPRODUCER_WITHIN_BOUND:
-            reproducer_cell = replace(
-                cell, condition=ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR
-            )
-            return self._execute_reproducer_robustness_cell(reproducer_cell, evidence)
-        if condition is BoundCondition.TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND:
-            reproducer_cell = replace(
-                cell, condition=ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS
-            )
-            return self._execute_reproducer_robustness_cell(reproducer_cell, evidence)
-        if condition is BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND:
-            verifier_cell = replace(
+            return self._execute_reproducer_robustness_cell(
                 cell,
-                method=VerifierProfile.DETERMINISTIC_BOUND,
-                condition=VerifierCondition.ONE_FALSE_POSITIVE,
+                evidence,
+                ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
             )
-            return self._execute_verifier_robustness_cell(verifier_cell, evidence)
-        verifier_cell = replace(
-            cell,
-            method=VerifierProfile.DETERMINISTIC_BOUND,
-            condition=VerifierCondition.TWO_FALSE_POSITIVES,
+        if condition is BoundCondition.TWO_BYZANTINE_REPRODUCERS_ABOVE_BOUND:
+            return self._execute_reproducer_robustness_cell(
+                cell,
+                evidence,
+                ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+            )
+        if condition is BoundCondition.ONE_BYZANTINE_VERIFIER_WITHIN_BOUND:
+            if cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM:
+                return self._execute_reproducer_robustness_cell(
+                    cell,
+                    evidence,
+                    ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+                )
+            return self._execute_verifier_robustness_cell(
+                cell, evidence, VerifierCondition.ONE_FALSE_POSITIVE
+            )
+        if cell.method == BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM:
+            return self._execute_reproducer_robustness_cell(
+                cell,
+                evidence,
+                ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+            )
+        return self._execute_verifier_robustness_cell(
+            cell, evidence, VerifierCondition.TWO_FALSE_POSITIVES
         )
-        return self._execute_verifier_robustness_cell(verifier_cell, evidence)
 
     def _execute_secondary_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -2329,7 +2425,7 @@ class ProtocolCellDispatch:
         state, bytes_total, transmissions = observation.value
         if cell.repetition is None:
             raise ValueError("Efficiency Measurement cell requires a repetition identity")
-        diagnostic_root = REPOSITORY_ROOT / experiment_repetition_telemetry_root(
+        diagnostic_root = current_repository_root() / experiment_repetition_telemetry_root(
             cell.experiment,
             cell.method,
             cell.master_seed,
@@ -2474,6 +2570,15 @@ def validate_cell_handler_registration() -> None:
     unknown = mapped - registered
     if unknown:
         raise ValueError(f"cell handlers for unregistered experiments: {sorted(unknown)}")
+    missing_methods = {
+        registration.handler
+        for registration in CELL_HANDLER_REGISTRATIONS
+        if not callable(getattr(ProtocolCellExecutor, registration.handler, None))
+    }
+    if missing_methods:
+        raise ValueError(
+            f"registered experiment handlers are missing methods: {sorted(missing_methods)}"
+        )
 
 
 class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellDispatch):
@@ -2483,6 +2588,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         secondary_prepared_root: Path | None = None,
         resolved_core: ResolvedCore | None = None,
     ) -> None:
+        validate_cell_handler_registration()
         self._primary_adapter = DatasetAdapter(
             specification=dataset_specification(DatasetId.N_BAIOT),
             prepared_root=primary_prepared_root or prepared_evidence_root(DatasetId.N_BAIOT),
@@ -2507,7 +2613,12 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
                 else None
             )
             if anchor is not None:
-                publish_anchor_checkpoints(self._primary_adapter.dataset, master_seed, anchor)
+                publish_anchor_checkpoints(
+                    self._primary_adapter.dataset,
+                    master_seed,
+                    anchor,
+                    self._primary_adapter.class_tokens,
+                )
             self.real_anchor_cache[master_seed] = anchor
         return self.real_anchor_cache[master_seed]
 
@@ -2587,14 +2698,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         supported_macro_f1_drop = supported_macro_f1_harm(
             anchor_screen.supported_macro_f1, candidate_screen.supported_macro_f1
         )
-        benign_far_increase = (
-            MetricResult(
-                value=candidate_screen.benign_far.value - anchor_screen.benign_far.value,
-                denominator=1,
-            )
-            if candidate_screen.benign_far.value is not None
-            and anchor_screen.benign_far.value is not None
-            else MetricResult(value=None, denominator=0)
+        benign_far_increase = benign_false_alarm_rate_increase(
+            candidate_screen.benign_far, anchor_screen.benign_far
         )
         return capability_contract_passes(
             contract,
@@ -2646,14 +2751,8 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         supported_macro_f1_drop = supported_macro_f1_harm(
             anchor_screen.supported_macro_f1, candidate_screen.supported_macro_f1
         )
-        benign_far_increase = (
-            MetricResult(
-                value=candidate_screen.benign_far.value - anchor_screen.benign_far.value,
-                denominator=1,
-            )
-            if candidate_screen.benign_far.value is not None
-            and anchor_screen.benign_far.value is not None
-            else MetricResult(value=None, denominator=0)
+        benign_far_increase = benign_false_alarm_rate_increase(
+            candidate_screen.benign_far, anchor_screen.benign_far
         )
         return capability_contract_passes(
             contract,
@@ -2663,18 +2762,14 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             benign_far_increase,
         )
 
-    def backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
+    def _configured_backdoor_scope(
+        self, cell: ScientificCell, poison_fraction: Probability
+    ) -> BackdoorScope | None:
         config = current_application_context().scientific_config
-        if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
-            return None
         real_feature_names = prepared_feature_names(self._primary_adapter.prepared_root)
         if real_feature_names is None:
             return None
         trigger_indices = tuple(real_feature_names.index(name) for name in NBAIOT_TRIGGER_FEATURES)
-        poison_fraction = (
-            config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction
-        )
-        validate_declared_source_backdoor_poison_fraction(poison_fraction)
         return BackdoorScope(
             attack_generation_seed=derive_uint32(
                 SeedDerivationLabel.ATTACK_GENERATION_SEED, cell.master_seed
@@ -2682,6 +2777,43 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             poison_fraction=poison_fraction,
             trigger_feature_indices=trigger_indices,
             trigger_value=config.attacks_and_boundaries.hidden_source_backdoor.trigger_value_after_standardization,
+        )
+
+    def source_backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
+        if cell.condition != ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT:
+            return None
+        config = current_application_context().scientific_config
+        poison_fraction = (
+            config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction
+        )
+        validate_declared_source_backdoor_poison_fraction(poison_fraction)
+        return self._configured_backdoor_scope(cell, poison_fraction)
+
+    def backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None:
+        source_scope = self.source_backdoor_scope_for_cell(cell)
+        if source_scope is not None:
+            return source_scope
+        replacement_conditions = (
+            ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+            ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+            ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+            ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+        )
+        ablation_scenario = ablation_scenario_for_condition(cell.condition)
+        ablation_strategy = (
+            ablation_reproducer_strategy(ablation_scenario)
+            if ablation_scenario is not None
+            else AblationReproducerStrategy.NONE
+        )
+        if cell.condition not in replacement_conditions and ablation_strategy not in (
+            AblationReproducerStrategy.MODEL_REPLACEMENT,
+            AblationReproducerStrategy.VERIFIER_AWARE,
+        ):
+            return None
+        config = current_application_context().scientific_config
+        return self._configured_backdoor_scope(
+            cell,
+            config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
         )
 
     def heterogeneity_scope_for_cell(self, cell: ScientificCell) -> HeterogeneityScope | None:
@@ -2735,20 +2867,22 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
                     "prepared evidence is not materialized for this cell; "
                     "run fedsira preprocess first",
                 )
-        try:
-            _state, metrics = self._execute_cell_protocol(cell, evidence)
-        except ValueError as error:
-            return CellExecutionOutcome(
-                cell=cell,
-                terminal_state=ExperimentLifecycleState.INVALID,
-                failure=FailureDetail(
-                    failure_class=FailureClass.INVARIANT_VIOLATION,
-                    message=str(error),
-                    cell_phase=ScientificCellPhase.PREPARE,
-                ),
-            )
+        with capture_model_score_artifacts() as score_artifacts:
+            try:
+                _state, metrics = self._execute_cell_protocol(cell, evidence)
+            except ValueError as error:
+                return CellExecutionOutcome(
+                    cell=cell,
+                    terminal_state=ExperimentLifecycleState.INVALID,
+                    failure=FailureDetail(
+                        failure_class=FailureClass.INVARIANT_VIOLATION,
+                        message=str(error),
+                        cell_phase=ScientificCellPhase.PREPARE,
+                    ),
+                    scoring_artifact_ids=tuple(sorted(set(score_artifacts))),
+                )
         trajectory = (
-            self._evidence_scarcity_trajectory(metrics, _state)
+            self.evidence_scarcity_trajectory(metrics, _state)
             if cell.experiment == EVIDENCE_SCARCITY_AND_DORMANCY_NAME
             else ()
         )
@@ -2758,9 +2892,10 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             failure=None,
             metrics=metrics,
             state_trajectory=trajectory,
+            scoring_artifact_ids=tuple(sorted(set(score_artifacts))),
         )
 
-    def _evidence_scarcity_trajectory(
+    def evidence_scarcity_trajectory(
         self,
         metrics: tuple[MetricObservation, ...],
         terminal_state: AdmissionState,
@@ -2778,12 +2913,14 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         return tuple(
             AdmissionStateObservation(
                 cycle=cycle,
-                state=(
+                state=apply_logical_cycle_expiry(
                     AdmissionState.DORMANT
                     if arrival_cycle is None or cycle < arrival_cycle
                     else AdmissionState.VERIFICATION_PENDING
                     if cycle == arrival_cycle
-                    else terminal_state
+                    else terminal_state,
+                    cycle,
+                    scientific_config.protocol.resource_horizon,
                 ),
             )
             for cycle in range(horizon + 1)
@@ -2843,6 +2980,7 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             production_checkpoint - real_anchor.flat_parameters,
             real_anchor.input_width,
             real_anchor.output_width,
+            self._primary_adapter.class_tokens,
         )
         state = ProtocolBaselineOutcomes._final_gate_outcome(
             self, evidence, source_domain, real_anchor, production_checkpoint

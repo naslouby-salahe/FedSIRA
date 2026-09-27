@@ -28,6 +28,26 @@ def generic_wrapper_violations(tree: ast.Module) -> list[str]:
             for imported in node.names:
                 if imported.name in FORBIDDEN_GENERIC_ALIASES:
                     found.append(f"import:{imported.name}:{node.lineno}")
+    annotations = [
+        node.annotation for node in ast.walk(tree) if isinstance(node, ast.arg | ast.AnnAssign)
+    ]
+    annotations.extend(
+        node.returns
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.returns is not None
+    )
+    for annotation in annotations:
+        if not isinstance(annotation, ast.Constant) or not isinstance(annotation.value, str):
+            continue
+        try:
+            parsed = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            continue
+        for node in ast.walk(parsed):
+            if isinstance(node, ast.Name) and node.id in FORBIDDEN_GENERIC_ALIASES:
+                found.append(f"string-name:{node.id}:{annotation.lineno}")
+            elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_GENERIC_ALIASES:
+                found.append(f"string-attribute:{node.attr}:{annotation.lineno}")
     return found
 
 
@@ -65,3 +85,10 @@ def test_qualified_forbidden_alias_is_detected() -> None:
         path = Path(tmp) / "offending.py"
         path.write_text("import fedsira.domain.types as t\nVALUE: t.NonNegativeInt = 0\n")
         assert generic_wrapper_violations(parse(path)) == ["attribute:NonNegativeInt:2"]
+
+
+def test_stringified_forbidden_alias_annotation_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text("def handler(value: 'list[PositiveInt]') -> None:\n    return None\n")
+        assert generic_wrapper_violations(parse(path)) == ["string-name:PositiveInt:1"]

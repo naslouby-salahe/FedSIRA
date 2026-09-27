@@ -17,9 +17,7 @@ VIEW_KEY = "DANMINI_DOORBELL_GAFGYT_COMBO_ROW_VERIFICATION"
 
 
 @pytest.fixture
-def prepared_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Path]:
-    monkeypatch.setattr("fedsira.datasets.prepared_validation.REPOSITORY_ROOT", tmp_path)
-    monkeypatch.setattr("fedsira.datasets.preprocess.REPOSITORY_ROOT", tmp_path)
+def prepared_root(tmp_path: Path) -> Iterator[Path]:
     root = tmp_path / "prepared"
     root.mkdir()
     context = current_application_context().model_copy(update={"repository_root": tmp_path})

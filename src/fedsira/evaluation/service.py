@@ -3,13 +3,16 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from pathlib import Path
 from typing import TypeAlias
 
 import torch
 
-from fedsira.artifacts.paths import artifact_slot_directory
-from fedsira.artifacts.store import read_current_artifact
+from fedsira.artifacts.paths import (
+    artifact_slot_directory,
+    current_repository_root,
+    execution_workspace_root,
+)
+from fedsira.artifacts.store import artifact_identity, read_current_artifact
 from fedsira.datasets.common import (
     DatasetAdapter,
     EpistemicFailureScope,
@@ -54,6 +57,7 @@ from fedsira.domain.types import (
     WallClockSeconds,
     WarmupPassCount,
 )
+from fedsira.evaluation.comparison_evidence import current_comparison_evidence
 from fedsira.evaluation.comparisons import (
     ComparisonDefinition,
     ComparisonEffectScale,
@@ -67,7 +71,9 @@ from fedsira.evaluation.comparisons import (
     evaluate_comparison,
 )
 from fedsira.evaluation.metrics import (
+    benign_false_alarm_rate_increase,
     evaluate_domain,
+    metric_mean,
     non_source_domains,
     supported_macro_f1_harm,
 )
@@ -78,10 +84,12 @@ from fedsira.evaluation.statistics import (
 )
 from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, experiment_by_name
 from fedsira.experiments.engine import (
+    ABLATION_REFERENCE_PROCEDURE_IDENTITY,
     CellExecutionOutcome,
     ExecutionRecordStore,
     PersistedAblationReference,
     PersistedExecutionRecord,
+    ablation_reference_dependencies,
     ablation_reference_slot,
 )
 from fedsira.learning.model import (
@@ -92,7 +100,6 @@ from fedsira.learning.model import (
 )
 from fedsira.learning.post_reference import train_domain_reproduction_delta
 from fedsira.runtime import (
-    REPOSITORY_ROOT,
     CudaIntervalTimer,
     ElapsedTimer,
     current_application_context,
@@ -125,8 +132,8 @@ def _comparison_pairs(
     dataset: DatasetId,
     metric_index: tuple[MetricCellRecord, ...],
     master_seeds: tuple[MasterSeed, ...],
-) -> tuple[PairedDifference, ...]:
-    paired: list[PairedDifference] = []
+) -> tuple[tuple[MasterSeed, PairedDifference], ...]:
+    paired: list[tuple[MasterSeed, PairedDifference]] = []
     for seed in master_seeds:
         method_key = MetricCellKey(
             dataset=dataset,
@@ -155,7 +162,7 @@ def _comparison_pairs(
             definition.orientation, definition.effect_scale, method_value, reference_value
         )
         if difference is not None:
-            paired.append(difference)
+            paired.append((seed, difference))
     return tuple(paired)
 
 
@@ -167,10 +174,19 @@ def ablation_reference_records(
     for scientific_scenario in AblationScenario:
         for master_seed in master_seeds:
             slot = ablation_reference_slot(scientific_scenario, master_seed)
-            current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+            current = read_current_artifact(
+                current_repository_root() / artifact_slot_directory(slot)
+            )
             if current is None:
                 continue
-            _manifest, payload = current
+            manifest, payload = current
+            expected_identity = artifact_identity(
+                slot,
+                ablation_reference_dependencies(dataset),
+                ABLATION_REFERENCE_PROCEDURE_IDENTITY,
+            )
+            if manifest.identity != expected_identity:
+                continue
             reference = PersistedAblationReference.model_validate_json(payload)
             records = merge_metric_record(
                 records,
@@ -188,7 +204,15 @@ def ablation_reference_records(
     return records
 
 
-def comparison_results_for_experiment(
+def read_comparison_results_for_experiment(
+    experiment: ExperimentName,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> tuple[ComparisonFamilyResult, ...]:
+    current = current_comparison_evidence(experiment, records)
+    return () if current is None else current[1].families
+
+
+def build_comparison_results_for_experiment(
     experiment: ExperimentName,
     dataset: DatasetId,
     outcomes: tuple[CellExecutionOutcome, ...],
@@ -202,9 +226,7 @@ def comparison_results_for_experiment(
     )
     if not definitions:
         return ()
-    execution_store = store or ExecutionRecordStore(
-        Path(config.execution.repository_layout.execution_workspace)
-    )
+    execution_store = store or ExecutionRecordStore(execution_workspace_root())
     metric_index = metric_index_from_outcomes(dataset, outcomes)
     if experiment == MECHANISM_ABLATION_NAME:
         metric_index = merge_metric_records(
@@ -242,7 +264,9 @@ def comparison_results_for_experiment(
             paired = _comparison_pairs(
                 definition, dataset, metric_index, config.seeds_and_determinism.master_seeds
             )
-            complete_seeds: CompleteSeedCount = len(paired)
+            paired_master_seeds = tuple(seed for seed, _difference in paired)
+            paired_differences = tuple(difference for _seed, difference in paired)
+            complete_seeds: CompleteSeedCount = len(paired_differences)
             if complete_seeds < minimum_complete_pairs:
                 state = (
                     ComparisonState.UNDEFINED
@@ -252,7 +276,7 @@ def comparison_results_for_experiment(
                 results.append(
                     ComparisonResult(
                         definition=definition,
-                        paired_differences=paired,
+                        paired_differences=paired_differences,
                         complete_seed_count=complete_seeds,
                         mean_paired_difference=None,
                         median_paired_difference=None,
@@ -262,15 +286,30 @@ def comparison_results_for_experiment(
                         confidence_interval=None,
                         materiality_passes=None,
                         comparison_state=state,
+                        paired_master_seeds=paired_master_seeds,
                     )
                 )
                 continue
+            evaluated = evaluate_comparison(
+                definition,
+                paired_differences,
+                config.metrics_and_statistics.bootstrap,
+                config.seeds_and_determinism.analysis_seed,
+            )
             results.append(
-                evaluate_comparison(
-                    definition,
-                    paired,
-                    config.metrics_and_statistics.bootstrap,
-                    config.seeds_and_determinism.analysis_seed,
+                ComparisonResult(
+                    definition=evaluated.definition,
+                    paired_differences=evaluated.paired_differences,
+                    complete_seed_count=evaluated.complete_seed_count,
+                    mean_paired_difference=evaluated.mean_paired_difference,
+                    median_paired_difference=evaluated.median_paired_difference,
+                    paired_standardized_effect=evaluated.paired_standardized_effect,
+                    raw_p_value=evaluated.raw_p_value,
+                    adjusted_p_value=evaluated.adjusted_p_value,
+                    confidence_interval=evaluated.confidence_interval,
+                    materiality_passes=evaluated.materiality_passes,
+                    comparison_state=evaluated.comparison_state,
+                    paired_master_seeds=paired_master_seeds,
                 )
             )
         families.append(
@@ -490,15 +529,9 @@ def compute_capability_under_specification_summary(
                 anchor_metrics.supported_macro_f1, scoped_metrics.supported_macro_f1
             )
         )
-        if anchor_metrics.benign_far.value is None or scoped_metrics.benign_far.value is None:
-            benign_far_increases.append(MetricResult(value=None, denominator=0))
-        else:
-            benign_far_increases.append(
-                MetricResult(
-                    value=scoped_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                    denominator=1,
-                )
-            )
+        benign_far_increases.append(
+            benign_false_alarm_rate_increase(scoped_metrics.benign_far, anchor_metrics.benign_far)
+        )
         a_scoped_metrics = evaluate_domain(
             adapter,
             anchor,
@@ -620,7 +653,7 @@ def _diagnostic_marker_for_domain(
     with torch.no_grad():
         marked_features = torch.tensor(marked_rows.features, dtype=torch.float32)
         predictions = torch.argmax(logits_for_samples(production_model, marked_features), dim=-1)
-    marker_rate = float((predictions == target_class_index).float().mean())
+    marker_rate = metric_mean(predictions == target_class_index)
     return diagnostic_marker_metric_or_insufficient(matched_pairs, marker_rate)
 
 
@@ -676,15 +709,11 @@ def compute_shared_epistemic_failure_summary(
                 anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
             )
         )
-        if anchor_metrics.benign_far.value is None or production_metrics.benign_far.value is None:
-            benign_far_increases.append(MetricResult(value=None, denominator=0))
-        else:
-            benign_far_increases.append(
-                MetricResult(
-                    value=production_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                    denominator=1,
-                )
+        benign_far_increases.append(
+            benign_false_alarm_rate_increase(
+                production_metrics.benign_far, anchor_metrics.benign_far
             )
+        )
         if has_diagnostic_marker:
             marker_result, _reason = _diagnostic_marker_for_domain(
                 adapter, anchor, production_flat, domain, epistemic_failure_scope

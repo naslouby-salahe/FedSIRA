@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -28,14 +29,22 @@ from fedsira.experiments.protocol_evidence import (
     publish_verifier_assignment_report,
 )
 from fedsira.reporting.verification import artifact_manifest_dependency_failures
+from fedsira.runtime import (
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
+)
 
 EXPERIMENT = ExperimentName.MECHANISM_ABLATION
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    monkeypatch.setattr("fedsira.experiments.protocol_evidence.REPOSITORY_ROOT", tmp_path)
-    return tmp_path
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
+    context: ApplicationContext = current_application_context().model_copy(
+        update={"repository_root": tmp_path}
+    )
+    with bound_application_context(context):
+        yield tmp_path
 
 
 def _verifier_report(commitment: str) -> VerifierAssignmentReportPayload:

@@ -4,7 +4,9 @@ from fedsira.artifacts.paths import (
     artifact_publication_root,
     execution_outputs_root,
     manuscript_results_root,
+    preprocessing_log_path,
     preprocessing_root,
+    reporting_log_path,
     workspace_root_for_family,
 )
 from fedsira.domain.enums import ArtifactFamily, ExperimentName
@@ -34,6 +36,10 @@ def test_every_artifact_family_is_visible_to_the_report_gate() -> None:
 def test_report_gate_roots_are_distinct_and_ordered_by_scope() -> None:
     roots = _report_gate_roots()
     assert len(set(roots)) == len(roots)
+
+
+def test_reporting_and_preprocessing_write_to_separate_log_files() -> None:
+    assert reporting_log_path() != preprocessing_log_path()
 
 
 def test_preprocessing_family_workspaces_stay_inside_the_preprocessing_root() -> None:

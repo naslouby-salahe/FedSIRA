@@ -1,20 +1,47 @@
+import hashlib
 from pathlib import Path
 
 import duckdb
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.ciciot2023.prepare import (
+    CICIoTPreparedViewMetadata,
     SecondaryCsvFile,
     assign_secondary_roles,
-    compute_stable_row_id,
+    framed_sha256_sql,
     materialize_ciciot2023_prepared_views,
+    pseudo_domain_sql,
     resolve_predictor_columns,
     resolve_row_identifier_columns,
+    sampling_digest_sql,
 )
-from fedsira.datasets.ciciot2023.schema import BENIGN_LABEL, TARGET_LABEL, CICIoT2023PseudoDomain
-from fedsira.datasets.common import DatasetExclusionReason, Role
+from fedsira.datasets.ciciot2023.schema import (
+    BENIGN_LABEL,
+    PSEUDO_DOMAIN_COUNT,
+    TARGET_LABEL,
+    CICIoT2023PseudoDomain,
+)
+from fedsira.datasets.common import (
+    PREPROCESSING_SAMPLE_ORDER_SEED,
+    DatasetExclusionReason,
+    Role,
+    compute_file_checksum,
+    sql_string,
+)
+from fedsira.domain.enums import SeedDerivationLabel
+from fedsira.runtime import framed_bytes
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+
+
+def _query_scalar(sql: str) -> object:
+    connection = duckdb.connect()
+    try:
+        row = connection.execute(sql).fetchone()
+        assert row is not None
+        return row[0]
+    finally:
+        connection.close()
 
 
 def _seed_retained(
@@ -42,16 +69,62 @@ def _roles_by_stable_row_id(database_path: Path) -> dict[str, Role]:
     return {str(stable_row_id): Role[str(role_token)] for stable_row_id, role_token in rows}
 
 
-def test_compute_stable_row_id_is_a_sha256_hex_digest() -> None:
-    digest = compute_stable_row_id("a/b.csv", "a" * 64, 0)
-    assert len(digest) == 64
-    bytes.fromhex(digest)
+def test_native_sql_framed_sha256_matches_python() -> None:
+    fields = ("CICIOT2023_SAMPLE_ID_V1", "a/b.csv", "a" * 64, "928")
+    sql = framed_sha256_sql(tuple(sql_string(field) for field in fields))
+    actual = _query_scalar(f"SELECT {sql}")
+    expected = hashlib.sha256(framed_bytes(*fields)).hexdigest()
+    assert actual == expected
 
 
-def test_compute_stable_row_id_changes_with_row_index() -> None:
-    first = compute_stable_row_id("a/b.csv", "a" * 64, 0)
-    second = compute_stable_row_id("a/b.csv", "a" * 64, 1)
-    assert first != second
+def test_native_sql_pseudo_domain_matches_python() -> None:
+    manifest = "f" * 64
+    label = "MIRAI_GREETH_FLOOD"
+    row_id = "a" * 64
+    salt = 730201
+    sql = pseudo_domain_sql(sql_string(label), sql_string(row_id), manifest, salt)
+    actual = _query_scalar(f"SELECT {sql}")
+    expected_hash = hashlib.sha256(
+        framed_bytes(SeedDerivationLabel.PSEUDO_DOMAIN_HASH, manifest, label, row_id, salt)
+    ).digest()
+    expected_domain = int.from_bytes(expected_hash[:8], byteorder="big") % PSEUDO_DOMAIN_COUNT
+    assert actual == expected_domain
+
+
+def test_native_sql_pseudo_domain_is_deterministic_and_in_range() -> None:
+    sql = pseudo_domain_sql(sql_string("BACKDOOR_MALWARE"), sql_string("b" * 64), "a" * 64, 730201)
+    first = _query_scalar(f"SELECT {sql}")
+    second = _query_scalar(f"SELECT {sql}")
+    assert isinstance(first, int)
+    assert isinstance(second, int)
+    assert first == second
+    assert 0 <= first < PSEUDO_DOMAIN_COUNT
+
+
+def test_native_sql_sampling_digest_matches_python() -> None:
+    manifest = "f" * 64
+    label = "MIRAI_GREETH_FLOOD"
+    domain = CICIoT2023PseudoDomain.PSEUDO_DOMAIN_4
+    row_id = "a" * 64
+    expected = hashlib.sha256(
+        framed_bytes(
+            manifest,
+            domain.display_token,
+            label,
+            Role.REPORT_TEST.name,
+            row_id,
+            PREPROCESSING_SAMPLE_ORDER_SEED,
+        )
+    ).digest()
+    sql = sampling_digest_sql(
+        manifest,
+        sql_string(label),
+        str(int(domain)),
+        sql_string(Role.REPORT_TEST.name),
+        sql_string(row_id),
+    )
+    actual = _query_scalar(f"SELECT {sql}")
+    assert actual == expected
 
 
 def test_resolve_predictor_columns_excludes_validated_row_identifier() -> None:
@@ -76,7 +149,7 @@ def _secondary_csv_file(path: Path, label_column: str = "Label") -> SecondaryCsv
     return SecondaryCsvFile(
         absolute_path=path,
         relative_path=path.name,
-        file_sha256="a" * 64,
+        file_sha256=compute_file_checksum(path),
         label_column=label_column,
     )
 
@@ -85,7 +158,7 @@ def _per_attack_csv_file(path: Path, shard_class: str) -> SecondaryCsvFile:
     return SecondaryCsvFile(
         absolute_path=path,
         relative_path=f"{path.parent.name}/{path.name}",
-        file_sha256="a" * 64,
+        file_sha256=compute_file_checksum(path),
         shard_class=shard_class,
     )
 
@@ -123,6 +196,41 @@ def test_complete_case_parsing_records_unparseable_and_nonfinite_rows(tmp_path: 
         DatasetExclusionReason.UNPARSEABLE_PREDICTOR,
         DatasetExclusionReason.NON_FINITE_PREDICTOR,
     )
+    staging = duckdb.connect(str(tmp_path / "cache" / "ciciot2023_preparation.duckdb"))
+    constraints = staging.execute(
+        "SELECT table_name, constraint_type FROM duckdb_constraints() "
+        "WHERE table_name IN ('retained', 'exclusions', 'role_assignments')"
+    ).fetchall()
+    staging.close()
+    assert not any(str(row[1]) == "PRIMARY KEY" for row in constraints)
+
+
+def test_materialization_replaces_interrupted_staging_database(tmp_path: Path) -> None:
+    csv_path = tmp_path / "part.csv"
+    _write_csv(
+        csv_path,
+        ("feature_a", "feature_b", "Label"),
+        (
+            ("1.0", "2.0", "BenignTraffic"),
+            ("3.0", "4.0", "Backdoor_Malware"),
+        ),
+    )
+    cache_root = tmp_path / "cache"
+    cache_root.mkdir()
+    interrupted_database = cache_root / "ciciot2023_preparation.duckdb"
+    interrupted = duckdb.connect(str(interrupted_database))
+    interrupted.execute("CREATE TABLE retained (stable_row_id VARCHAR)")
+    interrupted.close()
+
+    summary = materialize_ciciot2023_prepared_views(
+        (_secondary_csv_file(csv_path),),
+        tmp_path / "prepared",
+        tmp_path / "scaler",
+        tmp_path / "metadata",
+        cache_root,
+    )
+
+    assert summary.retained_row_count == 2
 
 
 def test_per_attack_shard_takes_its_class_from_the_directory_token(tmp_path: Path) -> None:
@@ -157,6 +265,12 @@ def test_per_attack_shard_takes_its_class_from_the_directory_token(tmp_path: Pat
     assert summary.retained_row_count == 204
     assert summary.class_registry == (BENIGN_LABEL, TARGET_LABEL)
     assert summary.predictor_columns == ("feature_a", "feature_b")
+    anchor_train_rows = sum(
+        view.row_count
+        for view in summary.views
+        if view.role is Role.ANCHOR_TRAIN and view.normalized_label != TARGET_LABEL
+    )
+    assert summary.scaler.training_row_count == anchor_train_rows
 
 
 def test_shard_without_any_class_label_source_is_rejected(tmp_path: Path) -> None:
@@ -396,3 +510,57 @@ def test_truncated_final_line_is_excluded_with_a_recorded_reason(tmp_path: Path)
         (4, DatasetExclusionReason.ROW_WIDTH_MISMATCH),
         (5, DatasetExclusionReason.ROW_WIDTH_MISMATCH),
     )
+
+
+def test_changed_raw_manifest_rebuilds_existing_prepared_views(tmp_path: Path) -> None:
+    benign_directory = tmp_path / "Benign_Final"
+    benign_directory.mkdir()
+    target_directory = tmp_path / "Backdoor_Malware"
+    target_directory.mkdir()
+    benign_csv = benign_directory / "part.csv"
+    rows = tuple((f"{index}.0", f"{index + 1}.0") for index in range(2000))
+    _write_csv(benign_csv, ("feature_a", "feature_b"), rows)
+    target_csv = target_directory / "part.csv"
+    _write_csv(target_csv, ("feature_a", "feature_b"), rows)
+    prepared_root = tmp_path / "prepared"
+    scaler_root = tmp_path / "scaler"
+    metadata_root = tmp_path / "metadata"
+    cache_root = tmp_path / "cache"
+    first = materialize_ciciot2023_prepared_views(
+        (
+            _per_attack_csv_file(target_csv, "BACKDOOR_MALWARE"),
+            _per_attack_csv_file(benign_csv, "BENIGN"),
+        ),
+        prepared_root,
+        scaler_root,
+        metadata_root,
+        cache_root,
+        overwrite=True,
+    )
+    assert first.views
+    first_view = first.views[0]
+    sidecar_path = first_view.parquet_path.with_suffix(".json")
+    first_metadata = CICIoTPreparedViewMetadata.model_validate_json(sidecar_path.read_text())
+
+    changed_rows = (("9000.0", rows[0][1]), *rows[1:])
+    _write_csv(benign_csv, ("feature_a", "feature_b"), changed_rows)
+    second = materialize_ciciot2023_prepared_views(
+        (
+            _per_attack_csv_file(target_csv, "BACKDOOR_MALWARE"),
+            _per_attack_csv_file(benign_csv, "BENIGN"),
+        ),
+        prepared_root,
+        scaler_root,
+        metadata_root,
+        cache_root,
+    )
+    second_view = next(
+        view
+        for view in second.views
+        if (view.pseudo_domain, view.normalized_label, view.role)
+        == (first_view.pseudo_domain, first_view.normalized_label, first_view.role)
+    )
+    updated_metadata = CICIoTPreparedViewMetadata.model_validate_json(sidecar_path.read_text())
+    assert second_view.parquet_path == first_view.parquet_path
+    assert updated_metadata.cache_identity != first_metadata.cache_identity
+    assert updated_metadata.parquet_sha256 != first_metadata.parquet_sha256

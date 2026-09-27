@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fedsira.artifacts.paths import prepared_evidence_root
+from fedsira.artifacts.paths import current_repository_root, prepared_evidence_root
 from fedsira.datasets.common import (
     PreparedDomainSummary,
     dataset_specification,
@@ -34,7 +34,7 @@ from fedsira.experiments.planning import ExperimentPlan
 from fedsira.protocol.baselines.registry import BASELINE_CONTRACTS
 from fedsira.reporting.tables import RenderedTable
 from fedsira.reporting.tables import csv_text as _csv_text
-from fedsira.runtime import REPOSITORY_ROOT, current_application_context
+from fedsira.runtime import current_application_context
 
 
 def _experiment_class_label(experiment_class: ExperimentClass) -> ReportCellText:
@@ -102,8 +102,8 @@ def render_dataset_and_domain_protocol_table() -> RenderedTable:
     secondary = config.datasets.secondary
     primary_specification = dataset_specification(DatasetId.N_BAIOT)
     secondary_specification = dataset_specification(DatasetId.CICIOT2023)
-    primary_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
-    secondary_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023)
+    primary_root = current_repository_root() / prepared_evidence_root(DatasetId.N_BAIOT)
+    secondary_root = current_repository_root() / prepared_evidence_root(DatasetId.CICIOT2023)
     primary_summaries = prepared_domain_summaries(DatasetId.N_BAIOT, primary_root)
     secondary_summaries = prepared_domain_summaries(DatasetId.CICIOT2023, secondary_root)
     primary_classes = frozenset(primary_specification.class_tokens) | frozenset(
@@ -206,7 +206,7 @@ def render_primary_domain_statistics_table() -> RenderedTable:
     primary_specification = dataset_specification(DatasetId.N_BAIOT)
     summaries = prepared_domain_summaries(
         DatasetId.N_BAIOT,
-        REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT),
+        current_repository_root() / prepared_evidence_root(DatasetId.N_BAIOT),
     )
     missing_domains = tuple(
         domain

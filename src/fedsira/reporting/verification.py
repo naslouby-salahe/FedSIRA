@@ -251,25 +251,21 @@ def artifact_manifest_dependency_failures(
 ) -> tuple[CheckpointIdentity, ...]:
     identities = frozenset(manifest.identity for manifest in manifests)
     unreadable = tuple(f"{report.manifest_path}: {report.failure}" for report in invalid_manifests)
-    unresolved = tuple(
-        f"{manifest.slot.family.value}/{manifest.slot.instance}: {manifest.identity} is "
-        f"{manifest.lifecycle_state.value}"
-        if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-        else f"{manifest.slot.family.value}/{manifest.slot.instance}: "
-        f"{dependency.dependency} upstream {dependency.digest} is not a published artifact"
-        for manifest in manifests
-        for dependency in (
-            tuple(manifest.dependencies)
-            if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-            else tuple(
-                item
-                for item in manifest.dependencies
-                if item.kind is ArtifactDependencyKind.ARTIFACT
+    unresolved: list[CheckpointIdentity] = []
+    for manifest in manifests:
+        slot_identity = f"{manifest.slot.family.value}/{manifest.slot.instance}"
+        if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE:
+            unresolved.append(
+                f"{slot_identity}: {manifest.identity} is {manifest.lifecycle_state.value}"
             )
+            continue
+        unresolved.extend(
+            f"{slot_identity}: {dependency.dependency} upstream {dependency.digest} "
+            "is not a published artifact"
+            for dependency in manifest.dependencies
+            if dependency.kind is ArtifactDependencyKind.ARTIFACT
+            and dependency.digest not in identities
         )
-        if manifest.lifecycle_state is not ArtifactLifecycleState.COMPLETE
-        or dependency.digest not in identities
-    )
     return (*unreadable, *unresolved)
 
 
@@ -500,9 +496,11 @@ def metric_artifact_is_semantically_complete(
         return expected_conditions.issubset(observed_conditions) and all(
             (experiment_rows[ReportColumnName.OBSERVATION_COUNT] > 0).tolist()
         )
+    terminal_state_values = cast(
+        list[str], experiment_rows[ReportColumnName.TERMINAL_STATE].tolist()
+    )
     recorded_terminal_states = frozenset(
-        ExperimentLifecycleState(cast(str, state))
-        for state in experiment_rows[ReportColumnName.TERMINAL_STATE].tolist()
+        ExperimentLifecycleState(state) for state in terminal_state_values
     )
     if recorded_terminal_states != frozenset((ExperimentLifecycleState.COMPLETED,)):
         return False

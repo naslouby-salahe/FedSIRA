@@ -80,6 +80,7 @@ from fedsira.evaluation.statistics import (
     domain_disparity,
     equal_weight_domain_mean,
     interquartile_range,
+    mean_of_defined_values,
     minimum_defined_domain_count,
     percentile_10_domain_target_f1,
     worst_domain_target_f1,
@@ -226,12 +227,12 @@ def f1_for_class(counts: ConfusionCounts) -> MetricResult:
 def _mean_of_defined_values(
     results: Mapping[DatasetClassToken, MetricResult],
 ) -> MetricResult:
-    defined_values = [result.value for result in results.values() if result.value is not None]
-    if len(defined_values) == 0:
+    defined_values = tuple(result.value for result in results.values())
+    mean = mean_of_defined_values(defined_values)
+    denominator = sum(value is not None for value in defined_values)
+    if mean is None:
         return MetricResult(value=None, denominator=0)
-    return MetricResult(
-        value=sum(defined_values) / len(defined_values), denominator=len(defined_values)
-    )
+    return MetricResult(value=mean, denominator=denominator)
 
 
 def macro_f1(f1_by_class: Mapping[DatasetClassToken, MetricResult]) -> MetricResult:
@@ -623,9 +624,7 @@ def report_metric_set(
     supported_f1 = OrderedDict(
         (token, f1_by_class[token]) for token in supported_class_tokens if token in f1_by_class
     )
-    current_target_f1 = f1_by_class.get(target_class_token) or MetricResult(
-        value=None, denominator=0
-    )
+    current_target_f1 = target_f1(counts_by_class, target_class_token)
     current_supported_macro = macro_f1(supported_f1)
     current_benign_far = benign_false_alarm_rate(true_labels, predicted_labels, benign_class_token)
     gain = (
@@ -639,11 +638,9 @@ def report_metric_set(
         else MetricResult(value=None, denominator=0)
     )
     benign_far_increase = (
-        MetricResult(value=current_benign_far.value - anchor_benign_far.value, denominator=1)
-        if anchor_benign_far is not None
-        and current_benign_far.value is not None
-        and anchor_benign_far.value is not None
-        else MetricResult(value=None, denominator=0)
+        MetricResult(value=None, denominator=0)
+        if anchor_benign_far is None
+        else benign_false_alarm_rate_increase(current_benign_far, anchor_benign_far)
     )
     asr = (
         attack_success_rate_within_domain(
@@ -921,18 +918,11 @@ def compute_real_report_summary(
                 anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
             )
         )
-        if (
-            anchor_metrics.benign_far.value is not None
-            and production_metrics.benign_far.value is not None
-        ):
-            benign_far_increases.append(
-                MetricResult(
-                    value=production_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                    denominator=1,
-                )
+        benign_far_increases.append(
+            benign_false_alarm_rate_increase(
+                production_metrics.benign_far, anchor_metrics.benign_far
             )
-        else:
-            benign_far_increases.append(MetricResult(value=None, denominator=0))
+        )
     if not target_f1_values:
         return None
     target_f1_tuple = tuple(target_f1_values)
@@ -1059,7 +1049,7 @@ def compute_unmatched_screen_differential(
     anchor_model, source_model = _screen_models(anchor, source_delta)
     target_anchor_loss = per_sample_cross_entropy(anchor_model, target_features, target_labels)
     target_source_loss = per_sample_cross_entropy(source_model, target_features, target_labels)
-    return float(torch.mean(target_anchor_loss - target_source_loss))
+    return metric_mean(target_anchor_loss - target_source_loss)
 
 
 def compute_screen_differential(
@@ -1128,6 +1118,10 @@ def compute_screen_differential(
     )
 
 
+def metric_mean(values: torch.Tensor) -> MetricValue:
+    return float(values.to(dtype=torch.float64).mean())
+
+
 def compute_source_backdoor_asr(
     adapter: DatasetAdapter,
     anchor: RealAnchor,
@@ -1151,7 +1145,7 @@ def compute_source_backdoor_asr(
     with torch.no_grad():
         predictions = torch.argmax(logits_for_samples(model, triggered_features), dim=1)
     benign_index = adapter.class_tokens.index(adapter.benign_class_token)
-    asr = float((predictions == benign_index).float().mean())
+    asr = metric_mean(predictions == benign_index)
     return MetricResult(value=asr, denominator=triggered_features.shape[0])
 
 
@@ -1179,5 +1173,5 @@ def triggered_to_benign_rate(
     with torch.no_grad():
         predictions = torch.argmax(logits_for_samples(model, triggered_features), dim=-1)
     benign_index = adapter.class_tokens.index(adapter.benign_class_token)
-    rate = float((predictions == benign_index).float().mean())
+    rate = metric_mean(predictions == benign_index)
     return MetricResult(value=rate, denominator=len(rows.sample_ids))

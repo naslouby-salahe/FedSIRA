@@ -5,12 +5,23 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from fedsira.artifacts.paths import artifact_instance_token
-from fedsira.artifacts.store import ArtifactSlot
-from fedsira.datasets.common import PreparedViewSidecar, Role
+from fedsira.artifacts.paths import artifact_instance_token, prepared_evidence_root
+from fedsira.artifacts.store import (
+    ArtifactConfigurationComponent,
+    ArtifactConfigurationScope,
+    ArtifactDependency,
+    ArtifactSlot,
+    configuration_digest,
+    configuration_scope_dependency,
+    repository_revision,
+)
+from fedsira.datasets.common import PreparedViewSidecar, Role, dataset_manifest_hash
+from fedsira.datasets.layout import dataset_readiness as current_dataset_readiness
 from fedsira.datasets.prepared_validation import prepared_view_publication_failures
 from fedsira.domain.enums import (
     AdmissionState,
+    ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     DatasetId,
     ExperimentLifecycleState,
@@ -50,7 +61,11 @@ from fedsira.domain.types import (
     TimeoutSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
-from fedsira.experiments.definitions import MECHANISM_ABLATION_NAME, experiment_by_name
+from fedsira.experiments.definitions import (
+    DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
+    MECHANISM_ABLATION_NAME,
+    experiment_by_name,
+)
 from fedsira.experiments.planning import (
     ExperimentPlan,
     PlannedExperiment,
@@ -68,7 +83,7 @@ from fedsira.runtime import (
 if TYPE_CHECKING:
     from fedsira.experiments.execution import ExperimentPrerequisiteState
 
-EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|2"
+EXECUTION_RECORD_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|execution_record|3"
 ABLATION_REFERENCE_SCHEMA_VERSION: ExecutionSchemaVersion = "fedsira|ablation_reference|1"
 ABLATION_REFERENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|ablation_reference|1"
 EXECUTION_LOGGER = get_structured_logger(RuntimeComponentName.EXECUTION)
@@ -77,6 +92,9 @@ EXECUTION_LOGGER = get_structured_logger(RuntimeComponentName.EXECUTION)
 class CellPhaseLogFields(FrozenDomainModel):
     cell: ScientificCellSemanticKey
     timeout_seconds: TimeoutSeconds | None = None
+    failure_class: FailureClass | None = None
+    failure_message: FailureMessage | None = None
+    failure_phase: ScientificCellPhase | None = None
 
 
 class PersistedFailureDetail(FrozenDomainModel):
@@ -109,6 +127,7 @@ class PersistedExecutionRecord(FrozenDomainModel):
     state_trajectory: tuple[AdmissionStateObservation, ...] = ()
     failure: PersistedFailureDetail | None
     provenance: ExecutionProvenance | None = None
+    scoring_artifact_ids: tuple[ArtifactDigest, ...] = ()
 
 
 def ablation_reference_slot(
@@ -118,6 +137,55 @@ def ablation_reference_slot(
         family=ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
         instance=artifact_instance_token(scientific_scenario, master_seed),
         experiment=MECHANISM_ABLATION_NAME,
+    )
+
+
+def ablation_reference_dependencies(dataset: DatasetId) -> tuple[ArtifactDependency, ...]:
+    context = current_application_context()
+    config = context.scientific_config
+    prepared_evidence = dataset_manifest_hash(
+        context.repository_root / prepared_evidence_root(dataset)
+    )
+    scoped_configuration = ArtifactConfigurationScope(
+        scope="ablation-reference",
+        components=(
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.CAPABILITY_CONTRACT,
+                configuration=config.capability_contract.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.MODEL_CONFIGURATION,
+                configuration=config.model.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.PROTOCOL_CONFIGURATION,
+                configuration=config.protocol.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.ATTACK_CONFIGURATION,
+                configuration=config.attacks_and_boundaries.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.BASELINE_CONFIGURATION,
+                configuration=config.baselines.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.METRIC_AGGREGATION,
+                configuration=config.metrics_and_statistics.metric_aggregation.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.DATA_LOADER,
+                configuration=config.execution.data_loader.model_dump_json(),
+            ),
+        ),
+    )
+    return (
+        ArtifactDependency(
+            kind=ArtifactDependencyKind.CONTENT,
+            dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
+            digest=prepared_evidence,
+        ),
+        configuration_scope_dependency(scoped_configuration),
     )
 
 
@@ -135,6 +203,7 @@ class CellExecutionOutcome(FrozenDomainModel):
     failure: FailureDetail | None
     metrics: tuple[MetricObservation, ...] = ()
     state_trajectory: tuple[AdmissionStateObservation, ...] = ()
+    scoring_artifact_ids: tuple[ArtifactDigest, ...] = ()
 
     @property
     def completed(self) -> CellCompletionStatus:
@@ -177,14 +246,19 @@ class ExecutionLogFields(FrozenDomainModel):
     completed_cells: ScientificCellCount | None = None
     total_cells: ScientificCellCount | None = None
     elapsed_seconds: MetricValue | None = None
+    failure_class: FailureClass | None = None
+    failure_message: FailureMessage | None = None
+    failure_phase: ScientificCellPhase | None = None
 
     def with_cell_terminal_state(
         self,
         terminal_state: ExperimentLifecycleState,
         completed_cells: ScientificCellCount,
+        failure: FailureDetail | None = None,
     ) -> ExecutionLogFields:
         return ExecutionLogFields(
             experiment=self.experiment,
+            dataset=self.dataset,
             overwrite=self.overwrite,
             cell=self.cell,
             method=self.method,
@@ -195,11 +269,15 @@ class ExecutionLogFields(FrozenDomainModel):
             completed_cells=completed_cells,
             total_cells=self.total_cells,
             elapsed_seconds=self.elapsed_seconds,
+            failure_class=failure.failure_class if failure is not None else None,
+            failure_message=failure.message[:256] if failure is not None else None,
+            failure_phase=failure.cell_phase if failure is not None else None,
         )
 
     def with_metric(self, metric: MetricName) -> ExecutionLogFields:
         return ExecutionLogFields(
             experiment=self.experiment,
+            dataset=self.dataset,
             overwrite=self.overwrite,
             cell=self.cell,
             method=self.method,
@@ -210,6 +288,9 @@ class ExecutionLogFields(FrozenDomainModel):
             completed_cells=self.completed_cells,
             total_cells=self.total_cells,
             elapsed_seconds=self.elapsed_seconds,
+            failure_class=self.failure_class,
+            failure_message=self.failure_message,
+            failure_phase=self.failure_phase,
         )
 
 
@@ -231,6 +312,8 @@ class ExperimentExecutionResult(FrozenDomainModel):
     lifecycle_state: ExperimentLifecycleState
     outcomes: tuple[CellExecutionOutcome, ...]
     comparison_results: tuple[ComparisonFamilyResult, ...] = ()
+    provenance: ExecutionProvenance | None = None
+    comparison_artifact_id: ArtifactDigest | None = None
 
     @property
     def execution_digest(self) -> ArtifactDigest:
@@ -309,7 +392,11 @@ def _execute_cell_phase_with_timeout(
         EXECUTION_LOGGER.info(
             LogEvent.CELL_PHASE_TIMEOUT,
             extra=CellPhaseLogFields(
-                cell=cell.semantic_key, timeout_seconds=timeout_seconds
+                cell=cell.semantic_key,
+                timeout_seconds=timeout_seconds,
+                failure_class=FailureClass.TIMEOUT,
+                failure_message="scientific cell phase exceeded configured timeout",
+                failure_phase=ScientificCellPhase.PROTOCOL_EVALUATION,
             ).model_dump(),
         )
         return CellExecutionOutcome(
@@ -360,6 +447,48 @@ def derive_experiment_lifecycle(
     return ExperimentLifecycleState.COMPLETED if complete else ExperimentLifecycleState.RUNNING
 
 
+def derive_current_experiment_lifecycle(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+    dataset_readiness: ExperimentLifecycleState,
+) -> ExperimentLifecycleState:
+    if (
+        planned.definition.name == DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME
+        and dataset_readiness is not ExperimentLifecycleState.COMPLETED
+    ):
+        return dataset_readiness
+    return derive_experiment_lifecycle(
+        planned, current_execution_records(planned, records, dataset_readiness)
+    )
+
+
+def current_execution_records(
+    planned: PlannedExperiment,
+    records: tuple[PersistedExecutionRecord, ...],
+    dataset_readiness: ExperimentLifecycleState,
+) -> tuple[PersistedExecutionRecord, ...]:
+    if dataset_readiness is not ExperimentLifecycleState.COMPLETED:
+        return ()
+    current_provenance = current_execution_provenance(planned.definition.dataset)
+    return tuple(
+        record
+        for record in records
+        if record.schema_version == EXECUTION_RECORD_SCHEMA_VERSION
+        and record.provenance == current_provenance
+    )
+
+
+def current_execution_provenance(dataset: DatasetId) -> ExecutionProvenance:
+    repository_root = current_application_context().repository_root
+    return ExecutionProvenance(
+        configuration_digest=configuration_digest(),
+        code_revision=repository_revision(),
+        dataset_manifest_hash=dataset_manifest_hash(
+            repository_root / prepared_evidence_root(dataset)
+        ),
+    )
+
+
 class ComparisonResultBuilder(Protocol):
     def __call__(
         self,
@@ -379,9 +508,10 @@ def prerequisite_states_from_store(
     return tuple(
         ExperimentPrerequisiteState(
             experiment=prerequisite,
-            lifecycle_state=derive_experiment_lifecycle(
+            lifecycle_state=derive_current_experiment_lifecycle(
                 plan.experiment(prerequisite),
                 store.read_planned_outcomes(plan.experiment(prerequisite)),
+                current_dataset_readiness(),
             ),
         )
         for prerequisite in definition.prerequisites
@@ -428,6 +558,7 @@ class ExecutionRecordStore:
             state_trajectory=outcome.state_trajectory,
             failure=failure,
             provenance=provenance,
+            scoring_artifact_ids=outcome.scoring_artifact_ids,
         )
         digest = hashlib.sha256(framed_bytes(outcome.cell.semantic_key)).hexdigest()
         (directory / f"{digest}.json").write_text(
@@ -456,6 +587,8 @@ class ExecutionRecordStore:
         if record is None:
             return None
         if record.terminal_state is not ExperimentLifecycleState.COMPLETED:
+            return None
+        if record.schema_version != EXECUTION_RECORD_SCHEMA_VERSION:
             return None
         if record.provenance != provenance:
             log_execution_event(
@@ -486,6 +619,7 @@ class ExecutionRecordStore:
             record
             for record in self.read_all_outcomes(planned.definition.name)
             if record.semantic_key in expected_keys
+            and record.schema_version == EXECUTION_RECORD_SCHEMA_VERSION
         )
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 import json
 from collections import OrderedDict
-from pathlib import Path
 
 import numpy
 import torch
@@ -12,13 +11,15 @@ from fedsira.artifacts.paths import (
     artifact_log_path,
     artifact_slot_directory,
     artifact_staging_root,
+    current_repository_root,
+    execution_workspace_root,
     experiment_log_path,
     prepared_evidence_root,
     smoke_record_path,
     workspace_root_for_family,
 )
 from fedsira.artifacts.store import (
-    ArtifactDependency,
+    artifact_identity,
     configuration_digest,
     configure_artifact_logging,
     publish_artifact,
@@ -30,6 +31,7 @@ from fedsira.datasets.common import (
     Role,
     dataset_manifest_hash,
 )
+from fedsira.datasets.layout import dataset_readiness
 from fedsira.datasets.nbaiot.prepare import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
@@ -38,8 +40,6 @@ from fedsira.datasets.nbaiot.schema import (
 from fedsira.domain.enums import (
     AblationVariant,
     AdmissionState,
-    ArtifactDependencyKind,
-    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactProducer,
     BoundCondition,
@@ -60,6 +60,7 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     AdequateFinalGateDomainCount,
+    ArtifactDigest,
     ComparisonName,
     DatasetClassToken,
     DomainId,
@@ -116,7 +117,10 @@ from fedsira.experiments.engine import (
     ExecutionRecordStore,
     ExperimentExecutionResult,
     PersistedAblationReference,
+    ablation_reference_dependencies,
     ablation_reference_slot,
+    current_execution_records,
+    derive_current_experiment_lifecycle,
     derive_experiment_lifecycle,
     execute_cell_with_retry,
     log_execution_event,
@@ -198,9 +202,15 @@ def materialize_ablation_references(
     for scientific_scenario in scenarios:
         for master_seed in master_seeds:
             slot = ablation_reference_slot(scientific_scenario, master_seed)
-            slot_directory = REPOSITORY_ROOT / artifact_slot_directory(slot)
+            slot_directory = current_repository_root() / artifact_slot_directory(slot)
+            dependencies = ablation_reference_dependencies(planned.definition.dataset)
+            expected_identity = artifact_identity(
+                slot,
+                dependencies,
+                ABLATION_REFERENCE_PROCEDURE_IDENTITY,
+            )
             current = read_current_artifact(slot_directory)
-            if current is not None:
+            if current is not None and current[0].identity == expected_identity:
                 _manifest, payload = current
                 references.append(PersistedAblationReference.model_validate_json(payload))
                 log_execution_event(
@@ -222,23 +232,14 @@ def materialize_ablation_references(
                 state_trajectory=outcome.state_trajectory,
             )
             payload = reference.model_dump_json().encode("utf-8")
-            prepared_evidence = dataset_manifest_hash(
-                REPOSITORY_ROOT / prepared_evidence_root(planned.definition.dataset)
-            )
             publish_artifact(
                 slot=slot,
                 producer=ArtifactProducer.EVALUATION_PRODUCER,
                 payload=payload,
-                dependencies=(
-                    ArtifactDependency(
-                        kind=ArtifactDependencyKind.CONTENT,
-                        dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
-                        digest=prepared_evidence,
-                    ),
-                ),
+                dependencies=dependencies,
                 procedure_identity=ABLATION_REFERENCE_PROCEDURE_IDENTITY,
                 slot_directory=slot_directory,
-                staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+                staging_root=current_repository_root() / artifact_staging_root(),
             )
             references.append(reference)
             log_execution_event(
@@ -298,9 +299,7 @@ def execute_experiment(
             lifecycle_state=ExperimentLifecycleState.BLOCKED,
             outcomes=(),
         )
-    store = ExecutionRecordStore(
-        Path(resolved_config.execution.repository_layout.execution_workspace)
-    )
+    store = ExecutionRecordStore(execution_workspace_root())
     states = prerequisite_states or prerequisite_states_from_store(plan, experiment, store)
     validate_experiment_prerequisites_met(experiment, states)
     if experiment == MECHANISM_ABLATION_NAME:
@@ -320,7 +319,7 @@ def execute_experiment(
         configuration_digest=configuration_digest(),
         code_revision=repository_revision(),
         dataset_manifest_hash=dataset_manifest_hash(
-            REPOSITORY_ROOT / prepared_evidence_root(definition.dataset)
+            current_repository_root() / prepared_evidence_root(definition.dataset)
         ),
     )
     outcomes: list[CellExecutionOutcome] = []
@@ -349,6 +348,7 @@ def execute_experiment(
                     failure=None,
                     metrics=existing.metrics,
                     state_trajectory=existing.state_trajectory,
+                    scoring_artifact_ids=existing.scoring_artifact_ids,
                 )
             )
             continue
@@ -356,7 +356,9 @@ def execute_experiment(
         outcome = execute_cell_with_retry(cell, executor)
         store.write_outcome(outcome, provenance)
         completed_cells = len(outcomes) + 1
-        completed_fields = fields.with_cell_terminal_state(outcome.terminal_state, completed_cells)
+        completed_fields = fields.with_cell_terminal_state(
+            outcome.terminal_state, completed_cells, outcome.failure
+        )
         log_execution_event(LogEvent.CELL_RECORD_PERSISTED, completed_fields)
         for metric_name, _metric_value in outcome.metrics:
             log_execution_event(
@@ -368,6 +370,7 @@ def execute_experiment(
         outcomes.append(outcome)
     outcome_tuple = tuple(outcomes)
     lifecycle_state = derive_experiment_lifecycle(planned, store.read_planned_outcomes(planned))
+    comparison_artifact_id: ArtifactDigest | None = None
     if comparison_builder is None:
         comparisons = ()
     else:
@@ -377,11 +380,12 @@ def execute_experiment(
             LogEvent.COMPARISON_COMPLETED, ExecutionLogFields(experiment=experiment)
         )
         if comparisons:
-            publish_comparison_evidence(
+            comparison_manifest, _comparison_reused = publish_comparison_evidence(
                 experiment,
                 store.read_planned_outcomes(planned),
                 comparisons,
             )
+            comparison_artifact_id = comparison_manifest.identity
             log_execution_event(
                 LogEvent.COMPARISON_EVIDENCE_PERSISTED, ExecutionLogFields(experiment=experiment)
             )
@@ -390,6 +394,8 @@ def execute_experiment(
         lifecycle_state=lifecycle_state,
         outcomes=outcome_tuple,
         comparison_results=comparisons,
+        provenance=provenance,
+        comparison_artifact_id=comparison_artifact_id,
     )
     log_execution_event(
         LogEvent.EXPERIMENT_COMPLETED
@@ -409,20 +415,21 @@ def execute_experiment(
 def render_status() -> StatusRenderText:
     from fedsira.experiments.collapse import read_resolved_core
 
-    config = current_application_context().scientific_config
     resolved_core = read_resolved_core(
-        REPOSITORY_ROOT / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
+        current_repository_root()
+        / workspace_root_for_family(ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION)
     )
     plan = build_plan(resolved_core_complete=resolved_core is not None)
-    store = ExecutionRecordStore(
-        REPOSITORY_ROOT / Path(config.execution.repository_layout.execution_workspace)
-    )
+    store = ExecutionRecordStore(execution_workspace_root())
     lines: list[str] = ["FedSIRA experiment status", ""]
+    readiness = dataset_readiness()
     for planned in plan.experiments:
         records = store.read_planned_outcomes(planned)
-        state = derive_experiment_lifecycle(planned, records)
+        state = derive_current_experiment_lifecycle(planned, records, readiness)
+        current_records = current_execution_records(planned, records, readiness)
         completed = sum(
-            record.terminal_state is ExperimentLifecycleState.COMPLETED for record in records
+            record.terminal_state is ExperimentLifecycleState.COMPLETED
+            for record in current_records
         )
         lines.append(
             f"{planned.definition.name:<55} {completed:>4}/{len(planned.cells):<4} {state}"

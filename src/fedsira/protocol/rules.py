@@ -80,29 +80,6 @@ def validate_no_safety_completion_before_tau_k(
         raise ValueError("safety completion precedes the required evidence-arrival cycle")
 
 
-def deduplicate_reports_by_proxy(
-    reports: Sequence[tuple[DomainId, TernaryOutcome]],
-) -> tuple[tuple[DomainId, TernaryOutcome], ...]:
-    seen_domains: set[DomainId] = set()
-    deduplicated: list[tuple[DomainId, TernaryOutcome]] = []
-    for domain, outcome in reports:
-        if domain in seen_domains:
-            continue
-        seen_domains.add(domain)
-        deduplicated.append((domain, outcome))
-    return tuple(deduplicated)
-
-
-def report_for_domain(
-    deduplicated_reports: Sequence[tuple[DomainId, TernaryOutcome]],
-    domain: DomainId,
-) -> TernaryOutcome:
-    for report_domain, outcome in deduplicated_reports:
-        if report_domain == domain:
-            return outcome
-    raise KeyError(f"no deduplicated report for domain {domain!r}")
-
-
 def validate_exactly_one_source_domain(source_domains: Sequence[DomainId]) -> None:
     if len(source_domains) != 1:
         raise ValueError(

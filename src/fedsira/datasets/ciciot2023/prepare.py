@@ -10,12 +10,12 @@ import duckdb
 from fedsira.config import SamplingCapsPerDomain
 from fedsira.datasets.ciciot2023.schema import (
     OFFICIAL_EXPECTED_PREDICTOR_COUNT,
+    PSEUDO_DOMAIN_COUNT,
     TARGET_LABEL,
     CICIoT2023PseudoDomain,
     CICIoTRowIdentifierToken,
     CICIoTSpecialLabel,
     build_class_registry,
-    hash_to_pseudo_domain,
     normalize_label,
     normalize_label_token,
     target_family_collision_is_declared,
@@ -30,7 +30,6 @@ from fedsira.datasets.common import (
     Role,
     ScalerMetadata,
     compute_file_checksum,
-    compute_sample_id,
     copy_query_to_parquet,
     fetch_feature_statistics,
     fit_feature_moments,
@@ -46,6 +45,7 @@ from fedsira.datasets.common import (
     view_parquet_path,
     write_json_payload,
 )
+from fedsira.datasets.role_split import prepared_view_cache_identity
 from fedsira.domain.enums import (
     CICIoT2023Acquisition,
     DatasetId,
@@ -69,12 +69,9 @@ from fedsira.domain.types import (
     PredictorCountMatchesOfficial,
     PreparedViewKey,
     RelativePathText,
-    RoleHashToken,
     RowCount,
     SampleIdPrefix,
-    SamplingSelectionDigest,
     SchemaVersion,
-    SourceRowIndex,
     SqlText,
 )
 from fedsira.runtime import (
@@ -85,8 +82,10 @@ from fedsira.runtime import (
 )
 
 _ASCII_HEADER_WHITESPACE = " \t\r\n\f\v"
+CICIOT_PARALLEL_TRANSFORM_THREADS = 4
+CICIOT_PREPARATION_CHECKPOINT_SHARDS = 16
 STABLE_ROW_ID_PREFIX: SampleIdPrefix = "CICIOT2023_SAMPLE_ID_V1"
-PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|1"
+PREPARED_VIEW_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_prepared_view|2"
 SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_scaler|1"
 ROLE_MANIFEST_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_role_manifest|1"
 EXCLUSION_SCHEMA_VERSION: SchemaVersion = "fedsira|ciciot2023_exclusions|1"
@@ -123,52 +122,33 @@ class SecondaryMaterializationSummary(FrozenDomainModel):
     scaler: FeatureMoments
 
 
-class SecondaryRoleAssignment(FrozenDomainModel):
-    stable_row_id: ArtifactDigest
-    normalized_label: DatasetClassToken
-    pseudo_domain: CICIoT2023PseudoDomain
-    role: Role
-
-
-class _PreparedViewMetadata(FrozenDomainModel):
+class CICIoTPreparedViewMetadata(FrozenDomainModel):
     schema_version: SchemaVersion
+    cache_identity: ArtifactDigest
+    parquet_sha256: ArtifactDigest
     pseudo_domain: CICIoT2023PseudoDomain
     normalized_label: DatasetClassToken
     role: Role
     row_count: RowCount
 
 
-def compute_stable_row_id(
-    normalized_relative_csv_path: RelativePathText,
-    file_sha256: ArtifactDigest,
-    zero_based_original_row_index: SourceRowIndex,
-) -> ArtifactDigest:
-    return compute_sample_id(
-        STABLE_ROW_ID_PREFIX,
-        normalized_relative_csv_path,
-        file_sha256,
-        zero_based_original_row_index,
+def _cached_view_is_reusable(
+    parquet_path: Path,
+    metadata_path: Path,
+    cache_identity: ArtifactDigest,
+    row_count: RowCount,
+) -> BooleanValue:
+    if not parquet_path.is_file() or not metadata_path.is_file():
+        return False
+    try:
+        metadata = CICIoTPreparedViewMetadata.model_validate_json(metadata_path.read_text())
+    except (OSError, ValueError):
+        return False
+    return (
+        metadata.cache_identity == cache_identity
+        and metadata.row_count == row_count
+        and metadata.parquet_sha256 == compute_file_checksum(parquet_path)
     )
-
-
-def secondary_sampling_selection_key(
-    dataset_manifest_hash: DatasetManifestDigest,
-    normalized_label: DatasetClassToken,
-    pseudo_domain: CICIoT2023PseudoDomain,
-    role: Role,
-    stable_row_id: ArtifactDigest,
-) -> tuple[SamplingSelectionDigest, ArtifactDigest]:
-    digest: SamplingSelectionDigest = hashlib.sha256(
-        framed_bytes(
-            dataset_manifest_hash,
-            pseudo_domain.display_token,
-            normalized_label,
-            role.name,
-            stable_row_id,
-            PREPROCESSING_SAMPLE_ORDER_SEED,
-        )
-    ).digest()
-    return digest, stable_row_id
 
 
 def resolve_label_column(header: tuple[DatasetColumnName, ...]) -> DatasetColumnName | None:
@@ -338,53 +318,60 @@ def validate_target_label_present(normalized_labels: frozenset[ClassLabel]) -> N
         )
 
 
-def _ciciot_stable_row_id(
-    relative_path: RelativePathText,
-    file_sha256: ArtifactDigest,
-    original_row_index: SourceRowIndex,
-) -> ArtifactDigest:
-    return compute_stable_row_id(relative_path, file_sha256, original_row_index)
+def framed_sha256_sql(fields: tuple[SqlText, ...]) -> SqlText:
+    framed_fields: list[str] = []
+    for field in fields:
+        encoded = f"encode(CAST({field} AS VARCHAR))"
+        length_prefix = f"from_hex(lpad(to_hex(octet_length({encoded})), 8, '0'))"
+        framed_fields.append(f"({length_prefix} || {encoded})")
+    return f"sha256({' || '.join(framed_fields)})"
 
 
-def _ciciot_normalized_label(raw_label: ClassLabel) -> ClassLabel:
-    return normalize_label(raw_label)
-
-
-def _ciciot_pseudo_domain(
-    label: ClassLabel,
-    row_id: ArtifactDigest,
+def pseudo_domain_sql(
+    normalized_label: SqlText,
+    stable_row_id: SqlText,
     dataset_manifest_hash: DatasetManifestDigest,
     partition_salt: PartitionSalt,
-) -> CICIoT2023PseudoDomain:
-    return hash_to_pseudo_domain(dataset_manifest_hash, label, row_id, partition_salt)
+) -> SqlText:
+    digest = framed_sha256_sql(
+        (
+            sql_string(SeedDerivationLabel.PSEUDO_DOMAIN_HASH),
+            sql_string(dataset_manifest_hash),
+            normalized_label,
+            stable_row_id,
+            sql_string(str(partition_salt)),
+        )
+    )
+    return f"(CAST('0x' || substr({digest}, 1, 16) AS UBIGINT) % {PSEUDO_DOMAIN_COUNT})"
 
 
-def _ciciot_sampling_digest(
-    label: DatasetClassToken,
-    domain_index: CICIoT2023PseudoDomain,
-    role_hash_token: RoleHashToken,
-    row_id: ArtifactDigest,
+def stable_row_id_sql(item: SecondaryCsvFile, original_row_index: SqlText) -> SqlText:
+    return framed_sha256_sql(
+        (
+            sql_string(STABLE_ROW_ID_PREFIX),
+            sql_string(item.relative_path),
+            sql_string(item.file_sha256),
+            original_row_index,
+        )
+    )
+
+
+def sampling_digest_sql(
     dataset_manifest_hash: DatasetManifestDigest,
-) -> SamplingSelectionDigest:
-    digest, _ranked = secondary_sampling_selection_key(
-        dataset_manifest_hash,
-        label,
-        CICIoT2023PseudoDomain(domain_index),
-        Role[role_hash_token],
-        row_id,
+    normalized_label: SqlText,
+    pseudo_domain: SqlText,
+    role: SqlText,
+    stable_row_id: SqlText,
+) -> SqlText:
+    fields = (
+        sql_string(dataset_manifest_hash),
+        f"('PSEUDO_DOMAIN_' || CAST(({pseudo_domain}) + 1 AS VARCHAR))",
+        normalized_label,
+        role,
+        stable_row_id,
+        sql_string(str(PREPROCESSING_SAMPLE_ORDER_SEED)),
     )
-    return digest
-
-
-def _register_ciciot_functions(connection: duckdb.DuckDBPyConnection) -> None:
-    connection.create_function("ciciot_stable_row_id", _ciciot_stable_row_id, return_type="VARCHAR")
-    connection.create_function(
-        "ciciot_normalized_label", _ciciot_normalized_label, return_type="VARCHAR"
-    )
-    connection.create_function("ciciot_pseudo_domain", _ciciot_pseudo_domain, return_type="INTEGER")
-    connection.create_function(
-        "ciciot_sampling_digest", _ciciot_sampling_digest, return_type="BLOB"
-    )
+    return f"from_hex({framed_sha256_sql(fields)})"
 
 
 def _create_preparation_tables(
@@ -394,29 +381,25 @@ def _create_preparation_tables(
     feature_schema = ", ".join(f"{sql_ident(name)} DOUBLE" for name in predictor_columns)
     connection.execute(
         "CREATE TABLE retained ("
-        "stable_row_id VARCHAR PRIMARY KEY, file_sha256 VARCHAR, relative_path VARCHAR, "
+        "stable_row_id VARCHAR, file_sha256 VARCHAR, relative_path VARCHAR, "
         "original_row_index BIGINT, normalized_label VARCHAR, pseudo_domain INTEGER, "
         f"{feature_schema})"
     )
     connection.execute(
         "CREATE TABLE exclusions ("
-        "stable_row_id VARCHAR PRIMARY KEY, file_sha256 VARCHAR, relative_path VARCHAR, "
+        "stable_row_id VARCHAR, file_sha256 VARCHAR, relative_path VARCHAR, "
         "original_row_index BIGINT, reason VARCHAR)"
     )
     connection.execute(
         "CREATE TABLE role_assignments ("
-        "stable_row_id VARCHAR PRIMARY KEY, normalized_label VARCHAR, "
+        "stable_row_id VARCHAR, normalized_label VARCHAR, "
         "pseudo_domain INTEGER, role VARCHAR)"
     )
 
 
 def _exclusion_reason_sql(predictor_columns: tuple[DatasetColumnName, ...]) -> SqlText:
-    unparseable = " OR ".join(
-        f"try_cast({sql_ident(name)} AS DOUBLE) IS NULL" for name in predictor_columns
-    )
-    nonfinite = " OR ".join(
-        f"NOT isfinite(try_cast({sql_ident(name)} AS DOUBLE))" for name in predictor_columns
-    )
+    unparseable = " OR ".join(f"{sql_ident(name)} IS NULL" for name in predictor_columns)
+    nonfinite = " OR ".join(f"NOT isfinite({sql_ident(name)})" for name in predictor_columns)
     return (
         "CASE "
         f"WHEN {unparseable} THEN {sql_string(DatasetExclusionReason.UNPARSEABLE_PREDICTOR)} "
@@ -451,9 +434,10 @@ def _record_width_exclusions(
     malformed: tuple[RowCount, RowCount],
 ) -> None:
     first_excluded, data_rows = malformed
+    stable_row_id = stable_row_id_sql(item, "original_row_index")
     connection.execute(
         "INSERT INTO exclusions "
-        "SELECT ciciot_stable_row_id(relative_path, file_sha256, original_row_index), "
+        f"SELECT {stable_row_id}, "
         "file_sha256, relative_path, original_row_index, reason FROM ("
         f"SELECT {sql_string(item.relative_path)} AS relative_path, "
         f"{sql_string(item.file_sha256)} AS file_sha256, "
@@ -476,6 +460,7 @@ def _ingest_shard(
         LogEvent.DATASET_INGEST,
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023, file=item.relative_path),
     )
+    connection.execute("SET threads TO 1")
     physical_row_count: RowCount | None = None
     try:
         connection.execute(
@@ -506,8 +491,7 @@ def _ingest_shard(
         recorded = connection.execute("SELECT count(*) FROM shard").fetchone()
         if recorded is None or int(recorded[0]) != malformed[0]:
             raise ValueError(
-                "CICIoT2023 width-excluded rows are not a trailing run: "
-                f"file={item.relative_path}"
+                f"CICIoT2023 width-excluded rows are not a trailing run: file={item.relative_path}"
             ) from error
         _record_width_exclusions(connection, item, malformed)
         physical_row_count = malformed[1]
@@ -519,6 +503,7 @@ def _ingest_shard(
         raise TypeError("CICIoT2023 shard row count must be a non-negative integer")
     if physical_row_count is not None:
         raw_count = physical_row_count
+    connection.execute(f"SET threads TO {CICIOT_PARALLEL_TRANSFORM_THREADS}")
     reason_sql = _exclusion_reason_sql(predictor_columns)
     if item.label_column is not None:
         raw_label_sql: SqlText = sql_ident(item.label_column)
@@ -526,43 +511,57 @@ def _ingest_shard(
         raw_label_sql = sql_string(item.shard_class)
     else:
         raise ValueError(f"CICIoT2023 shard has no class label source: {item.relative_path}")
+    casted_features = ", ".join(
+        f"try_cast({sql_ident(name)} AS DOUBLE) AS {sql_ident(name)}" for name in predictor_columns
+    )
     connection.execute(
         "CREATE OR REPLACE TABLE classified AS "
+        "SELECT casted.*, "
+        f"{reason_sql} AS reason FROM ("
         "SELECT original_row_index, "
-        f"{raw_label_sql} AS raw_label, "
-        f"{reason_sql} AS reason, "
-        + ", ".join(
-            f"try_cast({sql_ident(name)} AS DOUBLE) AS {sql_ident(name)}"
-            for name in predictor_columns
-        )
-        + " FROM shard"
+        f"{raw_label_sql} AS raw_label, {casted_features} FROM shard"
+        ") AS casted"
     )
-    feature_insert = ", ".join(sql_ident(name) for name in predictor_columns)
+    raw_labels = connection.execute("SELECT DISTINCT raw_label FROM classified").fetchall()
+    normalized_labels: list[tuple[str, ClassLabel]] = []
+    for row in raw_labels:
+        raw_label = row[0]
+        if not isinstance(raw_label, str):
+            raise TypeError("CICIoT2023 class labels must be text")
+        normalized_labels.append((raw_label, normalize_label(raw_label)))
+    connection.execute(
+        "CREATE OR REPLACE TABLE normalized_label_map (raw_label VARCHAR, normalized_label VARCHAR)"
+    )
+    connection.executemany("INSERT INTO normalized_label_map VALUES (?, ?)", normalized_labels)
+    stable_row_id = stable_row_id_sql(item, "classified.original_row_index")
+    pseudo_domain_expression = pseudo_domain_sql(
+        "normalized_label", "stable_row_id", dataset_manifest_hash, partition_salt
+    )
+    feature_insert = ", ".join(f"identified.{sql_ident(name)}" for name in predictor_columns)
     connection.execute(
         "INSERT INTO exclusions "
-        "SELECT ciciot_stable_row_id(relative_path, file_sha256, original_row_index), "
-        "file_sha256, relative_path, original_row_index, reason FROM ("
-        f"SELECT {sql_string(item.relative_path)} AS relative_path, "
-        f"{sql_string(item.file_sha256)} AS file_sha256, original_row_index, reason "
-        "FROM classified WHERE reason IS NOT NULL)"
+        "SELECT stable_row_id, "
+        f"{sql_string(item.file_sha256)}, {sql_string(item.relative_path)}, "
+        "original_row_index, reason FROM ("
+        "SELECT original_row_index, reason, "
+        f"{stable_row_id} AS stable_row_id FROM classified "
+        "WHERE reason IS NOT NULL) AS excluded"
     )
     connection.execute(
         "INSERT INTO retained "
-        "SELECT ciciot_stable_row_id(relative_path, file_sha256, original_row_index), "
-        "file_sha256, relative_path, original_row_index, "
-        "ciciot_normalized_label(raw_label), "
-        "ciciot_pseudo_domain(ciciot_normalized_label(raw_label), "
-        "ciciot_stable_row_id(relative_path, file_sha256, original_row_index), "
-        f"{sql_string(dataset_manifest_hash)}, {partition_salt}), "
+        "SELECT stable_row_id, "
+        f"{sql_string(item.file_sha256)}, {sql_string(item.relative_path)}, "
+        "original_row_index, normalized_label, "
+        f"{pseudo_domain_expression}, "
         f"{feature_insert} FROM ("
-        f"SELECT {sql_string(item.relative_path)} AS relative_path, "
-        f"{sql_string(item.file_sha256)} AS file_sha256, original_row_index, raw_label, "
-        f"{feature_insert} FROM classified WHERE reason IS NULL)"
+        "SELECT classified.original_row_index, "
+        f"{stable_row_id} AS stable_row_id, normalized_label_map.normalized_label, "
+        + ", ".join(f"classified.{sql_ident(name)}" for name in predictor_columns)
+        + " FROM classified LEFT JOIN normalized_label_map USING (raw_label) "
+        "WHERE reason IS NULL) AS identified"
     )
-    labels = tuple(
-        str(row[0])
-        for row in connection.execute("SELECT DISTINCT raw_label FROM classified").fetchall()
-    )
+    labels = tuple(raw_label for raw_label, _ in normalized_labels)
+    connection.execute("SET threads TO 1")
     return raw_count, labels
 
 
@@ -606,10 +605,10 @@ def assign_secondary_roles(
     try:
         connection.execute(
             "CREATE TABLE IF NOT EXISTS role_assignments ("
-            "stable_row_id VARCHAR PRIMARY KEY, normalized_label VARCHAR, "
+            "stable_row_id VARCHAR, normalized_label VARCHAR, "
             "pseudo_domain INTEGER, role VARCHAR)"
         )
-        _assign_secondary_roles(connection, dataset_manifest_hash, True)
+        _assign_secondary_roles(connection, dataset_manifest_hash)
     finally:
         connection.close()
 
@@ -617,11 +616,9 @@ def assign_secondary_roles(
 def _assign_secondary_roles(
     connection: duckdb.DuckDBPyConnection,
     dataset_manifest_hash: DatasetManifestDigest,
-    register_functions: BooleanValue,
 ) -> None:
+    connection.execute(f"SET threads TO {CICIOT_PARALLEL_TRANSFORM_THREADS}")
     config = current_application_context().scientific_config
-    if register_functions:
-        _register_ciciot_functions(connection)
     target = sql_string(CICIoTSpecialLabel.BACKDOOR_MALWARE)
     position_sql = "(group_index * 1.0) / group_size"
     target_role_sql = role_case_sql(
@@ -631,6 +628,9 @@ def _assign_secondary_roles(
         position_sql, supported_role_windows(config.datasets.primary.role_intervals)
     )
     cap_sql = _cap_case_sql(config.datasets.primary.sampling_caps_per_domain)
+    digest_expression = sampling_digest_sql(
+        dataset_manifest_hash, "normalized_label", "pseudo_domain", "role", "stable_row_id"
+    )
     connection.execute(
         "INSERT INTO role_assignments "
         "WITH ordered AS ("
@@ -648,8 +648,8 @@ def _assign_secondary_roles(
         "), ranked AS ("
         "SELECT eligible.*, "
         f"{cap_sql} AS cap, "
-        "ciciot_sampling_digest(normalized_label, pseudo_domain, role, stable_row_id, "
-        f"{sql_string(dataset_manifest_hash)}) AS digest "
+        f"{digest_expression} "
+        "AS digest "
         "FROM eligible"
         ") SELECT stable_row_id, normalized_label, pseudo_domain, role FROM ranked "
         "QUALIFY cap IS NULL OR row_number() OVER ("
@@ -663,6 +663,7 @@ def _write_secondary_views(
     predictor_columns: tuple[DatasetColumnName, ...],
     moments: FeatureMoments,
     prepared_root: Path,
+    cache_identity: ArtifactDigest,
     overwrite: OverwriteExisting,
 ) -> tuple[SecondaryPreparedViewSummary, ...]:
     config = current_application_context().scientific_config
@@ -686,6 +687,7 @@ def _write_secondary_views(
         role = Role[str(stored_role_hash_token)]
         view_key: PreparedViewKey = f"{pseudo_domain.display_token}_{label}_{role.name}"
         parquet_path = view_parquet_path(prepared_root, view_key)
+        metadata_path = (prepared_root / view_key).with_suffix(".json")
         query = (
             "SELECT retained.stable_row_id AS sample_id, retained.normalized_label AS label, "
             f"{standardized} FROM role_assignments JOIN retained USING (stable_row_id) "
@@ -694,19 +696,24 @@ def _write_secondary_views(
             f"AND role_assignments.role = {sql_string(role.name)} "
             "ORDER BY retained.stable_row_id"
         )
-        if overwrite or not parquet_path.exists():
-            copy_query_to_parquet(connection, query, parquet_path)
-        write_json_payload(
-            (prepared_root / view_key).with_suffix(".json"),
-            _PreparedViewMetadata(
-                schema_version=PREPARED_VIEW_SCHEMA_VERSION,
-                pseudo_domain=pseudo_domain,
-                normalized_label=str(label),
-                role=role,
-                row_count=int(row_count),
-            ),
-            overwrite,
+        reusable = not overwrite and _cached_view_is_reusable(
+            parquet_path, metadata_path, cache_identity, int(row_count)
         )
+        if not reusable:
+            copy_query_to_parquet(connection, query, parquet_path)
+            write_json_payload(
+                metadata_path,
+                CICIoTPreparedViewMetadata(
+                    schema_version=PREPARED_VIEW_SCHEMA_VERSION,
+                    pseudo_domain=pseudo_domain,
+                    normalized_label=str(label),
+                    role=role,
+                    row_count=int(row_count),
+                    cache_identity=cache_identity,
+                    parquet_sha256=compute_file_checksum(parquet_path),
+                ),
+                True,
+            )
         log_structured_event(
             CICIOT_PREPARATION_LOGGER,
             LogEvent.DATASET_VIEW_WRITTEN,
@@ -738,6 +745,7 @@ def materialize_ciciot2023_prepared_views(
         raise ValueError("CICIoT2023 materialization requires discovered CSV shards")
     config = current_application_context().scientific_config
     dataset_manifest_hash = compute_dataset_manifest_hash(discovered)
+    cache_identity = prepared_view_cache_identity(DatasetId.CICIOT2023, dataset_manifest_hash)
     reference_header = read_csv_header(discovered[0].absolute_path)
     if len(set(reference_header)) != len(reference_header):
         raise ValueError("CICIoT2023 fixed header contains duplicate names")
@@ -756,15 +764,15 @@ def materialize_ciciot2023_prepared_views(
     )
     cache_root.mkdir(parents=True, exist_ok=True)
     database_path = cache_root / "ciciot2023_preparation.duckdb"
-    if overwrite and database_path.exists():
-        database_path.unlink()
+    for stale_database in (database_path, database_path.with_name(f"{database_path.name}.wal")):
+        if stale_database.exists():
+            stale_database.unlink()
     connection = open_tabular_engine(database_path)
     raw_row_count: RowCount = 0
     try:
-        _register_ciciot_functions(connection)
         _create_preparation_tables(connection, predictor_columns)
         observed_raw: list[ClassLabel] = []
-        for item in discovered:
+        for shard_index, item in enumerate(discovered, start=1):
             shard_rows, shard_labels = _ingest_shard(
                 connection,
                 item,
@@ -773,8 +781,26 @@ def materialize_ciciot2023_prepared_views(
                 dataset_manifest_hash,
                 config.datasets.secondary.pseudo_domain_partition_salt,
             )
+            if shard_index % CICIOT_PREPARATION_CHECKPOINT_SHARDS == 0 or shard_index == len(
+                discovered
+            ):
+                connection.execute("CHECKPOINT")
             raw_row_count += shard_rows
             observed_raw.extend(shard_labels)
+            if shard_index % CICIOT_PREPARATION_CHECKPOINT_SHARDS == 0 or shard_index == len(
+                discovered
+            ):
+                log_structured_event(
+                    CICIOT_PREPARATION_LOGGER,
+                    LogEvent.DATASET_INGEST_PROGRESS,
+                    DatasetPreparationLogFields(
+                        dataset=DatasetId.CICIOT2023,
+                        file=item.relative_path,
+                        raw_rows=raw_row_count,
+                        completed_shards=shard_index,
+                        total_shards=len(discovered),
+                    ),
+                )
         validate_label_collisions(frozenset(observed_raw))
         normalized_labels = frozenset(normalize_label(label) for label in observed_raw)
         validate_target_label_present(normalized_labels)
@@ -811,7 +837,7 @@ def materialize_ciciot2023_prepared_views(
             ),
         )
         views = _write_secondary_views(
-            connection, predictor_columns, moments, prepared_root, overwrite
+            connection, predictor_columns, moments, prepared_root, cache_identity, overwrite
         )
         metadata_root.mkdir(parents=True, exist_ok=True)
         copy_query_to_parquet(

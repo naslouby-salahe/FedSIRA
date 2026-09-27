@@ -4,6 +4,8 @@ from fedsira.artifacts.paths import (
     artifact_log_path,
     artifact_slot_directory,
     artifact_staging_root,
+    current_repository_root,
+    execution_workspace_root,
     prepared_evidence_root,
     prepared_feature_root,
     preprocessing_extraction_cache_root,
@@ -11,9 +13,11 @@ from fedsira.artifacts.paths import (
     preprocessing_metadata_root,
 )
 from fedsira.artifacts.store import (
+    ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactSlot,
     compute_checksum,
+    configuration_scope_dependency,
     configure_artifact_logging,
     publish_artifact,
 )
@@ -51,6 +55,7 @@ from fedsira.datasets.nbaiot.prepare import (
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
 from fedsira.datasets.role_split import (
     RoleSplitViewCount,
+    dataset_preprocessing_configuration,
     publish_role_split_sample_manifest,
 )
 from fedsira.domain.enums import (
@@ -123,7 +128,7 @@ def _publish_dataset_manifest(payload: DatasetManifestPayload) -> ArtifactReuseD
                 instance=payload.dataset_file_manifest_hash,
             )
         ),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
     return reused
 
@@ -155,8 +160,8 @@ def publish_raw_dataset_identity(
             ),
         ),
         procedure_identity=RAW_DATASET_IDENTITY_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
     return reused
 
@@ -178,15 +183,21 @@ def publish_scaler(
                 dependency=ArtifactDependencyLabel.RAW_FILE_MANIFEST,
                 digest=manifest_hash,
             ),
+            configuration_scope_dependency(
+                ArtifactConfigurationScope(
+                    scope=f"preprocessing:{dataset}",
+                    components=dataset_preprocessing_configuration(dataset).components,
+                )
+            ),
         ),
         procedure_identity=SCALER_ARTIFACT_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
     return reused
 
 
-PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|1"
+PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|2"
 
 
 def publish_prepared_role_view(
@@ -228,8 +239,8 @@ def publish_prepared_role_view(
             ),
         ),
         procedure_identity=PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
     return reused
 
@@ -237,9 +248,7 @@ def publish_prepared_role_view(
 def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
     config = current_application_context().scientific_config
     raw_root = required_raw_dataset_root(DatasetId.N_BAIOT)
-    extraction_cache_root = preprocessing_extraction_cache_root(
-        REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
-    )
+    extraction_cache_root = preprocessing_extraction_cache_root(execution_workspace_root())
     log_structured_event(
         PREPROCESSING_LOGGER,
         LogEvent.DATASET_PREPROCESSING_STARTED,
@@ -268,11 +277,11 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         ),
         manifest_hash,
     )
-    prepared_root = REPOSITORY_ROOT / prepared_evidence_root(DatasetId.N_BAIOT)
+    prepared_root = current_repository_root() / prepared_evidence_root(DatasetId.N_BAIOT)
     nbaiot_views, moments = materialize_nbaiot_prepared_views(
         discovered,
         prepared_root,
-        REPOSITORY_ROOT / prepared_feature_root(),
+        current_repository_root() / prepared_feature_root(),
         overwrite,
         retain_materialized_views=False,
     )
@@ -334,9 +343,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         DatasetPreparationLogFields(dataset=DatasetId.CICIOT2023),
     )
     discovered = discover_secondary_csv_files(csv_root, config.datasets.secondary.acquisition)
-    cache_root = preprocessing_extraction_cache_root(
-        REPOSITORY_ROOT / config.execution.repository_layout.execution_workspace
-    )
+    cache_root = preprocessing_extraction_cache_root(execution_workspace_root())
     publish_raw_dataset_identity(
         DatasetId.CICIOT2023,
         tuple(
@@ -347,9 +354,9 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
     )
     summary = materialize_ciciot2023_prepared_views(
         discovered,
-        REPOSITORY_ROOT / prepared_evidence_root(DatasetId.CICIOT2023),
-        REPOSITORY_ROOT / prepared_feature_root(),
-        REPOSITORY_ROOT / preprocessing_metadata_root(),
+        current_repository_root() / prepared_evidence_root(DatasetId.CICIOT2023),
+        current_repository_root() / prepared_feature_root(),
+        current_repository_root() / preprocessing_metadata_root(),
         cache_root,
         overwrite,
     )
@@ -439,9 +446,9 @@ def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) 
 
 def _execute_bound(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
     configure_structured_file_logging(
-        PREPROCESSING_LOGGER, REPOSITORY_ROOT / preprocessing_log_path()
+        PREPROCESSING_LOGGER, current_repository_root() / preprocessing_log_path()
     )
-    configure_artifact_logging(REPOSITORY_ROOT / artifact_log_path())
+    configure_artifact_logging(current_repository_root() / artifact_log_path())
     mirror_structured_logging_to_console(PREPROCESSING_LOGGER)
     selected_datasets = tuple(DatasetId) if dataset is None else (dataset,)
     for selected_dataset in selected_datasets:

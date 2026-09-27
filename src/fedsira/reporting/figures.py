@@ -5,7 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
 
-import numpy
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
@@ -46,11 +45,15 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.comparisons import (
     CapabilityContractScope,
+    ComparisonFamily,
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonResult,
 )
-from fedsira.evaluation.statistics import bootstrap_percentile_confidence_interval
+from fedsira.evaluation.statistics import (
+    bootstrap_percentile_confidence_interval,
+    quantile_type7,
+)
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME,
     ADMISSION_DELAY_DECOMPOSITION_NAME,
@@ -84,6 +87,8 @@ from fedsira.experiments.engine import (
     ExecutionRecordStore,
     ExperimentExecutionResult,
 )
+from fedsira.experiments.observations import mean_of_defined
+from fedsira.experiments.observations import outcome_metric_mean as _outcome_metric_mean
 from fedsira.experiments.planning import ExperimentPlan
 from fedsira.runtime import current_application_context
 
@@ -241,13 +246,21 @@ def render_security_utility_tradeoff(
         upper_errors: list[MetricValue] = []
         for family in comparison_results:
             for comparison in family.comparisons:
-                if comparison.definition.metric is not metric:
+                if (
+                    family.family is not ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY
+                    or comparison.definition.experiment != PRIMARY_CONFIRMATORY_EVALUATION_NAME
+                    or comparison.definition.metric is not metric
+                ):
                     continue
                 if comparison.mean_paired_difference is None:
                     continue
                 if comparison.confidence_interval is None:
                     continue
-                labels.append(comparison.definition.method)
+                labels.append(
+                    f"{comparison.definition.scientific_scenario}\n"
+                    f"{comparison.definition.method} vs "
+                    f"{comparison.definition.reference_method}"
+                )
                 effects.append(comparison.mean_paired_difference)
                 lower_errors.append(
                     comparison.mean_paired_difference - comparison.confidence_interval[0]
@@ -267,8 +280,11 @@ def render_security_utility_tradeoff(
             fmt="o",
         )
         axis.set_yticks(positions, labels)
+        axis.tick_params(axis="y", labelsize=7)
         axis.set_title(metric)
         axis.axvline(0.0)
+    maximum_label_count = max(len(axis.get_yticklabels()) for axis in figure.axes)
+    figure.set_size_inches(15, max(5, maximum_label_count * 0.35))
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
@@ -496,8 +512,10 @@ def render_useful_backdoored_source(
             continue
         asr_interval = _summary_interval(asr_values)
         target_f1_interval = _summary_interval(target_f1_values)
-        mean_asr = sum(asr_values) / len(asr_values)
-        mean_target_f1 = sum(target_f1_values) / len(target_f1_values)
+        mean_asr = mean_of_defined(asr_values)
+        mean_target_f1 = mean_of_defined(target_f1_values)
+        if mean_asr is None or mean_target_f1 is None:
+            continue
         x_error = (
             None
             if asr_interval is None
@@ -605,28 +623,6 @@ def render_collapse_decision_effects(
     figure.tight_layout()
     figure.savefig(destination, dpi=150)
     return destination
-
-
-def _outcome_metric_mean(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    condition: ScenarioName,
-    metric: MetricName,
-) -> MetricValue | None:
-    values = tuple(
-        value
-        for outcome in outcomes
-        if (
-            outcome.completed
-            and outcome.cell.experiment == experiment
-            and outcome.cell.method == method
-            and outcome.cell.condition == condition
-        )
-        for recorded_metric, value in outcome.metrics
-        if recorded_metric == metric and value is not None
-    )
-    return None if not values else sum(values) / len(values)
 
 
 def _paired_comparison(
@@ -1409,7 +1405,7 @@ def efficiency_telemetry(
     for metric_name in metric_names:
         for method in methods:
             seed_medians = tuple(
-                float(numpy.median(values))
+                quantile_type7(tuple(sorted(values)), 0.5)
                 for seed in frozenset(outcome.cell.master_seed for outcome in outcomes)
                 if (
                     values := tuple(
@@ -1428,13 +1424,14 @@ def efficiency_telemetry(
                 )
             )
             if seed_medians:
+                ordered_medians = tuple(sorted(seed_medians))
                 observations.append(
                     EfficiencyMetricObservation(
                         method=method,
                         metric=metric_name,
-                        median=float(numpy.median(seed_medians)),
-                        first_quartile=float(numpy.quantile(seed_medians, 0.25, method="linear")),
-                        third_quartile=float(numpy.quantile(seed_medians, 0.75, method="linear")),
+                        median=quantile_type7(ordered_medians, 0.5),
+                        first_quartile=quantile_type7(ordered_medians, 0.25),
+                        third_quartile=quantile_type7(ordered_medians, 0.75),
                         seed_count=len(seed_medians),
                     )
                 )

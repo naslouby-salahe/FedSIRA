@@ -2,10 +2,13 @@ import hashlib
 
 from fedsira.artifacts.paths import artifact_slot_directory, artifact_staging_root
 from fedsira.artifacts.store import (
+    ArtifactConfigurationComponent,
+    ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactManifest,
     ArtifactReuseDecision,
     ArtifactSlot,
+    configuration_scope_dependency,
     publish_artifact,
     read_current_artifact,
 )
@@ -25,12 +28,12 @@ from fedsira.domain.types import (
     ProcedureIdentity,
     SchemaVersion,
 )
-from fedsira.evaluation.comparisons import ComparisonFamilyResult
+from fedsira.evaluation.comparisons import ComparisonFamilyResult, build_comparison_registry
 from fedsira.experiments.engine import PersistedExecutionRecord
-from fedsira.runtime import REPOSITORY_ROOT, framed_bytes
+from fedsira.runtime import current_application_context, framed_bytes
 
-COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|1"
-COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|1"
+COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|2"
+COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|2"
 
 
 class PersistedComparisonEvidence(FrozenDomainModel):
@@ -46,6 +49,17 @@ def metric_evidence_digest(
     fields: list[FramingField] = []
     for record in sorted(records, key=lambda item: item.semantic_key):
         fields.extend((record.semantic_key, record.terminal_state))
+        if record.provenance is None:
+            fields.extend(("", "", ""))
+        else:
+            fields.extend(
+                (
+                    record.provenance.configuration_digest,
+                    record.provenance.dataset_manifest_hash,
+                    record.provenance.code_revision or "",
+                )
+            )
+        fields.extend(record.scoring_artifact_ids)
         for metric_name, metric_value in record.metrics:
             fields.extend(
                 (
@@ -61,6 +75,25 @@ def comparison_evidence_slot(experiment: ExperimentName) -> ArtifactSlot:
         family=ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
         instance=ArtifactInstanceLabel.COMPARISONS,
         experiment=experiment,
+    )
+
+
+def _statistical_configuration_dependency() -> ArtifactDependency:
+    scientific_config = current_application_context().scientific_config
+    config = scientific_config.metrics_and_statistics
+    return configuration_scope_dependency(
+        ArtifactConfigurationScope(
+            scope="statistical-analysis",
+            components=(
+                ArtifactConfigurationComponent(
+                    name=ArtifactDependencyLabel.STATISTICAL_ANALYSIS,
+                    configuration=(
+                        f"{config.model_dump_json(exclude={'publication_rounding'})}"
+                        f"\nanalysis_seed={scientific_config.seeds_and_determinism.analysis_seed}"
+                    ),
+                ),
+            ),
+        )
     )
 
 
@@ -90,33 +123,60 @@ def publish_comparison_evidence(
                 dependency=ArtifactDependencyLabel.METRIC_EVIDENCE,
                 digest=metric_evidence_digest(records),
             ),
+            _statistical_configuration_dependency(),
         ),
         procedure_identity=COMPARISON_EVIDENCE_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_application_context().repository_root
+        / artifact_slot_directory(slot),
+        staging_root=current_application_context().repository_root / artifact_staging_root(),
     )
 
 
-def read_comparison_evidence(experiment: ExperimentName) -> PersistedComparisonEvidence | None:
+def current_comparison_evidence(
+    experiment: ExperimentName,
+    records: tuple[PersistedExecutionRecord, ...],
+) -> tuple[ArtifactManifest, PersistedComparisonEvidence] | None:
     slot = comparison_evidence_slot(experiment)
-    current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+    current = read_current_artifact(
+        current_application_context().repository_root / artifact_slot_directory(slot)
+    )
     if current is None:
         return None
-    _manifest, payload = current
-    return PersistedComparisonEvidence.model_validate_json(payload)
+    manifest, payload = current
+    if _statistical_configuration_dependency() not in manifest.dependencies:
+        return None
+    evidence = PersistedComparisonEvidence.model_validate_json(payload)
+    if (
+        evidence.schema_version != COMPARISON_EVIDENCE_SCHEMA_VERSION
+        or evidence.experiment != experiment
+        or evidence.metric_evidence_digest != metric_evidence_digest(records)
+    ):
+        return None
+    return manifest, evidence
 
 
 def comparison_evidence_failures(
     experiment: ExperimentName,
     records: tuple[PersistedExecutionRecord, ...],
 ) -> tuple[FailureMessage, ...]:
-    evidence = read_comparison_evidence(experiment)
-    if evidence is None:
+    current = current_comparison_evidence(experiment, records)
+    if current is not None:
         return ()
-    observed = metric_evidence_digest(records)
-    if evidence.metric_evidence_digest != observed:
-        return (
-            f"{experiment}: persisted comparison evidence is stale "
-            f"({evidence.metric_evidence_digest} != {observed})",
-        )
-    return ()
+    expected = any(
+        definition.experiment == experiment for definition in build_comparison_registry()
+    )
+    if not expected:
+        return ()
+    slot = comparison_evidence_slot(experiment)
+    existing = read_current_artifact(
+        current_application_context().repository_root / artifact_slot_directory(slot)
+    )
+    if (
+        existing is not None
+        and _statistical_configuration_dependency() not in existing[0].dependencies
+    ):
+        return (f"{experiment}: persisted comparison evidence has stale statistical configuration",)
+    if existing is None:
+        return (f"{experiment}: required comparison evidence is missing",)
+
+    return (f"{experiment}: persisted comparison evidence is stale for current execution records",)

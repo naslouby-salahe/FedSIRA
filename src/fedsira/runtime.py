@@ -7,7 +7,9 @@ import logging
 import os
 import random
 import resource
+import signal
 import subprocess
+import threading
 import time
 from collections.abc import Callable, Generator
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +18,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import timedelta
 from pathlib import Path
+from types import FrameType
 from typing import Annotated, ClassVar, Protocol, Self, TypeVar, cast
 
 import numpy
@@ -94,6 +97,11 @@ class ApplicationContext(FrozenDomainModel):
 
 _APPLICATION_CONTEXT: ContextVar[ApplicationContext | None] = ContextVar(
     "fedsira_application_context",
+    default=None,
+)
+
+_BOUNDED_OPERATION: ContextVar[tuple[RuntimeComponentName, TimeoutSeconds] | None] = ContextVar(
+    "_BOUNDED_OPERATION",
     default=None,
 )
 
@@ -430,11 +438,21 @@ class OperationTimeoutError(RuntimeError):
         self.timeout_seconds = timeout_seconds
 
 
+def _raise_operation_timeout(_signum: DeterministicInteger, _frame: FrameType | None) -> None:
+    bounded_operation = _BOUNDED_OPERATION.get()
+    if bounded_operation is None:
+        raise RuntimeError("received an operation timeout without a bound operation")
+    operation, timeout_seconds = bounded_operation
+    raise OperationTimeoutError(operation, timeout_seconds)
+
+
 def run_bounded(
     operation: RuntimeComponentName,
     timeout_seconds: TimeoutSeconds,
     action: Callable[[], OperationResult],
 ) -> OperationResult:
+    if threading.current_thread() is threading.main_thread() and hasattr(signal, "setitimer"):
+        return _run_bounded_on_posix_main_thread(operation, timeout_seconds, action)
     bound_context = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(bound_context.run, action)
@@ -443,3 +461,24 @@ def run_bounded(
         except FuturesTimeoutError as error:
             future.cancel()
             raise OperationTimeoutError(operation, timeout_seconds) from error
+
+
+def _run_bounded_on_posix_main_thread(
+    operation: RuntimeComponentName,
+    timeout_seconds: TimeoutSeconds,
+    action: Callable[[], OperationResult],
+) -> OperationResult:
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    started_at = time.monotonic()
+    previous_delay, previous_interval = signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    token = _BOUNDED_OPERATION.set((operation, timeout_seconds))
+    signal.signal(signal.SIGALRM, _raise_operation_timeout)
+    try:
+        return action()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0.0)
+        signal.signal(signal.SIGALRM, previous_handler)
+        _BOUNDED_OPERATION.reset(token)
+        remaining_delay = max(0.0, previous_delay - (time.monotonic() - started_at))
+        if remaining_delay > 0.0 or previous_interval > 0.0:
+            signal.setitimer(signal.ITIMER_REAL, remaining_delay, previous_interval)

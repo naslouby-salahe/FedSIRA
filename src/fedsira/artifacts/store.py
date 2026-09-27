@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
+    ArtifactDependencyLabel,
     ArtifactFamily,
     ArtifactFileToken,
     ArtifactLifecycleState,
@@ -40,7 +41,7 @@ from fedsira.runtime import (
     get_structured_logger,
 )
 
-ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|2"
+ARTIFACT_SCHEMA_VERSION: SchemaVersion = "fedsira|artifact_manifest|4"
 
 ARTIFACT_LOGGER = get_structured_logger(RuntimeComponentName.ARTIFACTS)
 
@@ -48,13 +49,21 @@ ARTIFACT_PAYLOAD_SUFFIX: ArtifactFileToken = ArtifactFileToken.PAYLOAD_SUFFIX
 ARTIFACT_MANIFEST_SUFFIX: ArtifactFileToken = ArtifactFileToken.MANIFEST_SUFFIX
 ARTIFACT_CURRENT_FILE_NAME: ArtifactFileToken = ArtifactFileToken.CURRENT_FILE
 
-ARTIFACT_LOG_NAME: ArtifactFileToken = ArtifactFileToken.LOG_FILE
-
 
 class ArtifactDependency(FrozenDomainModel):
     kind: ArtifactDependencyKind
     dependency: ArtifactDependencyName
     digest: ArtifactDigest
+
+
+class ArtifactConfigurationComponent(FrozenDomainModel):
+    name: ArtifactDependencyLabel
+    configuration: ArtifactSerializedText
+
+
+class ArtifactConfigurationScope(FrozenDomainModel):
+    scope: ArtifactDependencyName
+    components: tuple[ArtifactConfigurationComponent, ...]
 
 
 class ArtifactSlot(FrozenDomainModel):
@@ -132,6 +141,34 @@ def configuration_digest() -> ArtifactDigest:
     return hashlib.sha256(payload).hexdigest()
 
 
+def configuration_scope_dependency(
+    scoped_configuration: ArtifactConfigurationScope,
+) -> ArtifactDependency:
+    dependency_name: ArtifactDependencyName = f"configuration-scope:{scoped_configuration.scope}"
+    digest = hashlib.sha256(
+        framed_bytes(scoped_configuration.scope, scoped_configuration.model_dump_json())
+    ).hexdigest()
+    return ArtifactDependency(
+        kind=ArtifactDependencyKind.CONTENT,
+        dependency=dependency_name,
+        digest=digest,
+    )
+
+
+def _configuration_scope_digest(
+    dependencies: tuple[ArtifactDependency, ...],
+) -> ArtifactDigest:
+    scope_dependencies = tuple(
+        item for item in dependencies if item.dependency.startswith("configuration-scope:")
+    )
+    fields = tuple(
+        field
+        for item in sorted(scope_dependencies, key=lambda dependency: dependency.dependency)
+        for field in (item.dependency, item.digest)
+    )
+    return hashlib.sha256(framed_bytes(*fields)).hexdigest()
+
+
 def artifact_identity(
     slot: ArtifactSlot,
     dependencies: tuple[ArtifactDependency, ...],
@@ -139,8 +176,11 @@ def artifact_identity(
 ) -> ArtifactDigest:
     labelled = tuple(
         field
-        for dependency in sorted(dependencies, key=lambda item: item.dependency)
-        for field in (dependency.dependency, dependency.digest)
+        for dependency in sorted(
+            dependencies,
+            key=lambda item: (item.dependency, item.kind.value),
+        )
+        for field in (dependency.kind, dependency.dependency, dependency.digest)
     )
     return hashlib.sha256(
         framed_bytes(
@@ -203,9 +243,13 @@ def load_published_manifests(
             continue
         for path in sorted(root.rglob(f"*{ARTIFACT_MANIFEST_SUFFIX}")):
             try:
-                manifests.append(
-                    ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
-                )
+                manifest = ArtifactManifest.model_validate_json(path.read_text(encoding="utf-8"))
+                if manifest.schema_version != ARTIFACT_SCHEMA_VERSION:
+                    raise ValueError(
+                        f"artifact schema {manifest.schema_version} is obsolete; "
+                        f"expected {ARTIFACT_SCHEMA_VERSION}"
+                    )
+                manifests.append(manifest)
             except ValueError as error:
                 if _is_superseded_history(path):
                     _log_unreadable_manifest(path, error)
@@ -283,7 +327,13 @@ def read_published_manifest(
     if not manifest_path.exists():
         return None
     try:
-        return ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+        manifest = ArtifactManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+        if manifest.schema_version != ARTIFACT_SCHEMA_VERSION:
+            raise ValueError(
+                f"artifact schema {manifest.schema_version} is obsolete; "
+                f"expected {ARTIFACT_SCHEMA_VERSION}"
+            )
+        return manifest
     except ValueError as error:
         _log_unreadable_manifest(manifest_path, error)
         return None
@@ -336,6 +386,8 @@ def read_current_artifact(
     if not pointer_path.exists():
         return None
     pointer = ArtifactCurrentPointer.model_validate_json(pointer_path.read_text(encoding="utf-8"))
+    if pointer.schema_version != ARTIFACT_SCHEMA_VERSION:
+        return None
     manifest = read_published_manifest(slot_directory, pointer.identity)
     if manifest is None or manifest.slot != pointer.slot:
         return None
@@ -397,7 +449,7 @@ def publish_artifact(
         lifecycle_state=ArtifactLifecycleState.STAGING,
         dependencies=dependencies,
         procedure_identity=procedure_identity,
-        configuration_digest=configuration_digest(),
+        configuration_digest=_configuration_scope_digest(dependencies),
         code_revision=repository_revision(),
     )
     staged_path = stage_payload(staging_root, payload)

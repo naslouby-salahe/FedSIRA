@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from fedsira.artifacts.paths import prepared_evidence_root
+from fedsira.artifacts.paths import current_repository_root, prepared_evidence_root
 from fedsira.datasets.common import dataset_specification
 from fedsira.domain.enums import DatasetId, ExperimentLifecycleState, RepositoryRootName
 from fedsira.domain.types import BooleanValue, FailureMessage, FrozenDomainModel
-from fedsira.runtime import REPOSITORY_ROOT, current_application_context
+from fedsira.runtime import current_application_context
 
 
 def raw_dataset_root(dataset: DatasetId) -> Path | None:
@@ -74,7 +74,7 @@ def raw_dataset_present(dataset: DatasetId) -> BooleanValue:
 
 
 def prepared_dataset_present(dataset: DatasetId) -> BooleanValue:
-    prepared = REPOSITORY_ROOT / prepared_evidence_root(dataset)
+    prepared = current_repository_root() / prepared_evidence_root(dataset)
     return prepared.is_dir() and any(prepared.rglob("*.parquet"))
 
 

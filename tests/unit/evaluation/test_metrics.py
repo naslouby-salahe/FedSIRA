@@ -1,3 +1,5 @@
+import torch
+
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import AdmissionState, ComparisonMetric
 from fedsira.domain.models import FalseSameCapabilityReason, MetricResult, ProposalOracleLabel
@@ -22,6 +24,7 @@ from fedsira.evaluation.metrics import (
     legitimate_admission_rate,
     macro_f1,
     malicious_admission_rate,
+    metric_mean,
     metrics_from_state,
     precision_for_class,
     reproduction_abstention_rate,
@@ -34,6 +37,14 @@ from fedsira.evaluation.metrics import (
 )
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
+
+
+def test_metric_mean_accumulates_float32_observations_in_float64() -> None:
+    values = torch.tensor([1.0, 1e-7], dtype=torch.float32)
+    expected = float(values.to(dtype=torch.float64).mean())
+
+    assert metric_mean(values) == expected
+    assert metric_mean(values) != float(values.mean())
 
 
 def test_confusion_counts_partition_all_examples() -> None:
@@ -99,6 +110,17 @@ def test_target_f1_selects_target_class() -> None:
     )
     result = target_f1(counts_by_class, "GAFGYT_COMBO")
     assert result.value == 1.0
+
+
+def test_benign_false_alarm_rate_increase_preserves_undefined_values() -> None:
+    increase = benign_false_alarm_rate_increase(
+        MetricResult(value=0.25, denominator=20),
+        MetricResult(value=0.10, denominator=20),
+    )
+    assert increase == MetricResult(value=0.15, denominator=1)
+    assert benign_false_alarm_rate_increase(
+        MetricResult(value=0.25, denominator=20), MetricResult(value=None, denominator=0)
+    ) == MetricResult(value=None, denominator=0)
 
 
 def test_target_capability_gain_is_na_when_either_side_undefined() -> None:

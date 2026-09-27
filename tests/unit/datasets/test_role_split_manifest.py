@@ -20,9 +20,7 @@ from fedsira.runtime import (
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Path]:
-    monkeypatch.setattr("fedsira.datasets.role_split.REPOSITORY_ROOT", tmp_path)
-    monkeypatch.setattr("fedsira.datasets.layout.REPOSITORY_ROOT", tmp_path)
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
     context = current_application_context().model_copy(update={"repository_root": tmp_path})
     with bound_application_context(context):
         yield tmp_path

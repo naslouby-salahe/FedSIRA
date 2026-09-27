@@ -26,7 +26,16 @@ ViolationDetector = Callable[[ast.Module], list[str]]
 
 
 def _names(annotation: ast.expr) -> set[str]:
-    return {node.id for node in ast.walk(annotation) if isinstance(node, ast.Name)}
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return set()
+    return {
+        node.id if isinstance(node, ast.Name) else node.attr
+        for node in ast.walk(annotation)
+        if isinstance(node, ast.Name | ast.Attribute)
+    }
 
 
 def _primitives(annotation: ast.expr) -> list[str]:
@@ -174,6 +183,30 @@ def test_function_boundary_violation_detected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "offending.py"
         path.write_text("def handler(value: str) -> int:\n    return len(value)\n")
+        assert function_boundary_primitive_violations(parse(path)) == [
+            "handler.value: str",
+            "handler.return: int",
+        ]
+
+
+def test_stringified_primitive_boundary_violation_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text("def handler(value: 'str') -> 'int':\n    return len(value)\n")
+        assert function_boundary_primitive_violations(parse(path)) == [
+            "handler.value: str",
+            "handler.return: int",
+        ]
+
+
+def test_qualified_primitive_boundary_violation_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text(
+            "import builtins\n"
+            "def handler(value: builtins.str) -> builtins.int:\n"
+            "    return len(value)\n"
+        )
         assert function_boundary_primitive_violations(parse(path)) == [
             "handler.value: str",
             "handler.return: int",

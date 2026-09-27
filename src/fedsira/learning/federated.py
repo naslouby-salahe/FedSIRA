@@ -195,7 +195,7 @@ def run_anchor_fedavg_training(
                 extra=AnchorRoundEvaluationLogFields(
                     round_index=round_index,
                     validation_parameters=float(
-                        flatten_trainable_parameters(validation_model).sum()
+                        flatten_trainable_parameters(validation_model).sum().detach()
                     ),
                 ).model_dump(),
             )

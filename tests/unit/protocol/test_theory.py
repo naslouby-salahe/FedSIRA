@@ -5,9 +5,7 @@ import torch
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.nbaiot.schema import NBAIOT_DOMAIN_ORDER
-from fedsira.domain.enums import TernaryOutcome
 from fedsira.protocol.rules import (
-    deduplicate_reports_by_proxy,
     diagnostic_at_least_two_byzantine_probability,
     first_cycle_with_minimum_eligible_evidence_holders,
     krum_committee_is_admissible,
@@ -56,7 +54,7 @@ def test_primary_verifier_profile_guarantees_at_least_one_honest_positive() -> N
         VERIFICATION_CONFIG.required_positive_reports,
         VERIFICATION_CONFIG.maximum_byzantine_verifiers_per_panel,
     )
-    assert guaranteed >= 1
+    assert guaranteed == 1
 
 
 def test_krum_minimum_committee_size_for_f_1_is_five() -> None:
@@ -85,19 +83,6 @@ def test_validate_no_safety_completion_before_tau_k_rejects_early_completion() -
     with pytest.raises(ValueError, match="precedes"):
         validate_no_safety_completion_before_tau_k(0, None)
     validate_no_safety_completion_before_tau_k(3, 3)
-
-
-def test_deduplicate_reports_by_proxy_keeps_first_report_per_domain() -> None:
-    reports = (
-        (DOMAIN_A, TernaryOutcome.POSITIVE),
-        (DOMAIN_A, TernaryOutcome.NEGATIVE),
-        (DOMAIN_B, TernaryOutcome.ABSTAIN),
-    )
-    deduplicated = deduplicate_reports_by_proxy(reports)
-    assert deduplicated == (
-        (DOMAIN_A, TernaryOutcome.POSITIVE),
-        (DOMAIN_B, TernaryOutcome.ABSTAIN),
-    )
 
 
 def test_validate_exactly_one_source_domain() -> None:

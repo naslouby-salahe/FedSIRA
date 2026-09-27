@@ -4,12 +4,16 @@ from fedsira.artifacts.paths import (
     artifact_instance_token,
     artifact_slot_directory,
     artifact_staging_root,
+    current_repository_root,
 )
 from fedsira.artifacts.store import (
+    ArtifactConfigurationComponent,
+    ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactManifest,
     ArtifactReuseDecision,
     ArtifactSlot,
+    configuration_scope_dependency,
     publish_artifact,
 )
 from fedsira.datasets.common import DatasetAdapter, RealAnchor, Role, flat_parameters_identity
@@ -38,6 +42,7 @@ from fedsira.domain.types import (
     ScientificCellCount,
 )
 from fedsira.evaluation.metrics import (
+    benign_false_alarm_rate_increase,
     compute_screen_differential,
     compute_unmatched_screen_differential,
     evaluate_domain,
@@ -52,7 +57,7 @@ from fedsira.protocol.proposal import (
     screen_domain_decision_is_positive,
     unmatched_control_screen_domain_decision_is_positive,
 )
-from fedsira.runtime import REPOSITORY_ROOT, current_application_context, derive_uint32
+from fedsira.runtime import current_application_context, derive_uint32
 
 SCREEN_MATCHING_SCHEMA_VERSION: SchemaVersion = "fedsira|screen_matching|1"
 SCREEN_MATCHING_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|screen_matching|1"
@@ -77,6 +82,11 @@ class ScreenMatchingPayload(FrozenDomainModel):
     benign_far_increase: MetricResult | None = None
 
 
+class ScreenFoldConfiguration(FrozenDomainModel):
+    seed: NamespaceSeed
+    count: ScientificCellCount
+
+
 def screen_matching_slot(
     dataset: DatasetId,
     domain: DomainId,
@@ -97,6 +107,31 @@ def screen_matching_slot(
 def publish_screen_matching(
     payload: ScreenMatchingPayload,
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
+    config = current_application_context().scientific_config
+    screen_configuration = ArtifactConfigurationScope(
+        scope="proposal-screen",
+        components=(
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.CAPABILITY_CONTRACT,
+                configuration=config.capability_contract.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.ADMISSION_OPENING_CONFIGURATION,
+                configuration=config.protocol.admission_opening.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.PROPOSAL_SCREEN_CONFIGURATION,
+                configuration=config.protocol.proposal_screen.model_dump_json(),
+            ),
+            ArtifactConfigurationComponent(
+                name=ArtifactDependencyLabel.SCREEN_FOLD,
+                configuration=ScreenFoldConfiguration(
+                    seed=payload.screen_fold_seed,
+                    count=payload.screen_fold_count,
+                ).model_dump_json(),
+            ),
+        ),
+    )
     slot = screen_matching_slot(
         payload.dataset,
         payload.domain,
@@ -123,10 +158,11 @@ def publish_screen_matching(
                 dependency=ArtifactDependencyLabel.PREPARED_EVIDENCE,
                 digest=payload.dataset_manifest_hash,
             ),
+            configuration_scope_dependency(screen_configuration),
         ),
         procedure_identity=SCREEN_MATCHING_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
 
 
@@ -244,13 +280,8 @@ def evaluate_screen_domain(
     supported_macro_f1_drop = supported_macro_f1_harm(
         anchor_screen.supported_macro_f1, source_screen.supported_macro_f1
     )
-    benign_far_increase = (
-        MetricResult(
-            value=source_screen.benign_far.value - anchor_screen.benign_far.value,
-            denominator=1,
-        )
-        if source_screen.benign_far.value is not None and anchor_screen.benign_far.value is not None
-        else MetricResult(value=None, denominator=0)
+    benign_far_increase = benign_false_alarm_rate_increase(
+        source_screen.benign_far, anchor_screen.benign_far
     )
     if screen_predicate_variant is AblationVariant.RAW_TARGET_F1_SCREEN_ONLY:
         predicate = raw_target_f1_screen_domain_decision_is_positive(

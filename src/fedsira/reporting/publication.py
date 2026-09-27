@@ -1,7 +1,11 @@
 import hashlib
 from pathlib import Path
 
-from fedsira.artifacts.paths import artifact_slot_directory, artifact_staging_root
+from fedsira.artifacts.paths import (
+    artifact_slot_directory,
+    artifact_staging_root,
+    current_repository_root,
+)
 from fedsira.artifacts.store import (
     ArtifactDependency,
     ArtifactManifest,
@@ -32,7 +36,6 @@ from fedsira.domain.types import (
     SchemaVersion,
 )
 from fedsira.reporting.tables import RenderedTable
-from fedsira.runtime import REPOSITORY_ROOT
 
 PUBLICATION_SCHEMA_VERSION: SchemaVersion = "fedsira|publication|1"
 TABLE_FIGURE_SOURCE_DATA_PROCEDURE_IDENTITY: ProcedureIdentity = (
@@ -152,10 +155,26 @@ def publish_table_figure_source_data(
                 )
                 for item in evidence
             ),
+            *(
+                ArtifactDependency(
+                    kind=ArtifactDependencyKind.CONTENT,
+                    dependency=f"table-render:{item.table}",
+                    digest=item.content_digest,
+                )
+                for item in payload.tables
+            ),
+            *(
+                ArtifactDependency(
+                    kind=ArtifactDependencyKind.CONTENT,
+                    dependency=f"figure-render:{item.figure}",
+                    digest=item.content_digest,
+                )
+                for item in payload.figures
+            ),
         ),
         procedure_identity=TABLE_FIGURE_SOURCE_DATA_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
 
 
@@ -186,18 +205,29 @@ def publish_table_figure_export(
             ),
         ),
         procedure_identity=TABLE_FIGURE_REPORT_EXPORT_PROCEDURE_IDENTITY,
-        slot_directory=REPOSITORY_ROOT / artifact_slot_directory(slot),
-        staging_root=REPOSITORY_ROOT / artifact_staging_root(),
+        slot_directory=current_repository_root() / artifact_slot_directory(slot),
+        staging_root=current_repository_root() / artifact_staging_root(),
     )
 
 
 def read_table_figure_export(experiment: ExperimentName) -> TableFigureExportPayload | None:
     slot = table_figure_export_slot(experiment)
-    current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+    current = read_current_artifact(current_repository_root() / artifact_slot_directory(slot))
     if current is None:
         return None
     _manifest, payload = current
     return TableFigureExportPayload.model_validate_json(payload)
+
+
+def read_table_figure_source_data(
+    experiment: ExperimentName,
+) -> tuple[ArtifactManifest, TableFigureSourceDataPayload] | None:
+    slot = table_figure_source_data_slot(experiment)
+    current = read_current_artifact(current_repository_root() / artifact_slot_directory(slot))
+    if current is None:
+        return None
+    manifest, payload = current
+    return manifest, TableFigureSourceDataPayload.model_validate_json(payload)
 
 
 def _table_row_count(table: RenderedTable) -> RowCount:

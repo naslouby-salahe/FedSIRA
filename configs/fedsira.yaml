@@ -293,7 +293,7 @@ execution:
     pin_memory: true
     persistent_workers: false
   timeouts_seconds:
-    dataset_preprocessing: 7200
+    dataset_preprocessing: 28800
     scientific_cell_phase: 7200
     experiment_analysis_or_report: 1800
     final_export_verification: 1800

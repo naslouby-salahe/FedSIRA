@@ -1,4 +1,4 @@
-from collections.abc import Hashable, Mapping, Sequence
+from collections.abc import Hashable, Sequence
 from enum import StrEnum
 from typing import Final, TypeVar
 
@@ -311,13 +311,6 @@ BASELINE_CONTRACTS: Final[tuple[BaselineContract, ...]] = (
 )
 
 
-def baseline_contract(identity: BaselineIdentity) -> BaselineContract:
-    for contract in BASELINE_CONTRACTS:
-        if contract.identity is identity:
-            return contract
-    raise KeyError(f"no baseline contract registered for {identity!r}")
-
-
 if frozenset(contract.identity for contract in BASELINE_CONTRACTS) != frozenset(BaselineIdentity):
     raise AssertionError("every registered baseline must have exactly one contract")
 
@@ -487,12 +480,6 @@ def local_only_reference_evaluation_is_domain_local(
 
 def centralized_reference_local_epochs() -> LocalEpochCount:
     return current_application_context().scientific_config.baselines.centralized_reference_epochs
-
-
-def pool_domain_rows(
-    ordered_domains: Sequence[DomainId], domain_rows: Mapping[DomainId, torch.Tensor]
-) -> torch.Tensor:
-    return torch.cat([domain_rows[domain] for domain in ordered_domains], dim=0)
 
 
 def centralized_reference_pooled_rows(

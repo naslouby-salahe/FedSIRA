@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -24,14 +25,22 @@ from fedsira.reporting.verification import (
     artifact_manifest_dependency_failures,
     verify_report_export_currency,
 )
+from fedsira.runtime import (
+    ApplicationContext,
+    bound_application_context,
+    current_application_context,
+)
 
 EXPERIMENT = ExperimentName.PRIMARY_CONFIRMATORY_EVALUATION
 
 
 @pytest.fixture
-def isolated_repository(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    monkeypatch.setattr("fedsira.reporting.publication.REPOSITORY_ROOT", tmp_path)
-    return tmp_path
+def isolated_repository(tmp_path: Path) -> Iterator[Path]:
+    context: ApplicationContext = current_application_context().model_copy(
+        update={"repository_root": tmp_path}
+    )
+    with bound_application_context(context):
+        yield tmp_path
 
 
 def _rendered_table(csv_text: str) -> RenderedTable:
@@ -82,6 +91,13 @@ def test_source_data_records_table_and_figure_content(isolated_repository: Path)
     assert restored.figures[0].content_bytes == len(b"png-bytes")
     assert restored.evidence[0].evidence_name == table_path.name
     assert manifest.dependencies[0].digest == "e" * 64
+    dependencies = {item.dependency: item.digest for item in manifest.dependencies}
+    assert (
+        dependencies[f"table-render:{TableName.CELL_METRICS}"] == restored.tables[0].content_digest
+    )
+    assert dependencies["figure-render:Primary Security-Utility Tradeoff"] == (
+        restored.figures[0].content_digest
+    )
 
 
 def test_source_data_identity_changes_when_rendered_content_changes(

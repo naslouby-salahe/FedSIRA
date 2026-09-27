@@ -4,7 +4,14 @@ from collections import OrderedDict
 
 import torch
 
-from fedsira.datasets.common import BackdoorScope, DatasetAdapter, HeterogeneityScope, RealAnchor
+from fedsira.datasets.common import (
+    BackdoorScope,
+    DatasetAdapter,
+    HeterogeneityScope,
+    RealAnchor,
+    Role,
+    fraction_to_attack_count,
+)
 from fedsira.datasets.nbaiot.schema import NBaiotDomain
 from fedsira.domain.enums import (
     AblationReproducerStrategy,
@@ -55,6 +62,23 @@ ANCHOR_CHECKPOINT_IDENTITY = ArtifactFamilyDirectoryToken.ANCHOR_CHECKPOINT
 SOURCE_CHECKPOINT_IDENTITY = "source-checkpoint"
 
 
+def model_replacement_attack_feasible_domains(
+    adapter: DatasetAdapter,
+) -> frozenset[DomainId]:
+    config = current_application_context().scientific_config
+    poison_fraction = (
+        config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction
+    )
+    carrier_class = adapter.attack_carrier_class_token()
+    return frozenset(
+        domain
+        for domain in adapter.domain_ids
+        if (rows := adapter.load_rows(domain, carrier_class, Role.POST_REFERENCE_REPLAY))
+        is not None
+        and fraction_to_attack_count(poison_fraction, len(rows.sample_ids)) > 0
+    )
+
+
 def _train_reproduction_update(
     adapter: DatasetAdapter,
     cell: ScientificCell,
@@ -67,6 +91,17 @@ def _train_reproduction_update(
     strategy: AblationReproducerStrategy,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
+    if (
+        cell.condition
+        in (
+            ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+            ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+            ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+            ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+        )
+        and backdoor_scope is None
+    ):
+        raise ValueError("compromised backdoor reproducer requires its declared attack scope")
     validate_reproduction_starts_from_anchor(anchor.flat_parameters, anchor.flat_parameters)
     if domain not in compromised_reproducers:
         return train_domain_reproduction_delta(
@@ -235,6 +270,7 @@ def reproduction_progression(
             update,
             anchor.input_width,
             anchor.output_width,
+            adapter.class_tokens,
         )
         is_certified = domain not in compromised_reproducers or not external_verification_active
         attempts.append(

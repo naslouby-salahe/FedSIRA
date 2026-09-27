@@ -76,12 +76,33 @@ def forbidden_alias_symbol_violations(tree: ast.Module) -> list[str]:
 
 
 def _enum_class_names(tree: ast.Module) -> set[str]:
+    enum_base_names = {"Enum", "IntEnum", "StrEnum"}
+    enum_base_aliases = {
+        imported.asname or imported.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "enum"
+        for imported in node.names
+        if imported.name in enum_base_names
+    }
+    enum_module_aliases = {
+        imported.asname or imported.name.split(".")[0]
+        for node in tree.body
+        if isinstance(node, ast.Import)
+        for imported in node.names
+        if imported.name == "enum"
+    }
     defined = {
         node.name
         for node in tree.body
         if isinstance(node, ast.ClassDef)
         and any(
-            isinstance(base, ast.Name) and base.id in {"Enum", "IntEnum", "StrEnum"}
+            (isinstance(base, ast.Name) and base.id in enum_base_names | enum_base_aliases)
+            or (
+                isinstance(base, ast.Attribute)
+                and base.attr in enum_base_names
+                and isinstance(base.value, ast.Name)
+                and base.value.id in enum_module_aliases
+            )
             for base in node.bases
         )
     }
@@ -198,6 +219,25 @@ def test_no_enum_value_unwrap_inside_comparisons() -> None:
 def enum_value_access_violations(tree: ast.Module) -> list[str]:
     found: list[str] = []
     enum_names = _enum_class_names(tree)
+    module_prefixes: set[tuple[str, ...]] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                if not imported.name.endswith(".domain.enums"):
+                    continue
+                module_prefixes.add(
+                    (imported.asname,)
+                    if imported.asname is not None
+                    else tuple(imported.name.split(".")[:3])
+                )
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            if not node.module.endswith(".domain"):
+                continue
+            module_prefixes.update(
+                (imported.asname or imported.name,)
+                for imported in node.names
+                if imported.name == "enums"
+            )
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr == "value":
             if isinstance(node.value, ast.Name):
@@ -211,7 +251,12 @@ def enum_value_access_violations(tree: ast.Module) -> list[str]:
                     current = current.value
                 if isinstance(current, ast.Name):
                     parts.append(current.id)
-                if parts and parts[-1] in enum_names:
+                module_qualified = any(
+                    tuple(reversed(parts[-len(prefix) :])) == prefix
+                    and len(parts) >= len(prefix) + 2
+                    for prefix in module_prefixes
+                )
+                if (parts and parts[-1] in enum_names) or module_qualified:
                     found.append(f"{node.lineno}")
     return found
 
@@ -390,3 +435,27 @@ def test_enum_value_access_mutation_is_detected() -> None:
         )
         violations = enum_value_access_violations(parse(path))
         assert violations == ["5"]
+
+
+def test_qualified_enum_module_alias_value_access_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text(
+            "import fedsira.domain.enums as domain_enums\n"
+            "VALUE = domain_enums.AdmissionState.ADMITTED.value\n",
+            encoding="utf-8",
+        )
+        assert enum_value_access_violations(parse(path)) == ["2"]
+
+
+def test_aliased_enum_base_value_access_is_detected() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "offending.py"
+        path.write_text(
+            "from enum import StrEnum as StringEnum\n"
+            "class Mode(StringEnum):\n"
+            "    ACTIVE = 'active'\n"
+            "VALUE = Mode.ACTIVE.value\n",
+            encoding="utf-8",
+        )
+        assert enum_value_access_violations(parse(path)) == ["4"]

@@ -28,6 +28,17 @@ def test_build_loss_function_has_no_class_weights_or_smoothing() -> None:
     assert loss_function.reduction == "mean"
 
 
+def test_cross_entropy_is_the_unweighted_arithmetic_mean_without_ignored_labels() -> None:
+    logits = torch.tensor([[2.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    labels = torch.tensor([0, 1, 1])
+
+    actual = build_loss_function()(logits, labels)
+    expected = -torch.log_softmax(logits, dim=-1)[torch.arange(3), labels].mean()
+
+    assert torch.allclose(actual, expected)
+    assert build_loss_function().ignore_index == -100
+
+
 def test_build_optimizer_uses_configured_hyperparameters() -> None:
     model = FedSIRAClassifier(input_width=10, output_width=3)
     optimizer = build_optimizer(
@@ -42,6 +53,8 @@ def test_build_optimizer_uses_configured_hyperparameters() -> None:
     assert param_group["maximize"] is False
     assert param_group["foreach"] is False
     assert param_group["fused"] is None or param_group["fused"] is False
+    assert optimizer.defaults["capturable"] is False
+    assert optimizer.defaults["differentiable"] is False
 
 
 def test_clip_gradients_bounds_the_global_gradient_norm() -> None:
@@ -74,6 +87,12 @@ def test_ordered_minibatches_retains_a_final_partial_batch() -> None:
     batches = ordered_minibatches(42, 0, sample_ids, batch_size=3)
     assert len(batches) == 4
     assert len(batches[-1]) == 1
+
+
+def test_configured_batch_size_is_256_without_a_fallback() -> None:
+    assert TRAINING_CONFIG.batch_size == 256
+    batches = ordered_minibatches(42, 0, tuple(f"sample-{index}" for index in range(257)), 256)
+    assert tuple(len(batch) for batch in batches) == (256, 1)
 
 
 def test_ordered_minibatches_is_deterministic() -> None:

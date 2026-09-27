@@ -1,18 +1,11 @@
-from collections.abc import Sequence
-
 import torch
 from torch import nn, optim
 
 from fedsira.config import PostReferenceConfig, TrainingConfig
-from fedsira.datasets.common import (
-    select_fractional_attack_rows,
-)
 from fedsira.domain.enums import ByzantineVerifierBehavior, TernaryOutcome
 from fedsira.domain.types import (
-    ArtifactDigest,
     DeltaScale,
     LossWeight,
-    NamespaceSeed,
     Probability,
     TrainableParameterCount,
     TrainingLoss,
@@ -106,16 +99,6 @@ def validate_declared_source_backdoor_poison_fraction(poison_fraction: Probabili
             f"source-backdoor poison fraction {poison_fraction!r} is not one of the declared "
             f"robustness sweep fractions {declared}"
         )
-
-
-def select_model_replacement_carrier_rows(
-    capped_replay_gafgyt_udp_row_ids: Sequence[ArtifactDigest],
-    poison_fraction: Probability,
-    attack_generation_namespace_seed: NamespaceSeed,
-) -> tuple[ArtifactDigest, ...] | None:
-    return select_fractional_attack_rows(
-        capped_replay_gafgyt_udp_row_ids, poison_fraction, attack_generation_namespace_seed
-    )
 
 
 def scale_model_replacement_delta(delta: torch.Tensor, delta_scale: DeltaScale) -> torch.Tensor:

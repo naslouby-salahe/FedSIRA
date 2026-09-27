@@ -2,7 +2,7 @@ import hashlib
 from collections import OrderedDict
 from pathlib import Path
 
-from fedsira.artifacts.paths import artifact_slot_directory
+from fedsira.artifacts.paths import artifact_slot_directory, current_repository_root
 from fedsira.artifacts.store import ArtifactSlot, read_current_artifact
 from fedsira.datasets.common import (
     PreparedRoleViewManifest,
@@ -19,7 +19,6 @@ from fedsira.domain.types import (
     RowCount,
     ValidatedPreparedViewsLimit,
 )
-from fedsira.runtime import REPOSITORY_ROOT
 
 VALIDATED_PREPARED_VIEWS_LIMIT: ValidatedPreparedViewsLimit = 512
 
@@ -56,7 +55,7 @@ def _view_failures(
     if not parquet_path.is_file():
         return (f"prepared role view {view_key} has no parquet payload",)
     slot = ArtifactSlot(family=ArtifactFamily.PREPARED_ROLE_VIEW, instance=view_key)
-    current = read_current_artifact(REPOSITORY_ROOT / artifact_slot_directory(slot))
+    current = read_current_artifact(current_repository_root() / artifact_slot_directory(slot))
     if current is None:
         return (
             f"prepared role view {view_key} has no published Complete artifact; "

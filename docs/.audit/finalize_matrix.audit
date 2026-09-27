@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import re
+from collections import Counter
+from pathlib import Path
+
+# Validation only: audit dispositions must be edited with current evidence,
+# never auto-filled or overridden by a historical default map.
+ROOT = Path(__file__).resolve().parents[2]
+MATRIX = ROOT / "docs" / "Audit Matrix.md"
+ALLOWED = {
+    "PASS",
+    "FAIL",
+    "PARTIAL",
+    "MISSING",
+    "UNWIRED",
+    "DEAD_CODE_CANDIDATE",
+    "JUSTIFIED_EMPIRICAL_DEVIATION",
+    "JUSTIFIED_ARCHITECTURE_DEVIATION",
+    "BLOCKED_BY_PRE_EXPERIMENT_STATE",
+    "NOT_APPLICABLE",
+}
+
+
+def main() -> None:
+    statuses: dict[str, str] = {}
+    for line in MATRIX.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"^\| ([A-Z]+-\d+) \|", line)
+        if match is None:
+            continue
+        fields = line.split("|")
+        identifier = match.group(1)
+        status = fields[-4].strip()
+        if status not in ALLOWED:
+            raise ValueError(f"missing or invalid status for {identifier}: {status!r}")
+        statuses[identifier] = status
+    if len(statuses) != 250:
+        raise ValueError(f"expected 250 requirement rows, found {len(statuses)}")
+    counts = Counter(statuses.values())
+    print(f"validated {len(statuses)} requirements: {dict(sorted(counts.items()))}")
+    partial = sorted(identifier for identifier, status in statuses.items() if status == "PARTIAL")
+    print("partial requirements: " + ", ".join(partial))
+
+
+if __name__ == "__main__":
+    main()

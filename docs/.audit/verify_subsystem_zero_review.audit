@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SUBSYSTEMS = ROOT / "docs/.audit/experiment-scientific-subsystems.csv"
+ZERO_REVIEW = ROOT / "docs/.audit/experiment-scientific-subsystem-zero-review.csv"
+BYZANTINE = "BYZANTINE_BOUND_VIOLATION_NAME"
+BYZANTINE_REQUIRED = {
+    "attacks/baselines",
+    "learning",
+    "metrics",
+    "reproduction",
+    "synthesis",
+    "verification",
+}
+
+
+def main() -> None:
+    with SUBSYSTEMS.open(encoding="utf-8", newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    if len(rows) != 19:
+        raise ValueError(f"expected 19 registered workflows, got {len(rows)}")
+    zero_cells = {
+        (row["experiment"], subsystem)
+        for row in rows
+        for subsystem, value in row.items()
+        if subsystem != "experiment" and int(value) == 0
+    }
+    with ZERO_REVIEW.open(encoding="utf-8", newline="") as stream:
+        review_rows = list(csv.DictReader(stream))
+    reviewed_cells = {
+        (row["experiment"], row["zero_subsystem"])
+        for row in review_rows
+        if row["disposition"] == "EXPECTED_NOT_APPLICABLE"
+        and row["source_anchor"]
+        and row["evidence"]
+    }
+    if zero_cells != reviewed_cells:
+        raise ValueError(
+            f"zero-category review mismatch: unreviewed={sorted(zero_cells - reviewed_cells)}, "
+            f"stale={sorted(reviewed_cells - zero_cells)}"
+        )
+    byzantine = next(row for row in rows if row["experiment"] == BYZANTINE)
+    missing = sorted(name for name in BYZANTINE_REQUIRED if int(byzantine[name]) == 0)
+    if missing:
+        raise ValueError(f"Byzantine-bound path misses required subsystems: {missing}")
+    print(
+        f"verified {len(rows)} workflows × {len(rows[0]) - 1} subsystems; "
+        f"all {len(zero_cells)} zero cells justified; Byzantine-bound attack routes complete"
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+import duckdb
+import pyarrow.parquet as parquet
+
+ROOT = Path(__file__).resolve().parents[2]
+PREPARED = ROOT / "outputs" / "preprocessing" / "prepared"
+DATASETS = ("N-BaIoT", "CICIoT2023")
+PreparedView = tuple[Path, dict[str, Any]]
+
+
+def _verify_payload(sidecar: Path, metadata: dict[str, Any]) -> Path:
+    parquet_path = sidecar.with_suffix(".parquet")
+    if not parquet_path.is_file():
+        raise FileNotFoundError(parquet_path)
+    cache_identity = metadata.get("cache_identity")
+    expected_digest = metadata.get("parquet_sha256")
+    if not isinstance(cache_identity, str) or not cache_identity:
+        raise RuntimeError(f"prepared view lacks cache identity: {sidecar}")
+    if not isinstance(expected_digest, str) or not expected_digest:
+        raise RuntimeError(f"prepared view lacks payload checksum: {sidecar}")
+    digest = hashlib.sha256()
+    with parquet_path.open("rb") as payload:
+        for chunk in iter(lambda: payload.read(4 * 1024 * 1024), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != expected_digest:
+        raise RuntimeError(f"prepared view checksum mismatch: {parquet_path}")
+    observed_rows = parquet.ParquetFile(parquet_path).metadata.num_rows
+    if observed_rows != int(metadata["row_count"]):
+        raise RuntimeError(
+            f"prepared-view row count mismatch for {parquet_path}: "
+            f"{observed_rows} != {metadata['row_count']}"
+        )
+    return parquet_path
+
+
+def _load_views(dataset: str) -> list[PreparedView]:
+    views = []
+    for sidecar in sorted((PREPARED / dataset).glob("*.json")):
+        metadata = json.loads(sidecar.read_text(encoding="utf-8"))
+        views.append((_verify_payload(sidecar, metadata), metadata))
+    if not views:
+        raise RuntimeError(f"no prepared views for {dataset}")
+    cache_identities = {str(metadata["cache_identity"]) for _, metadata in views}
+    if len(cache_identities) != 1:
+        raise RuntimeError(f"prepared views have mixed cache identities for {dataset}")
+    return views
+
+
+def _verify_ciciot_manifests(con: duckdb.DuckDBPyConnection) -> tuple[int, int]:
+    metadata_root = ROOT / "outputs" / "preprocessing" / "metadata"
+    role_manifest_path = metadata_root / "ciciot2023_role_manifest.parquet"
+    exclusion_path = metadata_root / "dataset_exclusions.parquet"
+    role_manifest = con.read_parquet(str(role_manifest_path))
+    role_manifest.create_view("role_manifest")
+    role_rows, unique_role_ids = con.execute(
+        "SELECT count(*), count(DISTINCT stable_row_id) FROM role_manifest"
+    ).fetchone()
+    view_only, role_only = con.execute(
+        "SELECT "
+        "(SELECT count(*) FROM prepared_views p WHERE NOT EXISTS "
+        "(SELECT 1 FROM role_manifest r WHERE r.stable_row_id = p.sample_id)), "
+        "(SELECT count(*) FROM role_manifest r WHERE NOT EXISTS "
+        "(SELECT 1 FROM prepared_views p WHERE p.sample_id = r.stable_row_id))"
+    ).fetchone()
+    if int(role_rows) != int(unique_role_ids) or view_only or role_only:
+        raise RuntimeError(
+            f"prepared-view/role-manifest mismatch: rows={role_rows}, unique={unique_role_ids}, "
+            f"view_only={view_only}, role_only={role_only}"
+        )
+    exclusions = con.read_parquet(str(exclusion_path))
+    exclusions.create_view("dataset_exclusions")
+    exclusion_rows, unique_exclusion_ids = con.execute(
+        "SELECT count(*), count(DISTINCT stable_row_id) FROM dataset_exclusions"
+    ).fetchone()
+    retained_excluded_ids = con.execute(
+        "SELECT count(*) FROM dataset_exclusions e JOIN prepared_views p "
+        "ON e.stable_row_id = p.sample_id"
+    ).fetchone()[0]
+    if int(exclusion_rows) != int(unique_exclusion_ids) or retained_excluded_ids:
+        raise RuntimeError(
+            f"retained/excluded identity overlap: excluded={exclusion_rows}, "
+            f"unique={unique_exclusion_ids}, overlap={retained_excluded_ids}"
+        )
+    return int(role_rows), int(exclusion_rows)
+
+
+def _role_summaries(
+    views: list[PreparedView],
+) -> tuple[Counter[str], Counter[str], Counter[str], Counter[tuple[str, str, str]]]:
+    role_rows: Counter[str] = Counter()
+    domain_rows: Counter[str] = Counter()
+    class_rows: Counter[str] = Counter()
+    domain_class_role_rows: Counter[tuple[str, str, str]] = Counter()
+    for _, metadata in views:
+        count = int(metadata["row_count"])
+        role = str(metadata["role"])
+        domain_value = metadata.get("domain", metadata.get("pseudo_domain"))
+        class_value = metadata.get("class_id", metadata.get("normalized_label"))
+        if domain_value is None or not isinstance(class_value, str):
+            raise RuntimeError("prepared sidecar is missing its domain or class identity")
+        domain = str(domain_value)
+        class_id = class_value
+        role_rows[role] += count
+        domain_rows[domain] += count
+        class_rows[class_id] += count
+        domain_class_role_rows[(domain, class_id, role)] += count
+    return role_rows, domain_rows, class_rows, domain_class_role_rows
+
+
+def inspect(dataset: str) -> dict[str, Any]:
+    views = _load_views(dataset)
+    field_names = tuple(parquet.read_schema(views[0][0]).names)
+    inconsistent_schema = any(
+        tuple(parquet.read_schema(path).names) != field_names for path, _ in views[1:]
+    )
+    if inconsistent_schema:
+        raise RuntimeError(f"inconsistent parquet schemas for {dataset}")
+    if "sample_id" not in field_names or "label" not in field_names:
+        raise RuntimeError(f"prepared schema missing sample identity or label for {dataset}")
+
+    con = duckdb.connect(database=":memory:")
+    relation = con.read_parquet([str(path) for path, _ in views])
+    relation.create_view("prepared_views")
+    total_rows, distinct_ids, missing_ids = relation.query(
+        "prepared",
+        """
+        SELECT count(*), count(DISTINCT sample_id), count(*) FILTER (WHERE sample_id IS NULL)
+        FROM prepared
+        """,
+    ).fetchone()
+    sidecar_rows = sum(int(metadata["row_count"]) for _, metadata in views)
+    if int(total_rows) != sidecar_rows:
+        raise RuntimeError(
+            f"sidecar row count mismatch for {dataset}: {sidecar_rows} != {total_rows}"
+        )
+    duplicate_ids = int(total_rows) - int(distinct_ids)
+    if duplicate_ids or int(missing_ids):
+        raise RuntimeError(
+            f"sample identity overlap/nulls for {dataset}: "
+            f"duplicates={duplicate_ids}, nulls={missing_ids}"
+        )
+
+    role_manifest_rows: int | None = None
+    exclusion_rows: int | None = None
+    if dataset == "CICIoT2023":
+        role_manifest_rows, exclusion_rows = _verify_ciciot_manifests(con)
+
+    role_rows, domain_rows, class_rows, domain_class_role_rows = _role_summaries(views)
+
+    con.close()
+    return {
+        "dataset": dataset,
+        "view_count": len(views),
+        "total_rows": int(total_rows),
+        "unique_sample_ids": int(distinct_ids),
+        "feature_count": len(field_names) - 2,
+        "role_manifest_rows": role_manifest_rows,
+        "exclusion_rows": exclusion_rows,
+        "domains": sorted(domain_rows),
+        "classes": sorted(class_rows),
+        "rows_by_role": dict(sorted(role_rows.items())),
+        "rows_by_domain": dict(sorted(domain_rows.items())),
+        "rows_by_class": dict(sorted(class_rows.items())),
+        "rows_by_domain_class_role": {
+            " | ".join(key): value for key, value in sorted(domain_class_role_rows.items())
+        },
+        "schema": field_names,
+        "duplicate_sample_ids": duplicate_ids,
+        "null_sample_ids": int(missing_ids),
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("datasets", nargs="*")
+    requested = parser.parse_args().datasets
+    invalid = tuple(dataset for dataset in requested if dataset not in DATASETS)
+    if invalid:
+        parser.error(f"unknown dataset(s): {', '.join(invalid)}")
+    selected = requested or DATASETS
+    print(json.dumps([inspect(dataset) for dataset in selected], indent=2))
+
+
+if __name__ == "__main__":
+    main()

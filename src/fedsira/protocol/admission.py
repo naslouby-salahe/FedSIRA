@@ -26,6 +26,7 @@ from fedsira.domain.types import (
 )
 from fedsira.evaluation.metrics import (
     RealReportSummary,
+    benign_false_alarm_rate_increase,
     compute_real_report_summary,
     evaluate_domain,
     non_source_domains,
@@ -189,18 +190,11 @@ def real_final_gate_metrics(
                 anchor_metrics.supported_macro_f1, production_metrics.supported_macro_f1
             )
         )
-        if (
-            anchor_metrics.benign_far.value is not None
-            and production_metrics.benign_far.value is not None
-        ):
-            benign_far_increases.append(
-                MetricResult(
-                    value=production_metrics.benign_far.value - anchor_metrics.benign_far.value,
-                    denominator=1,
-                )
+        benign_far_increases.append(
+            benign_false_alarm_rate_increase(
+                production_metrics.benign_far, anchor_metrics.benign_far
             )
-        else:
-            benign_far_increases.append(MetricResult(value=None, denominator=0))
+        )
     return (
         len(adequate_domains),
         median_domain_target_f1(target_f1_values),

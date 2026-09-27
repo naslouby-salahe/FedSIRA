@@ -6,6 +6,7 @@ from fedsira.learning.model import (
     load_flat_trainable_parameters,
     trainable_parameter_count,
 )
+from fedsira.runtime import seed_job_local_rng_streams
 
 
 def test_forward_produces_the_dataset_derived_output_width() -> None:
@@ -62,6 +63,15 @@ def test_xavier_uniform_weights_are_bounded_by_the_xavier_limit() -> None:
     fan_in, fan_out = model.hidden_1.in_features, model.hidden_1.out_features
     limit = (6 / (fan_in + fan_out)) ** 0.5
     assert torch.all(model.hidden_1.weight.abs() <= limit + 1e-6)
+
+
+def test_model_initialization_is_bitwise_reproducible_under_the_designated_seed() -> None:
+    seed_job_local_rng_streams(731)
+    first = FedSIRAClassifier(input_width=115, output_width=11)
+    seed_job_local_rng_streams(731)
+    second = FedSIRAClassifier(input_width=115, output_width=11)
+
+    assert torch.equal(flatten_trainable_parameters(first), flatten_trainable_parameters(second))
 
 
 def test_trainable_parameter_count_matches_manual_sum() -> None:

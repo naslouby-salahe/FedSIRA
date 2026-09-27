@@ -10,6 +10,7 @@ from fedsira.domain.enums import (
     AblationVariant,
     BoundCondition,
     ByteUnit,
+    ClaimState,
     CoreMethodIdentity,
     DelayPhaseMetric,
     DescriptiveScientificMetric,
@@ -76,6 +77,13 @@ from fedsira.experiments.definitions import (
 )
 from fedsira.experiments.engine import (
     CellExecutionOutcome,
+)
+from fedsira.experiments.observations import mean_of_defined
+from fedsira.experiments.observations import (
+    outcome_metric_mean as _outcome_metric_mean,
+)
+from fedsira.experiments.observations import (
+    outcome_metric_values as _outcome_metric_values,
 )
 from fedsira.runtime import current_application_context
 
@@ -389,29 +397,6 @@ def render_collapse_decisions_table(
     )
 
 
-def _comparison_value(
-    comparison_results: tuple[ComparisonFamilyResult, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    scenario: ScenarioName,
-    metric: MetricName,
-) -> FormattedStatisticText:
-    for family in comparison_results:
-        for comparison in family.comparisons:
-            definition = comparison.definition
-            if (
-                definition.experiment == experiment
-                and definition.method == method
-                and definition.scientific_scenario == scenario
-                and definition.metric is metric
-            ):
-                return format_metric_value(
-                    comparison.mean_paired_difference,
-                    comparison.definition.metric,
-                )
-    return ReportCellLiteral.NOT_AVAILABLE
-
-
 def _comparison_result(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     experiment: ExperimentName,
@@ -444,38 +429,6 @@ def _materiality_text(comparison: ComparisonResult | None) -> FormattedStatistic
     if comparison is None or comparison.materiality_passes is None:
         return ReportCellLiteral.NOT_AVAILABLE
     return ReportCellLiteral.PASS if comparison.materiality_passes else ReportCellLiteral.FAIL
-
-
-def _outcome_metric_values(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    scenario: ScenarioName,
-    metric: MetricName,
-) -> tuple[MetricValue, ...]:
-    return tuple(
-        value
-        for outcome in sorted(outcomes, key=lambda item: item.cell.master_seed)
-        if (
-            outcome.completed
-            and outcome.cell.experiment == experiment
-            and outcome.cell.method == method
-            and outcome.cell.condition == scenario
-        )
-        for metric_name, value in outcome.metrics
-        if metric_name == metric and value is not None
-    )
-
-
-def _outcome_metric_mean(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    scenario: ScenarioName,
-    metric: MetricName,
-) -> MetricValue | None:
-    values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
-    return None if not values else sum(values) / len(values)
 
 
 def _outcome_metric_text(
@@ -571,7 +524,9 @@ def _outcome_summary_or_comparison(
 ) -> FormattedStatisticText:
     values = _outcome_metric_values(outcomes, experiment, method, scenario, metric)
     if values:
-        mean = sum(values) / len(values)
+        mean = mean_of_defined(values)
+        if mean is None:
+            return ReportCellLiteral.NOT_AVAILABLE
         sample_standard_deviation = (
             0.0
             if len(values) == 1
@@ -579,7 +534,7 @@ def _outcome_summary_or_comparison(
         )
         decimals = _publication_rounding().f1_accuracy_rates_decimals
         return f"{mean:.{decimals}f} ± {sample_standard_deviation:.{decimals}f}"
-    return _comparison_value(comparison_results, experiment, method, scenario, metric)
+    return ReportCellLiteral.NOT_AVAILABLE
 
 
 def render_primary_results_table(
@@ -719,7 +674,7 @@ def render_source_exclusion_results_table(
     source_exclusion_gate_outcome: FormattedStatisticText = (
         ReportCellLiteral.NOT_AVAILABLE
         if source_exclusion_decision is None
-        else ("Survives" if source_exclusion_decision.survives else "Not Supported")
+        else ("Survives" if source_exclusion_decision.survives else ClaimState.NOT_SUPPORTED)
     )
     methods: list[MethodName] = []
     seen: set[MethodName] = set()
