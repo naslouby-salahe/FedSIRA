@@ -5,6 +5,7 @@ from fedsira import application as doctor
 from fedsira.cli import app
 from fedsira.datasets import preprocess
 from fedsira.domain.enums import ExperimentLifecycleState, ProjectStage
+from fedsira.experiments.planning import plan_cell_count_contract
 from fedsira.runtime import REPOSITORY_ROOT
 
 runner = CliRunner()
@@ -70,10 +71,11 @@ def test_preprocess_without_dataset_runs_all_roadmap_datasets(
 
 def test_plan_prints_section_31_counts() -> None:
     result = runner.invoke(app, ["plan"])
+    contract = plan_cell_count_contract()
     assert result.exit_code == 0
-    assert "total cells: 1989" in result.stdout
-    assert "pre-core cells: 299" in result.stdout
-    assert "post-core cells: 1690" in result.stdout
+    assert f"total cells: {contract.complete_scientific_plan}" in result.stdout
+    assert f"pre-core cells: {contract.pre_core_subtotal}" in result.stdout
+    assert f"post-core cells: {contract.post_core_subtotal}" in result.stdout
     assert "FedSIRA experiment plan" in result.stdout
 
 

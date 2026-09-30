@@ -252,7 +252,7 @@ def load_published_manifests(
                 manifests.append(manifest)
             except ValueError as error:
                 if _is_superseded_history(path):
-                    _log_unreadable_manifest(path, error)
+                    _log_superseded_manifest(path, error)
                     continue
                 invalid.append(
                     InvalidArtifactReport(
@@ -415,6 +415,19 @@ def _log_unreadable_manifest(manifest_path: Path, error: ValueError) -> None:
     ARTIFACT_LOGGER.warning("artifact.manifest.unreadable %s: %s", manifest_path, error)
 
 
+def _log_superseded_manifest(manifest_path: Path, error: ValueError) -> None:
+    ARTIFACT_LOGGER.info("artifact.manifest.superseded_history %s: %s", manifest_path, error)
+
+
+def _retire_current_pointer(slot_directory: Path, identity: ArtifactDigest) -> None:
+    pointer_path = current_pointer_path(slot_directory)
+    if not pointer_path.is_file():
+        return
+    pointer = ArtifactCurrentPointer.model_validate_json(pointer_path.read_text(encoding="utf-8"))
+    if pointer.identity == identity:
+        pointer_path.unlink()
+
+
 def publish_artifact(
     *,
     slot: ArtifactSlot,
@@ -426,9 +439,10 @@ def publish_artifact(
     staging_root: Path,
 ) -> tuple[ArtifactManifest, ArtifactReuseDecision]:
     identity = artifact_identity(slot, dependencies, procedure_identity)
+    payload_checksum = compute_checksum(payload)
     if is_artifact_complete_and_valid(slot_directory, identity):
         existing = read_published_manifest(slot_directory, identity)
-        if existing is not None:
+        if existing is not None and existing.checksum == payload_checksum:
             _write_text_atomically(
                 current_pointer_path(slot_directory),
                 ArtifactCurrentPointer(
@@ -439,6 +453,10 @@ def publish_artifact(
             )
             _log_artifact_event(LogEvent.ARTIFACT_REUSED, slot, identity)
             return existing, True
+        if existing is not None:
+            _retire_current_pointer(slot_directory, identity)
+            _log_artifact_event(LogEvent.ARTIFACT_PUBLICATION_REJECTED, slot, identity)
+            return existing, False
     staged_manifest = ArtifactManifest(
         schema_version=ARTIFACT_SCHEMA_VERSION,
         slot=slot,

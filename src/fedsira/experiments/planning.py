@@ -23,12 +23,15 @@ from fedsira.domain.types import (
 )
 from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
+    CERTIFICATE_VALIDATION_CELL_COUNT,
     COLLAPSE_EXPERIMENT_NAMES,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
+    LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
     MECHANISM_ABLATION_NAME,
     POST_CORE_EXPERIMENT_NAMES,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
+    REGISTERED_EXPERIMENT_NAMES,
     ExperimentDefinition,
     ablation_scenario_for_variant,
     baseline_validation_fixture_for_method,
@@ -102,6 +105,7 @@ class PlanCellCountContract(FrozenDomainModel):
     efficiency_measurement: ScientificCellCount
     secondary_dataset_generalization: ScientificCellCount
     post_core_subtotal: ScientificCellCount
+    leave_fault_certificate_validation: ScientificCellCount
     complete_scientific_plan: ScientificCellCount
 
 
@@ -110,6 +114,7 @@ PRE_CORE_EXPERIMENT_NAMES: frozenset[ExperimentName] = frozenset(
         DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
         PROTOCOL_INVARIANT_VALIDATION_NAME,
         BASELINE_IMPLEMENTATION_VALIDATION_NAME,
+        LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
         *COLLAPSE_EXPERIMENT_NAMES,
     }
 )
@@ -131,7 +136,7 @@ PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
     single_reproduction_necessity=60,
     source_artifact_exclusion_necessity=60,
     external_verification_necessity=80,
-    pre_core_subtotal=299,
+    pre_core_subtotal=CERTIFICATE_VALIDATION_CELL_COUNT,
     primary_confirmatory_evaluation=420,
     mechanism_ablation=180,
     compromised_reproducer_robustness=280,
@@ -144,8 +149,9 @@ PLAN_CELL_COUNT_CONTRACT = PlanCellCountContract(
     admission_delay_decomposition=120,
     efficiency_measurement=60,
     secondary_dataset_generalization=100,
-    post_core_subtotal=1690,
-    complete_scientific_plan=1989,
+    post_core_subtotal=0,
+    leave_fault_certificate_validation=CERTIFICATE_VALIDATION_CELL_COUNT,
+    complete_scientific_plan=CERTIFICATE_VALIDATION_CELL_COUNT,
 )
 
 
@@ -318,27 +324,61 @@ def validate_planned_cell_count_invariant(plan: ExperimentPlan) -> None:
         if observed != expected:
             raise ValueError(
                 f"experiment {planned.definition.name} plans {observed} cells but "
-                f"its nominal Section 31 count is {expected}"
+                f"its nominal count is {expected}"
             )
+    registered_count = sum(
+        len(planned.cells)
+        for planned in plan.experiments
+        if planned.definition.name in REGISTERED_EXPERIMENT_NAMES
+    )
+    if registered_count != nominal.complete_scientific_plan:
+        raise ValueError(
+            f"registered algorithm-validation cell count {registered_count} does not match "
+            f"the contract {nominal.complete_scientific_plan}"
+        )
+    names = {planned.definition.name for planned in plan.experiments}
+    if names != set(REGISTERED_EXPERIMENT_NAMES):
+        return
     if plan.pre_core_cell_count != nominal.pre_core_subtotal:
         raise ValueError(
             f"pre-core planned cell count {plan.pre_core_cell_count} does not match "
-            f"the Section 31 contract {nominal.pre_core_subtotal}"
+            f"the contract {nominal.pre_core_subtotal}"
         )
     if plan.post_core_cell_count != nominal.post_core_subtotal:
         raise ValueError(
             f"post-core planned cell count {plan.post_core_cell_count} does not match "
-            f"the Section 31 contract {nominal.post_core_subtotal}"
+            f"the contract {nominal.post_core_subtotal}"
         )
     if plan.total_cell_count != nominal.complete_scientific_plan:
         raise ValueError(
             f"total planned cell count {plan.total_cell_count} does not match "
-            f"the Section 31 contract {nominal.complete_scientific_plan}"
+            f"the contract {nominal.complete_scientific_plan}"
         )
 
 
+def build_required_plan(
+    resolved_core_complete: ResolvedCoreComplete = False,
+    collapse_decision_states: tuple[tuple[ExperimentName, CollapseDecisionPassed], ...]
+    | None = None,
+    master_seeds: tuple[MasterSeed, ...] | None = None,
+    smoke_seed: MasterSeed | None = None,
+) -> ExperimentPlan:
+    plan = build_plan(
+        resolved_core_complete=resolved_core_complete,
+        collapse_decision_states=collapse_decision_states,
+        master_seeds=master_seeds,
+        smoke_seed=smoke_seed,
+    )
+    required = tuple(
+        planned
+        for planned in plan.experiments
+        if planned.definition.name in REGISTERED_EXPERIMENT_NAMES
+    )
+    return ExperimentPlan(experiments=required)
+
+
 def resolve_plan(resolved_core_complete: ResolvedCoreComplete) -> ExperimentPlan:
-    plan = build_plan(resolved_core_complete=resolved_core_complete)
+    plan = build_required_plan(resolved_core_complete=resolved_core_complete)
     validate_planned_cell_count_invariant(plan)
     return plan
 

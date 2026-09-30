@@ -35,7 +35,6 @@ from fedsira.datasets.layout import dataset_readiness
 from fedsira.datasets.nbaiot.prepare import assign_stream_roles_and_sample_ids
 from fedsira.datasets.nbaiot.schema import (
     NBaiotClass,
-    NBaiotDomain,
 )
 from fedsira.domain.enums import (
     AblationVariant,
@@ -98,7 +97,12 @@ from fedsira.evaluation.statistics import (
     quantile_type7,
 )
 from fedsira.experiments.artifact_invariants import artifact_invariants
-from fedsira.experiments.byzantine import validate_byzantine_vocabulary
+from fedsira.experiments.byzantine import (
+    BYZANTINE_VERIFIER_SOURCE_DOMAINS,
+    random_verifier_contamination_probability,
+    random_verifier_eligible_pool_size,
+    validate_byzantine_vocabulary,
+)
 from fedsira.experiments.collapse import resolve_all_eight_cases
 from fedsira.experiments.definitions import (
     MECHANISM_ABLATION_NAME,
@@ -158,7 +162,6 @@ from fedsira.protocol.capability_contract import (
 )
 from fedsira.protocol.reproduction import validate_commitment_exists_before_verifier_assignment
 from fedsira.protocol.rules import (
-    diagnostic_at_least_two_byzantine_probability,
     krum_committee_is_admissible,
     minimum_honest_positive_count,
 )
@@ -455,8 +458,7 @@ def execute_smoke(overwrite: OverwriteExisting) -> None:
 
 SMOKE_RECORD_SCHEMA_VERSION: SchemaVersion = "fedsira|smoke_record|2"
 
-_DANMINI = NBaiotDomain.DANMINI_DOORBELL
-_ENNIO = NBaiotDomain.ENNIO_DOORBELL
+_DANMINI, _ENNIO = BYZANTINE_VERIFIER_SOURCE_DOMAINS
 _DANMINI_HASH_TOKEN: DomainId = _DANMINI.name
 _DANMINI_BENIGN_CSV_PATH: RelativePathText = f"{_DANMINI}/benign_traffic.csv"
 _DANMINI_TARGET_CSV_PATH: RelativePathText = f"{_DANMINI}/{NBaiotClass.GAFGYT_COMBO.name}.csv"
@@ -694,9 +696,9 @@ def _protocol_invariants() -> tuple[SmokeCheckResult, ...]:
         validate_commitment_exists_before_verifier_assignment(None)
     except ValueError:
         commitment_rejected = True
-    eligible_pool_size = len(NBaiotDomain) - len((_DANMINI, _ENNIO))
-    probability = diagnostic_at_least_two_byzantine_probability(
-        eligible_pool_size, diagnostic.byzantine_domain_count, diagnostic.panel_size
+    eligible_pool_size = random_verifier_eligible_pool_size()
+    probability = random_verifier_contamination_probability(
+        diagnostic.byzantine_domain_count, diagnostic.panel_size
     )
     tolerance = config.validation_tolerances.random_committee_probability_absolute
     expected_probability = 1 / eligible_pool_size
@@ -917,9 +919,8 @@ def _extended_protocol_invariants() -> tuple[SmokeCheckResult, ...]:
 def _extended_mathematical_invariants() -> tuple[SmokeCheckResult, ...]:
     config = current_application_context().scientific_config
     diagnostic = config.protocol.diagnostic_random_verifier_profile
-    pool = len(NBaiotDomain) - len((_DANMINI, _ENNIO))
-    zero = diagnostic_at_least_two_byzantine_probability(pool, 0, diagnostic.panel_size)
-    one = diagnostic_at_least_two_byzantine_probability(pool, 1, diagnostic.panel_size)
+    zero = random_verifier_contamination_probability(0, diagnostic.panel_size)
+    one = random_verifier_contamination_probability(1, diagnostic.panel_size)
     tolerance = config.validation_tolerances.random_committee_probability_absolute
     delay = AdmissionDelayDecomposition(
         logical_information_arrival_cycles=1,

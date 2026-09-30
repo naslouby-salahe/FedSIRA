@@ -1,14 +1,19 @@
 from fedsira.domain.enums import ExperimentLifecycleState, ExperimentName
 from fedsira.experiments.definitions import COLLAPSE_EXPERIMENT_NAMES, POST_CORE_EXPERIMENT_NAMES
-from fedsira.experiments.planning import build_plan, validate_planned_cell_count_invariant
+from fedsira.experiments.planning import (
+    PLAN_CELL_COUNT_CONTRACT,
+    build_plan,
+    build_required_plan,
+    validate_planned_cell_count_invariant,
+)
 
 
 def test_plan_matches_section_31_counts_exactly() -> None:
-    plan = build_plan()
+    plan = build_required_plan()
     validate_planned_cell_count_invariant(plan)
-    assert plan.total_cell_count == 1989
-    assert plan.pre_core_cell_count == 299
-    assert plan.post_core_cell_count == 1690
+    assert plan.total_cell_count == PLAN_CELL_COUNT_CONTRACT.complete_scientific_plan
+    assert plan.pre_core_cell_count == PLAN_CELL_COUNT_CONTRACT.pre_core_subtotal
+    assert plan.post_core_cell_count == PLAN_CELL_COUNT_CONTRACT.post_core_subtotal
 
 
 def test_every_experiment_matches_its_section_31_nominal_count() -> None:

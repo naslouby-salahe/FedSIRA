@@ -41,6 +41,7 @@ from fedsira.domain.types import (
     AdmissionIndicatorSeries,
     ArtifactDigest,
     BinaryLabelMaskSeries,
+    BooleanValue,
     ClassLabel,
     CleanOracleDegradationMaterial,
     DatasetClassToken,
@@ -380,6 +381,28 @@ def malicious_admission_rate(
     )
 
 
+def production_depends_on_compromised_contributor(
+    contributor_ids: Sequence[DomainId],
+    compromised_ids: Sequence[DomainId],
+) -> BooleanValue:
+    compromised = frozenset(compromised_ids)
+    return any(contributor_id in compromised for contributor_id in contributor_ids)
+
+
+def malicious_admission_from_ancestry(
+    admitted: BooleanValue,
+    malicious_authority_fixture_present: BooleanValue,
+    depends_on_compromised_contributor: BooleanValue,
+) -> MetricValue | None:
+    if not malicious_authority_fixture_present:
+        return None
+    if not admitted:
+        return 0.0
+    if depends_on_compromised_contributor:
+        return 1.0
+    return 0.0
+
+
 def legitimate_admission_rate(
     legitimate_admission_indicators: AdmissionIndicatorSeries,
 ) -> MetricResult:
@@ -550,8 +573,8 @@ def boundary_metric_set(
     supported_macro_f1_drop: MetricResult,
     benign_far_increase: MetricResult,
     clean_oracle_materiality_config: CleanOracleMaterialityConfig,
-    false_certification_count: FalseCertificationCount = 0,
-    broad_certified_row_count: RowCount = 0,
+    false_certification_count: FalseCertificationCount,
+    broad_certified_row_count: RowCount,
     is_scoped_contract: ScopedContractActive = False,
     a_scoped_predicate_passes: PredicateSatisfied = False,
     b_scoped_predicate_passes: PredicateSatisfied = False,

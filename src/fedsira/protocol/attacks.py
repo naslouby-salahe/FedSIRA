@@ -6,13 +6,25 @@ from fedsira.domain.enums import ByzantineVerifierBehavior, TernaryOutcome
 from fedsira.domain.types import (
     DeltaScale,
     LossWeight,
+    ModelInputWidth,
+    ModelOutputWidth,
     Probability,
     TrainableParameterCount,
     TrainingLoss,
 )
-from fedsira.learning.model import FedSIRAClassifier
+from fedsira.learning.model import (
+    FedSIRAClassifier,
+    flatten_trainable_parameters,
+    load_flat_trainable_parameters,
+)
 from fedsira.learning.post_reference import compute_delta_l2, compute_stability_kl
-from fedsira.learning.training import clip_gradients, step_optimizer
+from fedsira.learning.training import (
+    ModelState,
+    clip_gradients,
+    load_model_state,
+    model_state_from_classifier,
+    step_optimizer,
+)
 from fedsira.runtime import current_application_context
 
 
@@ -103,3 +115,24 @@ def validate_declared_source_backdoor_poison_fraction(poison_fraction: Probabili
 
 def scale_model_replacement_delta(delta: torch.Tensor, delta_scale: DeltaScale) -> torch.Tensor:
     return delta * delta_scale
+
+
+def model_replacement_client_state(
+    current_state: ModelState,
+    trained_state: ModelState,
+    input_width: ModelInputWidth,
+    output_width: ModelOutputWidth,
+    delta_scale: DeltaScale,
+) -> ModelState:
+    current_model = FedSIRAClassifier(input_width, output_width)
+    trained_model = FedSIRAClassifier(input_width, output_width)
+    load_model_state(current_model, current_state)
+    load_model_state(trained_model, trained_state)
+    current_flat = flatten_trainable_parameters(current_model)
+    trained_flat = flatten_trainable_parameters(trained_model)
+    replaced = FedSIRAClassifier(input_width, output_width)
+    load_flat_trainable_parameters(
+        replaced,
+        current_flat + scale_model_replacement_delta(trained_flat - current_flat, delta_scale),
+    )
+    return model_state_from_classifier(replaced)

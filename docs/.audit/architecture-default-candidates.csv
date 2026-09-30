@@ -1,0 +1,809 @@
+candidate_kind,source_file,line,context,literal
+conditional_fallback,src/fedsira/application.py,206,then,None
+conditional_fallback,src/fedsira/application.py,207,then,None
+conditional_fallback,src/fedsira/application.py,294,else,'missing prepared views'
+conditional_fallback,src/fedsira/application.py,297,else,'absent'
+conditional_fallback,src/fedsira/application.py,297,then,'present'
+conditional_fallback,src/fedsira/application.py,569,else,'p=NA'
+conditional_fallback,src/fedsira/application.py,722,else,1
+conditional_fallback,src/fedsira/application.py,722,then,0
+conditional_fallback,src/fedsira/datasets/ciciot2023/prepare.py,161,else,None
+conditional_fallback,src/fedsira/datasets/ciciot2023/prepare.py,180,then,None
+conditional_fallback,src/fedsira/datasets/ciciot2023/schema.py,76,else,'_'
+conditional_fallback,src/fedsira/datasets/common.py,458,else,'false'
+conditional_fallback,src/fedsira/datasets/common.py,458,then,'true'
+conditional_fallback,src/fedsira/datasets/common.py,487,then,':memory:'
+conditional_fallback,src/fedsira/datasets/common.py,898,then,None
+conditional_fallback,src/fedsira/datasets/common.py,1154,else,-1
+conditional_fallback,src/fedsira/datasets/common.py,1154,then,1
+conditional_fallback,src/fedsira/datasets/preprocess.py,352,then,None
+conditional_fallback,src/fedsira/datasets/preprocess.py,492,else,0.0
+conditional_fallback,src/fedsira/domain/models.py,227,then,''
+conditional_fallback,src/fedsira/evaluation/comparison_evidence.py,67,then,''
+conditional_fallback,src/fedsira/evaluation/comparisons.py,318,else,1.0
+conditional_fallback,src/fedsira/evaluation/metrics.py,564,else,0.0
+conditional_fallback,src/fedsira/evaluation/metrics.py,564,then,1.0
+conditional_fallback,src/fedsira/evaluation/metrics.py,574,else,0.0
+conditional_fallback,src/fedsira/evaluation/metrics.py,574,then,1.0
+conditional_fallback,src/fedsira/evaluation/metrics.py,731,then,None
+conditional_fallback,src/fedsira/evaluation/metrics.py,741,then,None
+conditional_fallback,src/fedsira/evaluation/metrics.py,839,then,0
+conditional_fallback,src/fedsira/evaluation/metrics.py,1024,else,0
+conditional_fallback,src/fedsira/evaluation/metrics.py,1024,then,1
+conditional_fallback,src/fedsira/evaluation/screen_evidence.py,219,then,0
+conditional_fallback,src/fedsira/experiments/cell_parameters.py,37,else,1
+conditional_fallback,src/fedsira/experiments/collapse.py,233,then,None
+conditional_fallback,src/fedsira/experiments/collapse.py,473,else,1.0
+conditional_fallback,src/fedsira/experiments/engine.py,272,else,None
+conditional_fallback,src/fedsira/experiments/engine.py,273,else,None
+conditional_fallback,src/fedsira/experiments/engine.py,274,else,None
+conditional_fallback,src/fedsira/experiments/engine.py,540,then,None
+conditional_fallback,src/fedsira/experiments/execution.py,340,then,None
+conditional_fallback,src/fedsira/experiments/execution.py,1043,then,None
+conditional_fallback,src/fedsira/experiments/execution.py,1085,else,'FAIL'
+conditional_fallback,src/fedsira/experiments/execution.py,1085,then,'PASS'
+conditional_fallback,src/fedsira/experiments/execution.py,1086,else,''
+conditional_fallback,src/fedsira/experiments/execution.py,1088,else,'FAILED'
+conditional_fallback,src/fedsira/experiments/execution.py,1088,then,'PASSED'
+conditional_fallback,src/fedsira/experiments/handlers.py,482,else,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,562,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,622,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,665,else,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,665,then,1.0
+conditional_fallback,src/fedsira/experiments/handlers.py,666,else,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,666,then,1.0
+conditional_fallback,src/fedsira/experiments/handlers.py,675,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,762,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,825,else,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,825,then,1.0
+conditional_fallback,src/fedsira/experiments/handlers.py,906,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,982,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,993,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1001,else,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,1001,then,1.0
+conditional_fallback,src/fedsira/experiments/handlers.py,1009,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1042,then,1
+conditional_fallback,src/fedsira/experiments/handlers.py,1044,else,0
+conditional_fallback,src/fedsira/experiments/handlers.py,1045,else,0
+conditional_fallback,src/fedsira/experiments/handlers.py,1045,then,1
+conditional_fallback,src/fedsira/experiments/handlers.py,1080,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1188,then,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1457,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1476,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1482,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1491,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1797,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1882,then,1.0
+conditional_fallback,src/fedsira/experiments/handlers.py,1886,then,0.0
+conditional_fallback,src/fedsira/experiments/handlers.py,1888,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,1952,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2021,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2125,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2151,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2156,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2161,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2291,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2293,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2338,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2342,else,None
+conditional_fallback,src/fedsira/experiments/handlers.py,2391,else,0
+conditional_fallback,src/fedsira/experiments/handlers.py,2391,then,1
+conditional_fallback,src/fedsira/experiments/handlers.py,2613,else,None
+conditional_fallback,src/fedsira/learning/training.py,104,then,1
+conditional_fallback,src/fedsira/learning/training.py,105,then,0
+conditional_fallback,src/fedsira/protocol/admission.py,275,else,None
+conditional_fallback,src/fedsira/protocol/baselines/defenses.py,487,then,0
+conditional_fallback,src/fedsira/protocol/baselines/outcomes.py,192,else,0
+conditional_fallback,src/fedsira/protocol/baselines/training.py,398,else,None
+conditional_fallback,src/fedsira/protocol/proposal.py,331,then,0
+conditional_fallback,src/fedsira/protocol/proposal.py,397,else,None
+conditional_fallback,src/fedsira/protocol/rules.py,203,then,0
+conditional_fallback,src/fedsira/reporting/aggregate.py,350,then,None
+conditional_fallback,src/fedsira/reporting/export.py,407,then,0
+conditional_fallback,src/fedsira/reporting/export.py,461,then,''
+conditional_fallback,src/fedsira/reporting/export.py,1046,then,None
+conditional_fallback,src/fedsira/reporting/export.py,1429,else,None
+conditional_fallback,src/fedsira/reporting/export.py,1492,else,None
+conditional_fallback,src/fedsira/reporting/export.py,1494,then,None
+conditional_fallback,src/fedsira/reporting/export.py,1547,then,None
+conditional_fallback,src/fedsira/reporting/export.py,1877,then,0.0
+conditional_fallback,src/fedsira/reporting/export.py,1910,then,None
+conditional_fallback,src/fedsira/reporting/export.py,1911,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,160,else,None
+conditional_fallback,src/fedsira/reporting/figures.py,294,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,295,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,520,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,521,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,532,then,'p=NA'
+conditional_fallback,src/fedsira/reporting/figures.py,551,then,0.0
+conditional_fallback,src/fedsira/reporting/figures.py,587,else,None
+conditional_fallback,src/fedsira/reporting/figures.py,599,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,637,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,638,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,640,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,647,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,778,then,1.0
+conditional_fallback,src/fedsira/reporting/figures.py,1185,then,None
+conditional_fallback,src/fedsira/reporting/figures.py,1406,then,0.0
+conditional_fallback,src/fedsira/reporting/figures.py,1406,then,0.0
+conditional_fallback,src/fedsira/reporting/figures.py,1435,then,0
+conditional_fallback,src/fedsira/reporting/figures.py,1580,then,None
+conditional_fallback,src/fedsira/reporting/protocol_tables.py,72,else,'none (descriptive evidence)'
+conditional_fallback,src/fedsira/reporting/protocol_tables.py,452,else,'no'
+conditional_fallback,src/fedsira/reporting/protocol_tables.py,452,then,'yes'
+conditional_fallback,src/fedsira/reporting/protocol_tables.py,597,else,'insufficient'
+conditional_fallback,src/fedsira/reporting/protocol_tables.py,597,then,'eligible'
+conditional_fallback,src/fedsira/reporting/publication.py,811,else,None
+conditional_fallback,src/fedsira/reporting/publication.py,1093,then,0
+conditional_fallback,src/fedsira/reporting/tables.py,373,else,'source-influenced'
+conditional_fallback,src/fedsira/reporting/tables.py,373,then,'source-excluded'
+conditional_fallback,src/fedsira/reporting/tables.py,382,else,'Removed'
+conditional_fallback,src/fedsira/reporting/tables.py,382,then,'Survives'
+conditional_fallback,src/fedsira/reporting/tables.py,470,else,None
+conditional_fallback,src/fedsira/reporting/tables.py,480,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,774,then,'Survives'
+conditional_fallback,src/fedsira/reporting/tables.py,810,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,815,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,920,then,'reference row'
+conditional_fallback,src/fedsira/reporting/tables.py,923,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,927,then,'reference row'
+conditional_fallback,src/fedsira/reporting/tables.py,929,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,932,then,'reference row'
+conditional_fallback,src/fedsira/reporting/tables.py,934,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,1037,else,'Above Bound'
+conditional_fallback,src/fedsira/reporting/tables.py,1037,then,'Within Bound'
+conditional_fallback,src/fedsira/reporting/tables.py,1045,else,'Above Bound'
+conditional_fallback,src/fedsira/reporting/tables.py,1045,then,'Within Bound'
+conditional_fallback,src/fedsira/reporting/tables.py,1289,else,'Not an Epistemic-Oracle Experiment'
+conditional_fallback,src/fedsira/reporting/tables.py,1546,else,'no predeclared comparator'
+conditional_fallback,src/fedsira/reporting/tables.py,1615,then,'0.000 (reference method)'
+conditional_fallback,src/fedsira/reporting/tables.py,1618,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,1623,else,'not a predeclared comparison'
+conditional_fallback,src/fedsira/reporting/tables.py,1625,then,None
+conditional_fallback,src/fedsira/reporting/tables.py,1627,else,'not a predeclared comparison'
+conditional_fallback,src/fedsira/reporting/tables.py,1632,else,'not a predeclared comparison'
+conditional_fallback,src/fedsira/reporting/tables.py,1785,then,''
+conditional_fallback,src/fedsira/reporting/verification.py,530,else,0
+conditional_fallback,src/fedsira/runtime.py,400,then,None
+field_default_or_constraint,src/fedsira/domain/types.py,23,ge,0.0
+field_default_or_constraint,src/fedsira/domain/types.py,23,le,1.0
+field_default_or_constraint,src/fedsira/domain/types.py,24,ge,0.0
+field_default_or_constraint,src/fedsira/domain/types.py,24,le,100.0
+field_default_or_constraint,src/fedsira/domain/types.py,25,ge,0
+field_default_or_constraint,src/fedsira/domain/types.py,26,gt,0
+field_default_or_constraint,src/fedsira/domain/types.py,27,ge,0.0
+field_default_or_constraint,src/fedsira/domain/types.py,28,gt,0.0
+field_default_or_constraint,src/fedsira/domain/types.py,32,ge,0
+field_default_or_constraint,src/fedsira/domain/types.py,79,max_length,32
+field_default_or_constraint,src/fedsira/domain/types.py,79,min_length,32
+field_default_or_constraint,src/fedsira/domain/types.py,145,ge,-1
+field_default_or_constraint,src/fedsira/runtime.py,153,max_length,32
+field_default_or_constraint,src/fedsira/runtime.py,153,min_length,32
+keyword_default,src/fedsira/evaluation/comparisons.py,369,reference_experiment,None
+keyword_default,src/fedsira/evaluation/comparisons.py,370,reference_scenario,None
+keyword_default,src/fedsira/evaluation/summaries.py,86,safe_dormancy_verified,False
+keyword_default,src/fedsira/evaluation/summaries.py,87,byzantine_operating_region_verified,False
+keyword_default,src/fedsira/experiments/execution.py,264,overwrite,False
+keyword_default,src/fedsira/experiments/execution.py,265,resolved_core_complete,False
+keyword_default,src/fedsira/experiments/execution.py,266,prerequisite_states,None
+mapping_fallback,src/fedsira/protocol/baselines/defenses.py,322,get.default,0
+parameter_default,src/fedsira/application.py,171,config_path,None
+parameter_default,src/fedsira/artifacts/paths.py,300,experiment,None
+parameter_default,src/fedsira/datasets/ciciot2023/prepare.py,742,overwrite,False
+parameter_default,src/fedsira/datasets/common.py,453,ignore_errors,False
+parameter_default,src/fedsira/datasets/common.py,486,database_path,None
+parameter_default,src/fedsira/datasets/nbaiot/prepare.py,612,overwrite,False
+parameter_default,src/fedsira/datasets/nbaiot/prepare.py,613,retain_materialized_views,True
+parameter_default,src/fedsira/evaluation/comparisons.py,413,threshold,None
+parameter_default,src/fedsira/evaluation/metrics.py,553,false_certification_count,0
+parameter_default,src/fedsira/evaluation/metrics.py,554,broad_certified_row_count,0
+parameter_default,src/fedsira/evaluation/metrics.py,555,is_scoped_contract,False
+parameter_default,src/fedsira/evaluation/metrics.py,556,a_scoped_predicate_passes,False
+parameter_default,src/fedsira/evaluation/metrics.py,557,b_scoped_predicate_passes,False
+parameter_default,src/fedsira/evaluation/metrics.py,608,anchor_target_f1,None
+parameter_default,src/fedsira/evaluation/metrics.py,609,anchor_supported_macro_f1,None
+parameter_default,src/fedsira/evaluation/metrics.py,610,anchor_benign_far,None
+parameter_default,src/fedsira/evaluation/metrics.py,611,triggered_mask,None
+parameter_default,src/fedsira/evaluation/metrics.py,612,triggered_source_class_token,None
+parameter_default,src/fedsira/evaluation/metrics.py,761,target_role,None
+parameter_default,src/fedsira/evaluation/metrics.py,762,root_cause_scope,None
+parameter_default,src/fedsira/evaluation/metrics.py,763,heterogeneity_scope,None
+parameter_default,src/fedsira/evaluation/metrics.py,964,real_report,None
+parameter_default,src/fedsira/evaluation/metrics.py,965,attack_success_rate,None
+parameter_default,src/fedsira/evaluation/service.py,219,store,None
+parameter_default,src/fedsira/evaluation/service.py,444,warmup_forward_passes,0
+parameter_default,src/fedsira/experiments/cell_parameters.py,21,resolved_core,None
+parameter_default,src/fedsira/experiments/cell_parameters.py,33,resolved_core,None
+parameter_default,src/fedsira/experiments/checkpoints.py,205,experiment,None
+parameter_default,src/fedsira/experiments/engine.py,257,failure,None
+parameter_default,src/fedsira/experiments/execution.py,262,comparison_builder,None
+parameter_default,src/fedsira/experiments/handlers.py,890,screen_predicate_variant,None
+parameter_default,src/fedsira/experiments/handlers.py,1018,screen_predicate_variant,None
+parameter_default,src/fedsira/experiments/handlers.py,1324,opening_resolved,False
+parameter_default,src/fedsira/experiments/handlers.py,1325,verifier_condition_override,None
+parameter_default,src/fedsira/experiments/handlers.py,2002,condition_override,None
+parameter_default,src/fedsira/experiments/handlers.py,2133,condition_override,None
+parameter_default,src/fedsira/experiments/handlers.py,2587,primary_prepared_root,None
+parameter_default,src/fedsira/experiments/handlers.py,2588,secondary_prepared_root,None
+parameter_default,src/fedsira/experiments/handlers.py,2589,resolved_core,None
+parameter_default,src/fedsira/experiments/handlers.py,3004,heterogeneity_scope,None
+parameter_default,src/fedsira/experiments/planning.py,283,resolved_core_complete,False
+parameter_default,src/fedsira/experiments/planning.py,285,collapse_decision_states,None
+parameter_default,src/fedsira/experiments/planning.py,286,master_seeds,None
+parameter_default,src/fedsira/experiments/planning.py,287,smoke_seed,None
+parameter_default,src/fedsira/experiments/reproduction_progression.py,182,include_source_as_first_reproducer,False
+parameter_default,src/fedsira/experiments/reproduction_progression.py,183,heterogeneity_scope,None
+parameter_default,src/fedsira/experiments/reproduction_progression.py,184,backdoor_scope,None
+parameter_default,src/fedsira/experiments/reproduction_progression.py,185,source_delta,None
+parameter_default,src/fedsira/learning/model.py,80,keep_gradients,False
+parameter_default,src/fedsira/learning/post_reference.py,163,triggered_features,None
+parameter_default,src/fedsira/learning/post_reference.py,164,triggered_labels,None
+parameter_default,src/fedsira/learning/post_reference.py,165,carrier_row_mask,None
+parameter_default,src/fedsira/learning/post_reference.py,166,triggered_backdoor_loss_weight,None
+parameter_default,src/fedsira/learning/post_reference.py,365,root_cause_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,366,epistemic_failure_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,367,backdoor_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,368,heterogeneity_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,369,irrelevant_class,None
+parameter_default,src/fedsira/learning/post_reference.py,486,root_cause_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,487,epistemic_failure_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,488,backdoor_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,489,heterogeneity_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,490,verifier_aware,False
+parameter_default,src/fedsira/learning/post_reference.py,491,irrelevant_class,None
+parameter_default,src/fedsira/learning/post_reference.py,624,heterogeneity_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,646,root_cause_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,647,epistemic_failure_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,648,heterogeneity_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,649,backdoor_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,670,heterogeneity_scope,None
+parameter_default,src/fedsira/learning/post_reference.py,687,backdoor_scope,None
+parameter_default,src/fedsira/protocol/admission.py,141,heterogeneity_scope,None
+parameter_default,src/fedsira/protocol/admission.py,219,heterogeneity_scope,None
+parameter_default,src/fedsira/protocol/admission.py,220,precomputed_updates,None
+parameter_default,src/fedsira/protocol/admission.py,300,heterogeneity_scope,None
+parameter_default,src/fedsira/protocol/baselines/training.py,112,exclude_source_from_participants,False
+parameter_default,src/fedsira/protocol/baselines/training.py,241,heterogeneity_scope,None
+parameter_default,src/fedsira/protocol/verification.py,54,allow_source_as_verifier,False
+parameter_default,src/fedsira/protocol/verification.py,160,allow_source_as_verifier,False
+parameter_default,src/fedsira/reporting/export.py,1091,safe_dormancy_verified,False
+parameter_default,src/fedsira/reporting/export.py,1092,byzantine_operating_region_verified,False
+parameter_default,src/fedsira/reporting/figures.py,468,metrics,None
+parameter_default,src/fedsira/reporting/figures.py,469,annotation,None
+parameter_default,src/fedsira/reporting/publication.py,403,comparison_artifact_identity,None
+parameter_default,src/fedsira/reporting/tables.py,160,metric,None
+parameter_default,src/fedsira/reporting/tables.py,1720,metric,None
+parameter_default,src/fedsira/runtime.py,97,config_path,None
+parameter_default,src/fedsira/runtime.py,393,failure_class,None
+parameter_default,src/fedsira/runtime.py,394,failure_message,None
+repeated_string_literal,src/fedsira/application.py,296,occurrences=11,' '
+repeated_string_literal,src/fedsira/application.py,343,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/application.py,516,occurrences=19,')'
+repeated_string_literal,src/fedsira/application.py,531,occurrences=19,')'
+repeated_string_literal,src/fedsira/application.py,554,occurrences=19,'/'
+repeated_string_literal,src/fedsira/application.py,558,occurrences=11,' '
+repeated_string_literal,src/fedsira/application.py,562,occurrences=29,''
+repeated_string_literal,src/fedsira/application.py,572,occurrences=11,' '
+repeated_string_literal,src/fedsira/application.py,572,occurrences=11,' '
+repeated_string_literal,src/fedsira/application.py,575,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/application.py,689,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/artifacts/paths.py,331,occurrences=11,'-'
+repeated_string_literal,src/fedsira/artifacts/paths.py,331,occurrences=11,'-'
+repeated_string_literal,src/fedsira/artifacts/paths.py,331,occurrences=11,'-'
+repeated_string_literal,src/fedsira/artifacts/paths.py,333,occurrences=11,'-'
+repeated_string_literal,src/fedsira/artifacts/store.py,127,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,133,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,140,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,189,occurrences=29,''
+repeated_string_literal,src/fedsira/artifacts/store.py,207,occurrences=13,'.'
+repeated_string_literal,src/fedsira/artifacts/store.py,208,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,229,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,246,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,269,occurrences=5,'artifact '
+repeated_string_literal,src/fedsira/artifacts/store.py,330,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/artifacts/store.py,365,occurrences=5,'artifact '
+repeated_string_literal,src/fedsira/artifacts/store.py,368,occurrences=5,'artifact '
+repeated_string_literal,src/fedsira/artifacts/store.py,374,occurrences=5,'artifact '
+repeated_string_literal,src/fedsira/artifacts/store.py,378,occurrences=5,'artifact '
+repeated_string_literal,src/fedsira/artifacts/store.py,388,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/config.py,195,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,225,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,254,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,272,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,288,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,303,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,319,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,332,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,358,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,378,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,412,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,443,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,523,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,550,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,636,occurrences=17,'after'
+repeated_string_literal,src/fedsira/config.py,740,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/config.py,743,occurrences=11,': '
+repeated_string_literal,src/fedsira/config.py,754,occurrences=11,': '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,158,occurrences=11,': '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,210,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,295,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,326,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,327,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,345,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,374,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,381,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,383,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,402,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,404,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,404,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,416,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,439,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,514,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,540,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,542,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,551,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,551,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,559,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,577,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,582,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,587,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,595,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,597,occurrences=11,' '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,635,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,671,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,688,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,688,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,690,occurrences=5,'.json'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,821,occurrences=5,'SELECT '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,822,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,845,occurrences=5,'SELECT '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/prepare.py,853,occurrences=5,'SELECT '
+repeated_string_literal,src/fedsira/datasets/ciciot2023/schema.py,76,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/schema.py,76,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/ciciot2023/schema.py,77,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/ciciot2023/schema.py,78,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/common.py,115,occurrences=7,'big'
+repeated_string_literal,src/fedsira/datasets/common.py,133,occurrences=17,'after'
+repeated_string_literal,src/fedsira/datasets/common.py,137,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,137,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/common.py,158,occurrences=17,'after'
+repeated_string_literal,src/fedsira/datasets/common.py,447,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/common.py,456,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,465,occurrences=8,' THEN '
+repeated_string_literal,src/fedsira/datasets/common.py,470,occurrences=11,' '
+repeated_string_literal,src/fedsira/datasets/common.py,481,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/common.py,509,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/common.py,541,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/common.py,542,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,545,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,545,occurrences=5,'SELECT '
+repeated_string_literal,src/fedsira/datasets/common.py,652,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/datasets/common.py,653,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/common.py,681,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/datasets/common.py,686,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/common.py,740,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,760,occurrences=17,'|'
+repeated_string_literal,src/fedsira/datasets/common.py,761,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/common.py,801,occurrences=11,': '
+repeated_string_literal,src/fedsira/datasets/common.py,813,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/common.py,813,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/common.py,831,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/common.py,966,occurrences=7,'big'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,162,occurrences=19,'/'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,198,occurrences=19,'/'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,257,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,289,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,291,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,324,occurrences=29,''
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,324,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,444,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,481,occurrences=11,': '
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,487,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,487,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,527,occurrences=5,'.json'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,529,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,591,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,653,occurrences=19,'/'
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,682,occurrences=5,'SELECT '
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,683,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,710,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/datasets/nbaiot/prepare.py,725,occurrences=5,'.json'
+repeated_string_literal,src/fedsira/datasets/nbaiot/schema.py,85,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/nbaiot/schema.py,85,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/nbaiot/schema.py,105,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,34,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,56,occurrences=5,'prepared role view '
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,61,occurrences=5,'prepared role view '
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,70,occurrences=5,'prepared role view '
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,75,occurrences=5,'prepared role view '
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,88,occurrences=19,')'
+repeated_string_literal,src/fedsira/datasets/prepared_validation.py,88,occurrences=5,'prepared role view '
+repeated_string_literal,src/fedsira/datasets/preprocess.py,120,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,160,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,186,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,297,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,383,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,383,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,408,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,458,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/preprocess.py,458,occurrences=16,'_'
+repeated_string_literal,src/fedsira/datasets/role_split.py,118,occurrences=11,'-'
+repeated_string_literal,src/fedsira/datasets/role_split.py,154,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/domain/enums.py,699,occurrences=8,'none'
+repeated_string_literal,src/fedsira/domain/models.py,147,occurrences=13,'.'
+repeated_string_literal,src/fedsira/domain/models.py,151,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/domain/models.py,155,occurrences=7,'big'
+repeated_string_literal,src/fedsira/domain/models.py,227,occurrences=29,''
+repeated_string_literal,src/fedsira/domain/models.py,228,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,53,occurrences=29,''
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,53,occurrences=29,''
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,53,occurrences=29,''
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,59,occurrences=29,''
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,67,occurrences=29,''
+repeated_string_literal,src/fedsira/evaluation/comparison_evidence.py,113,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,345,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,345,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,345,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,345,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,345,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/comparisons.py,955,occurrences=17,'|'
+repeated_string_literal,src/fedsira/evaluation/metrics.py,804,occurrences=6,"','"
+repeated_string_literal,src/fedsira/evaluation/scores.py,147,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/evaluation/screen_evidence.py,144,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/artifact_invariants.py,34,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/artifact_invariants.py,35,occurrences=5,'b'
+repeated_string_literal,src/fedsira/experiments/artifact_invariants.py,62,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,179,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,185,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,213,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,213,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,214,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/checkpoints.py,301,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/collapse.py,97,occurrences=8,'none'
+repeated_string_literal,src/fedsira/experiments/collapse.py,130,occurrences=17,'|'
+repeated_string_literal,src/fedsira/experiments/collapse.py,673,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/collapse.py,684,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/definitions.py,778,occurrences=17,'|'
+repeated_string_literal,src/fedsira/experiments/engine.py,347,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/engine.py,564,occurrences=5,'.json'
+repeated_string_literal,src/fedsira/experiments/engine.py,565,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/engine.py,572,occurrences=5,'.json'
+repeated_string_literal,src/fedsira/experiments/engine.py,575,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/engine.py,606,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/engine.py,607,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/experiments/engine.py,660,occurrences=6,'*.json'
+repeated_string_literal,src/fedsira/experiments/execution.py,237,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/execution.py,427,occurrences=29,''
+repeated_string_literal,src/fedsira/experiments/execution.py,438,occurrences=11,' '
+repeated_string_literal,src/fedsira/experiments/execution.py,438,occurrences=11,' '
+repeated_string_literal,src/fedsira/experiments/execution.py,438,occurrences=19,'/'
+repeated_string_literal,src/fedsira/experiments/execution.py,440,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/experiments/execution.py,464,occurrences=19,'/'
+repeated_string_literal,src/fedsira/experiments/execution.py,488,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,489,occurrences=5,'b'
+repeated_string_literal,src/fedsira/experiments/execution.py,493,occurrences=5,'b'
+repeated_string_literal,src/fedsira/experiments/execution.py,494,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,511,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,511,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,511,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,511,occurrences=5,'b'
+repeated_string_literal,src/fedsira/experiments/execution.py,512,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,512,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,512,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,512,occurrences=5,'b'
+repeated_string_literal,src/fedsira/experiments/execution.py,513,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,531,occurrences=17,'|'
+repeated_string_literal,src/fedsira/experiments/execution.py,624,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,637,occurrences=13,'a'
+repeated_string_literal,src/fedsira/experiments/execution.py,1005,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/experiments/execution.py,1029,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/experiments/execution.py,1037,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/execution.py,1086,occurrences=19,')'
+repeated_string_literal,src/fedsira/experiments/execution.py,1086,occurrences=29,''
+repeated_string_literal,src/fedsira/experiments/execution.py,1089,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/experiments/handlers.py,752,occurrences=17,'|'
+repeated_string_literal,src/fedsira/experiments/handlers.py,2373,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/experiments/handlers.py,2450,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/experiments/handlers.py,2978,occurrences=11,'-'
+repeated_string_literal,src/fedsira/experiments/planning.py,349,occurrences=29,''
+repeated_string_literal,src/fedsira/experiments/planning.py,350,occurrences=11,' '
+repeated_string_literal,src/fedsira/experiments/planning.py,353,occurrences=29,''
+repeated_string_literal,src/fedsira/experiments/planning.py,358,occurrences=11,' '
+repeated_string_literal,src/fedsira/experiments/planning.py,359,occurrences=29,''
+repeated_string_literal,src/fedsira/experiments/planning.py,363,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/experiments/protocol_evidence.py,143,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/learning/model.py,23,occurrences=8,'none'
+repeated_string_literal,src/fedsira/learning/model.py,28,occurrences=8,'none'
+repeated_string_literal,src/fedsira/learning/model.py,33,occurrences=8,'none'
+repeated_string_literal,src/fedsira/learning/model.py,100,occurrences=8,'none'
+repeated_string_literal,src/fedsira/protocol/baselines/registry.py,56,occurrences=8,'none'
+repeated_string_literal,src/fedsira/protocol/baselines/registry.py,67,occurrences=8,'none'
+repeated_string_literal,src/fedsira/protocol/proposal.py,149,occurrences=7,'big'
+repeated_string_literal,src/fedsira/reporting/export.py,414,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/export.py,431,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/export.py,435,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/export.py,461,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/export.py,473,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/export.py,599,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/export.py,607,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/export.py,700,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/export.py,824,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/export.py,834,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/export.py,888,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/reporting/export.py,890,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/reporting/export.py,919,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/reporting/export.py,955,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/export.py,965,occurrences=6,"','"
+repeated_string_literal,src/fedsira/reporting/export.py,965,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/export.py,966,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/export.py,988,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/export.py,1050,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/export.py,1703,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/figures.py,212,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,212,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,217,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,218,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,283,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/figures.py,297,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,298,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,299,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,313,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,323,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,398,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,432,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,436,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,440,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,450,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,451,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,509,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/figures.py,523,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,524,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,525,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,544,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,553,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,585,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/figures.py,585,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/figures.py,585,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/figures.py,660,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,660,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,660,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,665,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,690,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,739,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,740,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,741,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,750,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,751,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,752,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,770,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,780,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,879,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,880,occurrences=7,'o'
+repeated_string_literal,src/fedsira/reporting/figures.py,889,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,890,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,922,occurrences=19,'nan'
+repeated_string_literal,src/fedsira/reporting/figures.py,932,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,933,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,997,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/figures.py,1177,occurrences=17,'|'
+repeated_string_literal,src/fedsira/reporting/figures.py,1209,occurrences=17,'|'
+repeated_string_literal,src/fedsira/reporting/figures.py,1417,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,1418,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,1438,occurrences=9,'offset points'
+repeated_string_literal,src/fedsira/reporting/figures.py,1439,occurrences=9,'center'
+repeated_string_literal,src/fedsira/reporting/figures.py,1442,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/figures.py,1475,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1477,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1479,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1481,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1488,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1492,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1496,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1501,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1502,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1508,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1513,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1518,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1523,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1528,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1541,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1547,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1548,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1554,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1560,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1566,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1572,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1578,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1590,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1596,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1603,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1610,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1617,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1624,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/figures.py,1631,occurrences=31,'.png'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,53,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,62,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,63,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,64,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,68,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,74,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,155,occurrences=19,')'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,218,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,494,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,496,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,516,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,519,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,576,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,585,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,597,occurrences=19,')'
+repeated_string_literal,src/fedsira/reporting/protocol_tables.py,597,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/publication.py,196,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/publication.py,290,occurrences=27,"', '"
+repeated_string_literal,src/fedsira/reporting/publication.py,296,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/publication.py,312,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/publication.py,318,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,318,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,323,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,323,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,458,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,458,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,494,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/publication.py,593,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/publication.py,621,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,621,occurrences=9,':'
+repeated_string_literal,src/fedsira/reporting/publication.py,631,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/publication.py,955,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/publication.py,962,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/publication.py,999,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/publication.py,999,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/publication.py,999,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/publication.py,1022,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/tables.py,156,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,156,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,169,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,169,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,178,occurrences=11,' '
+repeated_string_literal,src/fedsira/reporting/tables.py,178,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,178,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,188,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,219,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,219,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,224,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,224,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,224,occurrences=6,"','"
+repeated_string_literal,src/fedsira/reporting/tables.py,228,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,232,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,445,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,445,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,445,occurrences=6,"','"
+repeated_string_literal,src/fedsira/reporting/tables.py,468,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/tables.py,468,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/tables.py,468,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/tables.py,522,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,522,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,523,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,523,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,524,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,524,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,529,occurrences=6,"','"
+repeated_string_literal,src/fedsira/reporting/tables.py,1013,occurrences=5,'Within Bound'
+repeated_string_literal,src/fedsira/reporting/tables.py,1015,occurrences=5,'Within Bound'
+repeated_string_literal,src/fedsira/reporting/tables.py,1037,occurrences=5,'Within Bound'
+repeated_string_literal,src/fedsira/reporting/tables.py,1045,occurrences=5,'Within Bound'
+repeated_string_literal,src/fedsira/reporting/tables.py,1074,occurrences=5,'Within Bound'
+repeated_string_literal,src/fedsira/reporting/tables.py,1209,occurrences=17,'|'
+repeated_string_literal,src/fedsira/reporting/tables.py,1211,occurrences=17,'|'
+repeated_string_literal,src/fedsira/reporting/tables.py,1546,occurrences=9,';'
+repeated_string_literal,src/fedsira/reporting/tables.py,1729,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,1729,occurrences=12,'.3f'
+repeated_string_literal,src/fedsira/reporting/tables.py,1729,occurrences=6,"','"
+repeated_string_literal,src/fedsira/reporting/tables.py,1731,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,1731,occurrences=13,'.'
+repeated_string_literal,src/fedsira/reporting/tables.py,1731,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,1731,occurrences=9,'f'
+repeated_string_literal,src/fedsira/reporting/tables.py,1764,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/tables.py,1765,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/tables.py,1768,occurrences=15,'\n'
+repeated_string_literal,src/fedsira/reporting/tables.py,1785,occurrences=29,''
+repeated_string_literal,src/fedsira/reporting/telemetry.py,89,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/telemetry.py,89,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/verification.py,437,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/verification.py,440,occurrences=19,'/'
+repeated_string_literal,src/fedsira/reporting/verification.py,443,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/verification.py,447,occurrences=11,': '
+repeated_string_literal,src/fedsira/reporting/verification.py,504,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/reporting/verification.py,526,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/runtime.py,169,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/runtime.py,170,occurrences=7,'big'
+repeated_string_literal,src/fedsira/runtime.py,176,occurrences=17,'|'
+repeated_string_literal,src/fedsira/runtime.py,177,occurrences=51,'utf-8'
+repeated_string_literal,src/fedsira/runtime.py,178,occurrences=7,'big'
+repeated_string_literal,src/fedsira/runtime.py,187,occurrences=7,'big'
+repeated_string_literal,src/fedsira/runtime.py,356,occurrences=29,''
+repeated_string_literal,src/fedsira/runtime.py,356,occurrences=29,''
+repeated_string_literal,src/fedsira/runtime.py,356,occurrences=29,''
+repeated_string_literal,src/fedsira/runtime.py,371,occurrences=13,'.'
+repeated_string_literal,src/fedsira/runtime.py,411,occurrences=51,'utf-8'
+truthy_fallback,src/fedsira/artifacts/store.py,189,or,''
+truthy_fallback,src/fedsira/datasets/nbaiot/prepare.py,257,or,''
+truthy_fallback,src/fedsira/evaluation/comparison_evidence.py,59,or,''
+truthy_fallback,src/fedsira/reporting/export.py,955,or,''
+truthy_fallback,src/fedsira/reporting/export.py,988,or,''
+truthy_fallback,src/fedsira/reporting/publication.py,296,or,''
+truthy_fallback,src/fedsira/reporting/publication.py,319,or,'project'
+truthy_fallback,src/fedsira/reporting/publication.py,324,or,'project'
+truthy_fallback,src/fedsira/reporting/publication.py,593,or,''
+truthy_fallback,src/fedsira/reporting/publication.py,621,or,'project'
+truthy_fallback,src/fedsira/reporting/verification.py,252,or,'project summary'
+typed_model_field_default,src/fedsira/artifacts/store.py,72,ArtifactSlot.experiment,None
+typed_model_field_default,src/fedsira/datasets/ciciot2023/prepare.py,101,SecondaryCsvFile.shard_class,None
+typed_model_field_default,src/fedsira/datasets/ciciot2023/prepare.py,102,SecondaryCsvFile.label_column,None
+typed_model_field_default,src/fedsira/datasets/common.py,199,PreparedViewSidecar.cache_identity,None
+typed_model_field_default,src/fedsira/datasets/common.py,200,PreparedViewSidecar.parquet_sha256,None
+typed_model_field_default,src/fedsira/datasets/common.py,569,DatasetPreparationLogFields.dataset,None
+typed_model_field_default,src/fedsira/datasets/common.py,570,DatasetPreparationLogFields.domain,None
+typed_model_field_default,src/fedsira/datasets/common.py,571,DatasetPreparationLogFields.class_id,None
+typed_model_field_default,src/fedsira/datasets/common.py,572,DatasetPreparationLogFields.file,None
+typed_model_field_default,src/fedsira/datasets/common.py,573,DatasetPreparationLogFields.rows,None
+typed_model_field_default,src/fedsira/datasets/common.py,574,DatasetPreparationLogFields.selected,None
+typed_model_field_default,src/fedsira/datasets/common.py,575,DatasetPreparationLogFields.training_rows,None
+typed_model_field_default,src/fedsira/datasets/common.py,576,DatasetPreparationLogFields.view,None
+typed_model_field_default,src/fedsira/datasets/common.py,577,DatasetPreparationLogFields.path,None
+typed_model_field_default,src/fedsira/datasets/common.py,578,DatasetPreparationLogFields.raw_rows,None
+typed_model_field_default,src/fedsira/datasets/common.py,579,DatasetPreparationLogFields.completed_shards,None
+typed_model_field_default,src/fedsira/datasets/common.py,580,DatasetPreparationLogFields.total_shards,None
+typed_model_field_default,src/fedsira/datasets/common.py,581,DatasetPreparationLogFields.retained_rows,None
+typed_model_field_default,src/fedsira/datasets/common.py,582,DatasetPreparationLogFields.excluded_rows,None
+typed_model_field_default,src/fedsira/datasets/common.py,583,DatasetPreparationLogFields.class_count,None
+typed_model_field_default,src/fedsira/datasets/common.py,584,DatasetPreparationLogFields.predictor_count,None
+typed_model_field_default,src/fedsira/datasets/common.py,585,DatasetPreparationLogFields.predictor_count_matches_official,None
+typed_model_field_default,src/fedsira/datasets/common.py,586,DatasetPreparationLogFields.prepared_views,None
+typed_model_field_default,src/fedsira/datasets/common.py,587,DatasetPreparationLogFields.exclusion_rate,None
+typed_model_field_default,src/fedsira/datasets/common.py,588,DatasetPreparationLogFields.dataset_file_manifest_hash,None
+typed_model_field_default,src/fedsira/datasets/common.py,589,DatasetPreparationLogFields.structurally_unavailable_classes,None
+typed_model_field_default,src/fedsira/datasets/common.py,590,DatasetPreparationLogFields.dataset_manifest_reused,None
+typed_model_field_default,src/fedsira/datasets/common.py,1164,RootCauseScope.balanced_selection_seed,None
+typed_model_field_default,src/fedsira/datasets/nbaiot/prepare.py,103,DiscoveredCsvFile.source_archive_digest,None
+typed_model_field_default,src/fedsira/datasets/nbaiot/prepare.py,119,PreparedView.materialized_row_count,None
+typed_model_field_default,src/fedsira/domain/models.py,223,ScientificCell.repetition,None
+typed_model_field_default,src/fedsira/evaluation/comparisons.py,138,ComparisonDefinition.margin,None
+typed_model_field_default,src/fedsira/evaluation/comparisons.py,139,ComparisonDefinition.material_threshold,None
+typed_model_field_default,src/fedsira/evaluation/comparisons.py,168,ComparisonTemplate.margin,None
+typed_model_field_default,src/fedsira/evaluation/comparisons.py,169,ComparisonTemplate.material_threshold,None
+typed_model_field_default,src/fedsira/evaluation/screen_evidence.py,80,ScreenMatchingPayload.target_f1_gain,None
+typed_model_field_default,src/fedsira/evaluation/screen_evidence.py,81,ScreenMatchingPayload.supported_macro_f1_harm,None
+typed_model_field_default,src/fedsira/evaluation/screen_evidence.py,82,ScreenMatchingPayload.benign_far_increase,None
+typed_model_field_default,src/fedsira/experiments/collapse.py,125,ResolvedCore.final_gate_required,True
+typed_model_field_default,src/fedsira/experiments/collapse.py,126,ResolvedCore.source_excluded,True
+typed_model_field_default,src/fedsira/experiments/engine.py,94,CellPhaseLogFields.timeout_seconds,None
+typed_model_field_default,src/fedsira/experiments/engine.py,95,CellPhaseLogFields.failure_class,None
+typed_model_field_default,src/fedsira/experiments/engine.py,96,CellPhaseLogFields.failure_message,None
+typed_model_field_default,src/fedsira/experiments/engine.py,97,CellPhaseLogFields.failure_phase,None
+typed_model_field_default,src/fedsira/experiments/engine.py,124,PersistedExecutionRecord.repetition,None
+typed_model_field_default,src/fedsira/experiments/engine.py,129,PersistedExecutionRecord.provenance,None
+typed_model_field_default,src/fedsira/experiments/engine.py,214,ProtocolPhaseDurations.assignment_seconds,0.0
+typed_model_field_default,src/fedsira/experiments/engine.py,215,ProtocolPhaseDurations.reproduce_seconds,0.0
+typed_model_field_default,src/fedsira/experiments/engine.py,216,ProtocolPhaseDurations.verify_seconds,0.0
+typed_model_field_default,src/fedsira/experiments/engine.py,217,ProtocolPhaseDurations.synthesize_seconds,0.0
+typed_model_field_default,src/fedsira/experiments/engine.py,238,ExecutionLogFields.dataset,None
+typed_model_field_default,src/fedsira/experiments/engine.py,239,ExecutionLogFields.overwrite,None
+typed_model_field_default,src/fedsira/experiments/engine.py,240,ExecutionLogFields.cell,None
+typed_model_field_default,src/fedsira/experiments/engine.py,241,ExecutionLogFields.method,None
+typed_model_field_default,src/fedsira/experiments/engine.py,242,ExecutionLogFields.condition,None
+typed_model_field_default,src/fedsira/experiments/engine.py,243,ExecutionLogFields.master_seed,None
+typed_model_field_default,src/fedsira/experiments/engine.py,244,ExecutionLogFields.metric,None
+typed_model_field_default,src/fedsira/experiments/engine.py,245,ExecutionLogFields.terminal_state,None
+typed_model_field_default,src/fedsira/experiments/engine.py,246,ExecutionLogFields.completed_cells,None
+typed_model_field_default,src/fedsira/experiments/engine.py,247,ExecutionLogFields.total_cells,None
+typed_model_field_default,src/fedsira/experiments/engine.py,248,ExecutionLogFields.elapsed_seconds,None
+typed_model_field_default,src/fedsira/experiments/engine.py,249,ExecutionLogFields.failure_class,None
+typed_model_field_default,src/fedsira/experiments/engine.py,250,ExecutionLogFields.failure_message,None
+typed_model_field_default,src/fedsira/experiments/engine.py,251,ExecutionLogFields.failure_phase,None
+typed_model_field_default,src/fedsira/experiments/engine.py,315,ExperimentExecutionResult.provenance,None
+typed_model_field_default,src/fedsira/experiments/engine.py,316,ExperimentExecutionResult.comparison_artifact_id,None
+typed_model_field_default,src/fedsira/experiments/smoke_records.py,15,SmokeCheckResult.detail,None
+typed_model_field_default,src/fedsira/learning/federated.py,256,AnchorTrainingLogFields.round_count,None
+typed_model_field_default,src/fedsira/learning/federated.py,257,AnchorTrainingLogFields.elapsed_seconds,None
+typed_model_field_default,src/fedsira/reporting/export.py,249,ReportLogFields.artifact_count,None
+typed_model_field_default,src/fedsira/runtime.py,88,WorkflowTerminalFields.failure_class,None
+typed_model_field_default,src/fedsira/runtime.py,89,WorkflowTerminalFields.failure_message,None

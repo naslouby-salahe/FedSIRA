@@ -36,10 +36,12 @@ from fedsira.domain.enums import (
     EnvironmentVariableName,
     FailureClass,
     Fp32PrecisionMode,
+    LogEvent,
     RuntimeComponentName,
     ScientificCellPhase,
     SeedDerivationLabel,
     StructuredLogField,
+    WorkflowTerminalState,
 )
 from fedsira.domain.types import (
     UINT32_MODULUS,
@@ -78,6 +80,13 @@ class FailureDetail(FrozenDomainModel):
     failure_class: FailureClass
     message: FailureMessage
     cell_phase: ScientificCellPhase | None
+
+
+class WorkflowTerminalFields(FrozenDomainModel):
+    workflow: RuntimeComponentName
+    state: WorkflowTerminalState
+    failure_class: FailureClass | None = None
+    failure_message: FailureMessage | None = None
 
 
 class ApplicationContext(FrozenDomainModel):
@@ -313,9 +322,14 @@ def numerical_runtime_identity() -> ArtifactDigest:
             str(torch.are_deterministic_algorithms_enabled()),
             str(torch.backends.cudnn.deterministic),
             str(torch.backends.cudnn.benchmark),
-            torch.get_float32_matmul_precision(),
+            torch.backends.cuda.matmul.fp32_precision,
+            cudnn_conv_precision(),
         )
     ).hexdigest()
+
+
+def cudnn_conv_precision() -> Fp32PrecisionMode:
+    return cast(_Fp32PrecisionController, torch.backends.cudnn.conv).fp32_precision
 
 
 def collect_environment_mismatches(
@@ -370,6 +384,22 @@ def log_structured_event(
     fields: FrozenDomainModel,
 ) -> None:
     logger.info(event, extra=fields.model_dump())
+
+
+def log_workflow_terminal(
+    logger: logging.Logger,
+    workflow: RuntimeComponentName,
+    state: WorkflowTerminalState,
+    failure_class: FailureClass | None = None,
+    failure_message: FailureMessage | None = None,
+) -> None:
+    fields = WorkflowTerminalFields(
+        workflow=workflow,
+        state=state,
+        failure_class=failure_class,
+        failure_message=(None if failure_message is None else failure_message[:256]),
+    )
+    log_structured_event(logger, LogEvent.WORKFLOW_TERMINAL, fields)
 
 
 def configure_structured_file_logging(logger: logging.Logger, log_path: Path) -> None:

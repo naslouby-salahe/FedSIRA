@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import textwrap
 from collections.abc import Callable
 from pathlib import Path
@@ -8,23 +9,23 @@ from typing import TypeAlias
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from fedsira.artifacts.paths import experiment_metric_evidence_root
 from fedsira.domain.enums import (
     AdmissionState,
     CoreMethodIdentity,
     DelayPhaseMetric,
     DescriptiveScientificMetric,
-    ExperimentLifecycleState,
+    EvidenceArrivalSchedule,
     ExperimentName,
     FigureAxisName,
     FigureLegendLabel,
     FigureName,
     FigurePanelTitle,
-    HeterogeneityRegime,
     MetricObservationKey,
     PrimaryScenario,
     ProtocolSchematicStage,
     ReportCellLiteral,
-    RootCauseMixture,
+    ReproducerCondition,
     VerifierCondition,
 )
 from fedsira.domain.types import (
@@ -33,7 +34,6 @@ from fedsira.domain.types import (
     FigureAnnotationText,
     FigureAxisLabel,
     FigureLegendText,
-    FrozenDomainModel,
     MethodName,
     MetricName,
     MetricValue,
@@ -44,26 +44,26 @@ from fedsira.domain.types import (
     ScientificCellCount,
 )
 from fedsira.evaluation.comparisons import (
-    CapabilityContractScope,
+    ComparisonDefinition,
     ComparisonFamily,
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonResult,
+    build_comparison_registry,
 )
-from fedsira.evaluation.statistics import (
-    bootstrap_percentile_confidence_interval,
-    quantile_type7,
-)
+from fedsira.experiments.byzantine import random_verifier_contamination_probability
 from fedsira.experiments.definitions import (
     ADMISSION_DELAY_DECOMPOSITION_FIGURE_NAME,
     ADMISSION_DELAY_DECOMPOSITION_NAME,
+    AGGREGATE_METRICS_PARQUET_NAME,
     CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
     COLLAPSE_DECISION_EFFECTS_FIGURE_NAME,
     COLLAPSE_EXPERIMENT_NAMES,
     COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-    COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME,
+    COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY_FIGURE_NAME,
+    COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY_FIGURE_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     EFFICIENCY_PROFILE_FIGURE_NAME,
@@ -79,17 +79,27 @@ from fedsira.experiments.definitions import (
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SHARED_EPISTEMIC_FAILURE_FIGURE_NAME,
     SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+    STATE_TRAJECTORY_FRACTIONS_PARQUET_NAME,
     USEFUL_BACKDOORED_SOURCE_FIGURE_NAME,
     EpistemicFailureType,
+    epistemic_strength_tokens,
+    experiment_by_name,
 )
 from fedsira.experiments.engine import (
     CellExecutionOutcome,
-    ExecutionRecordStore,
     ExperimentExecutionResult,
 )
-from fedsira.experiments.observations import mean_of_defined
-from fedsira.experiments.observations import outcome_metric_mean as _outcome_metric_mean
 from fedsira.experiments.planning import ExperimentPlan
+from fedsira.reporting.aggregate import (
+    AggregateMetricEvidenceRow,
+    read_aggregate_metric_evidence,
+)
+from fedsira.reporting.state_trajectory import (
+    EVIDENCE_TRAJECTORY_STATE_VOCABULARY,
+    EvidenceStateFraction,
+    read_state_trajectory_fractions,
+)
+from fedsira.reporting.telemetry import EfficiencyMetricObservation
 from fedsira.runtime import current_application_context
 
 BoundarySeries: TypeAlias = tuple[
@@ -99,29 +109,14 @@ BoundarySeries: TypeAlias = tuple[
 AxisDraw: TypeAlias = Callable[[Axes], None]
 
 
-class EvidenceStateFraction(FrozenDomainModel):
-    condition: ScenarioName
-    cycle: EvidenceCycleIndex
-    state: AdmissionState
-    fraction: Probability
-
-
-class EfficiencyMetricObservation(FrozenDomainModel):
-    method: MethodName
-    metric: MetricName
-    median: MetricValue
-    first_quartile: MetricValue
-    third_quartile: MetricValue
-    seed_count: ScientificCellCount
-
-
 MANDATORY_FIGURE_NAMES: tuple[FigureName, ...] = (
     FigureName.PROTOCOL_SCHEMATIC,
     FigureName.PRIMARY_SECURITY_UTILITY_TRADEOFF,
     FigureName.USEFUL_BACKDOORED_SOURCE,
     FigureName.COLLAPSE_DECISION_EFFECTS,
     FigureName.COMPROMISED_REPRODUCER_BOUNDARY,
-    FigureName.COMPROMISED_VERIFIER_BOUNDARY,
+    FigureName.COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY,
+    FigureName.COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY,
     FigureName.EVIDENCE_ARRIVAL_STATE_TRAJECTORY,
     FigureName.SHARED_EPISTEMIC_FAILURE,
     FigureName.CAPABILITY_GRANULARITY_BOUNDARY,
@@ -154,11 +149,15 @@ def efficiency_observation(
     observations: tuple[EfficiencyMetricObservation, ...],
     method: MethodName,
     metric: MetricName,
-) -> EfficiencyMetricObservation:
-    for observation in observations:
-        if observation.method == method and observation.metric == metric:
-            return observation
-    raise ValueError(f"missing efficiency telemetry for {method} / {metric}")
+) -> EfficiencyMetricObservation | None:
+    matches = tuple(
+        observation
+        for observation in observations
+        if observation.method == method and observation.metric == metric
+    )
+    if len(matches) > 1:
+        raise ValueError(f"duplicate efficiency telemetry for {method} / {metric}")
+    return matches[0] if matches else None
 
 
 def validate_mandatory_figures_covered(
@@ -232,42 +231,76 @@ def render_security_utility_tradeoff(
     comparison_results: tuple[ComparisonFamilyResult, ...],
     destination: Path,
 ) -> Path:
-    figure = Figure(figsize=(12, 4))
     metrics = (
         ComparisonMetric.TARGET_F1,
         ComparisonMetric.ATTACK_SUCCESS_RATE,
         ComparisonMetric.MALICIOUS_ADMISSION,
     )
+    expected_definitions = tuple(
+        definition
+        for definition in build_comparison_registry()
+        if (
+            definition.experiment == PRIMARY_CONFIRMATORY_EVALUATION_NAME
+            and definition.family is ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY
+            and definition.metric in metrics
+        )
+    )
+    observed: list[tuple[ComparisonDefinition, ComparisonResult]] = []
+    for family in comparison_results:
+        for comparison in family.comparisons:
+            expected = next(
+                (
+                    definition
+                    for definition in expected_definitions
+                    if definition.comparison_name == comparison.definition.comparison_name
+                ),
+                None,
+            )
+            if expected is None:
+                continue
+            if expected != comparison.definition or family.family is not expected.family:
+                raise ValueError("Primary Security-Utility Tradeoff: comparison identity mismatch")
+            if any(
+                definition.comparison_name == expected.comparison_name
+                for definition, _result in observed
+            ):
+                raise ValueError("Primary Security-Utility Tradeoff: duplicate comparison evidence")
+            observed.append((expected, comparison))
+    if not observed:
+        raise ValueError("Primary Security-Utility Tradeoff: missing comparison evidence")
+    figure = Figure(figsize=(12, 4))
     for plot_index, metric in enumerate(metrics, start=1):
         axis = figure.add_subplot(1, len(metrics), plot_index)
         labels: list[FigureLegendText] = []
         effects: list[MetricValue] = []
         lower_errors: list[MetricValue] = []
         upper_errors: list[MetricValue] = []
-        for family in comparison_results:
-            for comparison in family.comparisons:
-                if (
-                    family.family is not ComparisonFamily.PRIMARY_BASELINE_SUPERIORITY
-                    or comparison.definition.experiment != PRIMARY_CONFIRMATORY_EVALUATION_NAME
-                    or comparison.definition.metric is not metric
-                ):
-                    continue
-                if comparison.mean_paired_difference is None:
-                    continue
-                if comparison.confidence_interval is None:
-                    continue
-                labels.append(
-                    f"{comparison.definition.scientific_scenario}\n"
-                    f"{comparison.definition.method} vs "
-                    f"{comparison.definition.reference_method}"
-                )
-                effects.append(comparison.mean_paired_difference)
-                lower_errors.append(
-                    comparison.mean_paired_difference - comparison.confidence_interval[0]
-                )
-                upper_errors.append(
-                    comparison.confidence_interval[1] - comparison.mean_paired_difference
-                )
+        definitions = tuple(
+            definition for definition in expected_definitions if definition.metric is metric
+        )
+        for definition in definitions:
+            labels.append(
+                f"{definition.scientific_scenario}\n"
+                f"{definition.method} vs {definition.reference_method}"
+            )
+            comparison = next(
+                (
+                    result
+                    for registered, result in observed
+                    if registered.comparison_name == definition.comparison_name
+                ),
+                None,
+            )
+            effect = None if comparison is None else comparison.mean_paired_difference
+            interval = None if comparison is None else comparison.confidence_interval
+            if effect is None or interval is None:
+                effects.append(float("nan"))
+                lower_errors.append(float("nan"))
+                upper_errors.append(float("nan"))
+            else:
+                effects.append(effect)
+                lower_errors.append(effect - interval[0])
+                upper_errors.append(interval[1] - effect)
         if not labels:
             raise ValueError(
                 f"Primary Security-Utility Tradeoff: missing comparison evidence for {metric}"
@@ -281,6 +314,15 @@ def render_security_utility_tradeoff(
         )
         axis.set_yticks(positions, labels)
         axis.tick_params(axis="y", labelsize=7)
+        for position, effect in zip(positions, effects, strict=True):
+            if math.isnan(effect):
+                axis.annotate(
+                    ReportCellLiteral.NOT_AVAILABLE,
+                    (0.0, position),
+                    xytext=(5, 4),
+                    textcoords="offset points",
+                    fontsize=7,
+                )
         axis.set_title(metric)
         axis.axvline(0.0)
     maximum_label_count = max(len(axis.get_yticklabels()) for axis in figure.axes)
@@ -296,28 +338,59 @@ def render_evidence_arrival_trajectory(
 ) -> Path:
     if not state_fractions:
         raise ValueError("Evidence-Arrival State Trajectory: missing state evidence")
-    schedules = tuple(sorted(frozenset(observation.condition for observation in state_fractions)))
-    states = (
-        AdmissionState.DORMANT,
-        AdmissionState.VERIFICATION_PENDING,
-        AdmissionState.ADMITTED,
-        AdmissionState.EXPIRED,
+    expected_schedules = frozenset(EvidenceArrivalSchedule)
+    observed_schedules = frozenset(observation.condition for observation in state_fractions)
+    if observed_schedules != expected_schedules:
+        raise ValueError("Evidence-Arrival State Trajectory: schedule grid is incomplete")
+    keys = tuple(
+        (observation.condition, observation.cycle, observation.state)
+        for observation in state_fractions
     )
+    if len(keys) != len(set(keys)):
+        raise ValueError("Evidence-Arrival State Trajectory: duplicate state evidence")
+    cycles = tuple(sorted(frozenset(observation.cycle for observation in state_fractions)))
+    resource_horizon = current_application_context().scientific_config.protocol.resource_horizon
+    horizon = resource_horizon.maximum_logical_evidence_cycles
+    expected_cycles = tuple(range(horizon + 1))
+    if cycles != expected_cycles:
+        raise ValueError("Evidence-Arrival State Trajectory: cycle grid is incomplete")
+    expected_keys = {
+        (schedule, cycle, state)
+        for schedule in expected_schedules
+        for cycle in cycles
+        for state in EVIDENCE_TRAJECTORY_STATE_VOCABULARY
+    }
+    if set(keys) != expected_keys:
+        raise ValueError("Evidence-Arrival State Trajectory: cycle/state grid is incomplete")
+    for schedule in expected_schedules:
+        for cycle in cycles:
+            observations = tuple(
+                observation
+                for observation in state_fractions
+                if observation.condition == schedule and observation.cycle == cycle
+            )
+            denominators = frozenset(item.instance_total for item in observations)
+            if len(denominators) != 1 or not next(iter(denominators)):
+                raise ValueError("Evidence-Arrival State Trajectory: seed denominator is invalid")
+            denominator = next(iter(denominators))
+            if (
+                any(
+                    item.fraction != item.instance_count / item.instance_total
+                    for item in observations
+                )
+                or sum(item.instance_count for item in observations) != denominator
+            ):
+                raise ValueError(
+                    "Evidence-Arrival State Trajectory: state fractions do not partition seeds"
+                )
+    schedules = tuple(sorted(expected_schedules))
+    states = EVIDENCE_TRAJECTORY_STATE_VOCABULARY
     figure = Figure(figsize=(5 * len(schedules), 4))
     first_axis = None
     for index, schedule in enumerate(schedules, start=1):
         axis = figure.add_subplot(1, len(schedules), index)
         if first_axis is None:
             first_axis = axis
-        cycles = tuple(
-            sorted(
-                frozenset(
-                    observation.cycle
-                    for observation in state_fractions
-                    if observation.condition == schedule
-                )
-            )
-        )
         for state in states:
             fractions = tuple(
                 state_fraction(state_fractions, schedule, cycle, state) for cycle in cycles
@@ -347,37 +420,37 @@ def render_efficiency_profile(
 ) -> Path:
     if not metric_values:
         raise ValueError("Efficiency Profile: missing timing and resource telemetry")
-    missing = tuple(
-        metric
-        for metric in EFFICIENCY_PROFILE_METRICS
-        if not any(observation.metric == metric for observation in metric_values)
-    )
-    if missing:
-        raise ValueError(f"Efficiency Profile: missing telemetry for {', '.join(missing)}")
     metrics = EFFICIENCY_PROFILE_METRICS
+    methods = experiment_by_name(EFFICIENCY_MEASUREMENT_NAME).methods
     figure = Figure(figsize=(5 * len(metrics), 5))
     for index, selected_metric in enumerate(metrics, start=1):
         axis = figure.add_subplot(1, len(metrics), index)
-        methods = tuple(
-            sorted(
-                frozenset(
-                    observation.method
-                    for observation in metric_values
-                    if observation.metric == selected_metric
-                )
-            )
-        )
         observations = tuple(
             efficiency_observation(metric_values, method, selected_metric) for method in methods
         )
-        medians = tuple(observation.median for observation in observations)
+        medians = tuple(
+            float("nan") if observation is None else observation.median
+            for observation in observations
+        )
         lower_errors = tuple(
-            observation.median - observation.first_quartile for observation in observations
+            float("nan") if observation is None else observation.median - observation.first_quartile
+            for observation in observations
         )
         upper_errors = tuple(
-            observation.third_quartile - observation.median for observation in observations
+            float("nan") if observation is None else observation.third_quartile - observation.median
+            for observation in observations
         )
         axis.bar(methods, medians, yerr=(lower_errors, upper_errors), capsize=4)
+        for method_index, observation in enumerate(observations):
+            if observation is None:
+                axis.annotate(
+                    ReportCellLiteral.NOT_AVAILABLE,
+                    (method_index, 0.0),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=7,
+                )
         axis.set_ylabel(f"{selected_metric} (median; IQR bars)")
         axis.set_title(selected_metric)
     figure.tight_layout()
@@ -402,26 +475,65 @@ def _render_experiment_effects(
     lower_errors: list[MetricValue] = []
     upper_errors: list[MetricValue] = []
     annotations: list[FigureAnnotationText] = []
+    expected_definitions = tuple(
+        definition
+        for definition in build_comparison_registry()
+        if definition.experiment in experiments
+        and (metrics is None or definition.metric in metrics)
+    )
+    if not expected_definitions:
+        raise ValueError(f"{title}: no registered comparisons exist")
+    observed: list[tuple[ComparisonDefinition, ComparisonResult]] = []
     for family in comparison_results:
         for comparison in family.comparisons:
-            if comparison.definition.experiment not in experiments:
-                continue
-            if metrics is not None and comparison.definition.metric not in metrics:
-                continue
-            effect = comparison.mean_paired_difference
-            interval = comparison.confidence_interval
-            if effect is None or interval is None:
-                continue
-            labels.append(f"{comparison.definition.method}: {comparison.definition.metric}")
-            effects.append(effect)
-            lower_errors.append(effect - interval[0])
-            upper_errors.append(interval[1] - effect)
-            adjusted_p = (
-                "p=NA"
-                if comparison.adjusted_p_value is None
-                else f"p={comparison.adjusted_p_value:.4g}"
+            expected = next(
+                (
+                    definition
+                    for definition in expected_definitions
+                    if definition.comparison_name == comparison.definition.comparison_name
+                ),
+                None,
             )
-            annotations.append(adjusted_p)
+            if expected is None:
+                continue
+            if expected != comparison.definition or family.family is not expected.family:
+                raise ValueError(f"{title}: comparison identity does not match its registry")
+            if any(
+                definition.comparison_name == expected.comparison_name
+                for definition, _comparison in observed
+            ):
+                raise ValueError(f"{title}: duplicate registered comparison evidence")
+            observed.append((expected, comparison))
+    for definition in expected_definitions:
+        labels.append(
+            f"{definition.scientific_scenario}\n"
+            f"{definition.method} vs {definition.reference_method}"
+        )
+        comparison = next(
+            (
+                result
+                for registered, result in observed
+                if registered.comparison_name == definition.comparison_name
+            ),
+            None,
+        )
+        effect = None if comparison is None else comparison.mean_paired_difference
+        interval = None if comparison is None else comparison.confidence_interval
+        if effect is None or interval is None:
+            effects.append(float("nan"))
+            lower_errors.append(float("nan"))
+            upper_errors.append(float("nan"))
+            annotations.append(ReportCellLiteral.NOT_AVAILABLE)
+            continue
+        effects.append(effect)
+        lower_errors.append(effect - interval[0])
+        upper_errors.append(interval[1] - effect)
+        adjusted_p = (
+            "p=NA"
+            if comparison is None or comparison.adjusted_p_value is None
+            else f"p={comparison.adjusted_p_value:.4g}"
+        )
+        annotations.append(adjusted_p)
     if not effects:
         raise ValueError(f"{title}: missing completed comparison evidence")
     positions = tuple(range(len(effects)))
@@ -434,7 +546,12 @@ def _render_experiment_effects(
     axis.set_yticks(positions, labels)
     axis.axvline(0.0)
     for position, effect, label in zip(positions, effects, annotations, strict=True):
-        axis.annotate(label, (effect, position), xytext=(5, 4), textcoords="offset points")
+        axis.annotate(
+            label,
+            (0.0 if math.isnan(effect) else effect, position),
+            xytext=(5, 4),
+            textcoords="offset points",
+        )
     axis.set_title(title)
     axis.set_xlabel(xlabel)
     axis.set_ylabel(ylabel)
@@ -451,32 +568,35 @@ def _render_experiment_effects(
     return destination
 
 
-def _completed_metric_values(
-    outcomes: tuple[CellExecutionOutcome, ...],
+def _aggregate_metric_row(
+    experiment: ExperimentName,
     method: MethodName,
+    scenario: ScenarioName,
     metric: MetricName,
-) -> tuple[MetricValue, ...]:
-    return tuple(
-        value
-        for outcome in sorted(outcomes, key=lambda item: item.cell.master_seed)
-        if (
-            outcome.completed
-            and outcome.cell.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
-            and outcome.cell.condition == PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-            and outcome.cell.method == method
+) -> AggregateMetricEvidenceRow | None:
+    path = experiment_metric_evidence_root(experiment) / AGGREGATE_METRICS_PARQUET_NAME
+    matches = tuple(
+        row
+        for row in read_aggregate_metric_evidence(path, experiment)
+        if row.method == method and row.condition == scenario and row.metric == metric
+    )
+    if len(matches) > 1:
+        raise ValueError(
+            f"{experiment}/{method}/{scenario}/{metric}: duplicate aggregate metric evidence"
         )
-        for metric_name, value in outcome.metrics
-        if metric_name == metric and value is not None
-    )
+    return matches[0] if matches else None
 
 
-def _summary_interval(values: tuple[MetricValue, ...]) -> tuple[MetricValue, MetricValue] | None:
-    config = current_application_context().scientific_config
-    return bootstrap_percentile_confidence_interval(
-        values,
-        config.metrics_and_statistics.bootstrap,
-        config.seeds_and_determinism.analysis_seed,
-    )
+def _aggregate_metric_mean(
+    outcomes: tuple[CellExecutionOutcome, ...],
+    experiment: ExperimentName,
+    method: MethodName,
+    scenario: ScenarioName,
+    metric: MetricName,
+) -> MetricValue | None:
+    del outcomes
+    row = _aggregate_metric_row(experiment, method, scenario, metric)
+    return None if row is None else row.mean_value
 
 
 def render_useful_backdoored_source(
@@ -487,47 +607,80 @@ def render_useful_backdoored_source(
     del comparison_results
     figure = Figure(figsize=(8, 5))
     axis = figure.add_subplot(1, 1, 1)
-    methods = tuple(
-        sorted(
-            frozenset(
-                outcome.cell.method
-                for outcome in outcomes
-                if (
-                    outcome.completed
-                    and outcome.cell.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
-                    and outcome.cell.condition == PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                )
-            )
+    scenario = PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+    completed = tuple(
+        outcome
+        for outcome in outcomes
+        if (
+            outcome.completed
+            and outcome.cell.experiment == SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME
+            and outcome.cell.condition == scenario
         )
     )
+    if not completed:
+        raise ValueError("Useful Backdoored Source: missing completed source-exclusion evidence")
+    methods = experiment_by_name(SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME).methods
     plotted = False
     for method in methods:
-        asr_values = _completed_metric_values(
-            outcomes,
+        asr = _aggregate_metric_row(
+            SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
             method,
+            scenario,
             ComparisonMetric.ATTACK_SUCCESS_RATE,
         )
-        target_f1_values = _completed_metric_values(outcomes, method, ComparisonMetric.TARGET_F1)
-        if not asr_values or not target_f1_values:
-            continue
-        asr_interval = _summary_interval(asr_values)
-        target_f1_interval = _summary_interval(target_f1_values)
-        mean_asr = mean_of_defined(asr_values)
-        mean_target_f1 = mean_of_defined(target_f1_values)
-        if mean_asr is None or mean_target_f1 is None:
-            continue
-        x_error = (
+        target_f1 = _aggregate_metric_row(
+            SOURCE_ARTIFACT_EXCLUSION_NECESSITY_NAME,
+            method,
+            scenario,
+            ComparisonMetric.TARGET_F1,
+        )
+        mean_asr = None if asr is None else asr.mean_value
+        mean_target_f1 = None if target_f1 is None else target_f1.mean_value
+        asr_interval = (
             None
-            if asr_interval is None
-            else ((mean_asr - asr_interval[0],), (asr_interval[1] - mean_asr,))
+            if asr is None
+            or asr.confidence_interval_lower is None
+            or asr.confidence_interval_upper is None
+            else (asr.confidence_interval_lower, asr.confidence_interval_upper)
+        )
+        target_f1_interval = (
+            None
+            if target_f1 is None
+            or target_f1.confidence_interval_lower is None
+            or target_f1.confidence_interval_upper is None
+            else (target_f1.confidence_interval_lower, target_f1.confidence_interval_upper)
+        )
+        has_complete_estimate = (
+            mean_asr is not None
+            and mean_target_f1 is not None
+            and asr_interval is not None
+            and target_f1_interval is not None
+        )
+        if not has_complete_estimate:
+            axis.errorbar(float("nan"), float("nan"), fmt="o", label=method)
+            axis.annotate(
+                ReportCellLiteral.NOT_AVAILABLE,
+                (0.0, 0.0),
+                xytext=(5, 4),
+                textcoords="offset points",
+                fontsize=7,
+            )
+            plotted = True
+            continue
+        if (
+            mean_asr is None
+            or mean_target_f1 is None
+            or asr_interval is None
+            or target_f1_interval is None
+        ):
+            raise ValueError("Useful Backdoored Source: incomplete aggregate estimate")
+        x_error = (
+            (mean_asr - asr_interval[0],),
+            (asr_interval[1] - mean_asr,),
         )
         y_error = (
-            None
-            if target_f1_interval is None
-            else (
-                (mean_target_f1 - target_f1_interval[0],),
-                (target_f1_interval[1] - mean_target_f1,),
-            )
+            (mean_target_f1 - target_f1_interval[0],),
+            (target_f1_interval[1] - mean_target_f1,),
         )
         axis.errorbar(
             mean_asr,
@@ -575,23 +728,30 @@ def render_collapse_decision_effects(
             comparison
             for family in comparison_results
             for comparison in family.comparisons
-            if (
-                comparison.definition.experiment == experiment
-                and comparison.mean_paired_difference is not None
-                and comparison.definition.material_threshold is not None
-                and comparison.definition.material_threshold > 0.0
-                and comparison.confidence_interval is not None
-            )
+            if comparison.definition.experiment == experiment
         )
-        if not matching:
+        comparison = next(
+            (item for item in matching if item.definition.material_threshold is not None),
+            None,
+        )
+        labels.append(experiment)
+        if comparison is None:
+            normalized_effects.append(float("nan"))
+            lower_errors.append(float("nan"))
+            upper_errors.append(float("nan"))
+            annotations.append(ReportCellLiteral.NOT_AVAILABLE)
             continue
-        comparison = matching[0]
         threshold = comparison.definition.material_threshold
         effect = comparison.mean_paired_difference
         interval = comparison.confidence_interval
-        if threshold is None or threshold <= 0.0 or effect is None or interval is None:
+        if threshold is None or threshold <= 0.0:
+            raise ValueError(f"{experiment}: collapse figure has an invalid material threshold")
+        if effect is None or interval is None:
+            normalized_effects.append(float("nan"))
+            lower_errors.append(float("nan"))
+            upper_errors.append(float("nan"))
+            annotations.append(ReportCellLiteral.NOT_AVAILABLE)
             continue
-        labels.append(experiment)
         normalized_effects.append(effect / threshold)
         lower_errors.append((effect - interval[0]) / threshold)
         upper_errors.append((interval[1] - effect) / threshold)
@@ -613,10 +773,15 @@ def render_collapse_decision_effects(
         for position, effect, annotation in zip(
             positions, normalized_effects, annotations, strict=True
         ):
-            axis.annotate(annotation, (effect, position), xytext=(5, 4), textcoords="offset points")
+            axis.annotate(
+                annotation,
+                (1.0 if math.isnan(effect) else effect, position),
+                xytext=(5, 4),
+                textcoords="offset points",
+            )
         axis.axvline(1.0, color="black", linestyle="--")
     else:
-        raise ValueError("Collapse Decision Effects: missing completed collapse evidence")
+        raise ValueError("Collapse Decision Effects: no preregistered collapse rows exist")
     axis.set_title(FigureName.COLLAPSE_DECISION_EFFECTS)
     axis.set_xlabel(FigureAxisName.PRIMARY_MATERIAL_EFFECT_OVER_THRESHOLD)
     axis.set_ylabel(FigureAxisName.MECHANISM)
@@ -654,23 +819,50 @@ def _completed_outcomes(
     )
 
 
-def _experiment_methods(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-) -> tuple[MethodName, ...]:
-    return tuple(
-        sorted(
-            frozenset(outcome.cell.method for outcome in _completed_outcomes(outcomes, experiment))
-        )
-    )
+COMPROMISED_CONDITION_COUNTS: tuple[
+    tuple[ReproducerCondition | VerifierCondition, ScientificCellCount], ...
+] = (
+    (ReproducerCondition.CLEAN, 0),
+    (ReproducerCondition.ONE_SOURCE_COPY, 1),
+    (ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR, 1),
+    (ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR, 1),
+    (ReproducerCondition.TWO_SOURCE_COPIES, 2),
+    (ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS, 2),
+    (ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS, 2),
+    (VerifierCondition.ALL_HONEST, 0),
+    (VerifierCondition.ONE_FALSE_POSITIVE, 1),
+    (VerifierCondition.TWO_FALSE_POSITIVES, 2),
+    (VerifierCondition.ONE_FALSE_NEGATIVE, 1),
+    (VerifierCondition.TWO_FALSE_NEGATIVES, 2),
+)
+REPRODUCER_STRATEGY_CONDITIONS: tuple[
+    tuple[FigureLegendText, ReproducerCondition, ReproducerCondition], ...
+] = (
+    (
+        "Source Copy",
+        ReproducerCondition.ONE_SOURCE_COPY,
+        ReproducerCondition.TWO_SOURCE_COPIES,
+    ),
+    (
+        "Model Replacement Backdoor",
+        ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
+        ReproducerCondition.TWO_MODEL_REPLACEMENT_BACKDOORS,
+    ),
+    (
+        "Verifier-Aware Backdoor",
+        ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+        ReproducerCondition.TWO_VERIFIER_AWARE_BACKDOORS,
+    ),
+)
 
 
-def _condition_compromised_count(condition: ScenarioName) -> ScientificCellCount:
-    if condition.startswith("Two"):
-        return 2
-    if condition.startswith("One"):
-        return 1
-    return 0
+def _condition_compromised_count(
+    condition: ReproducerCondition | VerifierCondition,
+) -> ScientificCellCount:
+    for registered_condition, compromised_count in COMPROMISED_CONDITION_COUNTS:
+        if condition is registered_condition:
+            return compromised_count
+    raise ValueError(f"condition has no registered compromised count: {condition}")
 
 
 def _series_panel(
@@ -682,14 +874,22 @@ def _series_panel(
 ) -> None:
     plotted = False
     for label, x_values, y_values in series:
-        if not any(value is not None for value in y_values):
-            continue
         axis.plot(
             x_values,
             tuple(float("nan") if value is None else value for value in y_values),
             marker="o",
             label=label,
         )
+        for x_value, y_value in zip(x_values, y_values, strict=True):
+            if y_value is None:
+                axis.annotate(
+                    ReportCellLiteral.NOT_AVAILABLE,
+                    (x_value, 0.0),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=7,
+                )
         plotted = True
     if not plotted:
         raise ValueError(f"{title}: missing completed source evidence")
@@ -708,18 +908,31 @@ def _grouped_panel(
     ylabel: FigureAxisName,
     title: FigureName | FigurePanelTitle,
 ) -> None:
-    if not any(value is not None for row in values for value in row):
+    if not x_labels or not groups or len(values) != len(groups):
         raise ValueError(f"{title}: missing completed source evidence")
     positions = tuple(range(len(x_labels)))
     width = 0.8 / max(len(groups), 1)
     for index, group in enumerate(groups):
         offsets = tuple(position + index * width for position in positions)
+        row = values[index]
+        if len(row) != len(x_labels):
+            raise ValueError(f"{title}: grouped source evidence has an incomplete condition grid")
         axis.bar(
             offsets,
-            tuple(float("nan") if value is None else value for value in values[index]),
+            tuple(float("nan") if value is None else value for value in row),
             width=width,
             label=group,
         )
+        for offset, value in zip(offsets, row, strict=True):
+            if value is None:
+                axis.annotate(
+                    ReportCellLiteral.NOT_AVAILABLE,
+                    (offset, 0.0),
+                    xytext=(0, 5),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=7,
+                )
     centre_offset = (len(groups) - 1) * width / 2
     axis.set_xticks(
         tuple(position + centre_offset for position in positions),
@@ -759,30 +972,57 @@ def render_compromised_reproducer_boundary(
     completed = _completed_outcomes(outcomes, COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
     if not completed:
         raise ValueError("Compromised-Reproducer Boundary: missing completed source evidence")
-    conditions = tuple(sorted(frozenset(outcome.cell.condition for outcome in completed)))
-    counts = tuple(_condition_compromised_count(condition) for condition in conditions)
-    series = tuple(
+    definition = experiment_by_name(COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
+    registered_conditions = frozenset(definition.conditions)
+    expected_conditions = frozenset(
         (
-            method,
-            counts,
-            tuple(
-                _outcome_metric_mean(
-                    outcomes,
-                    COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-                    method,
-                    condition,
-                    ComparisonMetric.MALICIOUS_ADMISSION,
-                )
-                for condition in conditions
+            ReproducerCondition.CLEAN,
+            *(
+                condition
+                for _, one, two in REPRODUCER_STRATEGY_CONDITIONS
+                for condition in (one, two)
             ),
         )
-        for method in _experiment_methods(outcomes, COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
     )
+    if registered_conditions != expected_conditions:
+        raise ValueError(
+            "Compromised-Reproducer Boundary: condition strategies do not cover design"
+        )
+    methods = definition.methods
+    counts: tuple[ScientificCellCount, ...] = (0, 1, 2)
+
+    def series_for(metric: ComparisonMetric) -> BoundarySeries:
+        series: BoundarySeries = tuple(
+            (
+                f"{strategy}\n{method}",
+                counts,
+                tuple(
+                    _aggregate_metric_mean(
+                        outcomes,
+                        COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
+                        method,
+                        condition,
+                        metric,
+                    )
+                    for condition in (
+                        ReproducerCondition.CLEAN,
+                        one_condition,
+                        two_condition,
+                    )
+                ),
+            )
+            for strategy, one_condition, two_condition in REPRODUCER_STRATEGY_CONDITIONS
+            for method in methods
+        )
+        return series
+
+    mar_series = series_for(ComparisonMetric.MALICIOUS_ADMISSION)
+    asr_series = series_for(ComparisonMetric.ATTACK_SUCCESS_RATE)
 
     def draw_mar(axis: Axes) -> None:
         _series_panel(
             axis,
-            series,
+            mar_series,
             FigureAxisName.COMPROMISED_REPRODUCER_COUNT,
             FigureAxisName.MALICIOUS_ADMISSION_RATE,
             FigureName.COMPROMISED_REPRODUCER_BOUNDARY,
@@ -793,23 +1033,7 @@ def render_compromised_reproducer_boundary(
     def draw_asr(axis: Axes) -> None:
         _series_panel(
             axis,
-            tuple(
-                (
-                    method,
-                    counts,
-                    tuple(
-                        _outcome_metric_mean(
-                            outcomes,
-                            COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
-                            method,
-                            condition,
-                            ComparisonMetric.ATTACK_SUCCESS_RATE,
-                        )
-                        for condition in conditions
-                    ),
-                )
-                for method in _experiment_methods(outcomes, COMPROMISED_REPRODUCER_ROBUSTNESS_NAME)
-            ),
+            asr_series,
             FigureAxisName.COMPROMISED_REPRODUCER_COUNT,
             FigureAxisName.ATTACK_SUCCESS_RATE,
             FigurePanelTitle.COMPROMISED_REPRODUCER_BOUNDARY_ASR,
@@ -826,13 +1050,17 @@ def render_compromised_reproducer_boundary(
 
 def render_compromised_verifier_boundary(
     comparison_results: tuple[ComparisonFamilyResult, ...],
-    destination: Path,
+    false_positive_destination: Path,
+    false_negative_destination: Path,
     outcomes: tuple[CellExecutionOutcome, ...],
-) -> Path:
+) -> tuple[Path, Path]:
     del comparison_results
     completed = _completed_outcomes(outcomes, COMPROMISED_VERIFIER_ROBUSTNESS_NAME)
     if not completed:
         raise ValueError("Compromised-Verifier Boundary: missing completed source evidence")
+    verifier_definition = experiment_by_name(COMPROMISED_VERIFIER_ROBUSTNESS_NAME)
+    if frozenset(verifier_definition.conditions) != frozenset(VerifierCondition):
+        raise ValueError("Compromised-Verifier Boundary: condition panels do not cover design")
     false_positive_conditions = (
         VerifierCondition.ALL_HONEST,
         VerifierCondition.ONE_FALSE_POSITIVE,
@@ -856,7 +1084,7 @@ def render_compromised_verifier_boundary(
                 profile,
                 counts,
                 tuple(
-                    _outcome_metric_mean(
+                    _aggregate_metric_mean(
                         outcomes,
                         COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
                         profile,
@@ -866,44 +1094,62 @@ def render_compromised_verifier_boundary(
                     for condition in conditions
                 ),
             )
-            for profile in _experiment_methods(outcomes, COMPROMISED_VERIFIER_ROBUSTNESS_NAME)
+            for profile in verifier_definition.methods
         )
 
-    def draw_false_positive(axis: Axes) -> None:
+    def render_mode(
+        destination: Path,
+        conditions: tuple[VerifierCondition, ...],
+        metric: ComparisonMetric,
+        ylabel: FigureAxisName,
+        title: FigureName,
+    ) -> Path:
+        figure = Figure(figsize=(8, 5))
+        axis = figure.add_subplot(1, 1, 1)
         _series_panel(
             axis,
-            series_for(false_positive_conditions, ComparisonMetric.MALICIOUS_ADMISSION),
+            series_for(conditions, metric),
             FigureAxisName.COMPROMISED_VERIFIER_COUNT,
-            FigureAxisName.MALICIOUS_ADMISSION_RATE,
-            FigurePanelTitle.COMPROMISED_VERIFIER_BOUNDARY_FALSE_POSITIVE_MODE,
+            ylabel,
+            title,
         )
+        config = current_application_context().scientific_config.protocol
         axis.axvline(
-            current_application_context().scientific_config.protocol.verification.maximum_byzantine_verifiers_per_panel,
+            config.verification.maximum_byzantine_verifiers_per_panel,
             color="black",
             linestyle="--",
         )
-
-    def draw_false_negative(axis: Axes) -> None:
-        _series_panel(
-            axis,
-            series_for(false_negative_conditions, ComparisonMetric.LEGITIMATE_ADMISSION),
-            FigureAxisName.COMPROMISED_VERIFIER_COUNT,
-            FigureAxisName.LEGITIMATE_ADMISSION_RATE,
-            FigurePanelTitle.COMPROMISED_VERIFIER_BOUNDARY_FALSE_NEGATIVE_MODE,
+        diagnostic = config.diagnostic_random_verifier_profile
+        risk = random_verifier_contamination_probability(
+            diagnostic.byzantine_domain_count,
+            diagnostic.panel_size,
         )
-        axis.axvline(
-            current_application_context().scientific_config.protocol.verification.maximum_byzantine_verifiers_per_panel,
-            color="black",
-            linestyle="--",
+        axis.text(
+            FIGURE_ANNOTATION_INSET,
+            1.0 - FIGURE_ANNOTATION_INSET,
+            f"Random-profile exact P(K ≥ 2) = {risk:.6g}",
+            transform=axis.transAxes,
+            va="top",
         )
+        figure.tight_layout()
+        figure.savefig(destination, dpi=150)
+        return destination
 
-    return _single_panel_figure(
-        destination,
-        (
-            (FigurePanelTitle.FALSE_POSITIVE, draw_false_positive),
-            (FigurePanelTitle.FALSE_NEGATIVE, draw_false_negative),
-        ),
+    false_positive_figure = render_mode(
+        false_positive_destination,
+        false_positive_conditions,
+        ComparisonMetric.MALICIOUS_ADMISSION,
+        FigureAxisName.MALICIOUS_ADMISSION_RATE,
+        FigureName.COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY,
     )
+    false_negative_figure = render_mode(
+        false_negative_destination,
+        false_negative_conditions,
+        ComparisonMetric.LEGITIMATE_ADMISSION,
+        FigureAxisName.LEGITIMATE_ADMISSION_RATE,
+        FigureName.COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY,
+    )
+    return false_positive_figure, false_negative_figure
 
 
 def render_shared_epistemic_failure(
@@ -916,17 +1162,7 @@ def render_shared_epistemic_failure(
     failure_types = tuple(EpistemicFailureType)
 
     def strengths_for(failure_type: EpistemicFailureType) -> tuple[AttackStrength, ...]:
-        return tuple(
-            sorted(
-                frozenset(
-                    float(outcome.cell.condition.rsplit("|", 1)[1])
-                    for outcome in outcomes
-                    if outcome.completed
-                    and outcome.cell.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME
-                    and outcome.cell.condition.startswith(f"{failure_type}|")
-                )
-            )
-        )
+        return tuple(float(token) for token in epistemic_strength_tokens(failure_type))
 
     def clean_oracle_series() -> BoundarySeries:
         series: list[
@@ -966,7 +1202,7 @@ def render_shared_epistemic_failure(
             if not strengths:
                 continue
             values = tuple(
-                _outcome_metric_mean(
+                _aggregate_metric_mean(
                     outcomes,
                     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
                     CoreMethodIdentity.RESOLVED_FEDSIRA_CORE,
@@ -1015,21 +1251,14 @@ def render_capability_granularity_boundary(
     completed = _completed_outcomes(outcomes, CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME)
     if not completed:
         raise ValueError("Capability-Granularity Boundary: missing completed source evidence")
-    granularities = tuple(
-        scope
-        for scope in CapabilityContractScope
-        if any(outcome.cell.method == scope for outcome in completed)
-    )
-    mixtures = tuple(
-        mixture
-        for mixture in RootCauseMixture
-        if any(outcome.cell.condition == mixture for outcome in completed)
-    )
+    definition = experiment_by_name(CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME)
+    granularities = definition.methods
+    mixtures = definition.conditions
 
     def values_for(metric: MetricName) -> tuple[tuple[MetricValue | None, ...], ...]:
         return tuple(
             tuple(
-                _outcome_metric_mean(
+                _aggregate_metric_mean(
                     outcomes,
                     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
                     granularity,
@@ -1083,18 +1312,15 @@ def render_heterogeneity_synthesis_boundary(
     completed = _completed_outcomes(outcomes, HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME)
     if not completed:
         raise ValueError("Heterogeneity Synthesis Boundary: missing completed source evidence")
-    regimes = tuple(
-        regime
-        for regime in HeterogeneityRegime
-        if any(outcome.cell.condition == regime for outcome in completed)
-    )
-    methods = _experiment_methods(outcomes, HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME)
+    definition = experiment_by_name(HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME)
+    regimes = definition.conditions
+    methods = definition.methods
     positions = tuple(range(len(regimes)))
 
     def values_for(metric: MetricName) -> tuple[tuple[MetricValue | None, ...], ...]:
         return tuple(
             tuple(
-                _outcome_metric_mean(
+                _aggregate_metric_mean(
                     outcomes,
                     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
                     method,
@@ -1148,10 +1374,9 @@ def render_admission_delay_decomposition(
         raise ValueError("Admission-Delay Decomposition: missing completed source evidence")
     figure = Figure(figsize=(12, 5))
     axis = figure.add_subplot(1, 1, 1)
+    definition = experiment_by_name(ADMISSION_DELAY_DECOMPOSITION_NAME)
     cells = tuple(
-        sorted(
-            frozenset((outcome.cell.method, outcome.cell.condition) for outcome in delay_outcomes)
-        )
+        (method, condition) for method in definition.methods for condition in definition.conditions
     )
     phases: tuple[tuple[MetricName, FigureLegendLabel], ...] = (
         (DelayPhaseMetric.ASSIGNMENT_SECONDS, FigureLegendLabel.ASSIGNMENT),
@@ -1159,23 +1384,42 @@ def render_admission_delay_decomposition(
         (DelayPhaseMetric.VERIFY_SECONDS, FigureLegendLabel.VERIFY),
         (DelayPhaseMetric.SYNTHESIZE_SECONDS, FigureLegendLabel.SYNTHESIZE),
     )
-    bottoms = [0.0] * len(cells)
-    for metric, label in phases:
-        values = tuple(
-            _outcome_metric_mean(
+    phase_values = tuple(
+        tuple(
+            _aggregate_metric_mean(
                 outcomes,
                 ADMISSION_DELAY_DECOMPOSITION_NAME,
                 method,
                 condition,
                 metric,
             )
-            or 0.0
             for method, condition in cells
+        )
+        for metric, _label in phases
+    )
+    complete_cells = tuple(
+        all(phase[index] is not None for phase in phase_values) for index in range(len(cells))
+    )
+    bottoms = [0.0] * len(cells)
+    for phase, (_metric, label) in zip(phase_values, phases, strict=True):
+        values = tuple(
+            0.0 if not complete_cells[index] else (0.0 if value is None else value)
+            for index, value in enumerate(phase)
         )
         axis.bar(range(len(cells)), values, bottom=bottoms, label=label)
         bottoms = [bottom + value for bottom, value in zip(bottoms, values, strict=True)]
+    for index, is_complete in enumerate(complete_cells):
+        if not is_complete:
+            axis.annotate(
+                ReportCellLiteral.NOT_AVAILABLE,
+                (index, 0.0),
+                xytext=(0, 6),
+                textcoords="offset points",
+                ha="center",
+                fontsize=7,
+            )
     t_evidence = tuple(
-        _outcome_metric_mean(
+        _aggregate_metric_mean(
             outcomes,
             ADMISSION_DELAY_DECOMPOSITION_NAME,
             method,
@@ -1252,9 +1496,10 @@ def render_mandatory_figures(
             figures_root / f"{COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME}.png",
             outcomes,
         ),
-        render_compromised_verifier_boundary(
+        *render_compromised_verifier_boundary(
             comparison_results,
-            figures_root / f"{COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME}.png",
+            figures_root / f"{COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY_FIGURE_NAME}.png",
+            figures_root / f"{COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY_FIGURE_NAME}.png",
             outcomes,
         ),
         trajectory,
@@ -1288,7 +1533,7 @@ def render_mandatory_figures(
 def _render_specialized_figure(
     result: ExperimentExecutionResult,
     figures_root: Path,
-) -> Path | None:
+) -> tuple[Path, ...] | None:
     figure: Path | None = None
     if result.experiment == COMPROMISED_REPRODUCER_ROBUSTNESS_NAME:
         figure = render_compromised_reproducer_boundary(
@@ -1297,9 +1542,10 @@ def _render_specialized_figure(
             result.outcomes,
         )
     elif result.experiment == COMPROMISED_VERIFIER_ROBUSTNESS_NAME:
-        figure = render_compromised_verifier_boundary(
+        return render_compromised_verifier_boundary(
             result.comparison_results,
-            figures_root / f"{COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME}.png",
+            figures_root / f"{COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY_FIGURE_NAME}.png",
+            figures_root / f"{COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY_FIGURE_NAME}.png",
             result.outcomes,
         )
     elif result.experiment == SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME:
@@ -1331,7 +1577,7 @@ def _render_specialized_figure(
             result.comparison_results,
             figures_root / f"{SECONDARY_GENERALIZATION_FIGURE_NAME}.png",
         )
-    return figure
+    return None if figure is None else (figure,)
 
 
 def render_experiment_figures(
@@ -1388,161 +1634,16 @@ def render_experiment_figures(
     else:
         specialized = _render_specialized_figure(result, figures_root)
         if specialized is not None:
-            figures.append(specialized)
+            figures.extend(specialized)
     return tuple(figures)
 
 
-def efficiency_telemetry(
-    outcomes: tuple[CellExecutionOutcome, ...],
-) -> tuple[EfficiencyMetricObservation, ...]:
-    metric_names: tuple[MetricName, ...] = (
-        DescriptiveScientificMetric.WALL_CLOCK_SECONDS,
-        DescriptiveScientificMetric.COMMUNICATION_BYTES,
-        DescriptiveScientificMetric.PEAK_GPU_MEMORY_BYTES,
+def evidence_trajectory() -> tuple[EvidenceStateFraction, ...]:
+    path = (
+        experiment_metric_evidence_root(EVIDENCE_SCARCITY_AND_DORMANCY_NAME)
+        / STATE_TRAJECTORY_FRACTIONS_PARQUET_NAME
     )
-    methods = tuple(sorted(frozenset(outcome.cell.method for outcome in outcomes)))
-    observations: list[EfficiencyMetricObservation] = []
-    for metric_name in metric_names:
-        for method in methods:
-            seed_medians = tuple(
-                quantile_type7(tuple(sorted(values)), 0.5)
-                for seed in frozenset(outcome.cell.master_seed for outcome in outcomes)
-                if (
-                    values := tuple(
-                        value
-                        for outcome in outcomes
-                        if (
-                            outcome.completed
-                            and outcome.cell.experiment == EFFICIENCY_MEASUREMENT_NAME
-                            and outcome.cell.repetition is not None
-                            and outcome.cell.method == method
-                            and outcome.cell.master_seed == seed
-                        )
-                        for recorded_metric, value in outcome.metrics
-                        if recorded_metric == metric_name and value is not None
-                    )
-                )
-            )
-            if seed_medians:
-                ordered_medians = tuple(sorted(seed_medians))
-                observations.append(
-                    EfficiencyMetricObservation(
-                        method=method,
-                        metric=metric_name,
-                        median=quantile_type7(ordered_medians, 0.5),
-                        first_quartile=quantile_type7(ordered_medians, 0.25),
-                        third_quartile=quantile_type7(ordered_medians, 0.75),
-                        seed_count=len(seed_medians),
-                    )
-                )
-    return tuple(observations)
-
-
-def evidence_trajectory(
-    store: ExecutionRecordStore,
-) -> tuple[EvidenceStateFraction, ...]:
-    records = tuple(
-        record
-        for record in store.read_all_outcomes(EVIDENCE_SCARCITY_AND_DORMANCY_NAME)
-        if record.terminal_state is ExperimentLifecycleState.COMPLETED
-    )
-    if not records:
-        return ()
-    if any(not record.state_trajectory for record in records):
-        raise ValueError("Evidence Scarcity and Dormancy record lacks its state trajectory")
-    resource_horizon = current_application_context().scientific_config.protocol.resource_horizon
-    horizon = resource_horizon.maximum_logical_evidence_cycles
-    result: list[EvidenceStateFraction] = []
-    states = (
-        AdmissionState.DORMANT,
-        AdmissionState.VERIFICATION_PENDING,
-        AdmissionState.ADMITTED,
-        AdmissionState.EXPIRED,
-    )
-    for schedule in sorted(frozenset(record.condition for record in records)):
-        schedule_records = tuple(record for record in records if record.condition == schedule)
-        for cycle in range(horizon + 1):
-            for state in states:
-                count = sum(
-                    1
-                    for record in schedule_records
-                    if next(
-                        (
-                            observation.state
-                            for observation in record.state_trajectory
-                            if observation.cycle == cycle
-                        ),
-                        None,
-                    )
-                    is state
-                )
-                if count:
-                    result.append(
-                        EvidenceStateFraction(
-                            condition=schedule,
-                            cycle=cycle,
-                            state=state,
-                            fraction=count / len(schedule_records),
-                        )
-                    )
-    return tuple(result)
-
-
-def outcome_evidence_trajectory(
-    outcomes: tuple[CellExecutionOutcome, ...],
-) -> tuple[EvidenceStateFraction, ...]:
-    completed = tuple(outcome for outcome in outcomes if outcome.completed)
-    if not completed:
-        raise ValueError("Evidence Scarcity and Dormancy has no completed state evidence")
-    scientific_config = current_application_context().scientific_config
-    horizon = scientific_config.protocol.resource_horizon.maximum_logical_evidence_cycles
-    if any(not outcome.state_trajectory for outcome in completed):
-        raise ValueError("Evidence Scarcity and Dormancy outcome lacks its state trajectory")
-    expected_cycles = frozenset(range(horizon + 1))
-    for outcome in completed:
-        observed_cycles = frozenset(observation.cycle for observation in outcome.state_trajectory)
-        if observed_cycles != expected_cycles:
-            raise ValueError(
-                "Evidence Scarcity and Dormancy state trajectory does not cover every "
-                f"logical cycle for {outcome.cell.semantic_key}: "
-                f"missing {sorted(expected_cycles - observed_cycles)}"
-            )
-    result: list[EvidenceStateFraction] = []
-    states = (
-        AdmissionState.DORMANT,
-        AdmissionState.VERIFICATION_PENDING,
-        AdmissionState.ADMITTED,
-        AdmissionState.EXPIRED,
-    )
-    for schedule in sorted(frozenset(outcome.cell.condition for outcome in completed)):
-        schedule_outcomes = tuple(
-            outcome for outcome in completed if outcome.cell.condition == schedule
-        )
-        for cycle in range(horizon + 1):
-            for state in states:
-                count = sum(
-                    1
-                    for outcome in schedule_outcomes
-                    if next(
-                        (
-                            observation.state
-                            for observation in outcome.state_trajectory
-                            if observation.cycle == cycle
-                        ),
-                        None,
-                    )
-                    is state
-                )
-                if count:
-                    result.append(
-                        EvidenceStateFraction(
-                            condition=schedule,
-                            cycle=cycle,
-                            state=state,
-                            fraction=count / len(schedule_outcomes),
-                        )
-                    )
-    return tuple(result)
+    return read_state_trajectory_fractions(path, EVIDENCE_SCARCITY_AND_DORMANCY_NAME)
 
 
 def project_result_evidence(

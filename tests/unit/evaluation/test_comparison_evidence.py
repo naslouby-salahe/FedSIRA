@@ -163,6 +163,26 @@ def test_published_comparison_evidence_is_reused_only_for_exact_metric_lineage(
     assert current_comparison_evidence(experiment, (changed_lineage,)) is None
 
 
+def test_current_comparison_evidence_requires_the_complete_registered_family_set(
+    isolated_repository: Path,
+) -> None:
+    experiment = ExperimentName.SECONDARY_DATASET_GENERALIZATION
+    record = _record(0.5).model_copy(
+        update={
+            "experiment": experiment,
+            "semantic_key": f"{experiment}|{METHOD}|Scenario|1103",
+        }
+    )
+    publish_comparison_evidence(experiment, (record,), ())
+
+    current = current_comparison_evidence(experiment, (record,))
+    assert current is not None
+    assert comparison_evidence_failures(experiment, (record,)) == (
+        f"{experiment}: persisted comparison evidence does not contain "
+        "the complete registered family set",
+    )
+
+
 def test_analysis_seed_is_part_of_comparison_artifact_currency(
     isolated_repository: Path,
 ) -> None:

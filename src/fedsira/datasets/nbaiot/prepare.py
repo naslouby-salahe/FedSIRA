@@ -3,12 +3,14 @@ from __future__ import annotations
 import csv
 import hashlib
 import subprocess
+import tempfile
 from pathlib import Path
 
 import duckdb
 
 from fedsira.config import RoleIntervals, SamplingCapsPerDomain
 from fedsira.datasets.common import (
+    SCALER_METADATA_SCHEMA_VERSION,
     SUPPORTED_ROLE_ORDER,
     TARGET_ROLE_ORDER,
     DatasetExclusionReason,
@@ -24,6 +26,7 @@ from fedsira.datasets.common import (
     fetch_feature_statistics,
     fit_feature_moments,
     open_tabular_engine,
+    prepared_feature_names,
     read_csv_relation,
     role_for_normalized_position,
     sampling_cap_for_role,
@@ -49,7 +52,10 @@ from fedsira.datasets.nbaiot.schema import (
     resolve_attack_class,
     resolve_domain,
 )
-from fedsira.datasets.role_split import prepared_view_cache_identity
+from fedsira.datasets.role_split import (
+    RoleSplitSampleManifestPayload,
+    prepared_view_cache_identity,
+)
 from fedsira.domain.enums import DatasetId, LogEvent, RuntimeComponentName
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -85,6 +91,7 @@ SCALER_SCHEMA_VERSION: SchemaVersion = "fedsira|nbaiot_scaler|1"
 BENIGN_FILENAME: RelativePathText = "benign_traffic.csv"
 
 NBAIOT_PREPARATION_LOGGER = get_structured_logger(RuntimeComponentName.DATASET_PREPARATION)
+NBAIOT_PREPROCESSING_MEMORY_LIMIT = "2GB"
 
 
 class DiscoveredCsvFile(FrozenDomainModel):
@@ -109,10 +116,15 @@ class PreparedView(FrozenDomainModel):
     sample_ids: tuple[ArtifactDigest, ...]
     labels: tuple[DatasetClassToken, ...]
     parquet_path: Path
+    materialized_row_count: RowCount | None = None
 
     @property
     def row_count(self) -> RowCount:
-        return len(self.sample_ids)
+        return (
+            self.materialized_row_count
+            if self.materialized_row_count is not None
+            else len(self.sample_ids)
+        )
 
 
 class PreparedViewMetadata(FrozenDomainModel):
@@ -475,6 +487,97 @@ def _view_key(domain: NBaiotDomain, class_id: NBaiotClass, role: Role) -> Prepar
     return f"{nbaiot_domain_hash_token(domain)}_{class_id}_{role.name}"
 
 
+def reuse_cached_nbaiot_prepared_views(
+    discovered: tuple[DiscoveredCsvFile, ...],
+    prepared_root: Path,
+    manifest: RoleSplitSampleManifestPayload,
+    scaler: ScalerMetadata,
+) -> tuple[tuple[PreparedView, ...], FeatureMoments] | None:
+    if (
+        not discovered
+        or manifest.dataset is not DatasetId.N_BAIOT
+        or manifest.dataset_manifest_hash != compute_dataset_manifest_hash(discovered)
+        or scaler.schema_version != SCALER_METADATA_SCHEMA_VERSION
+    ):
+        return None
+    cache_identity = prepared_view_cache_identity(DatasetId.N_BAIOT, manifest.dataset_manifest_hash)
+    expected_training_rows = sum(
+        item.row_count
+        for item in manifest.counts
+        if item.role is Role.ANCHOR_TRAIN and item.class_id != manifest.target_class
+    )
+    if scaler.training_row_count != expected_training_rows or expected_training_rows <= 0:
+        return None
+    if not scaler.feature_names or len(scaler.feature_names) != NBAIOT_PRIMARY_PREDICTOR_COUNT:
+        return None
+
+    views: list[PreparedView] = []
+    observed_keys: set[tuple[NBaiotDomain, NBaiotClass, Role]] = set()
+    try:
+        for item in manifest.counts:
+            domain = NBaiotDomain[item.domain]
+            class_id = NBaiotClass[item.class_id]
+            role = Role(item.role)
+            key = (domain, class_id, role)
+            if key in observed_keys:
+                return None
+            observed_keys.add(key)
+            view_key = _view_key(domain, class_id, role)
+            parquet_path = view_parquet_path(prepared_root, view_key)
+            metadata_path = (prepared_root / view_key).with_suffix(".json")
+            metadata = PreparedViewMetadata.model_validate_json(
+                metadata_path.read_text(encoding="utf-8")
+            )
+            if (
+                metadata.schema_version != PREPARED_VIEW_SCHEMA_VERSION
+                or metadata.cache_identity != cache_identity
+                or metadata.domain is not domain
+                or metadata.class_id is not class_id
+                or metadata.role is not role
+                or metadata.row_count != item.row_count
+                or not parquet_path.is_file()
+                or metadata.parquet_sha256 != compute_file_checksum(parquet_path)
+            ):
+                return None
+            views.append(
+                PreparedView(
+                    domain=domain,
+                    class_id=class_id,
+                    role=role,
+                    sample_ids=(),
+                    labels=(),
+                    parquet_path=parquet_path,
+                    materialized_row_count=item.row_count,
+                )
+            )
+    except (KeyError, OSError, ValueError):
+        return None
+
+    try:
+        observed_feature_names = tuple(prepared_feature_names(prepared_root) or ())
+    except (duckdb.Error, OSError, ValueError):
+        return None
+    if scaler.feature_names != observed_feature_names:
+        return None
+
+    moments = FeatureMoments(
+        feature_names=tuple(scaler.feature_names),
+        means=tuple(scaler.means),
+        standard_deviations=tuple(scaler.standard_deviations),
+        training_row_count=scaler.training_row_count,
+    )
+    return tuple(views), moments
+
+
+def open_nbaiot_materialization_engine(staging_directory: Path) -> duckdb.DuckDBPyConnection:
+    connection = open_tabular_engine(staging_directory / "materialization.duckdb")
+    connection.execute(f"SET memory_limit = {sql_string(NBAIOT_PREPROCESSING_MEMORY_LIMIT)}")
+    connection.execute(
+        f"SET temp_directory = {sql_string((staging_directory / 'spill').as_posix())}"
+    )
+    return connection
+
+
 def _ensure_all_rows(
     connection: duckdb.DuckDBPyConnection,
     item: DiscoveredCsvFile,
@@ -517,8 +620,11 @@ def materialize_nbaiot_prepared_views(
     )
     feature_names = read_predictor_header(discovered[0].absolute_path)
     validate_predictor_schema(feature_names)
-    connection = open_tabular_engine()
+    staging_directory = tempfile.TemporaryDirectory(prefix="fedsira-nbaiot-")
+    staging_path = Path(staging_directory.name)
+    connection: duckdb.DuckDBPyConnection | None = None
     try:
+        connection = open_nbaiot_materialization_engine(staging_path)
         for item in discovered:
             log_structured_event(
                 NBAIOT_PREPARATION_LOGGER,
@@ -663,16 +769,22 @@ def materialize_nbaiot_prepared_views(
                     f"AND selected.role = {sql_string(role.name)} "
                     "ORDER BY selected.assignment_order"
                 ).fetchall()
-                views.append(
-                    PreparedView(
-                        domain=domain,
-                        class_id=class_id,
-                        role=role,
-                        sample_ids=tuple(str(row[0]) for row in rows),
-                        labels=tuple(str(row[1]) for row in rows),
-                        parquet_path=parquet_path,
-                    )
+                sample_ids = tuple(str(row[0]) for row in rows)
+                labels = tuple(str(row[1]) for row in rows)
+            else:
+                sample_ids = ()
+                labels = ()
+            views.append(
+                PreparedView(
+                    domain=domain,
+                    class_id=class_id,
+                    role=role,
+                    sample_ids=sample_ids,
+                    labels=labels,
+                    parquet_path=parquet_path,
+                    materialized_row_count=int(view_row_count),
                 )
+            )
         write_json_payload(
             scaler_root / "nbaiot_scaler.json",
             ScalerMetadata(
@@ -686,4 +798,8 @@ def materialize_nbaiot_prepared_views(
         )
         return tuple(views), moments
     finally:
-        connection.close()
+        try:
+            if connection is not None:
+                connection.close()
+        finally:
+            staging_directory.cleanup()

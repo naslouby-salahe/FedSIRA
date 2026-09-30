@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -59,6 +60,7 @@ from fedsira.domain.types import (
     ScientificCellCount,
     ScientificCellSemanticKey,
     TimeoutSeconds,
+    WallClockSeconds,
 )
 from fedsira.evaluation.comparisons import ComparisonFamilyResult
 from fedsira.experiments.definitions import (
@@ -92,6 +94,7 @@ EXECUTION_LOGGER = get_structured_logger(RuntimeComponentName.EXECUTION)
 class CellPhaseLogFields(FrozenDomainModel):
     cell: ScientificCellSemanticKey
     timeout_seconds: TimeoutSeconds | None = None
+    elapsed_seconds: WallClockSeconds | None = None
     failure_class: FailureClass | None = None
     failure_message: FailureMessage | None = None
     failure_phase: ScientificCellPhase | None = None
@@ -382,6 +385,7 @@ def _execute_cell_phase_with_timeout(
             cell=cell.semantic_key, timeout_seconds=timeout_seconds
         ).model_dump(),
     )
+    started = time.monotonic()
     try:
         outcome = run_bounded(
             RuntimeComponentName.SCIENTIFIC_CELL_PHASE,
@@ -412,7 +416,11 @@ def _execute_cell_phase_with_timeout(
             ),
         )
     EXECUTION_LOGGER.info(
-        LogEvent.CELL_PHASE_COMPLETED, extra=CellPhaseLogFields(cell=cell.semantic_key).model_dump()
+        LogEvent.CELL_PHASE_COMPLETED,
+        extra=CellPhaseLogFields(
+            cell=cell.semantic_key,
+            elapsed_seconds=time.monotonic() - started,
+        ).model_dump(),
     )
     return outcome
 

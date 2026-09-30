@@ -65,6 +65,7 @@ def test_project_family_workspaces_stay_inside_the_artifact_publication_root() -
         ArtifactFamily.SCREEN_MATCHING_ARTIFACT,
         ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT,
         ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
+        ArtifactFamily.CLAIM_STATE_ARTIFACT,
     ):
         assert workspace_root_for_family(family, PROBE_EXPERIMENT) == root
 

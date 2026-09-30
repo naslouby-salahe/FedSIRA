@@ -17,6 +17,7 @@ from fedsira.artifacts.store import (
     publish_artifact_to_disk,
     read_current_artifact,
     read_published_manifest,
+    read_validated_artifact_payload,
     stage_payload,
     verify_checksum,
 )
@@ -350,6 +351,48 @@ def test_complete_artifact_is_reusable_only_when_payload_matches(tmp_path: Path)
     assert is_artifact_complete_and_valid(directory, "a" * 64)
     (directory / f"{'a' * 64}.artifact.bin").write_bytes(b"corrupted")
     assert not is_artifact_complete_and_valid(directory, "a" * 64)
+
+
+def test_conflicting_payload_retires_the_current_pointer_without_replacing_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("fedsira.artifacts.store.configuration_digest", lambda: "d" * 64)
+    slot = ArtifactSlot(family=ArtifactFamily.SCALER, instance="test-scaler")
+    directory = tmp_path / "canonical"
+    staging = tmp_path / "staging"
+    dependency = ArtifactDependency(
+        kind=ArtifactDependencyKind.CONTENT,
+        dependency=ArtifactDependencyLabel.RAW_DATASET,
+        digest="a" * 64,
+    )
+    first, first_reused = publish_artifact(
+        slot=slot,
+        producer=ArtifactProducer.PREPROCESSING,
+        payload=b"honest",
+        dependencies=(dependency,),
+        procedure_identity="fedsira|test_scaler|1",
+        slot_directory=directory,
+        staging_root=staging,
+    )
+    conflicting, conflicting_reused = publish_artifact(
+        slot=slot,
+        producer=ArtifactProducer.PREPROCESSING,
+        payload=b"tampered",
+        dependencies=(dependency,),
+        procedure_identity="fedsira|test_scaler|1",
+        slot_directory=directory,
+        staging_root=staging,
+    )
+
+    assert not first_reused
+    assert not conflicting_reused
+    assert conflicting.identity == first.identity
+    assert conflicting.checksum == compute_checksum(b"honest")
+    assert is_artifact_complete_and_valid(directory, first.identity)
+    assert read_validated_artifact_payload(directory, first.identity) == b"honest"
+    assert read_current_artifact(directory) is None
+    assert len(tuple(directory.glob("*.manifest.json"))) == 1
 
 
 def test_two_experiment_consumers_reuse_one_compatible_shared_artifact(

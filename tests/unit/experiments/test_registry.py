@@ -1,5 +1,5 @@
 from fedsira.experiments.definitions import experiment_by_name, experiment_registry
-from fedsira.experiments.planning import PLAN_CELL_COUNT_CONTRACT, build_plan
+from fedsira.experiments.planning import PLAN_CELL_COUNT_CONTRACT, build_plan, build_required_plan
 
 
 def test_registry_names_are_unique() -> None:
@@ -22,6 +22,7 @@ def test_every_experiment_declares_required_evidence_artifacts() -> None:
 
 def test_planned_cells_match_nominal_registry_counts() -> None:
     plan = build_plan(resolved_core_complete=True)
-    assert plan.total_cell_count == PLAN_CELL_COUNT_CONTRACT.complete_scientific_plan
     for planned in plan.experiments:
         assert len(planned.cells) == planned.definition.nominal_cell_count
+    required = build_required_plan(resolved_core_complete=True)
+    assert required.total_cell_count == PLAN_CELL_COUNT_CONTRACT.complete_scientific_plan

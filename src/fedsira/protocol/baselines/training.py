@@ -7,6 +7,7 @@ from typing import TypeVar
 import torch
 
 from fedsira.datasets.common import (
+    BackdoorScope,
     HeterogeneityScope,
     RealAnchor,
     Role,
@@ -22,6 +23,7 @@ from fedsira.domain.enums import AdmissionOpeningMode, AlgorithmName
 from fedsira.domain.types import (
     ArtifactDigest,
     BooleanValue,
+    DeltaScale,
     DomainId,
     ExampleCount,
     FederatedRoundCount,
@@ -54,8 +56,10 @@ from fedsira.learning.training import (
     load_model_state,
     model_state_from_classifier,
 )
+from fedsira.protocol.attacks import model_replacement_client_state
 from fedsira.protocol.baselines.defenses import (
     client_sampling_round_order,
+    clients_retained_by_trimmed_mean,
     clip_source_update,
     cosine_distance_matrix,
     density_cluster_labels,
@@ -102,6 +106,13 @@ def validate_candidate_free_full_path_opening_mode(mode: AdmissionOpeningMode) -
 Domain = TypeVar("Domain", bound=Hashable)
 
 
+def _record_accepted_contributor(
+    accepted_compromised: list[DomainId] | None, domain: DomainId
+) -> None:
+    if accepted_compromised is not None and domain not in accepted_compromised:
+        accepted_compromised.append(domain)
+
+
 def train_ordinary_fedavg_delta(
     prepared_root: Path,
     master_seed: MasterSeed,
@@ -110,6 +121,10 @@ def train_ordinary_fedavg_delta(
     rounds: FederatedRoundCount,
     algorithm_token: AlgorithmName,
     exclude_source_from_participants: BooleanValue = False,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     source_rows_available = (
@@ -135,32 +150,74 @@ def train_ordinary_fedavg_delta(
     state = model_state_from_classifier(model)
     local_epochs = fedavg_reference_post_reference_local_epochs()
     any_round_trained = False
+    scale_replacement = replacement_delta_scale is not None and compromised_client is not None
     for round_index in range(rounds):
         round_clients: list[LocalTrainingClient] = []
+        round_domains: list[DomainId] = []
+        overrides: list[ModelState | None] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
+            attack_domain = (
+                compromised_client is not None
+                and backdoor_scope is not None
+                and domain == compromised_client
+            )
+            combined = combined_post_reference_rows(
+                nbaiot_adapter(prepared_root),
+                domain,
+                role,
+                backdoor_scope=backdoor_scope if attack_domain else None,
+            )
             if combined is None:
+                if attack_domain:
+                    raise ValueError("model-replacement client lacks its declared poisoned view")
                 continue
             features, labels, sample_ids, _is_supported = combined
-            round_clients.append(
-                LocalTrainingClient(
-                    features=features,
-                    labels=labels,
-                    sample_ids=sample_ids,
-                    training_seed=training_seed(
-                        master_seed,
-                        anchor.dataset_manifest_hash,
-                        flat_parameters_identity(anchor.flat_parameters),
-                        algorithm_token,
-                        domain,
-                        round_index,
-                    ),
-                )
+            client_seed = training_seed(
+                master_seed,
+                anchor.dataset_manifest_hash,
+                flat_parameters_identity(anchor.flat_parameters),
+                algorithm_token,
+                domain,
+                round_index,
             )
+            client = LocalTrainingClient(
+                features=features,
+                labels=labels,
+                sample_ids=sample_ids,
+                training_seed=client_seed,
+            )
+            round_clients.append(client)
+            round_domains.append(domain)
+            if scale_replacement:
+                if attack_domain and replacement_delta_scale is not None:
+                    trained = train_one_client_locally(
+                        state,
+                        anchor.input_width,
+                        anchor.output_width,
+                        config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                        config.model.optimizer,
+                        config.model.training,
+                        local_epochs,
+                        client,
+                    )
+                    overrides.append(
+                        model_replacement_client_state(
+                            state,
+                            trained.state,
+                            anchor.input_width,
+                            anchor.output_width,
+                            replacement_delta_scale,
+                        )
+                    )
+                else:
+                    overrides.append(None)
         if not round_clients:
             continue
         any_round_trained = True
+        for domain in round_domains:
+            if domain == compromised_client:
+                _record_accepted_contributor(accepted_compromised, domain)
         state = run_fedavg_round(
             state,
             anchor.input_width,
@@ -170,6 +227,7 @@ def train_ordinary_fedavg_delta(
             config.model.training,
             local_epochs,
             tuple(round_clients),
+            tuple(overrides) if scale_replacement else None,
         )
     if not any_round_trained:
         return None
@@ -183,6 +241,10 @@ def train_fedavg_reference_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: DomainId | None,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     return train_ordinary_fedavg_delta(
         prepared_root,
@@ -191,6 +253,10 @@ def train_fedavg_reference_delta(
         source_domain,
         fedavg_reference_post_reference_rounds(),
         AlgorithmName.FEDAVG_REFERENCE,
+        compromised_client=compromised_client,
+        backdoor_scope=backdoor_scope,
+        replacement_delta_scale=replacement_delta_scale,
+        accepted_compromised=accepted_compromised,
     )
 
 
@@ -199,6 +265,10 @@ def train_secure_continual_assessment_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: DomainId | None,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     return train_ordinary_fedavg_delta(
         prepared_root,
@@ -207,6 +277,10 @@ def train_secure_continual_assessment_delta(
         source_domain,
         secure_continual_assessment_post_reference_rounds(),
         AlgorithmName.SECURE_CONTINUAL_ASSESSMENT,
+        compromised_client=compromised_client,
+        backdoor_scope=backdoor_scope,
+        replacement_delta_scale=replacement_delta_scale,
+        accepted_compromised=accepted_compromised,
     )
 
 
@@ -239,6 +313,10 @@ def train_krum_reference_delta(
     anchor: RealAnchor,
     source_domain: DomainId | None,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
@@ -261,10 +339,21 @@ def train_krum_reference_delta(
         committee: list[CertifiedReproductionRow] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
+            attack_domain = (
+                compromised_client is not None
+                and backdoor_scope is not None
+                and domain == compromised_client
+            )
             combined = combined_post_reference_rows(
-                nbaiot_adapter(prepared_root), domain, role, heterogeneity_scope=heterogeneity_scope
+                nbaiot_adapter(prepared_root),
+                domain,
+                role,
+                heterogeneity_scope=heterogeneity_scope,
+                backdoor_scope=backdoor_scope if attack_domain else None,
             )
             if combined is None:
+                if attack_domain:
+                    raise ValueError("model-replacement client lacks its declared poisoned view")
                 continue
             features, labels, sample_ids, _is_supported = combined
             client_result = train_one_client_locally(
@@ -289,22 +378,30 @@ def train_krum_reference_delta(
                     ),
                 ),
             )
+            update_state = client_result.state
+            if attack_domain and replacement_delta_scale is not None:
+                update_state = model_replacement_client_state(
+                    state,
+                    client_result.state,
+                    anchor.input_width,
+                    anchor.output_width,
+                    replacement_delta_scale,
+                )
             committee.append(
                 CertifiedReproductionRow(
                     reproducer_domain=domain,
-                    update_vector=_flatten_model_state(anchor, client_result.state) - current_flat,
+                    update_vector=_flatten_model_state(anchor, update_state) - current_flat,
                 )
             )
         if len(committee) < participant_count:
             return None
-        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
-        load_flat_trainable_parameters(
-            next_model,
-            current_flat
-            + select_krum_update(
-                committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
-            ).update_vector,
+        selected_row = select_krum_update(
+            committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
         )
+        if selected_row.reproducer_domain == compromised_client:
+            _record_accepted_contributor(accepted_compromised, selected_row.reproducer_domain)
+        next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
+        load_flat_trainable_parameters(next_model, current_flat + selected_row.update_vector)
         state = model_state_from_classifier(next_model)
     return _flatten_model_state(anchor, state) - anchor.flat_parameters
 
@@ -314,6 +411,10 @@ def train_density_cluster_trimmed_mean_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: DomainId | None,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     source_rows_available = (
@@ -341,8 +442,20 @@ def train_density_cluster_trimmed_mean_delta(
         raw_updates: list[torch.Tensor] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
+            attack_domain = (
+                compromised_client is not None
+                and backdoor_scope is not None
+                and domain == compromised_client
+            )
+            combined = combined_post_reference_rows(
+                nbaiot_adapter(prepared_root),
+                domain,
+                role,
+                backdoor_scope=backdoor_scope if attack_domain else None,
+            )
             if combined is None:
+                if attack_domain:
+                    raise ValueError("model-replacement client lacks its declared poisoned view")
                 continue
             features, labels, sample_ids, _is_supported = combined
             result = train_one_client_locally(
@@ -367,8 +480,17 @@ def train_density_cluster_trimmed_mean_delta(
                     ),
                 ),
             )
+            update_state = result.state
+            if attack_domain and replacement_delta_scale is not None:
+                update_state = model_replacement_client_state(
+                    state,
+                    result.state,
+                    anchor.input_width,
+                    anchor.output_width,
+                    replacement_delta_scale,
+                )
             contributing_domains.append(domain)
-            raw_updates.append(_flatten_model_state(anchor, result.state) - current_flat)
+            raw_updates.append(_flatten_model_state(anchor, update_state) - current_flat)
         if not raw_updates:
             continue
         distance_matrix = cosine_distance_matrix(l2_normalize(tuple(raw_updates)))
@@ -382,6 +504,15 @@ def train_density_cluster_trimmed_mean_delta(
         selected_updates = tuple(
             raw_updates[contributing_domains.index(domain)] for domain in selected_domains
         )
+        if compromised_client is not None:
+            retained = clients_retained_by_trimmed_mean(
+                selected_domains,
+                selected_updates,
+                config.baselines.density_cluster_trimmed_mean.minimum_cluster_size_for_trimming,
+                config.baselines.density_cluster_trimmed_mean.trim_each_tail_count,
+            )
+            if compromised_client in retained:
+                _record_accepted_contributor(accepted_compromised, compromised_client)
         next_model = FedSIRAClassifier(anchor.input_width, anchor.output_width)
         load_flat_trainable_parameters(
             next_model,
@@ -537,6 +668,10 @@ def train_update_reconstruction_filter_delta(
     master_seed: MasterSeed,
     anchor: RealAnchor,
     source_domain: DomainId | None,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> torch.Tensor | None:
     config = current_application_context().scientific_config
     calibration_errors = anchor_round_reconstruction_calibration_errors(
@@ -571,8 +706,20 @@ def train_update_reconstruction_filter_delta(
         accepted_states: list[WeightedModelState] = []
         for domain in participants:
             role = Role.SOURCE_PROPOSAL if domain == source_domain else Role.REPRODUCTION
-            combined = combined_post_reference_rows(nbaiot_adapter(prepared_root), domain, role)
+            attack_domain = (
+                compromised_client is not None
+                and backdoor_scope is not None
+                and domain == compromised_client
+            )
+            combined = combined_post_reference_rows(
+                nbaiot_adapter(prepared_root),
+                domain,
+                role,
+                backdoor_scope=backdoor_scope if attack_domain else None,
+            )
             if combined is None:
+                if attack_domain:
+                    raise ValueError("model-replacement client lacks its declared poisoned view")
                 continue
             features, labels, sample_ids, _is_supported = combined
             client_result = train_one_client_locally(
@@ -609,15 +756,32 @@ def train_update_reconstruction_filter_delta(
                 AlgorithmName.ANCHOR_ROUND_CALIBRATION,
             )
             if reconstructed is None:
+                if attack_domain:
+                    raise ValueError("model-replacement client lacks its reconstruction reference")
                 continue
-            submitted_delta = _flatten_model_state(anchor, client_result.state) - current_flat
+            submitted_state = client_result.state
+            if attack_domain and replacement_delta_scale is not None:
+                submitted_state = model_replacement_client_state(
+                    state,
+                    client_result.state,
+                    anchor.input_width,
+                    anchor.output_width,
+                    replacement_delta_scale,
+                )
+            submitted_delta = _flatten_model_state(anchor, submitted_state) - current_flat
             error = reconstruction_error(
                 submitted_delta,
                 reconstructed[0],
                 config.baselines.reconstruction_filter.normalization_epsilon,
             )
             if reconstruction_filter_accepts(error, rejection_threshold):
-                accepted_states.append(client_result)
+                accepted_states.append(
+                    WeightedModelState(
+                        state=submitted_state, example_count=client_result.example_count
+                    )
+                )
+                if attack_domain:
+                    _record_accepted_contributor(accepted_compromised, domain)
         reweighted = reconstruction_filter_reweight(tuple(accepted_states))
         if reweighted is not None:
             state = reweighted

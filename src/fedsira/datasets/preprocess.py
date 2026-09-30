@@ -16,10 +16,12 @@ from fedsira.artifacts.store import (
     ArtifactConfigurationScope,
     ArtifactDependency,
     ArtifactSlot,
+    artifact_identity,
     compute_checksum,
     configuration_scope_dependency,
     configure_artifact_logging,
     publish_artifact,
+    read_current_artifact,
 )
 from fedsira.datasets.ciciot2023.prepare import (
     compute_dataset_manifest_hash as compute_secondary_dataset_manifest_hash,
@@ -38,18 +40,23 @@ from fedsira.datasets.common import (
     PREPARED_ROLE_VIEW_SCHEMA_VERSION,
     SCALER_METADATA_SCHEMA_VERSION,
     DatasetPreparationLogFields,
+    FeatureMoments,
     PreparedRoleViewManifest,
     RawDatasetFileIdentity,
     RawDatasetIdentityPayload,
     ScalerMetadata,
     prepared_feature_names,
+    write_json_payload,
 )
 from fedsira.datasets.layout import required_raw_dataset_root
 from fedsira.datasets.nbaiot.prepare import (
+    DiscoveredCsvFile,
+    PreparedView,
     classes_structurally_unavailable,
     compute_dataset_manifest_hash,
     discover_primary_csv_files,
     materialize_nbaiot_prepared_views,
+    reuse_cached_nbaiot_prepared_views,
     validate_target_holder_feasibility,
 )
 from fedsira.datasets.nbaiot.schema import NBaiotDatasetManifestPayload
@@ -57,6 +64,7 @@ from fedsira.datasets.role_split import (
     RoleSplitViewCount,
     dataset_preprocessing_configuration,
     publish_role_split_sample_manifest,
+    read_current_role_split_sample_manifest,
 )
 from fedsira.domain.enums import (
     ArtifactDependencyKind,
@@ -64,9 +72,11 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactProducer,
     DatasetId,
+    FailureClass,
     LogEvent,
     Role,
     RuntimeComponentName,
+    WorkflowTerminalState,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
@@ -89,6 +99,7 @@ from fedsira.runtime import (
     current_application_context,
     get_structured_logger,
     log_structured_event,
+    log_workflow_terminal,
     mirror_structured_logging_to_console,
     run_bounded,
 )
@@ -197,6 +208,64 @@ def publish_scaler(
     return reused
 
 
+def _reuse_current_nbaiot_materialization(
+    discovered: tuple[DiscoveredCsvFile, ...],
+    manifest_hash: DatasetManifestDigest,
+    prepared_root: Path,
+) -> tuple[tuple[PreparedView, ...], FeatureMoments] | None:
+    role_split = read_current_role_split_sample_manifest(DatasetId.N_BAIOT, manifest_hash)
+    if role_split is None:
+        return None
+    _role_split_manifest, role_split_payload = role_split
+
+    slot = ArtifactSlot(family=ArtifactFamily.SCALER, instance=DatasetId.N_BAIOT)
+    configuration = dataset_preprocessing_configuration(DatasetId.N_BAIOT)
+    dependencies = (
+        ArtifactDependency(
+            kind=ArtifactDependencyKind.CONTENT,
+            dependency=ArtifactDependencyLabel.RAW_FILE_MANIFEST,
+            digest=manifest_hash,
+        ),
+        configuration_scope_dependency(
+            ArtifactConfigurationScope(
+                scope=f"preprocessing:{DatasetId.N_BAIOT}",
+                components=configuration.components,
+            )
+        ),
+    )
+    expected_identity = artifact_identity(slot, dependencies, SCALER_ARTIFACT_PROCEDURE_IDENTITY)
+    current_scaler = read_current_artifact(
+        current_repository_root() / artifact_slot_directory(slot)
+    )
+    if current_scaler is None:
+        return None
+    scaler_manifest, scaler_payload = current_scaler
+    if (
+        scaler_manifest.identity != expected_identity
+        or scaler_manifest.dependencies != dependencies
+        or scaler_manifest.procedure_identity != SCALER_ARTIFACT_PROCEDURE_IDENTITY
+    ):
+        return None
+    try:
+        scaler = ScalerMetadata.model_validate_json(scaler_payload)
+    except ValueError:
+        return None
+    cached = reuse_cached_nbaiot_prepared_views(
+        discovered,
+        prepared_root,
+        role_split_payload,
+        scaler,
+    )
+    if cached is None:
+        return None
+    write_json_payload(
+        current_repository_root() / prepared_feature_root() / "nbaiot_scaler.json",
+        scaler,
+        True,
+    )
+    return cached
+
+
 PREPARED_ROLE_VIEW_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|prepared_role_view|2"
 
 
@@ -278,13 +347,22 @@ def _preprocess_nbaiot(overwrite: OverwriteExisting) -> None:
         manifest_hash,
     )
     prepared_root = current_repository_root() / prepared_evidence_root(DatasetId.N_BAIOT)
-    nbaiot_views, moments = materialize_nbaiot_prepared_views(
-        discovered,
-        prepared_root,
-        current_repository_root() / prepared_feature_root(),
-        overwrite,
-        retain_materialized_views=False,
+    scaler_root = current_repository_root() / prepared_feature_root()
+    cached_materialization = (
+        None
+        if overwrite
+        else _reuse_current_nbaiot_materialization(discovered, manifest_hash, prepared_root)
     )
+    if cached_materialization is None:
+        nbaiot_views, moments = materialize_nbaiot_prepared_views(
+            discovered,
+            prepared_root,
+            scaler_root,
+            overwrite,
+            retain_materialized_views=False,
+        )
+    else:
+        nbaiot_views, moments = cached_materialization
     role_split_manifest, _role_split_reused = publish_role_split_sample_manifest(
         DatasetId.N_BAIOT,
         manifest_hash,
@@ -377,7 +455,7 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
         publish_prepared_role_view(
             DatasetId.CICIOT2023,
             role_split_manifest.identity,
-            f"{view.pseudo_domain.display_token}_{view.normalized_label}_" f"{view.role.name}",
+            f"{view.pseudo_domain.display_token}_{view.normalized_label}_{view.role.name}",
             view.role,
             view.normalized_label,
             view.pseudo_domain.display_token,
@@ -434,13 +512,47 @@ def _preprocess_ciciot2023(overwrite: OverwriteExisting) -> None:
 
 
 def execute_preprocess(dataset: DatasetId | None, overwrite: OverwriteExisting) -> None:
-    context = ApplicationContext.load(REPOSITORY_ROOT)
+    try:
+        context = ApplicationContext.load(REPOSITORY_ROOT)
+    except ValueError as error:
+        log_workflow_terminal(
+            PREPROCESSING_LOGGER,
+            RuntimeComponentName.PREPROCESSING,
+            WorkflowTerminalState.BLOCKED,
+            FailureClass.CONFIGURATION_INVALID,
+            str(error),
+        )
+        raise
     with bound_application_context(context):
         timeout = context.scientific_config.execution.timeouts_seconds.dataset_preprocessing
-        run_bounded(
+        try:
+            run_bounded(
+                RuntimeComponentName.PREPROCESSING,
+                timeout,
+                lambda: _execute_bound(dataset, overwrite),
+            )
+        except TimeoutError as error:
+            log_workflow_terminal(
+                PREPROCESSING_LOGGER,
+                RuntimeComponentName.PREPROCESSING,
+                WorkflowTerminalState.FAILED,
+                FailureClass.TIMEOUT,
+                str(error),
+            )
+            raise
+        except Exception as error:
+            log_workflow_terminal(
+                PREPROCESSING_LOGGER,
+                RuntimeComponentName.PREPROCESSING,
+                WorkflowTerminalState.FAILED,
+                FailureClass.IMPLEMENTATION_ERROR,
+                str(error),
+            )
+            raise
+        log_workflow_terminal(
+            PREPROCESSING_LOGGER,
             RuntimeComponentName.PREPROCESSING,
-            timeout,
-            lambda: _execute_bound(dataset, overwrite),
+            WorkflowTerminalState.COMPLETED,
         )
 
 

@@ -8,9 +8,11 @@ import pytest
 
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.datasets.common import (
+    SCALER_METADATA_SCHEMA_VERSION,
     DatasetExclusionReason,
     PreparedViewSidecar,
     Role,
+    ScalerMetadata,
     compute_file_checksum,
     open_tabular_engine,
     view_parquet_path,
@@ -21,8 +23,11 @@ from fedsira.datasets.nbaiot.prepare import (
     PreparedViewMetadata,
     RoleSamplingCap,
     assign_stream_roles_and_sample_ids,
+    compute_dataset_manifest_hash,
     ingest_primary_numeric_csv,
     materialize_nbaiot_prepared_views,
+    open_nbaiot_materialization_engine,
+    reuse_cached_nbaiot_prepared_views,
     supported_class_sampling_caps,
     target_class_sampling_caps,
     validate_consistent_predictor_schema,
@@ -35,6 +40,8 @@ from fedsira.datasets.nbaiot.schema import (
     NBaiotDomain,
     nbaiot_domain_hash_token,
 )
+from fedsira.datasets.role_split import RoleSplitViewCount, role_split_sample_manifest
+from fedsira.domain.enums import DatasetId
 from fedsira.runtime import current_application_context
 
 CONFIG = load_scientific_config(PRODUCTION_CONFIG_PATH)
@@ -320,6 +327,95 @@ def test_materialization_runs_and_writes_artifacts(tmp_path: Path) -> None:
     assert views
     assert len(moments.feature_names) == NBAIOT_PRIMARY_PREDICTOR_COUNT
     assert (scaler_root / "nbaiot_scaler.json").exists()
+
+
+def test_materialization_retains_view_metadata_without_loading_row_identities(
+    tmp_path: Path,
+) -> None:
+    csv_path = tmp_path / "benign.csv"
+    _write_benign_csv(csv_path, 6000)
+    prepared_root, scaler_root = _storage(tmp_path)
+
+    views, _moments = materialize_nbaiot_prepared_views(
+        (_discovered_csv(csv_path),),
+        prepared_root,
+        scaler_root,
+        overwrite=True,
+        retain_materialized_views=False,
+    )
+
+    assert views
+    assert all(view.sample_ids == () and view.labels == () for view in views)
+    assert all(view.row_count > 0 for view in views)
+    assert sum(view.row_count for view in views) > 0
+
+
+def test_cached_materialization_reuses_only_verified_prepared_views(tmp_path: Path) -> None:
+    csv_path = tmp_path / "benign.csv"
+    _write_benign_csv(csv_path, 6000)
+    discovered = (_discovered_csv(csv_path),)
+    prepared_root, scaler_root = _storage(tmp_path)
+    views, moments = materialize_nbaiot_prepared_views(
+        discovered,
+        prepared_root,
+        scaler_root,
+        overwrite=True,
+        retain_materialized_views=False,
+    )
+    manifest_hash = compute_dataset_manifest_hash(discovered)
+    role_manifest = role_split_sample_manifest(
+        DatasetId.N_BAIOT,
+        manifest_hash,
+        tuple(
+            RoleSplitViewCount(
+                domain=view.domain.name,
+                class_id=view.class_id.name,
+                role=view.role,
+                row_count=view.row_count,
+            )
+            for view in views
+        ),
+    )
+    scaler = ScalerMetadata(
+        schema_version=SCALER_METADATA_SCHEMA_VERSION,
+        feature_names=moments.feature_names,
+        means=moments.means,
+        standard_deviations=moments.standard_deviations,
+        training_row_count=moments.training_row_count,
+    )
+
+    cached = reuse_cached_nbaiot_prepared_views(discovered, prepared_root, role_manifest, scaler)
+
+    assert cached is not None
+    cached_views, cached_moments = cached
+    assert tuple(view.row_count for view in cached_views) == tuple(view.row_count for view in views)
+    assert all(view.sample_ids == () and view.labels == () for view in cached_views)
+    assert cached_moments == moments
+
+    cached_views[0].parquet_path.write_bytes(b"tampered")
+    assert (
+        reuse_cached_nbaiot_prepared_views(discovered, prepared_root, role_manifest, scaler) is None
+    )
+
+
+def test_materialization_engine_is_disk_backed_and_memory_limited(tmp_path: Path) -> None:
+    connection = open_nbaiot_materialization_engine(tmp_path)
+    try:
+        database_row = connection.execute("PRAGMA database_list").fetchone()
+        memory_row = connection.execute("SELECT current_setting('memory_limit')").fetchone()
+        temporary_row = connection.execute("SELECT current_setting('temp_directory')").fetchone()
+        assert database_row is not None
+        assert memory_row is not None
+        assert temporary_row is not None
+        database_path = str(database_row[2])
+        memory_limit = str(memory_row[0])
+        temp_directory = str(temporary_row[0])
+    finally:
+        connection.close()
+
+    assert database_path == str(tmp_path / "materialization.duckdb")
+    assert memory_limit == "1.8 GiB"
+    assert temp_directory == (tmp_path / "spill").as_posix()
 
 
 def test_materialization_is_deterministic(tmp_path: Path) -> None:

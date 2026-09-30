@@ -1,0 +1,3744 @@
+{
+  "dataset": "N-BaIoT",
+  "view_count": 534,
+  "entries": [
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "da0b369ae7c1922f3e8343f38911ec7ba59e556c44f11699ef9c173a32bd61c2",
+      "parquet_sha256": "d6a7eeeec8a7ec0c93500c2df531829a255669f279f262ad5821ec65a59b8a3b",
+      "sidecar_mtime_ns": 1790433491689024184,
+      "parquet_mtime_ns": 1790433491678881057
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "c341fe618d4021f98fb0faa168329ee21c35f1b43b475ed6987a7d0f2f21bb05",
+      "parquet_sha256": "930d53ab77f2cc718168a02fa36aca26485ce451e4b99b87932c2777193261aa",
+      "sidecar_mtime_ns": 1790433491740635620,
+      "parquet_mtime_ns": 1790433491735180770
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "73994f002a5673a4c6fed47da2f2c8ff259ea00047ec8e214280d39d13cf329f",
+      "parquet_sha256": "69c038324f010dfb4f3cb1fd450b7df38091f08049fcff747abdd7ac99bb3358",
+      "sidecar_mtime_ns": 1790433491789872755,
+      "parquet_mtime_ns": 1790433491779416258
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "277a7275c0a3d3d2b0800d642e314e474db68dd942ef24dbd7a23707445c72c4",
+      "parquet_sha256": "edd6d0ec5f70b775b213c99f0b932e01d7d45b9e1624151088239753853e432c",
+      "sidecar_mtime_ns": 1790433492027100590,
+      "parquet_mtime_ns": 1790433492012658777
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "409fc617f12f74fdecbc6b9107b1064625a76aeae70bfd55554e966aff1f5fe1",
+      "parquet_sha256": "95685ee95aa8f4f9e21aa6d5351cb30def23de11a41509dac4aaa2ea6f43f16d",
+      "sidecar_mtime_ns": 1790433492086442259,
+      "parquet_mtime_ns": 1790433492077007181
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "f4000cdfbbef3361792b72bf0c1fd1d15a6a492091a421da95f859356da290a6",
+      "parquet_sha256": "4caba8d719cbc314e0885393847b8f47ab8116acadc6d289c8e8e7f709f63e35",
+      "sidecar_mtime_ns": 1790433492133463954,
+      "parquet_mtime_ns": 1790433492125268482
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "81e4fb2a81630774ee42bbce8b39880e7ef891696f03f3c6101110a67a6379ce",
+      "parquet_sha256": "53eb08826e0e2b4b9e66e116b480c38de529ec599423860eb08faeacc09d4fe0",
+      "sidecar_mtime_ns": 1790433492168273132,
+      "parquet_mtime_ns": 1790433492161464458
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "e6ced13f6a62c80f7cb629295e1ae78cb8372180ccb35ac37149ba3669bcda04",
+      "parquet_sha256": "2355426418092594ef7c43e6ca2e22475f508ff4c69eef2f4ebde2c2abaae83c",
+      "sidecar_mtime_ns": 1790433492234472242,
+      "parquet_mtime_ns": 1790433492225812858
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "d0a455d17b1ca6a25c5b2364365fe0d772c776ab3de72e766bc2abeff8c883be",
+      "parquet_sha256": "0807d2ce799b1c320ec9efdf244ed0f34af9da2564f29d11094ff75fcdba2947",
+      "sidecar_mtime_ns": 1790433492305750528,
+      "parquet_mtime_ns": 1790433492298204812
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "7b4250f0d04d32b5cc645fa57b052be7d745d530fbe4d0a92a0f1b180704bce7",
+      "parquet_sha256": "71769458671cacd7768b73214c23b90c5c08ea331d237cfdf242c5f6161fc954",
+      "sidecar_mtime_ns": 1790433492353807764,
+      "parquet_mtime_ns": 1790433492346466113
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "4e3c9293a5dd8cd98343a9eb0e1eba7856731244b925a62221478930a43560f1",
+      "parquet_sha256": "ccb09eacf6b72bd317fa0b7895cec3b1fa19e01ff9e1ce6c0be8f41d06aac8b2",
+      "sidecar_mtime_ns": 1790433492403050619,
+      "parquet_mtime_ns": 1790433492398749191
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "a9c8b21581f2e49e80fb80b9cd2576ad5e639e0b62030a740194e64fff8a3c92",
+      "parquet_sha256": "1021283fcefd3638bcecd5de903eb8f12f24acc23e8367b6fae4b52cd93854d3",
+      "sidecar_mtime_ns": 1790433492457725210,
+      "parquet_mtime_ns": 1790433492451032266
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "27b66ecfd5512f45abfe5164a913af8ff1a98113e7e3be5faed65112dd212270",
+      "parquet_sha256": "692a30c573ef4b9a70b8ef470e22d0ddfae458199a0224a70f38aff2874b774f",
+      "sidecar_mtime_ns": 1790433492546809680,
+      "parquet_mtime_ns": 1790433492535489546
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "dc19148e2b28b931b9f938fcb8c7ff893e22318b1ef1587e3bcdd0773ed40df1",
+      "parquet_sha256": "d4bca9e198f5ff60fd03b81fc967c4c1b12a49b9601d3a39e1bb33432751c06b",
+      "sidecar_mtime_ns": 1790433492604901448,
+      "parquet_mtime_ns": 1790433492595816170
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "cf92c67c1afd4a9d7b3064e8928a38f5174c507c1c000e5d6a64864aee30763c",
+      "parquet_sha256": "f1535f29f678c74ae29503bce9d7247b9535c6e24cf2a41644091188f91db77b",
+      "sidecar_mtime_ns": 1790433492652467395,
+      "parquet_mtime_ns": 1790433492644077472
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "cb53bb266ceff9ad832c3e7ae8f9fde113957fb62623b4eb9047953e7ca5f7e5",
+      "parquet_sha256": "99d9a63dd0d1c4927b31da2441d32880761c6bcc0179a9a22c0938b69e14d52a",
+      "sidecar_mtime_ns": 1790433492886828932,
+      "parquet_mtime_ns": 1790433492877340432
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "977a009cb99d2bf7945db2c1ebb18f4dd848e9761530043e143d765efc24cae3",
+      "parquet_sha256": "7bd62e7f45cc2ed563dc7a31a15b335c1abf4b7346f5e5862e9d1e1825b0f407",
+      "sidecar_mtime_ns": 1790433492935879839,
+      "parquet_mtime_ns": 1790433492929623506
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "84aa2a645496606d94943e4ae9e6cc00eae6034d5168a6491afbaef6593a55fc",
+      "parquet_sha256": "f30a927cb2a3d9ba422a3d1a7db7f8c3dc49708cf8f7dd1d73479525f94bf009",
+      "sidecar_mtime_ns": 1790433492975850004,
+      "parquet_mtime_ns": 1790433492969841258
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "30dcf1726a43ca5f2a325af0523729210016cdb12bb8f216606c141870c1c08f",
+      "parquet_sha256": "842b20047df0728a8f9c95758874f553f90da002cfc556ad998efb72f7ed35ae",
+      "sidecar_mtime_ns": 1790433493084586801,
+      "parquet_mtime_ns": 1790433493074413090
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "1e84ea4811ee51c61e0f739fcaa887bce53b2d00df95fb2554afea44853e07d7",
+      "parquet_sha256": "f0b4485831af675d1ae85efb0e810cba5fc7554dd8cfb231a297a4f175656ffd",
+      "sidecar_mtime_ns": 1790433493140394957,
+      "parquet_mtime_ns": 1790433493134744535
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "d294771c1377620a06a05df75c200ba81d86a0ff9b94d443b69a51a53635fb39",
+      "parquet_sha256": "7176f7053d53f05ae359c3a34e3c477af7e234e33374c25785a1c2f634ab5482",
+      "sidecar_mtime_ns": 1790433493191128600,
+      "parquet_mtime_ns": 1790433493187031787
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "16a8eed97904770497d9b8773f69b441ab4b17b663b157205efe62f3fb6d6d37",
+      "parquet_sha256": "b2c9ca6ea1b357fe4706b7ce2c521e8a0d060d19fd8f42132a50516f8fe6c065",
+      "sidecar_mtime_ns": 1790433493418421698,
+      "parquet_mtime_ns": 1790433493404224990
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "55c8a26ff84751a3b24822978af10d71a1d978e558fd234c51928173afc413f4",
+      "parquet_sha256": "dd4765c86082864c7eb75d02b686c25c8f760d95db0dd6c0404e7353e40bb146",
+      "sidecar_mtime_ns": 1790433493475665925,
+      "parquet_mtime_ns": 1790433493468578528
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d99675e7a800c723ce91e54a18ad6a8b9867cdb3d1d76d2c5dea074d29ca64a8",
+      "parquet_sha256": "689d96be184135112827d5b9cb1cb54b7739a30275530fc12ee3bf2b349e7e96",
+      "sidecar_mtime_ns": 1790433493511584554,
+      "parquet_mtime_ns": 1790433493504777396
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "ce637e046f34c4fb924101ec28883310ae533c5871c225cc53b8256d2f89cbdd",
+      "parquet_sha256": "fe88816e566199d2a6c4260fc4652d917836238dcaeb1683e6199c240c8e4b0a",
+      "sidecar_mtime_ns": 1790433493617132900,
+      "parquet_mtime_ns": 1790433493605329803
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "b29a9c5ff57c2cf86d6ebfd48dc2a178662c065c272f3f235c60a86dbbb4e1d6",
+      "parquet_sha256": "d6e81b383188dcb10094932e8a494b7f141ff7e30cbde9beebe1a5bdaef68484",
+      "sidecar_mtime_ns": 1790433493676989057,
+      "parquet_mtime_ns": 1790433493669683345
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "036766944bc4c982fdc250e21b811acb16dd1bd9d45ad4fe5931e3791f31d5d8",
+      "parquet_sha256": "1a114b70dcfc82972ac055bcdf710a18db6408702faa410e25493f0ce1e29d9e",
+      "sidecar_mtime_ns": 1790433493726019855,
+      "parquet_mtime_ns": 1790433493721970597
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "657c31d16a12aae32215cf2d2a1e958aaffcb43c97e192c94dcd3595966bac00",
+      "parquet_sha256": "cb7aaebd55a8daf07e21568c3dcbad9eea73e61e0a7ffc0de6cce50c40c5c0b6",
+      "sidecar_mtime_ns": 1790433494002327913,
+      "parquet_mtime_ns": 1790433493995473147
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "651f96ba217c3a5d2fa35fd3c2092d4b91e8acd7950fa034dc42bb2a2a075763",
+      "parquet_sha256": "66745f585199bdf553af8aca98a219ab310b8f908aadacfc7697703d2d74ea9f",
+      "sidecar_mtime_ns": 1790433494053804809,
+      "parquet_mtime_ns": 1790433494043740848
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "9d15c69ab29a112ebaee1f648df31a7398d0f4ac361163903daaf172f22c7cec",
+      "parquet_sha256": "2b75b37db286edda6925ed4003214aa5bd9b1a9da1b2196f513174743be26900",
+      "sidecar_mtime_ns": 1790433494108568583,
+      "parquet_mtime_ns": 1790433494104076508
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "02f434234a0bbaafd7c36ca4ace5ab18d30d9a880c7de69653dc41583de6274b",
+      "parquet_sha256": "c877468c070846f723a9f0d94a4967b14e13fe9bb151922923346e6de41e37f2",
+      "sidecar_mtime_ns": 1790433494197573919,
+      "parquet_mtime_ns": 1790433494192568810
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "13c42f7e7aa9608f8af1792df3ed4ee1e3ec2fcbfb6cba7d1b3adb3c265f9b2e",
+      "parquet_sha256": "f277a09dd72c15b044347a5e8d09c736a3c9caa83d9883cd9ced85ceaa4adf95",
+      "sidecar_mtime_ns": 1790433494276895446,
+      "parquet_mtime_ns": 1790433494264971604
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "a6fdcdb22cf6664369ac4642e0c4078d33e3bfcc85d18df82ea0ea98d644b31d",
+      "parquet_sha256": "1154c74edda3b50411c5d2f8c10dfc8e2a524607ba5996ec52646a28b1e485c5",
+      "sidecar_mtime_ns": 1790433494315481792,
+      "parquet_mtime_ns": 1790433494309217754
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "277b5f39a0073e827b6e769b8f4142f49fd4013ee4e48733f5e8f1c708de401b",
+      "parquet_sha256": "9147a73138760e0bf93c13f97ae1f9edc1386c8ae134914dcbf44b1aa8ba5573",
+      "sidecar_mtime_ns": 1790433494582279018,
+      "parquet_mtime_ns": 1790433494574694659
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "5ef88e3c2ddbfd9b62ed9195fb19d3f1d7aee69fe1e9b4eecc047415a5e99b3c",
+      "parquet_sha256": "d4fc444258a3000803f3799eb28bef56b4d847b2ba2bcd935cb9b9752a8ab128",
+      "sidecar_mtime_ns": 1790433494632759464,
+      "parquet_mtime_ns": 1790433494626985566
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "b6d313dc9970865356d68f3760694e6e0f65d4bc22d4c9486c701ccb3bddd901",
+      "parquet_sha256": "d220e1ecd8574afede0909b66012b276b8b2299e1abc48efe45c88a580e6bc7a",
+      "sidecar_mtime_ns": 1790433494673896985,
+      "parquet_mtime_ns": 1790433494671231716
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2b3867b037ea259f2aa68c0564429fd1a4ee32fe137ebdc9683b3415d430ff50",
+      "parquet_sha256": "3c04361c3be9e7aa6d664db3f88a54808c0fcc335980414613dac1a34d5db2fd",
+      "sidecar_mtime_ns": 1790433494783163235,
+      "parquet_mtime_ns": 1790433494771791150
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "98162f389d75f1a2bd26c47c7afd125fe6bdfbb67a77c057baf4451bddec3f17",
+      "parquet_sha256": "1694f875a8468e59991915bea15419361b3e3f815945aaf9a88e3e88be0d15ca",
+      "sidecar_mtime_ns": 1790433494850824131,
+      "parquet_mtime_ns": 1790433494840171567
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "4cb1728eea395372557adbb492c96d119912ad330263daef98ce1b3c07872710",
+      "parquet_sha256": "fb9946b57cfbbea14156aab8504551e2ea0b21c3c0af67c232d4720f6a1b4010",
+      "sidecar_mtime_ns": 1790433494896176254,
+      "parquet_mtime_ns": 1790433494888440094
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "dd410f3401e05d4b76e3c572844d6e7ea23cd70eb86843df40245dc563680414",
+      "parquet_sha256": "6f2733c229a8c735314449196763ff4b70b37ec17935a57f14092098ca1e7ca1",
+      "sidecar_mtime_ns": 1790433495186079555,
+      "parquet_mtime_ns": 1790433495170016703
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "ba1187b67e063053bcc69e2d425a4dfb78cdab3b8b18df8e4d674bb54976bdf8",
+      "parquet_sha256": "dad46f0a0150b22f766194648edf32b8abca7b4b9af7e17afce7d0dda323a492",
+      "sidecar_mtime_ns": 1790433495247971555,
+      "parquet_mtime_ns": 1790433495238401297
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "706459e53766c4029db46ec3fda8e4002873a2366970f13e498f477933cdca5f",
+      "parquet_sha256": "876a7ef9f5ba275f445b18afbab974a50d7abda5f95c7a8feada897911d567de",
+      "sidecar_mtime_ns": 1790433495297453828,
+      "parquet_mtime_ns": 1790433495294718024
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "eb477dfc3330f983f9a1ceae0f4c82eea400de98d895d24fe7fdfb0c2ccbb877",
+      "parquet_sha256": "8679c732751b3cc1b0d9befdb783ec91a2babf229591bbf968b5ce5dc668c651",
+      "sidecar_mtime_ns": 1790433495399881216,
+      "parquet_mtime_ns": 1790433495395283605
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "2864863aadd9e55b7990d0fe8f56621fda97dbca6f13817dc4d05b04c0a31e2f",
+      "parquet_sha256": "8cb9133a3bece41f4dac0eb16aca097f5b8822cf8ae74fcac764b7752815f2c1",
+      "sidecar_mtime_ns": 1790433495456774350,
+      "parquet_mtime_ns": 1790433495447577708
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "4310f427e3d4b46e3f5a47ae90c85c2d19ed4364e3017362a415c83bdb5118b2",
+      "parquet_sha256": "996f79512fd7ccdf0e18a2ea6156363270296b340a15b2392f8f8aa20b679032",
+      "sidecar_mtime_ns": 1790433495509188438,
+      "parquet_mtime_ns": 1790433495503894436
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "e80e1adc90fd8959de66df8e78a42924e7b774ff1e0414d3cf4cfa3a8ba3cbf6",
+      "parquet_sha256": "67888f11450fc4b77e5d5a10747e12a9127d97621db3e7b46c8f8efd3ff892ee",
+      "sidecar_mtime_ns": 1790433495769343797,
+      "parquet_mtime_ns": 1790433495757319700
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "3a1595251a0224ad911a380c0433273e006a85118d1f86ea872b96437d9db233",
+      "parquet_sha256": "a4af6d6eb91cf1c3c70be72d28b47aeb396e49a04e3e589a30c04aec491ddbab",
+      "sidecar_mtime_ns": 1790433495834532030,
+      "parquet_mtime_ns": 1790433495825704297
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "b6fc2c7d36e137cf67a22fe185ca924ade3ddffc65e3c5fac20ae8308c5e82bb",
+      "parquet_sha256": "6ef227d1b8ba52f1687468e7a47de4be3290f09a629a2ae04babc3ad21694846",
+      "sidecar_mtime_ns": 1790433495893641346,
+      "parquet_mtime_ns": 1790433495890066268
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "737fa7c72b6be5fd21d31afdc3709334a59e8034f274395d6b2a3b29b70565de",
+      "parquet_sha256": "3ab2c94c51f7fac4ce8702429fa4b57ab67633fb485610abcb5e6b6c9af83bab",
+      "sidecar_mtime_ns": 1790433496013566707,
+      "parquet_mtime_ns": 1790433496006722527
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "bcf50d0ecb3cc777a518a93f348ccd09ea69ad73ffa9ec3e8098138c80c6fae7",
+      "parquet_sha256": "4999d36a592f67021e3ccacc817a7091c325af1cd60eab0fb444f7edc008cc75",
+      "sidecar_mtime_ns": 1790433496086564558,
+      "parquet_mtime_ns": 1790433496079133620
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "487f28a202616c880f5d18393e8fd8754ea7b38cbf64582afdcbc5c1d25c470c",
+      "parquet_sha256": "8a749c1b2aee2078daa44bd6173fc33f50101dd27af3643d070ffd47c8d41fbe",
+      "sidecar_mtime_ns": 1790433496134602300,
+      "parquet_mtime_ns": 1790433496127407681
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "e1a0198552c231b0e4eb36e4ad9748a861d73a57935faae002696ffb02754885",
+      "parquet_sha256": "6ff36f6945a5e3a96570582380d0d65af3547860aa3620706e0b97ffe058cd84",
+      "sidecar_mtime_ns": 1790433496461387143,
+      "parquet_mtime_ns": 1790433496449234755
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "29edd629ade19584ad756c23b658f74a01165a2c2ede73e0728993803f958e60",
+      "parquet_sha256": "9eb220a915956b62c5986ac08de09af02d56fad084abcbf613665a25374c58c5",
+      "sidecar_mtime_ns": 1790433496526797196,
+      "parquet_mtime_ns": 1790433496521645848
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "dc774c5fed9379a5f961d52965d560e1fb6dd990e962f10d24441d62315348dc",
+      "parquet_sha256": "1a863e8c25668983d5978b84482ba34e5b20c2bf057f86615b58208d4b3665a6",
+      "sidecar_mtime_ns": 1790433496578290535,
+      "parquet_mtime_ns": 1790433496573942749
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "8cf96322e66b723a5c679ede976a2fe3ca11f224813c6540ce281349b6c670eb",
+      "parquet_sha256": "a0d12ae43dc942c7b676dad8f89055f2d7850e26decc46a79443d3c5f760830d",
+      "sidecar_mtime_ns": 1790433497605004986,
+      "parquet_mtime_ns": 1790433497593258319
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "582135c367aa97b061d0e6b7f675ee4b16afa73652e230bc2d35e99cb3c5775f",
+      "parquet_sha256": "1bffe9cf19bb0988e4cd2914ff1c1472c738cf0dae483b6569497a3196e0e2d6",
+      "sidecar_mtime_ns": 1790433497673403556,
+      "parquet_mtime_ns": 1790433497663926063
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "435da30184bfbf51820514f6494dc7f45f6fd48496ade76f9cc176b306814ddd",
+      "parquet_sha256": "b12173a8f0a81c95f8ad950c27f43cd908daa8e32da85f877b39a0b4a74d4508",
+      "sidecar_mtime_ns": 1790433497727436304,
+      "parquet_mtime_ns": 1790433497722815852
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "ae47ed4f2e2bc60641160124b59058ff23e3bc6ae9923246b3ea1a027ea5187c",
+      "parquet_sha256": "dacdd83ae227d1863e97f88ba9d4d16e6f9458793be5c95810a761bda0be7bae",
+      "sidecar_mtime_ns": 1790433497972314738,
+      "parquet_mtime_ns": 1790433497958374999
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "a64c28e9d282ac240cab8c1223c101fa7765d22100a76872de1b508ba52282e2",
+      "parquet_sha256": "77c4e425d0be8ae025f0496f8327673628b7263c3adc98830bf97e2e736592fb",
+      "sidecar_mtime_ns": 1790433498038159593,
+      "parquet_mtime_ns": 1790433498033061706
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "6715f160f0e4f2379ca027f56191ae02c2830122eab6677b7a91f674c9b06d29",
+      "parquet_sha256": "ff881187e6bb8923d9f76f71ab2974a0d4ef1193d9295c70d36d7f6fa494a3d0",
+      "sidecar_mtime_ns": 1790433498086857052,
+      "parquet_mtime_ns": 1790433498080321074
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "cf3f0a92789c4e211997ec8e1f2fd8de772a20a5bb60e54d2dae31be7f681742",
+      "parquet_sha256": "cad225c36c8fa49938688b2bc3d004d3a946e2763f0b29cb83adf63984f879a3",
+      "sidecar_mtime_ns": 1790433496734207611,
+      "parquet_mtime_ns": 1790433496726810609
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "1d77fb719b1059a6854a05733d02960a3c09b80b238283187c0575bc71f3eb0f",
+      "parquet_sha256": "b003a5aab25b498a4d0535814a219aa8c829b7dfdd291a3c6f25d0d3331ba2c9",
+      "sidecar_mtime_ns": 1790433496827770083,
+      "parquet_mtime_ns": 1790433496819335894
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "a6dd114d987e2370b6afe620efdce09ca754ff3e5ed50b97db3f8e6f178b72ae",
+      "parquet_sha256": "6c0b7bc5d50d40ba17e905d67cd3ba7a17ba773893d2530b86a43d884f606684",
+      "sidecar_mtime_ns": 1790433496920010739,
+      "parquet_mtime_ns": 1790433496911861178
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "3e90809e025ed68d23e11a8c999497bae627c533ebef9bc3c9cb3da805b6601c",
+      "parquet_sha256": "579c5a11ccc97c5e57f64afc83a20673b987c3db98ffbbf65301afd7a7b91122",
+      "sidecar_mtime_ns": 1790433497317793294,
+      "parquet_mtime_ns": 1790433497298809383
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "73f1106332e1f190e2f0f079af66fc728421d1400c14e58b5354e4aa2a0f6830",
+      "parquet_sha256": "d694e39b6611783f650ce09d7cf56b8b372052af03c4131028d8448a05bd7d1e",
+      "sidecar_mtime_ns": 1790433497421941528,
+      "parquet_mtime_ns": 1790433497412662972
+    },
+    {
+      "sidecar": "DANMINI_DOORBELL_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "02c99852e82a1ec6a7a8b2d3017f3968ff17879e87f277333889fae678d80de8",
+      "parquet_sha256": "c7730294665f169cbe11f793de23200b76740ab732b10047e1bb8b302f5491b3",
+      "sidecar_mtime_ns": 1790433497500239002,
+      "parquet_mtime_ns": 1790433497495108675
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "17a98dcdcb1f207a78a42fa18bdd7cc7663f3d1bdcb2e90933ca5400ef5c3cad",
+      "parquet_sha256": "cb5e02ab45020a1f45f115dd4d6a2f1cfeca2b26c88f5e5bc7125b583dd64f4e",
+      "sidecar_mtime_ns": 1790433498182000620,
+      "parquet_mtime_ns": 1790433498174839810
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "fd4c18e9a5fbcc03a0c87570349194c01783ff03f6a43b2c10839b08e1ba6267",
+      "parquet_sha256": "d4d159f0c1342dbc40000ab1dc874a81e7ce9edf90a4e932ab1dff068a107ecd",
+      "sidecar_mtime_ns": 1790433498238288632,
+      "parquet_mtime_ns": 1790433498229975739
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "31929cbf25b0d9465bae047402b343147bf0786f8b674303855d3c298c292206",
+      "parquet_sha256": "645aa52afda997fd19efe6c2bc7841e0843200e030d67ebcc65722919314fc71",
+      "sidecar_mtime_ns": 1790433498276313715,
+      "parquet_mtime_ns": 1790433498269358546
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f7124af91849b5841fa38bdf3c84cde3af86fc10b908eb0515ad19a5ee83c538",
+      "parquet_sha256": "295dabe0aa71a4f828a81e906136580614383129985e951d18d58367bd311bbd",
+      "sidecar_mtime_ns": 1790433498488587728,
+      "parquet_mtime_ns": 1790433498482025703
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "3fd970f355c1717049240685c6c5acdbbddcde97e7c787e3f0bfc8fa80606108",
+      "parquet_sha256": "4d1217ec406f63ff5c73bd63863f2a09155c9f613c4f8afb61e2739b18faec3c",
+      "sidecar_mtime_ns": 1790433498545552998,
+      "parquet_mtime_ns": 1790433498537161632
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "a80de8af6832e46abd359a65e7d70a51090d4e119d41d23e7c3c9bcda9387cf4",
+      "parquet_sha256": "96ed94f860167e38808b21751f08bcf92abaefe523d532df765fca836df24a28",
+      "sidecar_mtime_ns": 1790433498584408163,
+      "parquet_mtime_ns": 1790433498576544436
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "1b375314b6c236417bd4ac555ede57d52cd201f637d1e05507f8ec375ac9ac20",
+      "parquet_sha256": "be6792f5e3a2cbad3196dbb4f8235113525607bf5d9c4235dd9dbfd4fad10857",
+      "sidecar_mtime_ns": 1790433498635430082,
+      "parquet_mtime_ns": 1790433498623803804
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "8db2868d40ee78d2bfc848c9d6428230bc2b1db4db489fb1e88dc052e8a6508b",
+      "parquet_sha256": "e627e1d86cd3542f10b7d15ffc8524b4e7efc90eb9aa4e97e2122879f1b98ba4",
+      "sidecar_mtime_ns": 1790433498719019683,
+      "parquet_mtime_ns": 1790433498714384261
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "b30d2a48dba8be0877a40387dad51f03022e63d3a611b3920da8bd7831c462e6",
+      "parquet_sha256": "d34b7a3099e47a6e15e19ba9259fcf7b36ca859ea904be0c5f07ded455b8a1ef",
+      "sidecar_mtime_ns": 1790433498777150951,
+      "parquet_mtime_ns": 1790433498769520190
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "1ea670718f5168fed5e0a960a43814402eb5afaee85938bf98f5bf67a5051526",
+      "parquet_sha256": "a96f907bd0c80788e5fba164f4d5b7c3eac81656ede8b107a3f86c57395699bf",
+      "sidecar_mtime_ns": 1790433498827713722,
+      "parquet_mtime_ns": 1790433498820717837
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "7d54c0f29fc6ae65fe56ce61ded77c8d5c3aece1728bae99ac798f2eb64aa7d5",
+      "parquet_sha256": "37637843eab1ff93c06930cff9f0ebe0d1d6f88bb84bcd07547c014ff70e1013",
+      "sidecar_mtime_ns": 1790433498895094605,
+      "parquet_mtime_ns": 1790433498883730328
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "ad201d4ddcf72d3c9f686932cf2f5200c2243a6309ad1fc62a73d86af89adc18",
+      "parquet_sha256": "f8a69affd790fa9428c2ccae3365c75669c435134b40338b5caa51e21487a060",
+      "sidecar_mtime_ns": 1790433498950273215,
+      "parquet_mtime_ns": 1790433498942789517
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "7bbdd0d95f1dbc121f895b81d26a62ca42d0df720f88592e9897951da5233ab5",
+      "parquet_sha256": "a572229ac0e253af4792f115f0d126240a4553cc6875e9d3b21089464a66e056",
+      "sidecar_mtime_ns": 1790433499050983765,
+      "parquet_mtime_ns": 1790433499041321218
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "afc2bcf040613173c2fa34f19cf7a6f2109a289dcfe68a534062184b5902f59f",
+      "parquet_sha256": "908d1e2b3b00036f9830b7053256d774b890e311597c198964b5ac7046db0ec1",
+      "sidecar_mtime_ns": 1790433499102396055,
+      "parquet_mtime_ns": 1790433499096591530
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "58f3f833fae9d2251092a820c624fe0b0c9abbff7d2018da4cfd91bffc064131",
+      "parquet_sha256": "49fab30a8b1f0f7a6229779f5b6d398d209d9176b497752d73aef0cd96e7792f",
+      "sidecar_mtime_ns": 1790433499152044882,
+      "parquet_mtime_ns": 1790433499143966080
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "b4e4accdf051cb1152de84ccd7396903c21e8dd20e45fe21bfb910b62ca14173",
+      "parquet_sha256": "770a86ed5b2302bff730e4cc366cc4289bd147d6f070769455c8323f3b891575",
+      "sidecar_mtime_ns": 1790433499396275475,
+      "parquet_mtime_ns": 1790433499384786726
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "063535d81967aa5baf9998980f55ee6ebbfbcc81ecc9060084dc726f7d323d38",
+      "parquet_sha256": "239e226c3f1953c39fd01ae65c6e0894a65c8bf3cb5747fa892fd39549ff648d",
+      "sidecar_mtime_ns": 1790433499447568302,
+      "parquet_mtime_ns": 1790433499440057038
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "dd025f92621fa717c04b1fc3f984f71efbacbff53dac5673a4950f66d323bb82",
+      "parquet_sha256": "c1686effd5170be7625ee0af8df6a69267b97a0fe692c01a4ce7adb65f27b12d",
+      "sidecar_mtime_ns": 1790433499491552327,
+      "parquet_mtime_ns": 1790433499483483711
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "eeef0f2aef32e17b1480878cc4cdc109c3ccf366c9344a7af703df1673ba183a",
+      "parquet_sha256": "d5e5a81d8260693b454639929e3593c8851c36ce84955aa734341f342548d75a",
+      "sidecar_mtime_ns": 1790433499583121609,
+      "parquet_mtime_ns": 1790433499574284937
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "82415435ecbe3852b41917deef184aa4db2441a08ddeb71d6e325d31cfe7fce4",
+      "parquet_sha256": "671aff86a92ff3b8ec005dd0eb44ea86c81f5fbb45eb5d7cdd95de3b14e266ad",
+      "sidecar_mtime_ns": 1790433499632959557,
+      "parquet_mtime_ns": 1790433499625607367
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "0699fa6e28846aa28216291c480b846bb0785bdba658bde72a7b4d6d6fe9bc16",
+      "parquet_sha256": "2f875c20b43eea87945e107a6f754a205e2d729d1631fb3f2a2ebf82f1983880",
+      "sidecar_mtime_ns": 1790433499681042705,
+      "parquet_mtime_ns": 1790433499672981922
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "e7e2d20335c2eb447227de93e5738f192721ddbd9ba5d7e58c794517a6de9fdd",
+      "parquet_sha256": "3638e7036ed63609c888778c5edc054b339c07a855ea26cab0b27f1edc5e0222",
+      "sidecar_mtime_ns": 1790433499885461457,
+      "parquet_mtime_ns": 1790433499878271650
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "87f9afbc5c44d3a3a4409b870244fb5ae5a12d5cfc2aab7aca951db31f9ed135",
+      "parquet_sha256": "4a36b37037d684169f4f675537837123ca3f583057618ccf0bb88d18a38f90ba",
+      "sidecar_mtime_ns": 1790433499931408265,
+      "parquet_mtime_ns": 1790433499925646203
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d083bcc533081ba3cdd010215fd9aa9b765864470f213d57ebbe2004724777f0",
+      "parquet_sha256": "473f5bdc6868cf6c10fbada683df0fa43c17e90154af88db6e543d032bf59427",
+      "sidecar_mtime_ns": 1790433499970650851,
+      "parquet_mtime_ns": 1790433499965124997
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "207ff679eead0c78a5a0fa4b3e1c6be16ce281b87c74e2046a0cfe3060a290cc",
+      "parquet_sha256": "b864f79448e40e723b6f3400d4dee6bcab7d442cd1cdc3bed3a377d5e2a2163e",
+      "sidecar_mtime_ns": 1790433500068094211,
+      "parquet_mtime_ns": 1790433500060009046
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "aa521fb5b6f3d111575b2e13019e13e6a67590cf4b5d63d2e437b2e8d392d0d3",
+      "parquet_sha256": "2ac6f9318e3f1af65803882707d5e4097d48e2ab8143abc780963f6dd4570fb2",
+      "sidecar_mtime_ns": 1790433500114517955,
+      "parquet_mtime_ns": 1790433500107496560
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "114006f139e1de4b86334a24128712eccd0d0b38939735e6113e71637c5f3993",
+      "parquet_sha256": "0fe5679ee24007f5fdefaeba9f912581407f111fe201daad6d215314bcb53cdb",
+      "sidecar_mtime_ns": 1790433500164565869,
+      "parquet_mtime_ns": 1790433500158941364
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "b84fc3b652e2dbc5a14769c1ca035f6aa77cda58206f05770937c950836668f8",
+      "parquet_sha256": "94dfe30d7aa8da3cd57048346321d07e2df46347caebbd6eda5f7d5d54f2f4ab",
+      "sidecar_mtime_ns": 1790433500476757885,
+      "parquet_mtime_ns": 1790433500467610190
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "e11ec9fd78eb0dd9c78f7e043f83c96b1f095920e7cf1a47a746165e72088afd",
+      "parquet_sha256": "dbc475e06adf1548671ca10e7beb0f5b78f6a6e2eb6462381324219ed12ee3ae",
+      "sidecar_mtime_ns": 1790433500529450563,
+      "parquet_mtime_ns": 1790433500526969578
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "703eec5dae4a9269fa2c1634bcc1e1c22ded216e9659471c9b32e1574bcbe2e5",
+      "parquet_sha256": "a508c06fbf76312e877247058527b4cf3004adc229f8958abe4e9285f24d1075",
+      "sidecar_mtime_ns": 1790433500569239931,
+      "parquet_mtime_ns": 1790433500566542506
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "56ee5206a5db256ff7b8dd44950c240ba88d897f8c97d4644877d502ad26c53a",
+      "parquet_sha256": "48645b564272061df6a693b8c4642ff68f15e6266d279db146b6d9af89e2633e",
+      "sidecar_mtime_ns": 1790433500667228273,
+      "parquet_mtime_ns": 1790433500661517529
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "a1ba9a4ee27c16a0a8087f1d9c77f3ac468f0ffa25f04881b7b22670dce99bd5",
+      "parquet_sha256": "46b5067742a3908b58d2b5d16cc32f693867a1ccc6cbccb8078f71e17e47bd92",
+      "sidecar_mtime_ns": 1790433500737796448,
+      "parquet_mtime_ns": 1790433500732748796
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "2347ba310d0017d415fbc3e6ef6121bd972f7a0fc1a11cd613b2ff91444d0b49",
+      "parquet_sha256": "957571a90292300f12adb6b9fe9f0797fb8ccce1ae23fc22efcb405163af3b0a",
+      "sidecar_mtime_ns": 1790433500795606596,
+      "parquet_mtime_ns": 1790433500788150893
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "71c360436455600cd545b2d1c0dc84931bd1cf1c590b1ffb1db9df1f72fc53b3",
+      "parquet_sha256": "7cf7c7304c21bfc3af805be9353da7b51b9e013e2cae9f2ac9bcad8d5c5ade25",
+      "sidecar_mtime_ns": 1790433501060825125,
+      "parquet_mtime_ns": 1790433501049428061
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "458ee5fd9a612e50923849e277c1f402e1717a39848240a4ace51325a0fdcc94",
+      "parquet_sha256": "2401abf351b1dc732abffd1fa9c1e865e37b021d5b9c9f8ff1691eb864d4a75d",
+      "sidecar_mtime_ns": 1790433501122470613,
+      "parquet_mtime_ns": 1790433501116842058
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "4f88fae3e3978c92bfd0468d83496647149f48211452a1f0f9e9316c3c7a6032",
+      "parquet_sha256": "920aa7ef776a82a0f19be4f62b78ba45ad951fc1b9241aa96aab7b03d64db74d",
+      "sidecar_mtime_ns": 1790433501169822484,
+      "parquet_mtime_ns": 1790433501164428409
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "bb640d6181795678a19b5feea112c2489999ac88452524ade47fbe2ef6a588ff",
+      "parquet_sha256": "fea8978931dfe5d6177cc7d8f91cb0e1126883f6733d5e5eb010a9f73611e0db",
+      "sidecar_mtime_ns": 1790433501314359323,
+      "parquet_mtime_ns": 1790433501307187462
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "45fa2b6d346337768e944e01c088a81e6f9a3b448a01f836a81108fc8c435dc6",
+      "parquet_sha256": "25b2dc768a4b2f481c8715a4f8f2ba3ef5226a62406c1d08c296f7184590d5b6",
+      "sidecar_mtime_ns": 1790433501409899213,
+      "parquet_mtime_ns": 1790433501406325693
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "84753bd8a2b1b006475ff235a49e4403decbf8c47616146e20a1020835370912",
+      "parquet_sha256": "8ec6ae14170026c19209df85c201fc293df1171916f47b2d8d6bbfb1a36bcfff",
+      "sidecar_mtime_ns": 1790433501479891784,
+      "parquet_mtime_ns": 1790433501473739690
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "a382bd768e8b31d993ce08c28466e423eb5bf4cdc135987fe0606c25e00a2764",
+      "parquet_sha256": "596eb8b6159efb14488f64600e474337e17d9bfef96871f83601fdbbe3f15a84",
+      "sidecar_mtime_ns": 1790433501836711745,
+      "parquet_mtime_ns": 1790433501822706263
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "c9cc7af7614c3d1e419f23e9c9195204f37d702c66b618426690ee6721e58fea",
+      "parquet_sha256": "a99347ea78340f3121098be171c0b01093504ca5e629a8a0da2dc4da4b3fa65c",
+      "sidecar_mtime_ns": 1790433501910839307,
+      "parquet_mtime_ns": 1790433501905982378
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "49bdfa2dabc512562c11886f02c8097fd3bdedca65b9ed005f3e8ae12453c380",
+      "parquet_sha256": "8c731622c43d7f72166cecb99e26f04ea0f2abbf5122591c5b101df9382dd06b",
+      "sidecar_mtime_ns": 1790433501971336802,
+      "parquet_mtime_ns": 1790433501965465316
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "4260ae03776b3cbad51d3db942d348ea2008874d4d305fd777dbe9a419295e84",
+      "parquet_sha256": "5477e411a871dd59faec8dfa921f553c39f8a391682766edf50c9dc73b6b61ff",
+      "sidecar_mtime_ns": 1790433502077945129,
+      "parquet_mtime_ns": 1790433502072660471
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f905092f74fdcd7aa4305095531fee2281d6ccc0c125ef4ceb10c1845332261f",
+      "parquet_sha256": "a1443f28e8dcdf3e8bddd44787b7b0c3d150605b44027d5a1de122aae3acac76",
+      "sidecar_mtime_ns": 1790433502148002423,
+      "parquet_mtime_ns": 1790433502140196990
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "9d8ce7e8ad2a81a6167ae16365125d92fe7df5f67b7faf6faec23d4daa0dfded",
+      "parquet_sha256": "c84265119abc673a2e2d61eea620e5e394f238ec8e64d69d4ea1dab186fc6e76",
+      "sidecar_mtime_ns": 1790433502198244922,
+      "parquet_mtime_ns": 1790433502191842559
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "27fbd15941935830266367516f097eabf2095054470facf17e7e0f842861697b",
+      "parquet_sha256": "07a7bfbd48d84d755166c3e697d8bd77edc8e82d7f4a41140e66b7196ae9d7f3",
+      "sidecar_mtime_ns": 1790433502409261083,
+      "parquet_mtime_ns": 1790433502402397581
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "176ee51a842e498e299d8cd690db44c1ddf676403d1afbca8c41510f860e2e4f",
+      "parquet_sha256": "65cb29dc09d19e61f8664d862b525fd5e46c3e087082ebfb81d3e1464ed2bd31",
+      "sidecar_mtime_ns": 1790433502470709671,
+      "parquet_mtime_ns": 1790433502465961362
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "862881f0dc54bc057c9fe17f0811a65b5c38388bc121e7a52afa3d4f2a6d88fb",
+      "parquet_sha256": "1166228285349f3d5b7fb692eeebcdbd5de2f1ecc3a0324269aea2756e328e5c",
+      "sidecar_mtime_ns": 1790433502521927345,
+      "parquet_mtime_ns": 1790433502517606931
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "fa1e4dbaadec1b35f71fca816618b9b5ba5161e1174d2e4eb98b2b0e38e36288",
+      "parquet_sha256": "32d5e42355caf5159b88e9a6b36efbf4e80498a8ddd87266b2a12a1ac9dbeb34",
+      "sidecar_mtime_ns": 1790433502639071105,
+      "parquet_mtime_ns": 1790433502632816285
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "821b1fb6d1df2ba6a7c4dc566e720aca2cfcb821da980c47e8cadd9761237cdb",
+      "parquet_sha256": "44dab58066fe71f7513d0477acb5ecead0e4aeaa40db520c0441aef62c3ef7f2",
+      "sidecar_mtime_ns": 1790433502708938530,
+      "parquet_mtime_ns": 1790433502700352800
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "2fc8a3d07b69658cf3e660a93abc31c5f525a5cab0dab170b58815805f8bdad7",
+      "parquet_sha256": "c75ddf9308e2716c29e248f71c156730fc7877993b5a4edc3513aff1e46c7522",
+      "sidecar_mtime_ns": 1790433502767977762,
+      "parquet_mtime_ns": 1790433502759943846
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "8459b53d4344c8d053d665492c1def92a179af2081cdcf5932a4f398d6fa5248",
+      "parquet_sha256": "f5c904732b63f610ab47d825c1db2b62f7447b59585ed01948a8ad8fe62c1b4f",
+      "sidecar_mtime_ns": 1790433503065301544,
+      "parquet_mtime_ns": 1790433503054006721
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "724a28846fc5c863f84faed20e6a5c065f38458f503d241658932c9c1108e2e6",
+      "parquet_sha256": "79b9d514111f9d664fd1c20370da2b8bc4318fdd0611362a8d8fa5a4a877d611",
+      "sidecar_mtime_ns": 1790433503138478822,
+      "parquet_mtime_ns": 1790433503133587569
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "a18b6d19e4033a88e57810f0eaff38eb78e46654ca2b8bbd23128efdf7827fb8",
+      "parquet_sha256": "bac9bbff14083867559ba3842eadbb4989eacf93997c561ab6eaef7073a8a5c2",
+      "sidecar_mtime_ns": 1790433503211806831,
+      "parquet_mtime_ns": 1790433503205210332
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "36547d8202cc13df1e78784ec2268d25a7fe2752a1dc0a5e11abca26ecba8b41",
+      "parquet_sha256": "5892d9847e43b9754cfd701873573f39223352d5f0ee7d9df9e29653632b9a62",
+      "sidecar_mtime_ns": 1790433504106486731,
+      "parquet_mtime_ns": 1790433504096645127
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "a2990127cc6155ac5cb5d8379f7ab44dd20a5d48977cd8e38d0b32356d072ebd",
+      "parquet_sha256": "fb16b45c534bdc85439a206c6778b7309fb7509f23bc747a84b696d1a5c72107",
+      "sidecar_mtime_ns": 1790433504178348026,
+      "parquet_mtime_ns": 1790433504168367212
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "8efe43ebb04524d35ef85a82e611b017cc0c11a6a2568f71b07d3818f80526b8",
+      "parquet_sha256": "cbad4c25f2c677da628a94fd57382ff88ccef88f88a6685000edea34b11da27d",
+      "sidecar_mtime_ns": 1790433504240499446,
+      "parquet_mtime_ns": 1790433504232120176
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "e54dc19e573126fec549a974e1b581f612aeee46676b1b3d1c0d4f8e61e7e00a",
+      "parquet_sha256": "cf52b105349a8d6271ec2478a9b140feea440e55dbf285eaab94777fda18c90a",
+      "sidecar_mtime_ns": 1790433504592968294,
+      "parquet_mtime_ns": 1790433504578776920
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "b4cac811462ad49259276e02d329fb373b8d2dfac49c8d2b71f9d0e673895851",
+      "parquet_sha256": "6ea2595e07d3f8bd30d882797bb7723e456e58b2c5b06e9ffeba671b1de0b4eb",
+      "sidecar_mtime_ns": 1790433504672128783,
+      "parquet_mtime_ns": 1790433504666437246
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "5f29565b7a07fcd1705eaec9342b9a2394f2ef1e11de263fa605c5c77ef111cd",
+      "parquet_sha256": "8af1d0f63526d2775f770de59805b0b722cdcad155af066109a1d2364a23b5bb",
+      "sidecar_mtime_ns": 1790433504745856124,
+      "parquet_mtime_ns": 1790433504738159332
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "55c585b1ce839bffdd4a3861d1536be571044a04d5413cd9198da983fb09277e",
+      "parquet_sha256": "64c03fc8727c9daf1e97a34a20c84b1579d661599301f0bd0882695161376837",
+      "sidecar_mtime_ns": 1790433503328394986,
+      "parquet_mtime_ns": 1790433503320602564
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "6c20e6b1cedb3b1cb30918b1693e18601d364df6a1404e5b841a0d7cbfad462e",
+      "parquet_sha256": "9a51815c090c1fb168a18d7b1423a69215c6a9ceb0c694ff8c0aa8559e377da3",
+      "sidecar_mtime_ns": 1790433503407714463,
+      "parquet_mtime_ns": 1790433503400183409
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "586663eed081e196314f5baee22238626c09a78f5c637c50237bec7cbd3e03de",
+      "parquet_sha256": "f7ac163d416143e53d45a442ce171a5a6a47c28c6cc57e2d2853a9bb6ee79450",
+      "sidecar_mtime_ns": 1790433503477817248,
+      "parquet_mtime_ns": 1790433503467827131
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "c6d1ef9d68853850186bd011c0cd1b858812741e6d6e5a9d2c347c50f96b2fe4",
+      "parquet_sha256": "8913e7314dcfa472e3ef7fac24e98bd269c0f013990b80574196e94f130857c3",
+      "sidecar_mtime_ns": 1790433503825831780,
+      "parquet_mtime_ns": 1790433503814003819
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "a2f8369e22f678868a68954906725749db8817cff7fc3c1da6f39db9038fe280",
+      "parquet_sha256": "f7a76ffdd958268d364747eb38bae0e9841a816442bb3f30de92327b21bb4c32",
+      "sidecar_mtime_ns": 1790433503915855541,
+      "parquet_mtime_ns": 1790433503909500837
+    },
+    {
+      "sidecar": "ECOBEE_THERMOSTAT_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "827a66410da38f9394b6884a40ca3adabe443b93cd49c78ad19c7f704f6df72c",
+      "parquet_sha256": "82e96dc4dc3b64934a4ee6ef3483da09b8c2bd61d77c5e666db259906317283c",
+      "sidecar_mtime_ns": 1790433503983984883,
+      "parquet_mtime_ns": 1790433503977144557
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "4e5125383abe8a4e594087c5d33c9d205442e408e47a39f63decb9e06e68a839",
+      "parquet_sha256": "cd50de8ce33a5d652b07622ca548ae6fed7a9d9419e6e35c1f609dac94e767fa",
+      "sidecar_mtime_ns": 1790433504848478325,
+      "parquet_mtime_ns": 1790433504837773339
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "ed119b5677dc49a0b54a812dff912f5c61f57a8a68e635c302e5e9e01ecee920",
+      "parquet_sha256": "1b2fc2d19cfe6a739da99443df24a36c686b42b9e282851a02a62ac1c7fb4120",
+      "sidecar_mtime_ns": 1790433504909206479,
+      "parquet_mtime_ns": 1790433504901526303
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "d05c5a9aae179480a279bff5ba546f184ef36b85f89abdcd19047071a544a4ef",
+      "parquet_sha256": "a244d00f6774808a4de1b33d46b626530e28b5f945962afc99d72531704a135d",
+      "sidecar_mtime_ns": 1790433504951954103,
+      "parquet_mtime_ns": 1790433504945356466
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "0ba98c907966e48d849028e66f5464b040e877680cc7562a63e2d0eb9574d27e",
+      "parquet_sha256": "61111a43f3cf9a3e030f78aa33657d72fc060a48d68522050d904f23055a008e",
+      "sidecar_mtime_ns": 1790433505199361514,
+      "parquet_mtime_ns": 1790433505184649583
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "18ea46407c7a65d82aaa9dbdb92a4c7e009a7f65ecee78c488251354f1b5609a",
+      "parquet_sha256": "3f1e4f3bec9ba9426f48131e3af2a432995d3bae3157c4ba55f32d2784187f52",
+      "sidecar_mtime_ns": 1790433505273697359,
+      "parquet_mtime_ns": 1790433505264437354
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "a07ddf5a3128c5e50b1150ddb7ba7b85e633d6e191e1131bd1d79b73505779d1",
+      "parquet_sha256": "250b6cf952bc50cd259aa329841686c50054c6050066497e19ae3c6f185b1941",
+      "sidecar_mtime_ns": 1790433505318406874,
+      "parquet_mtime_ns": 1790433505312310013
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "83de1f93e3a6b28348d6b3075578f7e1129d63b28f2e3618cf3b9c067062bbdf",
+      "parquet_sha256": "ff71b63d6c2a93d5f2a92e873c4a0a554f1d287588b37950028bad2517a24920",
+      "sidecar_mtime_ns": 1790433505354091676,
+      "parquet_mtime_ns": 1790433505348214511
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "bd363a526419e0fd79272bd92fb3fcdf3618acb3f281c09e94d04245dc8c0e7d",
+      "parquet_sha256": "882a61f811ae51d72698b24be3ca63a5c27eedbe0e6fd68dac8dec1889b41434",
+      "sidecar_mtime_ns": 1790433505438919056,
+      "parquet_mtime_ns": 1790433505428002277
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "32e1400836b983010f692d5c94812c6f5265b4e672e2cf32f25d36f356480570",
+      "parquet_sha256": "044b3f6194cc336da0aa023271d76eb368a3297312d7fded82b80794f0ca8627",
+      "sidecar_mtime_ns": 1790433505502609849,
+      "parquet_mtime_ns": 1790433505495821882
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "e42f73bb0d9de6a73a230dd3ae9da34abdf684122c1db97dca6c49aa705ca4a9",
+      "parquet_sha256": "f4fa549c7db25b28adc8b5b61afcde378d861dbcb13508071f252af319fd88b5",
+      "sidecar_mtime_ns": 1790433505569503929,
+      "parquet_mtime_ns": 1790433505559652097
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "8144342ac4214a17a9cc9fa21944deaa606988100f3da90536ef5d84c5847395",
+      "parquet_sha256": "750fcf55d41e3bc208814ed7477d1a77ba761d13dc185cab49b9b0abb6d0fd17",
+      "sidecar_mtime_ns": 1790433505640616334,
+      "parquet_mtime_ns": 1790433505627471697
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "d1972f4226e39282f22ac9e87270d06d5ef4d88aa3016c9d8cf51726e30c1f77",
+      "parquet_sha256": "635c199a66c5c13d4aaf627aeb0c749bdcf616fdb1adccb4ab8e1a0946befd51",
+      "sidecar_mtime_ns": 1790433505711444973,
+      "parquet_mtime_ns": 1790433505703270079
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "a29ff9350a7b4bc7c3ec2b9458549c7c3beda0cbdda59a3bedb37d6af225d3cf",
+      "parquet_sha256": "99ee56287c4a2d8c1ded3df44e56fbb95e7b9a594af81c5bc0f3969ba9d1422b",
+      "sidecar_mtime_ns": 1790433505831422813,
+      "parquet_mtime_ns": 1790433505826941118
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f0071b77ed34ea42cb77a8b3da0c460fd3b74e1e1f129a926c32dd377a3a31dc",
+      "parquet_sha256": "da48f16e3d568e3c4daff102a8e2be1aa818ad6b21dda960a0d1661068126689",
+      "sidecar_mtime_ns": 1790433505883021498,
+      "parquet_mtime_ns": 1790433505878803169
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "408b45a6de36b03ec382ad5b3dd5b79e37c489caec1fea0b12346d7b4763a0c1",
+      "parquet_sha256": "b627c5de05d3098b8bb7fc1d2faf8d0bfe15a9f63c142dd59a1110dff4c675ec",
+      "sidecar_mtime_ns": 1790433505925262549,
+      "parquet_mtime_ns": 1790433505922686440
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "0a58b54ddc012e9b567738967b8bcdf4bd2d8c7a0198fea0d6c97a753de01bff",
+      "parquet_sha256": "6fcb8613a72f82a2d8025ef40d3cc9d1468931506c88c6705104c682fd0794d4",
+      "sidecar_mtime_ns": 1790433506149753754,
+      "parquet_mtime_ns": 1790433506138256201
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "0b4fc29b798c8f0317cfbd3d8151089c7a33ccdfd32f6276bbac72dc20d68000",
+      "parquet_sha256": "14796181485472dd83a0de82f0fb8a51904652705de96e2c3d251eea6baea049",
+      "sidecar_mtime_ns": 1790433506208545177,
+      "parquet_mtime_ns": 1790433506202154009
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "c330de0bd0c0dc9ede0df2ef182374e899976c020d73ee61a9f8c282fa0fa435",
+      "parquet_sha256": "dc6ba4cb8974ff14d50f7c1477711284c54ccdcae0f7fcc17e9152301eab62d7",
+      "sidecar_mtime_ns": 1790433506250177927,
+      "parquet_mtime_ns": 1790433506246083753
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "41f98463d8a1cd5e106063593bd4b337df5803a9a605fe258a21cf66c6c069c7",
+      "parquet_sha256": "a8ba4c8e9f802662044fe2ff324d54fe2f5f0a096049fd9b3a54c9d014fe35d6",
+      "sidecar_mtime_ns": 1790433506358812163,
+      "parquet_mtime_ns": 1790433506353911305
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "9652d7f4d65735cc2f29cea8c7e617e8df539dbb726685aa83f530c305a7d0d3",
+      "parquet_sha256": "29da0433495ff749ff9897599ccc7ab02b6a2ce0bca376e96177cb3e60c8b6b9",
+      "sidecar_mtime_ns": 1790433506419006688,
+      "parquet_mtime_ns": 1790433506413815501
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "7985218f461751e1458918d3d897c14334043b943e44a4058982cafb86dc3ede",
+      "parquet_sha256": "b8f74157668d8dfe8bf2fa8ac4265032468c380b69dcf7115d7d920e4a49ed11",
+      "sidecar_mtime_ns": 1790433506459414710,
+      "parquet_mtime_ns": 1790433506453751631
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "818187684ddc3133c68dab736c148b73779f6306a8eea33c357043895d8f7908",
+      "parquet_sha256": "c0e0276c64889427cf29a11737625359d0b44767d19f9cbb9b14991befe40615",
+      "sidecar_mtime_ns": 1790433506639798897,
+      "parquet_mtime_ns": 1790433506633464217
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "0a1b7fca19f2dd5ea95c2937fa4019eb6e6b78294f4ae0f0ad5dc7dfbd9f4e06",
+      "parquet_sha256": "2e0e8d11a7cf40facc0b6db7f5e0d32947b108522bcf78a426a26180656d18bc",
+      "sidecar_mtime_ns": 1790433506698653027,
+      "parquet_mtime_ns": 1790433506693368414
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "100aa2d643a32d08ee6bd9aedb89f9a0d097f24caab0c7fbf95709f3081645ee",
+      "parquet_sha256": "1c614b8c4b68b3337fbac5231b0987e144b8332e767a6a55dbe02f535ee30d49",
+      "sidecar_mtime_ns": 1790433506743220653,
+      "parquet_mtime_ns": 1790433506737298155
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "d137bd53cb75da2b16e9441c1ccc3d1c601c690b7f9cf9b78194092993a23d0a",
+      "parquet_sha256": "279abd3f902cdee5154303bdee97d39f45eb4959ac9af1d3edb27dcf2221472b",
+      "sidecar_mtime_ns": 1790433506851665742,
+      "parquet_mtime_ns": 1790433506845125710
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "e21a2f5f5e4d3ed82598c2df10b696d88435d6727bba67a02a353f035bf5baa5",
+      "parquet_sha256": "6f095a4a20283e4023d14fc87312d9f612c540e66a101a365a8df9bdb951a7de",
+      "sidecar_mtime_ns": 1790433506908442154,
+      "parquet_mtime_ns": 1790433506901036383
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "d74613fcd81c195f5ee0c04da6337b14a90ad6cc42cb9e4f0ff232b38d01db13",
+      "parquet_sha256": "d156b1c063f39bf839a2bd1b376a71712f9438e9db7381f91d2c48ac534d2ea1",
+      "sidecar_mtime_ns": 1790433506965583043,
+      "parquet_mtime_ns": 1790433506960953951
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f22a4c4438657ca37c68e219f4282bffcb5c5ab62f285e96e3ca37e5345286f7",
+      "parquet_sha256": "290bed760612eb6c9004648a18c0f2875453779365db593ecb1b552c08d909c6",
+      "sidecar_mtime_ns": 1790433507277085105,
+      "parquet_mtime_ns": 1790433507264778056
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "2310ff0af1e8062a4fe32f4be466c5e2b39b6738b3ca38dbf120634d08ff86df",
+      "parquet_sha256": "bedc12ae729b5d35dca8cd5e7964e0a03b20a066f2ea92a65d118720267307c0",
+      "sidecar_mtime_ns": 1790433507350030604,
+      "parquet_mtime_ns": 1790433507344742078
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "4f38866525aca8abfae8cc22f19c44fdffa0be10f891f7bccc8b81c0bc9682be",
+      "parquet_sha256": "a21883643eddb4d3ea63668a21842bc75b37da92e749987ce4a77d1a1939c2ff",
+      "sidecar_mtime_ns": 1790433507397542053,
+      "parquet_mtime_ns": 1790433507392720489
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "90552411bb0ed18e29d460fabb5fbcb5cdf59f47acde4029cfc29ec273d99312",
+      "parquet_sha256": "2865c9deb0fb18892a82dec2d7a19d055e36f1c8726eeeae37ac213a207dcf1b",
+      "sidecar_mtime_ns": 1790433507502201678,
+      "parquet_mtime_ns": 1790433507496673715
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "d26f95f1844e69fa87f172ecd1a3c2084a41d0f72e927af70565d770e79e2a3f",
+      "parquet_sha256": "ea0c9c39d82527b8f98666e72737175065afb9cf80b16dc00fe0672d2eafe0b8",
+      "sidecar_mtime_ns": 1790433507560321425,
+      "parquet_mtime_ns": 1790433507552648526
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "d1477c29d23244c26b2479f166030c63da01b00bfa72fae5be38e5b6ec22d1ce",
+      "parquet_sha256": "8f3eb30f93ef362d51297a48afb1a939054307d9d0247796e8c0042c4e92cb25",
+      "sidecar_mtime_ns": 1790433507609201434,
+      "parquet_mtime_ns": 1790433507604625141
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "dd149bdf080853925a1dbed3326ed5a33db6aaf4019d54c1c911a3df92922185",
+      "parquet_sha256": "6a8385e7d0cbaa8612920471066d5d712745795ebf8d6b5e6c8ceb12599bca7f",
+      "sidecar_mtime_ns": 1790433507888968129,
+      "parquet_mtime_ns": 1790433507876502806
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "a417c0eeb61d070b090e319545a7b7fe0eb229034d302408eb7c1708bd6832b5",
+      "parquet_sha256": "604eea7a5850a17feab6352eca0cca1d1ffb7d358595236440537ddab8f84c1c",
+      "sidecar_mtime_ns": 1790433507947271147,
+      "parquet_mtime_ns": 1790433507940474025
+    },
+    {
+      "sidecar": "ENNIO_DOORBELL_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "71859a339cbeee148ea8126239c96d9e001c1281badfa71d967387cf8b8ae0cf",
+      "parquet_sha256": "592788e2e90c81eec2a5d81ad6799ca3fbdf63851a6654ec11d9a2ac76d1bb12",
+      "sidecar_mtime_ns": 1790433508001417297,
+      "parquet_mtime_ns": 1790433507996448839
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "0a1536d0294756c700bf03442ff889b0cd88ceb5c96b280ce6454b6f267f7219",
+      "parquet_sha256": "15a23f89d2d876d9ec0cf065f7977124c3a0e82a0bd97d98271a6d8f9ca8a2b9",
+      "sidecar_mtime_ns": 1790433508156599087,
+      "parquet_mtime_ns": 1790433508144496407
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f2f014b493d82d1c8a70f149a07d11c51acdb46e418de848481227ad1261dcee",
+      "parquet_sha256": "04e4b259c9dfdfefd913d43654c0b4e21b70990ad2c51aa8dddaecc0517183b9",
+      "sidecar_mtime_ns": 1790433508253196538,
+      "parquet_mtime_ns": 1790433508244532296
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "fc67c1c270707ce13f359d9893779ed5d24306a32dbde2d0d83d8b1ea28a958b",
+      "parquet_sha256": "34d1f693e723a40e44e64dad0b4b9e948243802446465306510bacee8c9bb1a2",
+      "sidecar_mtime_ns": 1790433508332275057,
+      "parquet_mtime_ns": 1790433508324561003
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "d22d14e4b2a5dcf02b82700d46690376c69e0997bd76ca7fa0e3218b521badf0",
+      "parquet_sha256": "cd61cdb9425b1889c82186c8101ba612a43f9ee8ba24619e9de86a15b21d3ea8",
+      "sidecar_mtime_ns": 1790433508784581257,
+      "parquet_mtime_ns": 1790433508748713162
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "e8aae74617f09dae2dbcd0f405e78ffce8259437877440d0d6ad898df6ef0eef",
+      "parquet_sha256": "ca8ff0f37d04c6654c28266f76c518d25194549dc5124c79c1ac9a17f45d6de4",
+      "sidecar_mtime_ns": 1790433508911060610,
+      "parquet_mtime_ns": 1790433508904769148
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "9ef99e04cb6dbe4da7611e702e310073ca4b6b79b9b6113f45cdf89bcef541b7",
+      "parquet_sha256": "e4984c42e278e1fa234a09606b1402b183063207196409e2c979daa3965e12de",
+      "sidecar_mtime_ns": 1790433508996172656,
+      "parquet_mtime_ns": 1790433508988799292
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "89969b699e58ab7001f3442b30e2ed8f4d8dc53ff25f9fd707547b9aa31e5214",
+      "parquet_sha256": "0df46548f102cf40638cd468acfd285dee9e707b9e0619b535ab58d65979e80b",
+      "sidecar_mtime_ns": 1790433509032662723,
+      "parquet_mtime_ns": 1790433509024827437
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "c542b6b24685d290e29aa27fea78ed948d3e484d53789ff00743b4b5807bc811",
+      "parquet_sha256": "c5f88308c96777aa7468f0fcfad00eb8653b14233fec4dd7e59702c6a8022461",
+      "sidecar_mtime_ns": 1790433509106163741,
+      "parquet_mtime_ns": 1790433509100908485
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "b58237cfeaa8fc3cde6af25c204d9235646344e39de10f562bf33d1b7c70feb8",
+      "parquet_sha256": "61c3f0816e4a1fd457c0100b3d9558d29e17303db9fe08b98d04c9445cb9478e",
+      "sidecar_mtime_ns": 1790433509165438877,
+      "parquet_mtime_ns": 1790433509156968203
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "b16fab498ba208539c13d612e4a3f3feaf1d52f4f0970fca213e5fc8fd2a23d0",
+      "parquet_sha256": "f50f1982d5474a7aa1b6ccf12024f4ee3dcb207add11916d890f954d118c0b50",
+      "sidecar_mtime_ns": 1790433509225182663,
+      "parquet_mtime_ns": 1790433509217032186
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "94c80c84983a7f2f602cf53f6c7a9f9581c10377fb57c2a37a2e7ad40e66d5af",
+      "parquet_sha256": "e4b5be6e4ad59f8a0022f3fa34efcb3e0895dfca99fc7a2adc7005c720329d1d",
+      "sidecar_mtime_ns": 1790433509290551071,
+      "parquet_mtime_ns": 1790433509285104701
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "d8306388e7a2d8527e58bb5f9c5407165c521b4d8b8d0602f717233cbc3d05d6",
+      "parquet_sha256": "e921eda738cd1f13db234c94ef9e3695c2d010f7fd33907947d67cea80698875",
+      "sidecar_mtime_ns": 1790433509344632343,
+      "parquet_mtime_ns": 1790433509337160157
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "343d875b6ea877a3b3919dd91f2dd7eea8cd0696d11a1a17eb538bfc560c59e9",
+      "parquet_sha256": "116e513f27370f18f6d9d30998d72b9102e030c27fd38d9c015b1ec567c112fc",
+      "sidecar_mtime_ns": 1790433509453383107,
+      "parquet_mtime_ns": 1790433509445275329
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "35844f7502ef980599ac8210250c38098a7e5484fefcf88a7986558a51f77482",
+      "parquet_sha256": "334a57d66a1df73189e98d0dcbd5d0261d7f4b3d9805e4e6357424d3d2b08dbc",
+      "sidecar_mtime_ns": 1790433509504794858,
+      "parquet_mtime_ns": 1790433509497330782
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "de681d272e929798ca6d72bead01e329f19cccfa580f85e2a03df2e271153408",
+      "parquet_sha256": "26a096ffcfec5e019fd66340bc8df02d626ae6979b5dd239797b00d29e7b42a1",
+      "sidecar_mtime_ns": 1790433509543707344,
+      "parquet_mtime_ns": 1790433509537373436
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "04463f5e8da1015f7b1138285d7832ae607a83474d5e1bca8ae8ef94cc28dba0",
+      "parquet_sha256": "6c173d9c00ff5f443390f2ba3681b034fc2e10a998f05f4916c78cc031fb4471",
+      "sidecar_mtime_ns": 1790433509798248255,
+      "parquet_mtime_ns": 1790433509785637907
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "c177d455a2ec2070d8f5ef6fc30d01d616a7cb2bc13b244f664988fc46211975",
+      "parquet_sha256": "ee2da7a1356e1ac0ac735ebb39c813c5f11dca091e20eb0544b111d5fc7d002e",
+      "sidecar_mtime_ns": 1790433509846644839,
+      "parquet_mtime_ns": 1790433509841697627
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "0b8f9bdc1949ac0d7d50ef71e93a082bd1f0cf70aab2e90b0637a6209292127c",
+      "parquet_sha256": "32e79966eff681b5ba369f0a1a0394f94aac90bc61922881b3bd3f274400d7a3",
+      "sidecar_mtime_ns": 1790433509891003914,
+      "parquet_mtime_ns": 1790433509885744548
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2d4fc4073d3c2f6b0340b9c48793f296630884cdeeb92e5371545b19074e213d",
+      "parquet_sha256": "693b373b7f331523a06e378e2628a1e2e03b292acd1b6207103971c84174f59b",
+      "sidecar_mtime_ns": 1790433510002106613,
+      "parquet_mtime_ns": 1790433509993859721
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "e08c7ea1834cff2f77b83948c45255a618d387803fba63073fde738072667bcc",
+      "parquet_sha256": "e7651d2853efebde0160cbdb8825a08ab10896a035c03fc28ce1c966998a7761",
+      "sidecar_mtime_ns": 1790433510079545320,
+      "parquet_mtime_ns": 1790433510073988729
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "0336ccbb25a8a58e2785031f529acd30bf68133da9cdd3a6bc005ae9a4830d53",
+      "parquet_sha256": "abaa251aea6c67767cd61722c7b3aa29b61973f1207541d0d1a56c977753f3a9",
+      "sidecar_mtime_ns": 1790433510137669475,
+      "parquet_mtime_ns": 1790433510134089859
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "391ce6127a5ed92b09aed5e277525beefd65fdc61c20bd36a5abc802771b611c",
+      "parquet_sha256": "8ffc2c20223834b82dc927c8e69a29e129167865abd9d8f717d71e8df5d24251",
+      "sidecar_mtime_ns": 1790433510355650374,
+      "parquet_mtime_ns": 1790433510346447186
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "491521e6d547b0b5f2e7b34afb619038aad7045a5f98eb2cbc5b229a74971861",
+      "parquet_sha256": "e2c41ad184c02660f5dd673024208cb919cd9af8e4ff6f60bae5d71a6481d19f",
+      "sidecar_mtime_ns": 1790433510404275145,
+      "parquet_mtime_ns": 1790433510398534835
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "97c9110ff57e4f83f998311d93dd8b7f362c6fde051ff6a828866afc0c4ccfbf",
+      "parquet_sha256": "fe28f73fd96b9dec386eadc64750803a7170571354fc9d704827abd09614c298",
+      "sidecar_mtime_ns": 1790433510447988886,
+      "parquet_mtime_ns": 1790433510442608996
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "97e3a9dbb75207e635422e1d0a62c8bda5fe4e8bc3d1f4462e10457a020c8810",
+      "parquet_sha256": "9e56caaa3c54c7610a04232e8075bf53198cf5ff12a30ac9fcfd9b4c526d1226",
+      "sidecar_mtime_ns": 1790433510570796422,
+      "parquet_mtime_ns": 1790433510566817998
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "9647eadb51a95928a1fc8000a498be0b4178a4fba568c150f0ac0b8f92ec0fac",
+      "parquet_sha256": "8738d60df69c51d7cf73a79debd2ff966003bb6c21521ac1c229d03321d94993",
+      "sidecar_mtime_ns": 1790433510625493179,
+      "parquet_mtime_ns": 1790433510622912386
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "fa1e50c3df0f5def27c39195bae82c66590bf375061654d03df86789b0908b46",
+      "parquet_sha256": "6605ea19db9f051df6c8975fd5fdf5fd706358f5fa05bbb9681bc9a69939a371",
+      "sidecar_mtime_ns": 1790433510670360592,
+      "parquet_mtime_ns": 1790433510666986550
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "20f923bf85623882075ba4970d9137dbe2cc097b8ca7379d0009f547f4814a98",
+      "parquet_sha256": "41530612a3530cae221de21a96f8d6d2d58f9722a3dabad1c83a63f73f583199",
+      "sidecar_mtime_ns": 1790433510943766556,
+      "parquet_mtime_ns": 1790433510935438266
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "5d24fa31eee88eb0db56831f9f38b518eadc1b745139dc7865a59c7731a9593d",
+      "parquet_sha256": "4d766a9ef14b9f2d13247e2fb1eec57a2641c7e60bdf08d46f18fd03b48f8ff3",
+      "sidecar_mtime_ns": 1790433510999763134,
+      "parquet_mtime_ns": 1790433510991532654
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "ad1d54d3ceacc9ac03886b2b9fd740a82ef0adcf582e05b86a90e4e740ae4dcb",
+      "parquet_sha256": "d929ac9e34ea5bf458b9dca1d4ca53f942eadbdacb5226d4f6a176997ad4f098",
+      "sidecar_mtime_ns": 1790433511062409202,
+      "parquet_mtime_ns": 1790433511055666674
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "4b997f90c57c9b4b38986625fc2a3ae10bae8e3622445ea3f91ef39d92f791b7",
+      "parquet_sha256": "568b2435b007862074ee2d123c85523576f2fae10c4da6410c74796f70dd811b",
+      "sidecar_mtime_ns": 1790433511169409864,
+      "parquet_mtime_ns": 1790433511159898305
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "63adae1489663d493664501fa0337cc02f932857316b9b49d13d59728b049421",
+      "parquet_sha256": "5970079df54bda5e18473d06bb88c32aa69ed3c96d37abf159b9b792c1785f3f",
+      "sidecar_mtime_ns": 1790433511235532903,
+      "parquet_mtime_ns": 1790433511228049757
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "32cda1ac25c36d0babe4a49a67cb43155bfa6005022cd02b6ae5ceba19e6633a",
+      "parquet_sha256": "e5e285d43a579f8cc9edb72681f819581fc4112f2b35346fb192bd0314805dd1",
+      "sidecar_mtime_ns": 1790433511284041841,
+      "parquet_mtime_ns": 1790433511276156665
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "6270e2003eaa8217cbc7fb18f2551b8aa23eed0266a587f12eb357677cf31e1f",
+      "parquet_sha256": "cbd22ee6bb40118ca84c432bf86fe3770e73d9798ccbf4e2935025e03b826d34",
+      "sidecar_mtime_ns": 1790433511533130005,
+      "parquet_mtime_ns": 1790433511524709015
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "3ddee9346d804c46c9e287fb83567427b571d3650592964c5ab2a2147e88b3f4",
+      "parquet_sha256": "7177b845a17afe9f40ad2e7229fbf57139094ef60c2ef207f9c4e75f591b1c7f",
+      "sidecar_mtime_ns": 1790433511610650929,
+      "parquet_mtime_ns": 1790433511604887191
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d6f92f6bc326d3e481db74221ddf297cfe1d4466f5f14dbb6753b9cde9e9134e",
+      "parquet_sha256": "c83a223e5b705b1ac9a5b93b6770ad6f9c47acbc55171144f9d0e1aa1f6fc16f",
+      "sidecar_mtime_ns": 1790433511670918224,
+      "parquet_mtime_ns": 1790433511661011915
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "e6f73fce2d4ed42bbd03e50a65b5ffc22ed6bad04f4876add0e5270ceda50dfa",
+      "parquet_sha256": "97d884679178edd5d594b909288e5f7e439789e4b0cbfd8f081e18bd547e4acf",
+      "sidecar_mtime_ns": 1790433511789263003,
+      "parquet_mtime_ns": 1790433511781279181
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "ecadfd751acd9d56f8b7ac549490c013fc52f2fd5265de12c34ce28e5a6f2c48",
+      "parquet_sha256": "b79e803681009eea2465a07bf549a96fd2afe2a793c3a35f20cb30aebb06a368",
+      "sidecar_mtime_ns": 1790433511847622048,
+      "parquet_mtime_ns": 1790433511841412814
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "4aff1fd30b8555b2e7914877624d7a036397d8ee3a1fd95cc9418afd78d2d160",
+      "parquet_sha256": "b47d2b4de1ee69825585756bb7228ba8b7ea9a52b95955788c931722fc6b0965",
+      "sidecar_mtime_ns": 1790433511898061603,
+      "parquet_mtime_ns": 1790433511893528630
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "a6f99575deba06add67ba3ad66ed569a630ef0fa6aa6970b9c8d2a5c00b7ee76",
+      "parquet_sha256": "698890216a4a218a4078d665c1f780880de1015dadfd3630a7ab6f6aea4aa4bd",
+      "sidecar_mtime_ns": 1790433512184725827,
+      "parquet_mtime_ns": 1790433512174233059
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "ad9fbdb48d1e706fe5325047237f8d1363bf34ca4a2da6504b57675a630d6cd6",
+      "parquet_sha256": "dec1c57ddb00bf17d13baf92186d8ea4b0429cd1233e4d684861928e6e94753b",
+      "sidecar_mtime_ns": 1790433512247201427,
+      "parquet_mtime_ns": 1790433512242416744
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "78bf4411266d90d9e4d1ea60839900a02995e910539c2ec9df33cf3a28e81e47",
+      "parquet_sha256": "ddf0826aef852e91755cd3a79041e345697113f84697ef7d6c86bb573c3f44d7",
+      "sidecar_mtime_ns": 1790433512293958284,
+      "parquet_mtime_ns": 1790433512290546402
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2c34d3445e3a811690e564fdf64b380f0c0d2901bf69e1546eed7900969f2d7f",
+      "parquet_sha256": "4f5da8e6fab83a16b33c45938c825efb844126ddf0cd5c764c3fb31994e08c05",
+      "sidecar_mtime_ns": 1790433512431985304,
+      "parquet_mtime_ns": 1790433512410870548
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "310836eb0e458851bc1b028cf78c3a0bf86618b9b64a781cf92581af0ac080c9",
+      "parquet_sha256": "3dad762caa1d95dfcec5d96a7bd58c8c226865f5646409d2f447e8f554d445f1",
+      "sidecar_mtime_ns": 1790433512492048515,
+      "parquet_mtime_ns": 1790433512487075840
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "5dcefcad14caf3d61691c816bef31f9fc40853d2d8333d7b18d2fdc7610ebf41",
+      "parquet_sha256": "50546d17dcdffa122dc8080dcce9008d5f8c6e73054e40d25a6db41423519621",
+      "sidecar_mtime_ns": 1790433512547272695,
+      "parquet_mtime_ns": 1790433512543227108
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "523641acb222e6f99203274d3e5baa4d0c421bd95ca54cabd84005bba5221c9f",
+      "parquet_sha256": "3c7e9ef1e55733ffa53b1b10838fb41bec7ffe922858842b3b5ee3ec7aafa653",
+      "sidecar_mtime_ns": 1790433512840495622,
+      "parquet_mtime_ns": 1790433512823983448
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "3b2d46b21267dff8e2fa16e14b0a17bfb74744d2a1b896c4400e73e517d7a3ea",
+      "parquet_sha256": "16e01fd715cf0dd754b00701e0929372e5fa1867e71dbac3d9cfb074d3d64a6a",
+      "sidecar_mtime_ns": 1790433512912124314,
+      "parquet_mtime_ns": 1790433512904199546
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d4dd743ed0cbeb561e154d220d4fc3d8f7cd21a896db4d46a9644b0c136c4bba",
+      "parquet_sha256": "cd1a1df93c17fec4f6c85bb476ec874df66ed4ef9797eca0c2d5102e5f22a656",
+      "sidecar_mtime_ns": 1790433512955770119,
+      "parquet_mtime_ns": 1790433512948318399
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "39ab68453a3661da46c07c41e0b809ac1ca89f389943149dfb5c1048de08c949",
+      "parquet_sha256": "8b0825e7cd2f969fffd1bdbb35b393f4ffd7ec495a51faf765f7984944b21370",
+      "sidecar_mtime_ns": 1790433513060471289,
+      "parquet_mtime_ns": 1790433513048607255
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "c11ec2a8771e8eafe4bb1616a652f85596f773ed472db3ba4a4ff97171d48a73",
+      "parquet_sha256": "fb140fb6f409dd7a142a82b8b46c85db8a167893f880bede61617223bb9e56a6",
+      "sidecar_mtime_ns": 1790433513120507347,
+      "parquet_mtime_ns": 1790433513112806676
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "0fa7e15a48094d70e0d95de3bc003ed0ed32f5b1399d219080e861159a053973",
+      "parquet_sha256": "6b127a0c05380356dc52107a9b4455f0672e5c8294dd8712f7c61f576ab7997f",
+      "sidecar_mtime_ns": 1790433513166415008,
+      "parquet_mtime_ns": 1790433513160956243
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f82860301f0207f5f74fbdf61bce89a83cd06b385574c709f9f18caa495f0a9c",
+      "parquet_sha256": "da4fbeba1a4536c3d1efe4e2c46b0535c8f60dcfe8a6577309ff46f2d7ab9565",
+      "sidecar_mtime_ns": 1790433513476293145,
+      "parquet_mtime_ns": 1790433513457878569
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "7de83d8058f59182729780add65c95b6e265cd85b2dd22c8af52931d6ceb405e",
+      "parquet_sha256": "33133a1c9345871f40f3125300fe666e2cadd96cfe770ace54a0db07f1618452",
+      "sidecar_mtime_ns": 1790433513531508479,
+      "parquet_mtime_ns": 1790433513526090454
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "2f3995e15ea3924184aeb25b57ccd3a94d084d6758a03a8a7e8e044311f73b6b",
+      "parquet_sha256": "c35a6dcdd92104612d86cb0448a76b1e801c7e11f293470e6219c7e5dd5046a5",
+      "sidecar_mtime_ns": 1790433513579971331,
+      "parquet_mtime_ns": 1790433513574240020
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "e63e2a0c97cfeae523d8c78083283d8a7460353d68a5e0eaf76f4482774a9e9b",
+      "parquet_sha256": "51e3aa73587a54d64c7fbad0c6ea29f20f0fb30c86c92ca92d88db561f30c42f",
+      "sidecar_mtime_ns": 1790433514611638601,
+      "parquet_mtime_ns": 1790433514605659630
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "d8ae4e10b4700fb19b275831b58e6264da1f756370492bbd87d9be8f12574820",
+      "parquet_sha256": "6328292ebdf7209182cb5cfd691d985832086cc2f6004d5ac23342434b19bd92",
+      "sidecar_mtime_ns": 1790433514697328731,
+      "parquet_mtime_ns": 1790433514689951854
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "03d0e6cedfb9f64177bf1ff42095ff45d1795af82c4694b2b851b4d2d7117671",
+      "parquet_sha256": "d04e562b2eeed6ba098575fabc521f2b2d0d03a3720d10c56240f510a8b36fae",
+      "sidecar_mtime_ns": 1790433514756445245,
+      "parquet_mtime_ns": 1790433514750160585
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "6cee0d8d9b7e543099c53abf18baa6f33250e240ae0aa6bc54e366f9d7d280cd",
+      "parquet_sha256": "4d93ae8ea8bf20a3c67c8a1a34d091063a983128666826b64883eb18aa6a5d8e",
+      "sidecar_mtime_ns": 1790433515034589576,
+      "parquet_mtime_ns": 1790433515027175002
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "d69de4cf8bfbdbd61b0d3da3de01ac52ee1264374fb9af7b874a9870ebedc828",
+      "parquet_sha256": "6cb2dbe6aa96895f0e5400d3fecc9942e7d384f73bab0d3b425630abcf671761",
+      "sidecar_mtime_ns": 1790433515113760369,
+      "parquet_mtime_ns": 1790433515107511043
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "9af030847fc396363ff2ef86413e4b9aecf7449f3927d310b163d28f53618a2b",
+      "parquet_sha256": "17c860b7fa77b52c07e73181481d22d924763df65b237b968f626bd8b282dbd0",
+      "sidecar_mtime_ns": 1790433515170438776,
+      "parquet_mtime_ns": 1790433515163746272
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "590aa2e3daf8713cde5faa661a17ef4a5b1d88628f445eb5b15d88992943dcec",
+      "parquet_sha256": "e7edac11558784214b595bf502d5d1f8b5284e3cf19f2f453a7e24653562050a",
+      "sidecar_mtime_ns": 1790433513719775259,
+      "parquet_mtime_ns": 1790433513710663792
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "ce2d55de0d54f9c6918fd4fe9b68213d6136009a16ac3516a70f87cce4f98a2c",
+      "parquet_sha256": "84d6abbf3a18ef5572d037c0654cbe425c9f3b1526951166af436bf83490e3cc",
+      "sidecar_mtime_ns": 1790433513825116475,
+      "parquet_mtime_ns": 1790433513819000317
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "834fce716ff01e55dd5144cfce8bc36fd5664a5fb40455b59c4a64c731d973f9",
+      "parquet_sha256": "3b5fe64e3962d1cee1afae4f971d4e495d9997b051a07798be2a97fb5dddfdc2",
+      "sidecar_mtime_ns": 1790433513903285782,
+      "parquet_mtime_ns": 1790433513899249593
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "c913cda2272f748f3d460463f21f36e48030abe259b02501bb007c12b4d76c8a",
+      "parquet_sha256": "66bce49fb2f1256c798588fad153ea4159d7eac54559a0db64cca771fa72dfd2",
+      "sidecar_mtime_ns": 1790433514311771296,
+      "parquet_mtime_ns": 1790433514288560306
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "7a104aa2238ae0b01e94548d16b5ae4ad7a4e1259f3881db68715f8ceec9499b",
+      "parquet_sha256": "0915bd0fa7312863bbdd98c7cc607bf098aad8be46fafe35d49eaa7b11c3c0f4",
+      "sidecar_mtime_ns": 1790433514406396648,
+      "parquet_mtime_ns": 1790433514400949939
+    },
+    {
+      "sidecar": "PHILIPS_BABY_MONITOR_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "bad77ce208d51b87bba9eb3275870167484a5ac9691f803880e46e47d9c80370",
+      "parquet_sha256": "febd7be09b935a6dfa71b62de69d202f2ed1358480102fcbe926ff2284411204",
+      "sidecar_mtime_ns": 1790433514496071890,
+      "parquet_mtime_ns": 1790433514489256079
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "964ed76fbb1362e5f7a5f0618b091b0ff54253474d6abe2a83d1935ce706fcda",
+      "parquet_sha256": "46e73009330e9251ef8fb3487ff7775c81a5917f2a6c50b2abca06c0ca4cd8d1",
+      "sidecar_mtime_ns": 1790433515298395549,
+      "parquet_mtime_ns": 1790433515288267135
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "a49032fe6d1756830000823d883b79ceda3789f951ad6f12c764bf2ac796c2bb",
+      "parquet_sha256": "8dae7b52f6352f8aba4ba280b40565d32b0b43e5e3b13cd03da55a1550868e1f",
+      "sidecar_mtime_ns": 1790433515369511370,
+      "parquet_mtime_ns": 1790433515360569572
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "ab2dd080d150972669382509b407460dcf395b384fc3dc6e1a9ea3026c5ce10c",
+      "parquet_sha256": "8c26e8b76b58124b603388ec894dabd195abda10369601ad8be1b9e5364d0ed9",
+      "sidecar_mtime_ns": 1790433515423041198,
+      "parquet_mtime_ns": 1790433515416804799
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "d2c0c1e24b95aecb7ddba21000aa0e353eb12536a8b9f0c0b3ba965b94041ef8",
+      "parquet_sha256": "e531b423cde4d80a53bc25f9e818017dabbf2bd3899c78cf330f2b5ac1d06e34",
+      "sidecar_mtime_ns": 1790433515686594108,
+      "parquet_mtime_ns": 1790433515673880130
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "ffadfde7693ecd5e4b03c2ea11fb7f8501df6f5a315f2b554fe0aac19828d745",
+      "parquet_sha256": "336bbc5f109d78ee48be883aadbf2bab0df6e9e0b2d3c9ad79439b69cc87bab8",
+      "sidecar_mtime_ns": 1790433515761511919,
+      "parquet_mtime_ns": 1790433515754216172
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d8195615667dc4c2fe422a1e62be4b4e678c87de933b923120d96b9ca697678f",
+      "parquet_sha256": "21329938f0884f9342f7efd9d6cc866310dd1c618f6bf88844b3e64e19b2e465",
+      "sidecar_mtime_ns": 1790433515816507205,
+      "parquet_mtime_ns": 1790433515810451401
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "50eb7b6928d4b0a7f0e72f73ad1a8a877db1d56437c08543cccfb24387d95bdf",
+      "parquet_sha256": "57904c14815044e938ea7ce4aedf17e588883b091441af4a51766e119231c574",
+      "sidecar_mtime_ns": 1790433515862789458,
+      "parquet_mtime_ns": 1790433515858653024
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "f655b2c39a263bec3d128c51908529188640b9ba317b825a5dd73be4d3053de2",
+      "parquet_sha256": "46b0288ebefae1d3baeaec047e899d411df761818071951224efbb8877706e73",
+      "sidecar_mtime_ns": 1790433515961380954,
+      "parquet_mtime_ns": 1790433515955056274
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "ed733b251426e72641c9d505ab8f87f82f43465e8c378415664838eed7652068",
+      "parquet_sha256": "17daa2911999453f76b20a28e8aa42ab838bdd5c61bc67b0370cb3bb264f244f",
+      "sidecar_mtime_ns": 1790433516033066056,
+      "parquet_mtime_ns": 1790433516023347455
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "28c1cb9fec604fc69facad6ba4543f4ba30b44a61004b12d0b2f70d7d6a698d1",
+      "parquet_sha256": "aa52566d5074545600d07a385a4284166b3cce23931afbbd6abbca87ec45b8b2",
+      "sidecar_mtime_ns": 1790433516096133759,
+      "parquet_mtime_ns": 1790433516087634070
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "103b79788620de05a5eab7aac024addc90ec26088b5205a9ef0ccacf97d28130",
+      "parquet_sha256": "eefc403af3adec2cd2d75bdc567eb5a2442647550a6dc3aed0dfb8731c72b6b5",
+      "sidecar_mtime_ns": 1790433516168837420,
+      "parquet_mtime_ns": 1790433516159956512
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "bd041c7cc6f881378eaf7338dfeb0cc0f714e872fb89ca6616e364b8967c83cc",
+      "parquet_sha256": "c3046cd9fabd1e6ebdd3c1d5af7470494ef01bb7491817c4450ac6bc2ddbcf7f",
+      "sidecar_mtime_ns": 1790433516241556270,
+      "parquet_mtime_ns": 1790433516232278951
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "ca7a6288f5f2db0522ce0e6cc66e391bf254836b7d302ad504d06a97fc99941a",
+      "parquet_sha256": "76265fb858fc1c3e84e29065fb7225ed64f905a24018bc7f1213045f5fdd41c9",
+      "sidecar_mtime_ns": 1790433516361513005,
+      "parquet_mtime_ns": 1790433516352816356
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f294702a1152850415ad145075ade346739b20bf793ff5f91607370e73f2e816",
+      "parquet_sha256": "17a27bc20d9a809457f85038e7720d6fc4891b084d47824147aec9ff82179cc7",
+      "sidecar_mtime_ns": 1790433516421903503,
+      "parquet_mtime_ns": 1790433516417102969
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "9c5b586fb6f87323cee8313bb8a117a202796dcaae3bf45735d447554714f0d9",
+      "parquet_sha256": "530a6bc058d3cb1e11c3fa4ad90ce8ed8416d66bb172c6d1433af8d7364616eb",
+      "sidecar_mtime_ns": 1790433516470400358,
+      "parquet_mtime_ns": 1790433516465317933
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "43ce4d8f59a8efad6c334981459391600a5d42d278169a338297f262109cbbc6",
+      "parquet_sha256": "82b2ca01bb38b2fc366778f438dabfc4461f54648cb62e36e6a9b4cd192225cf",
+      "sidecar_mtime_ns": 1790433516726205743,
+      "parquet_mtime_ns": 1790433516718446479
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "4a8705bdab831a403643c8520f3a0bb22cd2d30be14033485d22bd35ef1fca7e",
+      "parquet_sha256": "88948663c6f91210e6bb8e952c9a70b4b4f8fb7b17bbbd063f6374c9fb843fc9",
+      "sidecar_mtime_ns": 1790433516791937465,
+      "parquet_mtime_ns": 1790433516786751007
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "dda0dd601a08c54f7c708ca8f2b283b437dda1777d9d1da49e09c715511e1ba0",
+      "parquet_sha256": "3cbd2d347fbba37eee3304d99613335e13e7682cb8a9069abfda1e81268878e4",
+      "sidecar_mtime_ns": 1790433516836773841,
+      "parquet_mtime_ns": 1790433516830948055
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "b3319e803c2f02aee50ebf15fcd79490aecc5d544630312ef1fd69b025d2ecc8",
+      "parquet_sha256": "df64f1e4d073f20930a20218db5f9554e76da39f109bfd0364e79fc974811aba",
+      "sidecar_mtime_ns": 1790433516935367036,
+      "parquet_mtime_ns": 1790433516923360066
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "edc55603a533826cca2aa11eb933065691c6413f2eb5e319358d9eda7b89cead",
+      "parquet_sha256": "272a46f852740a031f6bd6dff554c48c172b5ebede7143443c35d1c847417116",
+      "sidecar_mtime_ns": 1790433516994296335,
+      "parquet_mtime_ns": 1790433516983628767
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "c8d761c57007e501ed2c8eca5270c637df389f6e7c28e868f467d6dfc72b3b8e",
+      "parquet_sha256": "77801ded42043d6bb10e9e0dccd836a65c1effa02b47c1b01c8eec044c24ae5d",
+      "sidecar_mtime_ns": 1790433517042880828,
+      "parquet_mtime_ns": 1790433517035868553
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f5dc9161de1748ef8b997bb7c576b8a6ce1519ae3bfb34fc3950cb5f5feb3d07",
+      "parquet_sha256": "5c23a04c9ee55da87a064d0579df778d833b9617a2b0562cf62af4630dc6a49e",
+      "sidecar_mtime_ns": 1790433517298602823,
+      "parquet_mtime_ns": 1790433517289058367
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "26f42f60a0b347bd23c78c270a3ec020a369599aba1b1cfa44a2f04d51957867",
+      "parquet_sha256": "be71fc09d047fc6ac7fa58a72649e6f06498778fc35a090632b9e228fac374d1",
+      "sidecar_mtime_ns": 1790433517373960788,
+      "parquet_mtime_ns": 1790433517365417199
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "b42a6e8cf2acc6787d9a1cfe7ba698ba70d605300e1ad986fdcff980d7c06330",
+      "parquet_sha256": "2eeaf892f6419d80286748fc403190ae9e82b06b870d9b05ccd42d921e606b66",
+      "sidecar_mtime_ns": 1790433517428554806,
+      "parquet_mtime_ns": 1790433517421681600
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "f0152ab10e2efbfc963938171a21620b0b6c838e46491f34447213a2f34bcc69",
+      "parquet_sha256": "d2c6ce1989f28189fd7ec79dabcbcbde0f6c807477d43e77293735816fc785e3",
+      "sidecar_mtime_ns": 1790433517525950398,
+      "parquet_mtime_ns": 1790433517522153747
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "8518798dec6d8611f47502a26d93aec468003666b69e8c8261fbdf9adf5bda26",
+      "parquet_sha256": "588886375cba2698e995c2eaff66988054229faf4859131513e764fe2cf7dc7e",
+      "sidecar_mtime_ns": 1790433517583349830,
+      "parquet_mtime_ns": 1790433517578418151
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "803d6a7819fb89e99ab703c53c8a8cb41fa3408484ca5c4b5d3c13696310cd37",
+      "parquet_sha256": "6267078912aa08fe4856daf44b1cc0f0ffde83c63da3621294a04450fe8455ec",
+      "sidecar_mtime_ns": 1790433517629282663,
+      "parquet_mtime_ns": 1790433517626644782
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "104168f0b46d1152d0393f89d048dcbe1d91f80afd7856a6da9b6bb1684fc298",
+      "parquet_sha256": "9ff902fba2b80ca4f81f6830b2adebc636a8c02195c8ddd1ceecb133c91a16bc",
+      "sidecar_mtime_ns": 1790433517865442046,
+      "parquet_mtime_ns": 1790433517855721279
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "44064982cf8b8b0b5eabc1605965047d6dbab48195e78fb15f99b741968c458c",
+      "parquet_sha256": "34f632d2e6bcd0d8260864911ca52e516474f4d02ac39859490227431fd30d34",
+      "sidecar_mtime_ns": 1790433517924491501,
+      "parquet_mtime_ns": 1790433517916004566
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "aa6b94019ef26c487c6f7888e00d1d9159d4faf22a81debab25c727ef3d604ce",
+      "parquet_sha256": "5bc1448226b29e38f21a89f100644d49563b959c1cae4dadf3dde37f82163153",
+      "sidecar_mtime_ns": 1790433517969426538,
+      "parquet_mtime_ns": 1790433517964231198
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "9b3d31198b19b5b93cdc3ca463042a260b742cac7e0084ad7d197ce2572155a0",
+      "parquet_sha256": "98b0f5a68cb344862deeff2f7248ac7c1b95ed6ea127b806c173c67f6afd0cb1",
+      "sidecar_mtime_ns": 1790433518081340947,
+      "parquet_mtime_ns": 1790433518072755820
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "2208c105fd314e229cb81fa655daa9521e353bd3640d0884008e527cc269bf4e",
+      "parquet_sha256": "1728f90765c801332157debefac448c95a9a05ff5fc48f7fb313299bc0a82109",
+      "sidecar_mtime_ns": 1790433518144673169,
+      "parquet_mtime_ns": 1790433518137071607
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "78de60ed5daadc611c7f1547519decf32678315644b78f747fa32c0e2f01a684",
+      "parquet_sha256": "846f22defce26c0e19e27012f36947c0a92d76b77c1f8444a32076d37bb0714a",
+      "sidecar_mtime_ns": 1790433518192332678,
+      "parquet_mtime_ns": 1790433518185308449
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "d58cf429555d79ec350fe2253a784616b98334055a392fb1c94b5a9abac76964",
+      "parquet_sha256": "df5fa32a2326dcbb00b09413e549f2f037bbe69d7ef2db55d2be6739b8e9176b",
+      "sidecar_mtime_ns": 1790433518476630596,
+      "parquet_mtime_ns": 1790433518470709763
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "12cb43ccd7220e7a472f03475ae9c071034ca23f6d446683ecfbadc4df2d9298",
+      "parquet_sha256": "40751773c4f0eae80cea7ba0e93eb467ceb46d0f5edc5a186a15b119a609273f",
+      "sidecar_mtime_ns": 1790433518535427639,
+      "parquet_mtime_ns": 1790433518531005815
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "87ebffc28f6622f7fbbb840fac08096d378416c7550759abeb37642d1bbd341d",
+      "parquet_sha256": "f4b03e7cd859f789a89848b73cf997571e64108570c0aa488a73246a7caf1422",
+      "sidecar_mtime_ns": 1790433518586199585,
+      "parquet_mtime_ns": 1790433518583262395
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "d722263d589745afdc68633aa95e99d3e697987114103cc934ec0925d9746158",
+      "parquet_sha256": "3c07aba2dad1dd7b2f4e1ae54da463ebe3751f944b364b8f4cf0be370ed7c5ed",
+      "sidecar_mtime_ns": 1790433518688950657,
+      "parquet_mtime_ns": 1790433518679736080
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "05a2b21614cd4ec86ead485b1c17ea072da26838827fa5b4a101dc0344f43da9",
+      "parquet_sha256": "b55a096b600e464928fc312f256ecaa45519c74349b6f11bd180a62f4267572d",
+      "sidecar_mtime_ns": 1790433518762374368,
+      "parquet_mtime_ns": 1790433518752091343
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "8ba48c3c51aea5795b01095e95c2da99dac2f8870bd33dc0da675b311b8be019",
+      "parquet_sha256": "cdccfe9396cadc52729a9dab8ecb8f670b9feb213789355aa62ab0a0e57d25ad",
+      "sidecar_mtime_ns": 1790433518824285261,
+      "parquet_mtime_ns": 1790433518816407130
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "434bd41945e23cf3ba132dd6fcf24c65ed25ca27b8a32a1b5d325a1f62bffcf9",
+      "parquet_sha256": "7eb9e8b7e5291f118f2e7e8270af1b0040087054af34086ac64712468fb4d773",
+      "sidecar_mtime_ns": 1790433519071434978,
+      "parquet_mtime_ns": 1790433519057601396
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "3bb7caca2b62abe9b0210fd47c16a050217a74ab81230e4f3e395943496a79e6",
+      "parquet_sha256": "7433c7a7073833e4fd0404d055576fd65ce296ceff344037f97ed74ff7026f9b",
+      "sidecar_mtime_ns": 1790433519131402791,
+      "parquet_mtime_ns": 1790433519125949577
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "865059497b998efd232b1cdddc4f89d31a9bb37bb77ec91b4ec0ca846c4b8232",
+      "parquet_sha256": "d28ad82bf27465fa68761af4156757fa35ef8ded6c0fa631c2526118f6d0d1eb",
+      "sidecar_mtime_ns": 1790433519183690587,
+      "parquet_mtime_ns": 1790433519178215837
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "f7444aaa5a8e819c201cfaf3a02af170bef6259bc0f3ba86a9b789d2cd3163b3",
+      "parquet_sha256": "68a557f966e49f38f7c1c548cc095d8a89f2647bf769645f52a97dd6ef4051e9",
+      "sidecar_mtime_ns": 1790433519299748667,
+      "parquet_mtime_ns": 1790433519294809795
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "3fec698c6fb0c8489d56efc6c010a00f28cc920061dfc5beae5b03c1165f58b0",
+      "parquet_sha256": "3114ff548fed2bd2fd58bc6f22ceda71dc9e4dcc91b6392f4bf934a6ae1724c2",
+      "sidecar_mtime_ns": 1790433519367178461,
+      "parquet_mtime_ns": 1790433519363157979
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "562d65f5cb80924a7843ede7f23ffb22bf00b2713637638bcf0e4e6e008c89ec",
+      "parquet_sha256": "4dd1d463b6e93aefc5cc672e0cbdd5e127259c139551dd7a439a307078be10dd",
+      "sidecar_mtime_ns": 1790433519439029739,
+      "parquet_mtime_ns": 1790433519431506164
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "8f624f897a4794cd946d87f7a1dd0a4750a7bec6c6bf5984f717dc372875e02a",
+      "parquet_sha256": "81dc087514ed18a405c2525a776ac28c80d173ffbc9dea11ae0931e4dfe0abcd",
+      "sidecar_mtime_ns": 1790433519742565332,
+      "parquet_mtime_ns": 1790433519733042266
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "a4468f51319f76f60851d4131f1c38afe3e31e2becc09cf4edc969ee8c171dca",
+      "parquet_sha256": "ab169bc38f8f97158103a27e41302dc2c5c3c959ee5f2478d692fe5b120788b3",
+      "sidecar_mtime_ns": 1790433519816942588,
+      "parquet_mtime_ns": 1790433519809431412
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "7efd4034d21ef863aee41fc7babf5b65ce6a4a51044378c07c36852b61392871",
+      "parquet_sha256": "8b62afb2229c3e34b30b9a3f1ea0c0bf7a34dc403b22d3f1a594f71167d01ad5",
+      "sidecar_mtime_ns": 1790433519880503871,
+      "parquet_mtime_ns": 1790433519873759114
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "a5d7bf81529a521b01de2afe569d57e64cf0ba61a0a5e8965fdc7d97073a0281",
+      "parquet_sha256": "75af4503adad43c902d5e1c36f0acb1bc79a1e2f6ccbff3c8c5f6b5a8a1f534e",
+      "sidecar_mtime_ns": 1790433519985749037,
+      "parquet_mtime_ns": 1790433519978291630
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "2874cbdfddf7ce22268c891c7bb2300f7d8ae2dcea0aee0a3114d5c4e5d7081c",
+      "parquet_sha256": "a35715d9084051de295d1cd30024e91cd28a23b080f05bc5c57f7af558c90178",
+      "sidecar_mtime_ns": 1790433520093640514,
+      "parquet_mtime_ns": 1790433520082837031
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "a911a9ec1f3b4a37db1e65a3dc2b8d68ea854c11bf89687166144e568ff3acaa",
+      "parquet_sha256": "14668f603474a8e7e9a692a7238c72e3921b49f0bd1be1cafd3781c459689a95",
+      "sidecar_mtime_ns": 1790433520162740228,
+      "parquet_mtime_ns": 1790433520159238554
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "06850308db45d9dab980bfed16051a70d287ca60ec0173227166cbb3f853b1e5",
+      "parquet_sha256": "ee83af543f1954f1a134d1e8d2cd3c19182b92562307081131004a6140128bc4",
+      "sidecar_mtime_ns": 1790433520427517202,
+      "parquet_mtime_ns": 1790433520416591059
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "7918740cf057262bb1a1dae9a5617fe4ff36670ebbca5baa04b64cb7ee2ca50b",
+      "parquet_sha256": "9ecdc5ccdbfe06b31926372cccbf818bf43864e9b508791481f8d72727b1b494",
+      "sidecar_mtime_ns": 1790433520507346546,
+      "parquet_mtime_ns": 1790433520501034848
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "10de38bb65983941924f0a9d95a10721ec58fa9bf6940acf6b4f3ffef9c345b0",
+      "parquet_sha256": "9ff5ee2b1644415a6bd8a6eb3094e3a98171920440c7f6aa8672be70f0bb14df",
+      "sidecar_mtime_ns": 1790433520561677507,
+      "parquet_mtime_ns": 1790433520557330708
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "c329c4a592778202cf2645dd11c4d87ce7b1d5bbee231c812839937ba98e0b95",
+      "parquet_sha256": "455e3d8bf3849e38b5ca7a6f78f9ab1d82c6a8c39bf89b90c7a3ea29c18cfa6b",
+      "sidecar_mtime_ns": 1790433521510070937,
+      "parquet_mtime_ns": 1790433521502367097
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "0c599375427f70f0aebcd3198e6c45a420ffacc1a1dae1e69ba03238088ba1fc",
+      "parquet_sha256": "9bb039418ca57db2d9f143117ca4981eaefc5df56f2edf0d7439745510711c88",
+      "sidecar_mtime_ns": 1790433521592780495,
+      "parquet_mtime_ns": 1790433521586822857
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "864345cab5feef39705e7ed0c17068fcd9792a40a978e4c4da084a030542f4e5",
+      "parquet_sha256": "ba5ea2bc9b128d7b763ff94102b135392e3ce48ee32b64e375844775650234ec",
+      "sidecar_mtime_ns": 1790433521656399247,
+      "parquet_mtime_ns": 1790433521651170102
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "1919ab3c2d7341028553e53d1376b7b3052c1348fda74c038d80690fbfb06d49",
+      "parquet_sha256": "a018fa02d14ea3d73d6817819a437c99524d9bc60fd4da7dc9dde16613388c9f",
+      "sidecar_mtime_ns": 1790433521914549832,
+      "parquet_mtime_ns": 1790433521896493977
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "6e82906b55354acfcb5d060ca4748627fd4eda53fbb0bf228a3f5ba1158aa26f",
+      "parquet_sha256": "8ab5e988fa7c32de2cfa44a7e6885ddb6fb596a0f394806016a20dcc36909e25",
+      "sidecar_mtime_ns": 1790433521973297671,
+      "parquet_mtime_ns": 1790433521968884629
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "dbfa50df5ce7de190305fab088bfa87fbf4927231a637c6d4a353d1fa0854631",
+      "parquet_sha256": "6f2537d2a1221c70581ec25149f58de1ed19cb06138cd9c9d7543d0ec135d7d3",
+      "sidecar_mtime_ns": 1790433522030219312,
+      "parquet_mtime_ns": 1790433522025191185
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "86426da6ae7cc178a2b4facb467d0159d6dc14fd8cfad86139d89de4ad08bcb9",
+      "parquet_sha256": "bab435c5c9b361cd0dbbef5fb1571307cca8fb386d18d4b928ce173be513efea",
+      "sidecar_mtime_ns": 1790433520691873451,
+      "parquet_mtime_ns": 1790433520681985825
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "c98e6f527d0c0142cf0aeb0b488b611d7fc45c9a582471f6fb966e89c8c732aa",
+      "parquet_sha256": "f7f477f3a33b17435a75a8a4036c2020b6604f3cd59eae198851dd18892741c2",
+      "sidecar_mtime_ns": 1790433520777714350,
+      "parquet_mtime_ns": 1790433520770450748
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "e84922b8286e7216f1ba6e8b7bc023a8d02cafad914756cf08c2744770d5e575",
+      "parquet_sha256": "508257a4885c8baf7f1d221abb3c83858f4e017097730b07000b4f2626d9cf99",
+      "sidecar_mtime_ns": 1790433520863224161,
+      "parquet_mtime_ns": 1790433520858915672
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "d13e39f527ee5e4986186aef324e1fc6143c866441a2c66f479c231d8c8fb7a3",
+      "parquet_sha256": "a2180eade060f937c2b1c89d08f166678aa8ef22e0f7f58397d4c5a1d7d8988c",
+      "sidecar_mtime_ns": 1790433521241528963,
+      "parquet_mtime_ns": 1790433521228891301
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "0725a652d62e490e0912bac525f1f733897ab374d256d1286c7011f7f3ee1a95",
+      "parquet_sha256": "05d4198bafc07677ca78ff8edade369ec848dda36373eb1ec6a0d735c05e5c6d",
+      "sidecar_mtime_ns": 1790433521323134811,
+      "parquet_mtime_ns": 1790433521317368762
+    },
+    {
+      "sidecar": "PROVISION_PT737E_CAMERA_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "07c3d85db65ce6b9717ae8257a556baddccfc2233815516e05d1a501859d941f",
+      "parquet_sha256": "45277259b6f2b2dde6b14ac295e9a17e26c435a51ac09b162c7c766b0b7a89d2",
+      "sidecar_mtime_ns": 1790433521401074708,
+      "parquet_mtime_ns": 1790433521393781118
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "80ae3efac17f13902a3a0a54ab7fd4b21ffec1f714cce91dd94a98badfb06a1e",
+      "parquet_sha256": "034d6c979a29b895faf5784a49e463d107cf8f7c7f9a328dfd5227c33cedff57",
+      "sidecar_mtime_ns": 1790433522158552314,
+      "parquet_mtime_ns": 1790433522149879437
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "de135b283935067e856ed6ac368dde0f7479922221df1a27253b4a421832d783",
+      "parquet_sha256": "c49f7e2f635418659e6397e8c66b19c381e41b15fe7fe416abd26818c80af152",
+      "sidecar_mtime_ns": 1790433522237396435,
+      "parquet_mtime_ns": 1790433522230323470
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "b0586c370ecfd5e532b83eaff279a706c04f361c566dbeadea9ab5f7714ee0b4",
+      "parquet_sha256": "4954a0f45be78a91092fe5fd019afe8e730d55e3740624ed2bb88eed86302008",
+      "sidecar_mtime_ns": 1790433522317526437,
+      "parquet_mtime_ns": 1790433522314789706
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "1e516aca669c8482c1813456cc0ccbb675161c4c88077a3af5957504427c94c4",
+      "parquet_sha256": "048b5d8631c062c4550139b72b3a41a2dc000175bc753d0d02b69edddc2286a8",
+      "sidecar_mtime_ns": 1790433522623693157,
+      "parquet_mtime_ns": 1790433522608410426
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "4a91b515ee8c78dafa06b43bc3072f9bd78fa5058888e0a017f7f8c619715d27",
+      "parquet_sha256": "ecabbd4ae3ca8b122b9fd63fac024efda5a9689a167d16a26005b307d0cd5371",
+      "sidecar_mtime_ns": 1790433522711055811,
+      "parquet_mtime_ns": 1790433522704943267
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "17de9b01b7b7f7a6969fe512054c7193e0ebcc21664b3c30e2ea9a9140ee8877",
+      "parquet_sha256": "d967930aeb7ce1306f4dae6b2d9f76a8cc4dbbd9dddbc3fff143742b6d9c6c63",
+      "sidecar_mtime_ns": 1790433522779637381,
+      "parquet_mtime_ns": 1790433522773320695
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "f76ccae726a69f8db31e252f93fce1708d9de63e667fe92ddd6fdaef64089912",
+      "parquet_sha256": "ff44557cf0aa286e9b1928f2f5f162d041b93ababe44af2fe0492018a68e03af",
+      "sidecar_mtime_ns": 1790433522823414443,
+      "parquet_mtime_ns": 1790433522817564914
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "01d81a3ba4aeecca1133ac2e252b5be74427aa5f24e5ef46a86369ba96591357",
+      "parquet_sha256": "3b601d8d3741d04413076ab9fb60354a66cc10238dc405e729becc55431a2722",
+      "sidecar_mtime_ns": 1790433522909969252,
+      "parquet_mtime_ns": 1790433522902031149
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "6d67c7f2b8f0fcd021e94366c905f7c5f1f4ca50368b4688fad0e9429c5f213f",
+      "parquet_sha256": "34c29856a64958ca22935db409dd68a4ee82ddcbe2a02afc4bc62ac4f7642ea7",
+      "sidecar_mtime_ns": 1790433522976490987,
+      "parquet_mtime_ns": 1790433522970395651
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "efeaa8b8e97fdfdf53e6f40074a0d0eaa86ae55787dc6eaaa853258c51844094",
+      "parquet_sha256": "b7ba8297109ab37d59b49c169fe2304d83af649598c38630fdf77a1615502e32",
+      "sidecar_mtime_ns": 1790433523057227597,
+      "parquet_mtime_ns": 1790433523050823140
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "7722a376999d725723f82dec3831d724c837985b3f477818c2f41e6f8746735a",
+      "parquet_sha256": "2b106f90987585cd53dcfc402dbef829af7711849757c99d540fad3dcd6dd090",
+      "sidecar_mtime_ns": 1790433523132986909,
+      "parquet_mtime_ns": 1790433523127232649
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "a3dbc4d3f1247524fb28f20027cc5c56e433d169bc2161156e82ef2c5e27db14",
+      "parquet_sha256": "853da7d66e9a839c264649ac527ccf6d050ccfd676fff40234b46413b75c1e70",
+      "sidecar_mtime_ns": 1790433523199433640,
+      "parquet_mtime_ns": 1790433523187555945
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "cf6cd243a95a71beec5ff6e4067e146c7895830baf1fc10624104c650a29aa35",
+      "parquet_sha256": "d93c98dd85f31a24f7fecadabe8907882927114e0cc5ad5f5cfc7727c789f1c9",
+      "sidecar_mtime_ns": 1790433523323973072,
+      "parquet_mtime_ns": 1790433523312224090
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "77036976dd492347b12ebc638d6d9d96c56d8e1f149f988de98f00bf4f832821",
+      "parquet_sha256": "9653bf50ccfbff3803b1aa8b18c6716fbbdc5a9da0c7692f1f34d89ae14962a0",
+      "sidecar_mtime_ns": 1790433523388108554,
+      "parquet_mtime_ns": 1790433523380590493
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "50c3626b323b476940eae1fc1c094f45e2e0ee3edf11fd8c49b1d80fd405bd4f",
+      "parquet_sha256": "91927f9b1e28797ec4e9ce4ebe55d1a7c0af70ee0818511af537a8a7d70123c6",
+      "sidecar_mtime_ns": 1790433523432856194,
+      "parquet_mtime_ns": 1790433523424827578
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "347ee76d47c07926d1ec4edac323f387089414ff3d3e010b437e35ee3f462ea0",
+      "parquet_sha256": "2bd22d6f36674b123ff5da3d0caefca34c30e1abab9c89233d0be271eac96982",
+      "sidecar_mtime_ns": 1790433523675883912,
+      "parquet_mtime_ns": 1790433523662099209
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "1c62c26db13c0a92772c6dfc0df580eff7b94295d7d045d4310556d42fc35483",
+      "parquet_sha256": "cd2f3c07dbe99876da9728e2d8b32cd5ce2c61d674fa59a586c9029390a4b4dc",
+      "sidecar_mtime_ns": 1790433523729159271,
+      "parquet_mtime_ns": 1790433523722422505
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "96b875cab712fc56714c800f5c5d3758eaa87f736350a5adb0025588c2d02c01",
+      "parquet_sha256": "08d0a937b1eaf9c4fb77e16fe37d9fdce01cddd09ecaec6f8f96be7a0608059d",
+      "sidecar_mtime_ns": 1790433523777305034,
+      "parquet_mtime_ns": 1790433523770681143
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "3ae6edcb06f3faeba075664e2954246402c865b4524ce63e73e1dad7520893e5",
+      "parquet_sha256": "ab310bf15176b046344ee08752d8a0504d6f348e96c851e8d857a376aa01a8df",
+      "sidecar_mtime_ns": 1790433523915171447,
+      "parquet_mtime_ns": 1790433523903392394
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "5d2543fc8b0d9ca10a9f40bc068e22b87a45aa093598fdca8fd79c1c50b1fb89",
+      "parquet_sha256": "65b03c06c36f239bfc23b34ce820017231617e7cff1c1da8753496abb8b7f18a",
+      "sidecar_mtime_ns": 1790433523980263433,
+      "parquet_mtime_ns": 1790433523971758797
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "bcb3ad4d439908dd4e7059d3c8ce81817da8e68227a2d27bd6b86f968b9ddd73",
+      "parquet_sha256": "176f862d4ea66fa5dfd4fa9b7195a10ff0912a2651257f3569803cacfa18c764",
+      "sidecar_mtime_ns": 1790433524026003591,
+      "parquet_mtime_ns": 1790433524020018640
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "53b40a77a79b247f3c605f465afe8b681e2c02625f195292847668e63164d1a1",
+      "parquet_sha256": "e09450271d283bd901eb4e924031ca72cb22e050721ccc37ae57335dfa491db9",
+      "sidecar_mtime_ns": 1790433524257563053,
+      "parquet_mtime_ns": 1790433524245246998
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "62becfefdca28d1de024df89aa61b8aec2e22a3b60a38fa365b8c1f90f381ff5",
+      "parquet_sha256": "e2993d49d985ad4345e0f7a25e5d4bb2fb6650031ab3bcd3297e6ae4679705d1",
+      "sidecar_mtime_ns": 1790433524311705102,
+      "parquet_mtime_ns": 1790433524305576023
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "c321927216d60904f167853774630c0b79b95f320e4075a76fdcc8d5f33fdb40",
+      "parquet_sha256": "66b150cc109f0187758d0c430f0744dd1a6891624042262a5325c8b431d62f03",
+      "sidecar_mtime_ns": 1790433524360658505,
+      "parquet_mtime_ns": 1790433524353839244
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "b3780a23dbdfdf12f907b9d11562f0b540f3c6473045ea1fb5880586b7392204",
+      "parquet_sha256": "82e99bc8ac69974a707f6058eb1a8d46f6b88ad50a07d294b0b7b575121f9a7e",
+      "sidecar_mtime_ns": 1790433524460948964,
+      "parquet_mtime_ns": 1790433524454387617
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "3fdd6fed6ff7eab4643385bc2587f956243150ae70708c3af8849559721349cf",
+      "parquet_sha256": "9496f85c3fb1754a1c38131707a6d433b6b32b6deab255a8cc6fcb8e3d1f9d60",
+      "sidecar_mtime_ns": 1790433524522760510,
+      "parquet_mtime_ns": 1790433524518738577
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "71b0d1532974a587edfe47c04a733a71fc6bd4f2355e90744ee2d06e05c48ba5",
+      "parquet_sha256": "87d134dd2b2eebd7ba57b6e4b229952ae285bf77882f2c94a17139a8810f388d",
+      "sidecar_mtime_ns": 1790433524574773313,
+      "parquet_mtime_ns": 1790433524571023731
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f994da80bcf2cc5b16f1ca8690db9249dae0d9c281ad5d008c68914fc9145534",
+      "parquet_sha256": "eaa544ee1cf8be7e598d7f5794a54eb5adf7c608bbe9921c32fa6de5c8577381",
+      "sidecar_mtime_ns": 1790433524880593862,
+      "parquet_mtime_ns": 1790433524872668851
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "f7e56acdd3edeb8ea0ba4bfa7b14ba217143437c0554cf7229add2052382cb3d",
+      "parquet_sha256": "f1830cee4f8b6b0d80ce5023f741e5cd6aad621703b5879d75a0a0f2e9404c2d",
+      "sidecar_mtime_ns": 1790433524940771727,
+      "parquet_mtime_ns": 1790433524932997878
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "5395cbd91974114a2728dfb670d2b0bbf813bd7e6d71dfd88a077bd204fb3eb5",
+      "parquet_sha256": "0497e788c235f2612b05acdefa7d58ddfa9c98426733e9484a2796e84053bbb3",
+      "sidecar_mtime_ns": 1790433524993886185,
+      "parquet_mtime_ns": 1790433524989304967
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "c848815fee51cede1655d1cd7bf097605227a491a3365eb24c73ee1a0ddad107",
+      "parquet_sha256": "254646548afef4a318993374b1e7cb9014cc346895e43e66580086ddf448abd7",
+      "sidecar_mtime_ns": 1790433525121163576,
+      "parquet_mtime_ns": 1790433525113994147
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "b4144248986cb0f39a99c4d7b7941c3b478bd8291aa6d31755fb258ea1d16331",
+      "parquet_sha256": "aba4edbe2a3d39d75fa4351dbc9dab4497e8016663a1cb022315ee29e0e8bfb6",
+      "sidecar_mtime_ns": 1790433525183143292,
+      "parquet_mtime_ns": 1790433525178350454
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "4e0c112679149e60939df97812a958efc0def203d97a31fafe89181b281b24e5",
+      "parquet_sha256": "b22e6b1c7d63cb4a85172ab8d551f23a0949cf730f876c017000d81ab49d557d",
+      "sidecar_mtime_ns": 1790433525234376498,
+      "parquet_mtime_ns": 1790433525230639951
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "45ea98c164721ab0a049158ebc9cfacde8de0920c8cd47b03c6eb79a9146ec3a",
+      "parquet_sha256": "3a0f3ae97667d44a3edcfe473b2cd4273650feebf76efe4796b4d58f0aa6bfd3",
+      "sidecar_mtime_ns": 1790433525514076566,
+      "parquet_mtime_ns": 1790433525508176522
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "88a39670a9ce634cc880fe87d4e97a9ff930074481a0b82226baa03560f0f2ef",
+      "parquet_sha256": "2f49b40221f1a96d0e0af0b3e43ebb5992c88840b3e5aca00ea28d07ebb6faf4",
+      "sidecar_mtime_ns": 1790433525573988027,
+      "parquet_mtime_ns": 1790433525568510558
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "17031cfdf077994336ca31a14c1bd90c65ed97440f3ad1318f358a58ec84a4cb",
+      "parquet_sha256": "2c21bedc5347c327d813ff8bfd4730f874a776bacaf7de0da4cc722128c6f745",
+      "sidecar_mtime_ns": 1790433525632401544,
+      "parquet_mtime_ns": 1790433525624822325
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "7f6efd376fd080a3fc04f68ea76da3c7923cbf633921d9b3cacc53cae139d53e",
+      "parquet_sha256": "873e69c3ca7df8f9b4a39fd3982ace9873b79a1be1c67e595197d357b06aff3c",
+      "sidecar_mtime_ns": 1790433525758871348,
+      "parquet_mtime_ns": 1790433525745490397
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "be56af93ee0b305dc20e05b5ccef589617f9f2363a28b95ae1c3964a28a71206",
+      "parquet_sha256": "77d26a87e64a7c2d351f94abca511092bbb35aa0c31f1f7515786d9ed9fdb258",
+      "sidecar_mtime_ns": 1790433525824837194,
+      "parquet_mtime_ns": 1790433525817891241
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "aa980d17198ee07b7416aeca1ee2621a70f9c4c9ff45153de62ffe51b3fda036",
+      "parquet_sha256": "d5fc5faaf272f04e1bf44ec5567ed768681429a4535d6f13363a9af67f4fc1b9",
+      "sidecar_mtime_ns": 1790433525878910313,
+      "parquet_mtime_ns": 1790433525874203011
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "de141917aee303394366a5292b78544f1e9cf8d46d2f8152ab58f9bf4bac142d",
+      "parquet_sha256": "970f934a7805547c284a1182643ecb80a43b7dbaefd970679b36651046641666",
+      "sidecar_mtime_ns": 1790433526148389936,
+      "parquet_mtime_ns": 1790433526131637564
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "aa43f6e4ffc248e2d067df6f3063549a42f20080e07ce30a988037f531076296",
+      "parquet_sha256": "5615fee12f801132cd7bda758f2d40cfad1528d995866addc6afa6a09ef0a24f",
+      "sidecar_mtime_ns": 1790433526204572046,
+      "parquet_mtime_ns": 1790433526195998545
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "d0ce20544c2a09fed3649dcde8253f84727de5972c5821a377fc25a090e7da42",
+      "parquet_sha256": "ea9be45c7b49ccae3856dd3a9e7b72b370c5c31a3b55b72ad29486e8b9646967",
+      "sidecar_mtime_ns": 1790433526261320385,
+      "parquet_mtime_ns": 1790433526252314406
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "443d717031d866c31f479c9ac25ffa161e3d78b78983931625f55085958d6e09",
+      "parquet_sha256": "916fe428578f943962a79e5f99dd4e2e96b6d64dda39ac32c0c90f42fc003da3",
+      "sidecar_mtime_ns": 1790433526366475673,
+      "parquet_mtime_ns": 1790433526360923567
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f86bc7e11972e82ba7e684b92fcdc6ae20ccd8fedc5f70c82f51dff6c8635a38",
+      "parquet_sha256": "5af50e80a60e1c4b0644e532d1afcb5e441db2f1026a70d7180e4b20a5bfa5b5",
+      "sidecar_mtime_ns": 1790433526461708474,
+      "parquet_mtime_ns": 1790433526457465043
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "075048f8bdc5a30d944c41447e86ebc5431344f0c5f5ff7adb359f39ad5c74e2",
+      "parquet_sha256": "42166fb152b8d1cd4926f8dd076d6c663f4c7f7b9ccd12018d359cc7b7ae3206",
+      "sidecar_mtime_ns": 1790433526515104210,
+      "parquet_mtime_ns": 1790433526509758345
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "c583d9491002296534db608d09e11bfebc522d5bd1e457e832a085b85abb05d2",
+      "parquet_sha256": "1c9cbe1cab6b7042d4e2146f7c003e5c0f95201cf109abb27593fde73447dafe",
+      "sidecar_mtime_ns": 1790433526812459993,
+      "parquet_mtime_ns": 1790433526799382774
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "cedbef465b7e9834b181512fee8ca214b9d901a86d2130f6cc78485f6ff16df1",
+      "parquet_sha256": "b070f507b7595d99d844bcc6b003f513998ac04135b5ea1b84d490285bb266ae",
+      "sidecar_mtime_ns": 1790433526876242360,
+      "parquet_mtime_ns": 1790433526867766316
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "19d326dfa3b890c883aed8ea0414afae727ce4b00b550b2e72e592fee5f69532",
+      "parquet_sha256": "b4979c49ddbb69b25f430a863cd6656c52f602b693b33ae0a13483c250de05b3",
+      "sidecar_mtime_ns": 1790433526927543397,
+      "parquet_mtime_ns": 1790433526920059617
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "5cca0fb2318deada9047f3dde9a3f14396cba790947f9fff0e19dfc57c6177d4",
+      "parquet_sha256": "a482ea3f2cab8ba0c6cd34a2d9f1771ddf8dc439e492c0a1af2d2acc96394059",
+      "sidecar_mtime_ns": 1790433527043376541,
+      "parquet_mtime_ns": 1790433527036716024
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "fb3f6b1e289b0942057a569a43c3812ba3ba93f6f567ef435b704386e6f6d6ec",
+      "parquet_sha256": "3f87232284778263a57b97f4b4916d9b26c88c7fa87e2a7945188bbf519675ed",
+      "sidecar_mtime_ns": 1790433527121889709,
+      "parquet_mtime_ns": 1790433527113149554
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "501f4936efd4769fd29db48b3b716a294b78dc37a6df8bd69138febde52d1f07",
+      "parquet_sha256": "7e01dff83179a965ff22321dd86bc26934de3f6f69418f4a0c8ac20ee8c6c2c6",
+      "sidecar_mtime_ns": 1790433527170068266,
+      "parquet_mtime_ns": 1790433527165446179
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "748654a9714c7b3e85e1940f8b426fbe971efa2d5d0ac34c7f34495da3d9912c",
+      "parquet_sha256": "f058606225838049191e066fba980f9ac316a80c5d06c1c040632b8a77ccfc32",
+      "sidecar_mtime_ns": 1790433527424484967,
+      "parquet_mtime_ns": 1790433527418883672
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "75d5d3ca485354121ae332d60803c950c8955aa3dd801af555ef2638a258fcf8",
+      "parquet_sha256": "174c444c2e246b137e6b657890c377965404859ee99699f94440bfcdb8f29fc7",
+      "sidecar_mtime_ns": 1790433527486384303,
+      "parquet_mtime_ns": 1790433527483248748
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "24e22e1ca63a8a9f41343457ae863b2e364e803b0f3106c3ef620f0f5bba8fc6",
+      "parquet_sha256": "846a4da9c6cdadd588a22609a64bc30b8a69d81be282d80b0c9165e94d217e19",
+      "sidecar_mtime_ns": 1790433527542399098,
+      "parquet_mtime_ns": 1790433527535545377
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "3fda846a153d90c1c8102e122e0fadcc56fa62de0e522c078f714533da80ff6b",
+      "parquet_sha256": "2bbf7fa8099d06070941cfa2d6bdbb6157fede4ffac9cbb7aec2ff45ccead1d8",
+      "sidecar_mtime_ns": 1790433528493904674,
+      "parquet_mtime_ns": 1790433528484957067
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "56f5fd9d83e08b35d6da172cfce1783a1872f94fb93fcccf76340209348b9e14",
+      "parquet_sha256": "f8d1d834825f2bde1c6414356694dc1e9ceffbbfb9b79999322f453c0926b96c",
+      "sidecar_mtime_ns": 1790433528556375132,
+      "parquet_mtime_ns": 1790433528549325726
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "3408a96b3228c1fe529684072444dba3be78f5e5abb2f49887a2228d81ee29cd",
+      "parquet_sha256": "0c692ffd28dd253dd10f6f7c48ac1c145811ddec6859f03fe53c70a3aeca62df",
+      "sidecar_mtime_ns": 1790433528618516902,
+      "parquet_mtime_ns": 1790433528613694384
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "afd36470451d28e785398590ba4a3ccbf54120465853b9905ec38602358eb02c",
+      "parquet_sha256": "6310b2ffb12e666280763933609c7deee488c2889dcf934e0405aec2eb8f4d8a",
+      "sidecar_mtime_ns": 1790433528858601307,
+      "parquet_mtime_ns": 1790433528847030774
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "e95103541b49061bbfc147409bb910bee16a50b313089115e8ab05a67ee4b99d",
+      "parquet_sha256": "770714ce76a1e46d466364564ca35e090c8676b885aeab17b9977c2ddc7930d3",
+      "sidecar_mtime_ns": 1790433528913583789,
+      "parquet_mtime_ns": 1790433528907376389
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "dfdb5a0f9114d1f05096aaba1505c72219e2a2375e1b3ee94bb9ffa31373070d",
+      "parquet_sha256": "e2584e30e9908dbb41a12e174c11f5224f1687682ea5a82e6bdbc2f29a9b30ac",
+      "sidecar_mtime_ns": 1790433528997290437,
+      "parquet_mtime_ns": 1790433528991860256
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "8854acce2d038a8fd4c74e844315bbe7c791eb5cee96608f82b1cfe92d43091e",
+      "parquet_sha256": "ccfbbb98574ba071b65e416f449ac8e68b1fcd3050cfb7051c2654abc1cd7763",
+      "sidecar_mtime_ns": 1790433527678083839,
+      "parquet_mtime_ns": 1790433527668298347
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "3f70b1db231ebb03728d7d5b1a8e4e9f8b35b22565106c2139390fbd7381fa9f",
+      "parquet_sha256": "10dea54fdebc9993ab57cda28e76ae374a7f9d8829e0ab8d5cdf8550f27b9a32",
+      "sidecar_mtime_ns": 1790433527761235563,
+      "parquet_mtime_ns": 1790433527752777510
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "955de256beecbc561195884f0ee3a774ed968464baeb92a99ed4e40c5ab8ad8b",
+      "parquet_sha256": "ab0e3442b9f104ceb74d495d4c9dc8292ef6c3e79c09012e6e837ae999a7de6b",
+      "sidecar_mtime_ns": 1790433527832967073,
+      "parquet_mtime_ns": 1790433527829211040
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "2950fea286480577b61f2329770e4e1e1e2b6e2aa88bbbf3a7708328ef5823cb",
+      "parquet_sha256": "e7d2f0bdb71bcea8c09b192505bcb9972705dcb35685009e26ed24e10e4696cc",
+      "sidecar_mtime_ns": 1790433528226417703,
+      "parquet_mtime_ns": 1790433528211390264
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "f13cc559204a4ac286bf1d12253ef33ac86c3227c27feaf083e2311d8042bc20",
+      "parquet_sha256": "8471b20caa69f8a15fd657c227919a80063e0c1e8881c7807077ba0f356369fd",
+      "sidecar_mtime_ns": 1790433528301988564,
+      "parquet_mtime_ns": 1790433528295874131
+    },
+    {
+      "sidecar": "PROVISION_PT838_CAMERA_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "e1c7e61e22c32387f2bb0f175338eaef5c9ecb7e15129f4838e5ad591b145998",
+      "parquet_sha256": "e3b26ef89f593d2e6800286d0794b84b21d0d358ff4442e3919308a461df48de",
+      "sidecar_mtime_ns": 1790433528374307911,
+      "parquet_mtime_ns": 1790433528364265829
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2f64acf499606fdb408699ef499970813dedc723c8dea564c8d8b45da713ebee",
+      "parquet_sha256": "38150ab811b72b9c2f4289ed255d47bfb11c11d43064fdc826e0f214eff54a85",
+      "sidecar_mtime_ns": 1790433529133955864,
+      "parquet_mtime_ns": 1790433529121797594
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "623664e2ed8487607765f14658a6740152117e8ad1f4e618c19115f3633fffc3",
+      "parquet_sha256": "60f3f66eea82d6c57a378f1fff8cbf6119cf5c3e4e0f8c48d5fb8e799d98b27b",
+      "sidecar_mtime_ns": 1790433529191229992,
+      "parquet_mtime_ns": 1790433529184617310
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "34ea9aa9cdd2115b88b4a1fe7063c1e2bc7e96ee02b1f8040d9e79165b61b1a4",
+      "parquet_sha256": "f5d66ebd4557706c65b05c4f64a5dca2cc0ccc5007f51d261f41b65befc68ade",
+      "sidecar_mtime_ns": 1790433529238105890,
+      "parquet_mtime_ns": 1790433529231732095
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "93b097ff32e917133df186b26ad7b9b197e22849b39c81df73120a3c37a2f41e",
+      "parquet_sha256": "fe4967028351defb364e73edc02bd68dff521494ada5b7f5d2cfa718317c1ea3",
+      "sidecar_mtime_ns": 1790433529467619388,
+      "parquet_mtime_ns": 1790433529455527327
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "e67e3b6222a6efe6fb225432355addef33287c153121965be4b4305268eaf448",
+      "parquet_sha256": "ccd5941b63a76d6077d0e4e9fde7d27c64aa1f5985b605cc45f3ef94ad30fc10",
+      "sidecar_mtime_ns": 1790433529529556585,
+      "parquet_mtime_ns": 1790433529522273272
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "153895069786a271bb57a4ba2b4474851709dda4fd7feadd53ef799f920c50da",
+      "parquet_sha256": "4da0f14cb222000df1a0518e1324ea01cf7c9a3b2879bf7e292e0cf0404d504e",
+      "sidecar_mtime_ns": 1790433529572206107,
+      "parquet_mtime_ns": 1790433529565461826
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "1a148cb663da29f1c80b3d6c0b22de841d58b66ceb3bd59034a513f166ca8284",
+      "parquet_sha256": "0cedcb4982bed52b812a8e7c638ef644d6f8101b6ac931ec415deadf967dec5a",
+      "sidecar_mtime_ns": 1790433529606553305,
+      "parquet_mtime_ns": 1790433529600797913
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "9124e5c730d06af7a98d91699c727b8c9c2d57424fc50658c6b49e5ab41e3876",
+      "parquet_sha256": "4373c359afa9e7582e96d3bb825ef346c0374a7f32e1c78fdc19af81ea394ab1",
+      "sidecar_mtime_ns": 1790433529684508885,
+      "parquet_mtime_ns": 1790433529675396326
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "1d89ab5c87f5788fdbd3f59e023b902459718ee1a4796113baaff4aca3384c30",
+      "parquet_sha256": "0cd4c649de9bdf8d443fabe7872ed8cf5e4f3c37ec5d84ef420550de7361355f",
+      "sidecar_mtime_ns": 1790433529753697062,
+      "parquet_mtime_ns": 1790433529746068504
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "28993ca120dabbc9edfa5611b8ebdb6df41cf38669e2a5fc227d119b624c051d",
+      "parquet_sha256": "a71dd49673aeb0e33f3847c8bf51ab8b2c6138bb8184c8bb142f271415939b42",
+      "sidecar_mtime_ns": 1790433529811001171,
+      "parquet_mtime_ns": 1790433529804961984
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "6f92be0b4fe7410e9efd52895e01856463bc2ddee164eb64725deb46790d3b66",
+      "parquet_sha256": "b8adbece5c05a914203cc7ed36af6561bb934914b0ce67d4e3926b1543cee4fc",
+      "sidecar_mtime_ns": 1790433529869410894,
+      "parquet_mtime_ns": 1790433529859929236
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "23034ea1a72d7e266eefad7cd069ef604b30f06bcf07d8241bac8bd1b94b75cf",
+      "parquet_sha256": "aa30badf9f1857119f147ef877ab22c120624d52db311dd33cc6e76c2a2069d4",
+      "sidecar_mtime_ns": 1790433529927836581,
+      "parquet_mtime_ns": 1790433529918822717
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "02d99b1efa5b03eae9a4809967a9ee27c942a445e73cf267eed42578326bdc54",
+      "parquet_sha256": "b71fe5ef0418697ff475ab8c2598ccb3e59601235d769b89b6484eaff5cc4099",
+      "sidecar_mtime_ns": 1790433530027144007,
+      "parquet_mtime_ns": 1790433530017021432
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "744d790c45eaf796c97db8ae2165020da339ae7b38d61dec2545cccd151a1705",
+      "parquet_sha256": "82dd0e0acff8ccb7eea3ae4a8c0ba079791a29626d600d13daa5286a9db58cbb",
+      "sidecar_mtime_ns": 1790433530085002925,
+      "parquet_mtime_ns": 1790433530076099366
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "36b20dec0df4ca45801eb90dd03db9ee6460cd84037ea76785e026e1efe7b613",
+      "parquet_sha256": "bfb826deb5b1ff2b59231e5c4c9f9df2eb6eb6f7ab62d186d9a0fb40f6974229",
+      "sidecar_mtime_ns": 1790433530123427801,
+      "parquet_mtime_ns": 1790433530115484658
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "7eac3dd5a614a8d5d4f467e24effdbbdce81083131eb1c3fb1889129816492cf",
+      "parquet_sha256": "ed5b620e9c16a9ed2805b42e2136f260366485322a26b9ef0c8ee8c8d89253f2",
+      "sidecar_mtime_ns": 1790433530357718714,
+      "parquet_mtime_ns": 1790433530343919348
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "c1682b2980b8a4458878532dd224b111ab1c2e4d23db748c5564b639436942fe",
+      "parquet_sha256": "8f1d5555ec7c66dc85692977dfe61eda786f1180f0d5d79cc7ec7d4848d6d810",
+      "sidecar_mtime_ns": 1790433530403369562,
+      "parquet_mtime_ns": 1790433530399058755
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "4cbcc972ed523708934e6483a471987c0424960c295a3c4ddf719719cf808037",
+      "parquet_sha256": "43b9808a53a066975918c782cef6ae8fb1352b113a8b0e304b7cdaa2dce2ddbc",
+      "sidecar_mtime_ns": 1790433530444126848,
+      "parquet_mtime_ns": 1790433530438444047
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "97e783c1880eab8ceee23934bf4eef6e71441cdbaaadcf249aff3b127b47ed0c",
+      "parquet_sha256": "8514c1fe681eedbd760ba5f2eaaceb24fb4bd8f099e7947bbb6f9bf1573fe308",
+      "sidecar_mtime_ns": 1790433530540545368,
+      "parquet_mtime_ns": 1790433530532968746
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "1d116594c1bb575b1b34e77eb3d3917b79461425c04af162c3d840ca9368fb55",
+      "parquet_sha256": "fbe62fced692da7d21f71dfe97e5f030d4e220bba16d5d92e10502de7f094974",
+      "sidecar_mtime_ns": 1790433530594760993,
+      "parquet_mtime_ns": 1790433530588108154
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "717ee0fe2c55da38f71cd4f7da7741e30c6528060317fde99a20b22fe2c48638",
+      "parquet_sha256": "5a2d67410d34b52ecacb62a0c3538a7ae79ae6c573769446ff30ebf7ae3db948",
+      "sidecar_mtime_ns": 1790433530638643534,
+      "parquet_mtime_ns": 1790433530631431975
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "813b0f39703d8fd97531803e8a520984669ca9731b06d7fdaf8f185b8ec319fe",
+      "parquet_sha256": "43a06e66d3ce11e55987050ba0d16903f7ccbdde0d40e40db1edd4fa7dc498c8",
+      "sidecar_mtime_ns": 1790433530879781583,
+      "parquet_mtime_ns": 1790433530871682251
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "e51d71a9d3ce523d18216796ee865a254a130514890c1ba71cf7aa625ed0dced",
+      "parquet_sha256": "3de0f1bf07cb60bdcc41f5eade4f90d103159468f4a17a752c33cd8ef59ccf0e",
+      "sidecar_mtime_ns": 1790433530937122797,
+      "parquet_mtime_ns": 1790433530930760188
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "1918a8e202ffe3b7500bcb8cda858caceea9f071a368f0d375de6c22392d88ab",
+      "parquet_sha256": "975df665f3b1403d6ae3afd59049b794cc0cd31b187c633ecda1bb8879c67344",
+      "sidecar_mtime_ns": 1790433530977031697,
+      "parquet_mtime_ns": 1790433530970134497
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "b8b9c73692803c443620206d9270d5592044b3ea9340963f9b1e2c185f9ef557",
+      "parquet_sha256": "80c823c679f85280825503ac7ca9bbb71c4319514e406cb7fddcb1e17ac7a681",
+      "sidecar_mtime_ns": 1790433531080438824,
+      "parquet_mtime_ns": 1790433531072696083
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "6cd762d850a3e95a3f11dd5cdda78a1dd8f8a5ce5d26d38ce07ba211388d2f5f",
+      "parquet_sha256": "3a68c4b17526f0fa335589924ad74f6ffdaf689bb554eae71e1f1014419883bc",
+      "sidecar_mtime_ns": 1790433531146122808,
+      "parquet_mtime_ns": 1790433531135866643
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "3abe4854ae362e3988345c8b40e9ab17ca50acab04578255aa72330f8d180311",
+      "parquet_sha256": "0d6597284f82e3d5ab10fe132cf9c5bd212e2aa4981e78cafd6d5d8aa6c6cd62",
+      "sidecar_mtime_ns": 1790433531195736549,
+      "parquet_mtime_ns": 1790433531191140884
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "6b71621b401011bf0b9ee644675a03f8d965238489e8fa3d3b3db47a16e3f5be",
+      "parquet_sha256": "3f13539185d83a4a4a4ca794c4aa32f18d8e57f25bc81e27ea7a309b121d35c0",
+      "sidecar_mtime_ns": 1790433531443723225,
+      "parquet_mtime_ns": 1790433531435926803
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "c5dda49a32a2496825308f9a8073d2eb1d42d1ee4ed516de13d0464778432fcd",
+      "parquet_sha256": "be7cd7a3a5491649a8bb12349e50a3d04d3141451e0cad9fe2d4b36c991df75c",
+      "sidecar_mtime_ns": 1790433531506276261,
+      "parquet_mtime_ns": 1790433531503045524
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "614903f777f3258ce36d64889ee683584f74736bd70d844ea59d987438eba495",
+      "parquet_sha256": "15885cd08b905ba3ab2206028e4be05739e0b735fd485466cd562ded92145a7d",
+      "sidecar_mtime_ns": 1790433531557770886,
+      "parquet_mtime_ns": 1790433531554371604
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "90cf8e53c9569d13a29b6872b15062fd754221e43196e804b6b4882fd90677dd",
+      "parquet_sha256": "613448707bd0b8a87d0b8b0db30480b1ea55c0888c0208ce651b60ce936e4e78",
+      "sidecar_mtime_ns": 1790433531682288169,
+      "parquet_mtime_ns": 1790433531676764565
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "e0163475fa84690b5ee7138d8c00c33f4fa83439b679015a1e2097736596b929",
+      "parquet_sha256": "d1521accb2d89a7917b2f73a2a35e9a4ca7a4904c23f00aa87cb8330d38e3d94",
+      "sidecar_mtime_ns": 1790433531743499763,
+      "parquet_mtime_ns": 1790433531735986963
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "d05b7f040e431da67fa4f5daea6c861b4bbe796eccedcf3895ffafda4d61bf1b",
+      "parquet_sha256": "1701d756cbfee4ac8ba0191003b04fe9d13f9c6e41c29bf67dca8604d2a8e4cc",
+      "sidecar_mtime_ns": 1790433531796711730,
+      "parquet_mtime_ns": 1790433531791261203
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "99dc56c50701fdd10293529344ecfbef0282962a1c160a5223dcd28ea20d63ca",
+      "parquet_sha256": "e44ce5694fafce478559d752303180627d3809c149d0ecd116499aa3063f3edb",
+      "sidecar_mtime_ns": 1790433532090557064,
+      "parquet_mtime_ns": 1790433532075701014
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "3d0154488bb57aeabb9e5393fbee083e4e4269df1cfc5d893b6bf9abb9f1e171",
+      "parquet_sha256": "978807f96a9136c6805eb70f5fab8ce774caf7f16914b08df04ed43345bdc372",
+      "sidecar_mtime_ns": 1790433532163761600,
+      "parquet_mtime_ns": 1790433532158810086
+    },
+    {
+      "sidecar": "SAMSUNG_WEBCAM_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "5054315f50243ea9fd24c78f9c7c86107dbafa9ebab47de399db217e963d1828",
+      "parquet_sha256": "17124c50ef6e826ffdeb9bbae77259b35efb0e497af4b4088c2bfb620176c06f",
+      "sidecar_mtime_ns": 1790433532224238775,
+      "parquet_mtime_ns": 1790433532218173709
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "999c8c228f12d4897de83821eb9ddcf63dc1b5bac08c00026e9ac6afca8b2efe",
+      "parquet_sha256": "36ed453da34181237107b3427a8f1f5a348316ba0698718f256b9eca5bbcd9c4",
+      "sidecar_mtime_ns": 1790433532370869182,
+      "parquet_mtime_ns": 1790433532356688831
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "31960f25107506be0ca8c9c6fdac58aa996394262cf2c091e878f8918527ec48",
+      "parquet_sha256": "a1bec2d06d29adc4e78198d114f6a392b6c984a157aae90a648c00c23f30cfb2",
+      "sidecar_mtime_ns": 1790433532433383718,
+      "parquet_mtime_ns": 1790433532423967604
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "5c1fe26d89ec37ea4d11f60feba86c5f78aea19a54d156b3c6ae8ac24e5d8d72",
+      "parquet_sha256": "3a48e7deba8fb964b35403e340bc7f08a1fdd2e5c0424a80ffa2be30ac565a28",
+      "sidecar_mtime_ns": 1790433532486143072,
+      "parquet_mtime_ns": 1790433532475416078
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "6e544c073107ba8d71329e7dc0bec9d0db4e46648a2fa6e6d02da9e52626609e",
+      "parquet_sha256": "15d22658eac7871c03f5a7cfd86c07378491021e77217074b4473a8f6b1d28a5",
+      "sidecar_mtime_ns": 1790433532756033422,
+      "parquet_mtime_ns": 1790433532744531170
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "b93f9ce047a80834cb426159d9aa88fa3a24a58d5ac6e56ec1f28c2d29c08bae",
+      "parquet_sha256": "cfa8d5d72fae2399c69b293911230630d3ed9f6d2bfc4658adbbf566f29aade3",
+      "sidecar_mtime_ns": 1790433532820385093,
+      "parquet_mtime_ns": 1790433532811809943
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "77aed01456ba2df91406bf57580bfece29e2f5415b1b6b88e4414b9c6aefd1af",
+      "parquet_sha256": "a4c55a007fb2a2e105cd43f02689af2a3e1e7503a21b4cb50af9909aa63e3815",
+      "sidecar_mtime_ns": 1790433532891934731,
+      "parquet_mtime_ns": 1790433532887003867
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "03ef62aa5ef8d3565d4a5ea600032aecdf5935ba3b5af84e9a7d5facd624ddab",
+      "parquet_sha256": "f728b2883881c6478b777269c6ff7f87c01ba9763f03278e68ce43fe6162c86e",
+      "sidecar_mtime_ns": 1790433532933430531,
+      "parquet_mtime_ns": 1790433532926579616
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "84f9233363f38f7db98b7982b473da14266beaa2ee93e77603fc20fa18e9602f",
+      "parquet_sha256": "85a107598d6f44a0ff30ab1df5f964886e43989311b433c1c85269d3bf7a5892",
+      "sidecar_mtime_ns": 1790433533019344274,
+      "parquet_mtime_ns": 1790433533009702034
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "572192612c3a0e0efc4e6d6a8d9719a2d8fe4576257dac5bda3d3cad882260af",
+      "parquet_sha256": "d138b11189df5405b4a90b77907da045605782f4b54b2a37721d62f17bea0456",
+      "sidecar_mtime_ns": 1790433533086709361,
+      "parquet_mtime_ns": 1790433533081086667
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "fe7dcbf0dd4d79e8f3fc16e0e94f68dc589595e102ed8e8412aba5e21cf4d3ed",
+      "parquet_sha256": "d0dc9318093c4ae07b9670f328242365ab175ead903bdc35ecb11e33826cf17c",
+      "sidecar_mtime_ns": 1790433533151042625,
+      "parquet_mtime_ns": 1790433533140573860
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "60118f561f506e5e302134c61a1b721e16759b2884e8a00c4915e4dd3e0b78f5",
+      "parquet_sha256": "5cc2323946e67c773dcdc2290b94ce88c552fdfec883c23a0f5d8d9d19b39787",
+      "sidecar_mtime_ns": 1790433533210494262,
+      "parquet_mtime_ns": 1790433533200061052
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "a22e11792f52f4758dfad8c6cd63dc7b3caf99f419cdc35c69ba72817c711587",
+      "parquet_sha256": "f21b3349c72089de9bbfe988a02ab5d664fa40690efed8d772e46ddb113123b5",
+      "sidecar_mtime_ns": 1790433533269505805,
+      "parquet_mtime_ns": 1790433533259548248
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "bbb1fa396a0d4867c0f390a16eca51e4033ac3db5a0b9a1aaa97e7c2286040ac",
+      "parquet_sha256": "282b5376e5983afd2cc6d3e450451d6c584997fb6cfff84b78ad6d7262e22e83",
+      "sidecar_mtime_ns": 1790433533385463282,
+      "parquet_mtime_ns": 1790433533378522636
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "b6bbeea9e362991abf2aa7f47cdd5b1904720154149dcbbd04d0d78bdc566ea7",
+      "parquet_sha256": "4a5cf90c96c0cec5e95b42d66e9b8988f5d1fda841d9100bf7403b9278670cf3",
+      "sidecar_mtime_ns": 1790433533444854420,
+      "parquet_mtime_ns": 1790433533438009829
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "f182437edf6917a398b2a2140856e56e17f7f6804113e686c18e9420ee1adb44",
+      "parquet_sha256": "95a0c73cf99fbb09ae23c2b4e7ba988703e5bbfffe2b73aa2016899ca2df26b1",
+      "sidecar_mtime_ns": 1790433533485846741,
+      "parquet_mtime_ns": 1790433533481633773
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "1fdcd32190f31a7124172aaed86680ef66b7cd33837b949909a4138812da3d79",
+      "parquet_sha256": "8211988cdad2837af3ab3800be6ea36a35c2b862d3b2ffcde58943dcab45305e",
+      "sidecar_mtime_ns": 1790433533729865689,
+      "parquet_mtime_ns": 1790433533715616734
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "e043c7321e3e735d3cbf6daac9f2fb2c180be832745a90be27a2b70641a5dd5e",
+      "parquet_sha256": "cc9e38b44e829395551f8408f4eb06792e6567f108b6b60c4c579350eb9b0ae2",
+      "sidecar_mtime_ns": 1790433533780330946,
+      "parquet_mtime_ns": 1790433533775103928
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "18d47b58681850307cb37ec9803739ba1197db058e03a622f861853c5801b5cb",
+      "parquet_sha256": "b184c9b43e9b30b99bc20a86e12386e8d633711f1ede3bc730c4f655f3dbbf41",
+      "sidecar_mtime_ns": 1790433533827158930,
+      "parquet_mtime_ns": 1790433533822693684
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "bac9bdf105d7de35ecc435d471e52862670e33d11d1c7fc57b91ff3bd4314879",
+      "parquet_sha256": "05557b4d9d4fa53924fb64261ba5cf70af6d2013d821e22c1bffa3ed2eae6d74",
+      "sidecar_mtime_ns": 1790433533946394268,
+      "parquet_mtime_ns": 1790433533937702257
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "1c47bead8558617340fd22ead5848d56540e3850bca801549281c5321271354d",
+      "parquet_sha256": "67960981f05f397b3b0c190d30f456691daf35dada4899b8cb75469bcbe8750f",
+      "sidecar_mtime_ns": 1790433534019214808,
+      "parquet_mtime_ns": 1790433534009097445
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "e363e736a3d5fd815ebf17c9fc3a14cb5294852fa9c452bff7fcc058cfb3bdb4",
+      "parquet_sha256": "0210434340171cf83652dad3cdf073d9c943dfca3f4a65ceac69d9343efba20e",
+      "sidecar_mtime_ns": 1790433534069949069,
+      "parquet_mtime_ns": 1790433534060746721
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "3e1f0911e2810fadeb21ac23de3a6d7262976c5fedd526678370e820556a448e",
+      "parquet_sha256": "7a9f9f59c46b70ac7242e4c59de1ee16b5de3aad5d14936ed53c2841cb96f74a",
+      "sidecar_mtime_ns": 1790433534323946236,
+      "parquet_mtime_ns": 1790433534315020079
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "32497c3cd7d75c51833e5d193a99b8a800bcdaf75df9e0bebb4ff18658461402",
+      "parquet_sha256": "599706c9dc50d0cb37ca4b6372e4c4da0e8c9a54da2b5b79bac84f1f3471925f",
+      "sidecar_mtime_ns": 1790433534395545286,
+      "parquet_mtime_ns": 1790433534390507482
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "14eb8a3d10583515b88b775e1816a6649137f1b379cb30f38dcf20c87a42cb7e",
+      "parquet_sha256": "af3a99529465bdc9d9bd0f15ed090e41fea9c18f87d613b8addb4e89c85b6fe3",
+      "sidecar_mtime_ns": 1790433534449589278,
+      "parquet_mtime_ns": 1790433534446129779
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "6f5f8ea49ea23e2d6e090150075ce6cb51015fd98dc28bb51739df49a206fe7c",
+      "parquet_sha256": "3c3fef79ad67d499fabcdc3140ffc17863408e9616fec0b128a8bdf36a066941",
+      "sidecar_mtime_ns": 1790433534548377741,
+      "parquet_mtime_ns": 1790433534541482290
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "65bd1a606c39a4ae934b97eb45a9e3f42065bf0d0b2b11bb2a8cb2f4baba6ee5",
+      "parquet_sha256": "c098baeae7045a08a97700efee7d79c53082fd9c80d54c41711c9b8e298cf4bd",
+      "sidecar_mtime_ns": 1790433534611090832,
+      "parquet_mtime_ns": 1790433534605050629
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "bdb6fb725f32318d431a1ab31ac6577ca302d21a1accea8930202d7081c0db6b",
+      "parquet_sha256": "c2d63d356cddead2810efa94fabf1b7ce2ede69125119da9e1e63a9e2582aced",
+      "sidecar_mtime_ns": 1790433534665005261,
+      "parquet_mtime_ns": 1790433534660672924
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "05dcda3d3ad8409be3bf39130834e72c984e4850eab9cbe720242e7bc9213f8c",
+      "parquet_sha256": "d4c5279129bbc06ee949d8c6d1e5cad0ba01e27375a90ebcee92c3d5aba42381",
+      "sidecar_mtime_ns": 1790433534926028782,
+      "parquet_mtime_ns": 1790433534918919304
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "fe7a6898f2e474dbdad026d0e2d647e11ec75bffc8a4d6bd9207a612801017b3",
+      "parquet_sha256": "80c8c80c6259ed3e8b0f68ac40f156e74a863d0c17f934dda6d84d56012bdbdb",
+      "sidecar_mtime_ns": 1790433534977428443,
+      "parquet_mtime_ns": 1790433534974541602
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "0ec83a0e9cd96551469c0a5e864083fca894808f9a0e87955435357c4244b144",
+      "parquet_sha256": "6ee15e22be2ad357161c9e6debb5380f3d37b6135a0131fa89017f179ba9d4e5",
+      "sidecar_mtime_ns": 1790433535036947999,
+      "parquet_mtime_ns": 1790433535034185906
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "58dc3e125e254dcde17b91f181848ceb4eff0785a85fe18a03f377f1b43c8875",
+      "parquet_sha256": "fc2cdc9a9d8686b4ab1b2eb73e882e7f7c7c5529aee1b67b345613e0073412ca",
+      "sidecar_mtime_ns": 1790433535154953413,
+      "parquet_mtime_ns": 1790433535149586432
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "639e84f4e935e073f900d9475d20378dcbfa6d0f556145ad175743d2dd9846de",
+      "parquet_sha256": "4635418249f11fc1b2291eacc00aaa2a1f21f4f136f809dc4826bd330c7e296a",
+      "sidecar_mtime_ns": 1790433535222705667,
+      "parquet_mtime_ns": 1790433535217235015
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "427a07e8d679b0eeb2553fc57490351de2a72b8776a0a7d76024515717c321b9",
+      "parquet_sha256": "b6daddb3b6a0e58bb9eeb43d6c3f380577c5f032e37e45c23339fb67afe68e3d",
+      "sidecar_mtime_ns": 1790433535269788061,
+      "parquet_mtime_ns": 1790433535264986959
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "ba64401f3212e54a1df93ce829ad5f06fbe0946fdd1abddf2a6bbb417c5266a5",
+      "parquet_sha256": "f3da4d600340b19876a1c851a79e26476f2155ddd95e0e8f8258baf4f07ac7c5",
+      "sidecar_mtime_ns": 1790433535524448385,
+      "parquet_mtime_ns": 1790433535511705320
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "126ad87b33fd08909557b5e4f3797f1f604f66365e1a08d8662fca1028e5834e",
+      "parquet_sha256": "7020aaaa680896864dbf964f2bbd0e4b3e246628b6e9f092249f8eb3493bbde0",
+      "sidecar_mtime_ns": 1790433535599014859,
+      "parquet_mtime_ns": 1790433535595271218
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "058e4945164f1619d5b07ca98b6bc8cdca9444c146cadec1593e071c36fdd775",
+      "parquet_sha256": "ab95372826ecf6873a5863363dbdbcc513d3fe030c9fcf5357f17a918e8437a6",
+      "sidecar_mtime_ns": 1790433535675138363,
+      "parquet_mtime_ns": 1790433535670878459
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "3dd2f3e23b7a09d93a801dc63a8c93761342ff2ff4967d94f76fd360f669b816",
+      "parquet_sha256": "4d2fcd40c628f9da51e0590da5f42baea61730e270b6c3602600df542df6d6d7",
+      "sidecar_mtime_ns": 1790433535797221915,
+      "parquet_mtime_ns": 1790433535790258315
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "57a58a691d909e8d46646b20c1ab80cb1b8f7437f0aacfb1669674edc6e91a79",
+      "parquet_sha256": "97c1a0a1e8e73201b709c9b37929f4f2c015c31784b68157499c54b0fb79fcbc",
+      "sidecar_mtime_ns": 1790433535873054415,
+      "parquet_mtime_ns": 1790433535865865554
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "5b5664ac59decd332ae567584d725be12e9af14464018c6a563c0dcd2846ef3e",
+      "parquet_sha256": "f0df23fdec2fd3ff59bab708e4626ca8a9e9991f02979901e52d393676962911",
+      "sidecar_mtime_ns": 1790433535934072145,
+      "parquet_mtime_ns": 1790433535929534810
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "a297052ed1526166c722c3ebfacf8046f0ff413be204a28bf59b1677a4042ecb",
+      "parquet_sha256": "fef9e7e21c3654e808601dfe5b0260d4d4aef119dc4c898082c84dc53333fffd",
+      "sidecar_mtime_ns": 1790433536263445033,
+      "parquet_mtime_ns": 1790433536244235472
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "df16811f26c959316c0f3caade55bca4862e24d2aacf03fcb18ca38152833387",
+      "parquet_sha256": "f4d6381938250ff21a0a2bd4debda47560b22b964d29527e56e191f45e5aedd1",
+      "sidecar_mtime_ns": 1790433536330824292,
+      "parquet_mtime_ns": 1790433536323932416
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "6a889724604c6de5ad234ccd563fb2f5d1ad845c35ecbf405e57f7ca5d435f51",
+      "parquet_sha256": "2bd5e3fabb3fee8e78ce177cfb1120400f74b85165693634c42c07ddf91e09b5",
+      "sidecar_mtime_ns": 1790433536386956282,
+      "parquet_mtime_ns": 1790433536379720280
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "f7b1692d988bfbcbe25542e01790530c1b50b4ac11c49c561bc23f0f97e46bd4",
+      "parquet_sha256": "20ea25fba21fbcada92c8de3341621d74ef80ea18adec24ec884e0d64a4737ef",
+      "sidecar_mtime_ns": 1790433536489003314,
+      "parquet_mtime_ns": 1790433536479341462
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "889d127acbe30d2c30d3e09177b3261c1edd3ef6673b3c93fe163fad6858e0b1",
+      "parquet_sha256": "ff1f371d6de10dfd89eb154ee1fa5c966812b282ddf1cdfcb9280bcb2d1df45e",
+      "sidecar_mtime_ns": 1790433536563641910,
+      "parquet_mtime_ns": 1790433536559038405
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "79b9212bed1a5094b623ef19b2b1e88800855271ade9e6a91637392586e9a8e2",
+      "parquet_sha256": "933c74e40b4ae6350d1ee02eb81494af513a6d65fc80eb7698521c60edf78a9d",
+      "sidecar_mtime_ns": 1790433536614496936,
+      "parquet_mtime_ns": 1790433536610841422
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f1676e2a4c9d9b1ce6e66b14c2bb6ef333f702c516a78c642d4e42a556cfe353",
+      "parquet_sha256": "3e17798d6f5bda46e8c576112ac76513cf36b80f47862a11eb0f4fbdbb3e7d6d",
+      "sidecar_mtime_ns": 1790433536851938665,
+      "parquet_mtime_ns": 1790433536845947411
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "4a5c2183bda12cc340a051d124ce0b69a7d0902a5af97a5125dbf28349fa64e3",
+      "parquet_sha256": "612f88e596df9955da3d2edd81bfbb2ce5a5a08097ffdf3ae0d9dbd9545b5935",
+      "sidecar_mtime_ns": 1790433536910685355,
+      "parquet_mtime_ns": 1790433536905720121
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "e4b169f948bccf39765208d50e0118bc62f66168a58f19de0a0a46f21fcf96c8",
+      "parquet_sha256": "dc9ab199af7635f6f87fad19cc44ca9a76b2db6d512d2bd920a4419163b2b5d1",
+      "sidecar_mtime_ns": 1790433536964582917,
+      "parquet_mtime_ns": 1790433536957523134
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2dd2874ecfaf7f5080c2fecdb0b60054f7267988efacc7d114baec98e27013e1",
+      "parquet_sha256": "07e64c4af4d6e79e41f03f5ecb0b28c06245c38fb9ebf810a355b9390ef5dba4",
+      "sidecar_mtime_ns": 1790433537100875340,
+      "parquet_mtime_ns": 1790433537093116679
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f9add66f416a6ea146b446428a162fad42eb8dfeae508d8770c76eb8bf509ffe",
+      "parquet_sha256": "be34ec090c8a7342b26e46ecc94c00ed892a9419a5b8ae4204d71cceb91a3930",
+      "sidecar_mtime_ns": 1790433537189326221,
+      "parquet_mtime_ns": 1790433537180889555
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "268ed68b63f6a2d2c98762116236783bb340f0768ad7bf40b619dbe2181ebf35",
+      "parquet_sha256": "826daaf776dd66a55f6ac3d8707b4906e1164b96fd029ee38a025cc5fd95d8d1",
+      "sidecar_mtime_ns": 1790433537263457293,
+      "parquet_mtime_ns": 1790433537256693407
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "97fffd0ed36a2410d0f69229c2fc669e5c8a5318abad36278d5e9aa60b3618f8",
+      "parquet_sha256": "13bcb4bed46a4fc968adeae9db5eb9649a4ea202565304ae87168ebde2defb7b",
+      "sidecar_mtime_ns": 1790433537653839585,
+      "parquet_mtime_ns": 1790433537635712652
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "002c53a4eaa2b5dcd0f6ea06f763cd2608048e764b9f22d47553dd9d18ef83d8",
+      "parquet_sha256": "372104c69b2a98400355889baf6623e182b5114f6b4c939b7b33e536fdf7377b",
+      "sidecar_mtime_ns": 1790433537734392238,
+      "parquet_mtime_ns": 1790433537727475205
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "de7cb7519856a70c75f4b9aa7863b2cd5b8c43995ee5456eaabf3e4d5967c882",
+      "parquet_sha256": "0a0614c75d13ae02c63b0b927b97bd53a519bf23f0e115f907eb22e9032b7289",
+      "sidecar_mtime_ns": 1790433537804980513,
+      "parquet_mtime_ns": 1790433537795299701
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "e805c746626c44ddbc56b3c4dcebf9eb2da27d4ae148bd67396fa4d873354617",
+      "parquet_sha256": "40ab0878146b3eeef1f5170b351f98f9b66fadc4d9c95ad5d717436c0d365b36",
+      "sidecar_mtime_ns": 1790433538839263989,
+      "parquet_mtime_ns": 1790433538829499960
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "e85b7a4a74ea0700bcc3338eb6a9f6001082540c94d4a4cd6ab2fe0c62a6dbaa",
+      "parquet_sha256": "b837dc619bc506d0aafe2f48120df7728adcfeba88739075b7c728402b147d6f",
+      "sidecar_mtime_ns": 1790433538908864068,
+      "parquet_mtime_ns": 1790433538901390187
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "90c821715a0a954fe1752e2aa46a0c101662dfb237f538ab44375ef3e76ad60f",
+      "parquet_sha256": "655bd3fed027eff30420d682942c1d848d8dbdad18bbadeda305ed1c3f79443b",
+      "sidecar_mtime_ns": 1790433538972344818,
+      "parquet_mtime_ns": 1790433538961303014
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "9504b05f9895e35e6f0acf3de4a32e437ecb873f8012191b2b31357bfad339ae",
+      "parquet_sha256": "8442993efd5ecea45013b5706db1e435d48c2457dda202edcd730e4e546574d5",
+      "sidecar_mtime_ns": 1790433539266682861,
+      "parquet_mtime_ns": 1790433539257148216
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "64261b36b1ddda7319f4667941627dd35d8e9ece931e08a2bbcb8b47931a1d02",
+      "parquet_sha256": "798e03a7d0dfd44c50dcb49f2a16f66a02c89c317ebcf8f72cf3e159de1578ce",
+      "sidecar_mtime_ns": 1790433539347275328,
+      "parquet_mtime_ns": 1790433539341115312
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "e2468a8e3039d8bd9170eb9fe83167a509c87b994678797f47a2ec04d1e7854d",
+      "parquet_sha256": "55adb220014758e7cf387ae6bdc68abc14fa514457aacb2d565c8203da59def0",
+      "sidecar_mtime_ns": 1790433539413482378,
+      "parquet_mtime_ns": 1790433539401091809
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "692d5235ca1af7bd3f6d572b7aa8030c0d135f9f019fba1271def62e3166c16d",
+      "parquet_sha256": "9aec24b4e485e2c0cfa49321099a9dac9c42be11b17be38f0a7aaab2f28a13e7",
+      "sidecar_mtime_ns": 1790433537974768145,
+      "parquet_mtime_ns": 1790433537966855780
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "83a870ce1e367710c813d62a64044b51a24e3bf34b11201a6c1f7c7bdf463038",
+      "parquet_sha256": "82fb3ec729bdd6395f2bdf46317948578eb38746eec2b657ba6e5577b50fae5a",
+      "sidecar_mtime_ns": 1790433538073137772,
+      "parquet_mtime_ns": 1790433538066664748
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "2c67321b1c9358290396c946bc773cd90f6ec9f73b89ac3a31bb4d4e53c406eb",
+      "parquet_sha256": "4755c3805558dc806d991e60de02bce5acb73455c5a40d2ceaba21f258b22e69",
+      "sidecar_mtime_ns": 1790433538151119823,
+      "parquet_mtime_ns": 1790433538146542779
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "04212d63ad4ae38a7f48298d2425456691a27772da579b6eb5ed44bda7a1dda0",
+      "parquet_sha256": "dd03dbceaa95eee47370ce13304a5aec470086906a79bc889a82aed2685729b0",
+      "sidecar_mtime_ns": 1790433538539758423,
+      "parquet_mtime_ns": 1790433538521969532
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "4a322c06e3797bf785356ef046b28a64ef83e12aa713a5ab5c26e2129d50cd76",
+      "parquet_sha256": "694b251f94e1f591db74d3befc7d4cd6ab91e95a0acda58679aaca076106b6a9",
+      "sidecar_mtime_ns": 1790433538622315829,
+      "parquet_mtime_ns": 1790433538617823173
+    },
+    {
+      "sidecar": "SIMPLEHOME_1002_CAMERA_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "427de8419a6fe7a83d66f9e71302099d9b9c4a04e46606ea5b67193d621fa7b7",
+      "parquet_sha256": "84e310e39b75111241a449420f40c88784d43680b3a10203be5c19bbecd7d43f",
+      "sidecar_mtime_ns": 1790433538701949258,
+      "parquet_mtime_ns": 1790433538697701204
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "7de5fd1d494e15a39c77087321d36babadfe148813af86f26096f1432576b1c8",
+      "parquet_sha256": "266bd4134175e32dfcae97508e00a1af106529cb12cce89b81a0aaa336147fde",
+      "sidecar_mtime_ns": 1790433539506324049,
+      "parquet_mtime_ns": 1790433539501052637
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f15616df2dfb562de3f234718bb6c2e020accd30e6a25445eb8807e79df975ab",
+      "parquet_sha256": "ae02eaa90869f02008f92e5a459a6e4ced35efa3f11f99db0200acc3081452f9",
+      "sidecar_mtime_ns": 1790433539567787468,
+      "parquet_mtime_ns": 1790433539561029135
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_FINAL_GATE.json",
+      "sidecar_sha256": "f2c4520ed3533f6dc90e903107da0a2e31a7e8ae25cc9f298aff335f23c37a79",
+      "parquet_sha256": "3c313c48401a7bf60a23de580e04750c57de10e9a4a5199b389e5cb0009ad75b",
+      "sidecar_mtime_ns": 1790433539615840323,
+      "parquet_mtime_ns": 1790433539609010331
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f4710887c3df80c5f1e5c69497fe2b474cbfb5b18794f3146ed1e0bf51e38a83",
+      "parquet_sha256": "f623531f674594409d1c3be4fa9f26340a9cde8453b6674f74841e1297f62b6d",
+      "sidecar_mtime_ns": 1790433539813859982,
+      "parquet_mtime_ns": 1790433539804933557
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_REPORT_TEST.json",
+      "sidecar_sha256": "c3af55b25e810e82d5bf12983963c93db02af528d391c8db71684194354d14f0",
+      "parquet_sha256": "cc9b874d2656477a4700ce43993cf1e815826c5a859355a76051aea1ae2c4fce",
+      "sidecar_mtime_ns": 1790433539868871194,
+      "parquet_mtime_ns": 1790433539860911619
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_BENIGN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "eaaa0fcbcc65b98b0262783783b9294dc16cb491438a59edae93a82163806db6",
+      "parquet_sha256": "edeac8ab1da9d341c862ff5bcba3d59af1a33ee277583f76fa6ed9c8fc170f26",
+      "sidecar_mtime_ns": 1790433539940454324,
+      "parquet_mtime_ns": 1790433539932883416
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_CANDIDATE_SCREEN.json",
+      "sidecar_sha256": "799295a3d691cd121174fe2d4284748dc34bc773e799c5c833ed03213bf4b445",
+      "parquet_sha256": "cc266f7db160c8a4502d9a790d0944850afaa1bf466b173b18347145d50e1e35",
+      "sidecar_mtime_ns": 1790433539990150058,
+      "parquet_mtime_ns": 1790433539984863049
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_FINAL_GATE.json",
+      "sidecar_sha256": "8a3adb036d731ff119d055846ef3eeb1bafaf0aeb29f14564051681583f8c381",
+      "parquet_sha256": "4a9ff484f00be42b06c738c01f01078eb383bedd4e604bbbddfe02cb3ef9bd3c",
+      "sidecar_mtime_ns": 1790433540064278640,
+      "parquet_mtime_ns": 1790433540056878174
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_REPORT_TEST.json",
+      "sidecar_sha256": "0462a0036340a9b33ac570308cc07374ffc66cdcf55ad294900b4494610de70f",
+      "parquet_sha256": "4fdb9222b5229ff188d52d98d59fe46f3f2b770fed6a492eb9ddfa53c5b68226",
+      "sidecar_mtime_ns": 1790433540154000373,
+      "parquet_mtime_ns": 1790433540144914874
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_REPRODUCTION.json",
+      "sidecar_sha256": "19ccb70dce259b93f0931eb7dceff87c65c336d25dc3c80079009cc41a11a5e2",
+      "parquet_sha256": "a0b06ff199902f5d5235230286734d9533fd21688a3c97c7cf49094b8113fe13",
+      "sidecar_mtime_ns": 1790433540221872917,
+      "parquet_mtime_ns": 1790433540212943231
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_ROW_VERIFICATION.json",
+      "sidecar_sha256": "7aa1e89a48c5e1c98972e5d041ac57c1c741b657fad6ef024be425a29873b535",
+      "parquet_sha256": "7f4f38744c221cbfb396fdf0299508cf778e2da05f95b0bfa4e39cd12e2cbd4b",
+      "sidecar_mtime_ns": 1790433540298684325,
+      "parquet_mtime_ns": 1790433540292976597
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_COMBO_SOURCE_PROPOSAL.json",
+      "sidecar_sha256": "040176a950937e7f9fc0574aea0fa301bf365499312daa8ae3e5c5727668714d",
+      "parquet_sha256": "dfe1d034a65a2c3bf0924c9687e15f86d9ba4394c5bd67ca00b74054bb24756d",
+      "sidecar_mtime_ns": 1790433540368417774,
+      "parquet_mtime_ns": 1790433540357003286
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "3439cd153bc24b8e6cbb497a1d57e07ee8722e51e2210edd09b6e066824ab930",
+      "parquet_sha256": "916dbcb4ba3b35c51d0a1422faf9172962b63877b13ca51ee5795b33a9ca7a13",
+      "sidecar_mtime_ns": 1790433540485559244,
+      "parquet_mtime_ns": 1790433540473051663
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "f3e55aac92d73ffa06e6cbeca8135feac189294b0b23a385aaf540d0eea1918a",
+      "parquet_sha256": "8b4911f71dfd024c22c4cbdb37e4384cba44c0c2ccb81f6dfecc996ad181fc79",
+      "sidecar_mtime_ns": 1790433540550293382,
+      "parquet_mtime_ns": 1790433540545081693
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_FINAL_GATE.json",
+      "sidecar_sha256": "4d24da78a4a01ba0266e5c265bcfd1d5db61ea1bd1f9f9a492e9e9b17010f1f0",
+      "parquet_sha256": "20363eab327b9b0c442471a3b325df63413b991afba8ec1784006d209fba6eb5",
+      "sidecar_mtime_ns": 1790433540602661359,
+      "parquet_mtime_ns": 1790433540593101709
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "51184ebec68b9ba91d7d0c39c33b3f52e4e30a97f8cc515a2f01fa0b680c3fe5",
+      "parquet_sha256": "62dd07a19e5d7a916ca7970168fdf141767a31e283109ed869e82d1ef59a3778",
+      "sidecar_mtime_ns": 1790433540871821830,
+      "parquet_mtime_ns": 1790433540861213478
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_REPORT_TEST.json",
+      "sidecar_sha256": "ff896761efa80f7997fd9ae84362bdc940533bd5724d38c70b9b432126f78b20",
+      "parquet_sha256": "033b52e3fa4031a1c079aa08079cd197dc36319fb0e5c057a945f31961692049",
+      "sidecar_mtime_ns": 1790433540933439403,
+      "parquet_mtime_ns": 1790433540925240170
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_JUNK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "8f3933d475d18323624e3986dbb6099e0f658a77dd33c66672dc40cd8578832f",
+      "parquet_sha256": "3212c03176021d72a43f7dc1cdcb3736ceb0f8f20e609a209972cd283afbd374",
+      "sidecar_mtime_ns": 1790433540984827455,
+      "parquet_mtime_ns": 1790433540977261855
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "f1bd1f8cac7ae9d697814dc7dff5d038c63f77ef390579bfa058d4133f05dfeb",
+      "parquet_sha256": "d120b66874dc64207dc5c0aed1b89eae113dfe9941c33f214730108fc764a473",
+      "sidecar_mtime_ns": 1790433541103788237,
+      "parquet_mtime_ns": 1790433541097378412
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "ff360762f6f8b548fa9abe7afa9bcbc5d0ebc6de2076bb8bfa67535dcb8e7551",
+      "parquet_sha256": "6c4bfe95cc5acc5ae06f8cf9be2bf0a9bf3716f57fa291aa8eca215d44220b57",
+      "sidecar_mtime_ns": 1790433541175565012,
+      "parquet_mtime_ns": 1790433541169459392
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "ff8c4694cc7c3e382548c76c80ee0c98a3604fca6ef9532a55e4a67164106c69",
+      "parquet_sha256": "f40ab0aff63fefcfa8c38f57d8b1efa5f2f79ef8d8685c4f50e3c3437ed18a7f",
+      "sidecar_mtime_ns": 1790433541224331729,
+      "parquet_mtime_ns": 1790433541217513377
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "55b6fb42dd1ab2cfb6cf6dc96d9019eb00a590288baae2167cb528631fd51906",
+      "parquet_sha256": "448e55a75defe5669428b410b76fd2308beaba13ea43faa2abb2afdc818aa562",
+      "sidecar_mtime_ns": 1790433541448422828,
+      "parquet_mtime_ns": 1790433541441765315
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "ce62287e1bfd761ab0fdfb963c49facddb45d231dbab99da6d5d54c636e040bc",
+      "parquet_sha256": "a51886dc14493aededfd7f44ba420034cf17ba14f80828ddb7d743afdfd4155a",
+      "sidecar_mtime_ns": 1790433541508857775,
+      "parquet_mtime_ns": 1790433541501832796
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "43ff8f48c70ad95f6b110edbf5d273f3ed9ca531aa8324d911c9154a08ebc2f8",
+      "parquet_sha256": "9989ca0760ef0c73c3d20e9b8bf5fb2191cfd18db957cdec185950367179dbd4",
+      "sidecar_mtime_ns": 1790433541556052897,
+      "parquet_mtime_ns": 1790433541549886782
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "3f8e50e183f5b64737b7502a25c3ef28fc003e9a99f7ecf4cb301c0796ad5857",
+      "parquet_sha256": "7ac010d461027296c797dd4fdfa9271870e607820f4c78c554253e761ebd0a0a",
+      "sidecar_mtime_ns": 1790433541657495313,
+      "parquet_mtime_ns": 1790433541649999254
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "8155fde712a07c505f22016eda2992c1786dfbb6de2d29979ee6e81a4366f9db",
+      "parquet_sha256": "619f58ede6dfe806f46cf75335677c779ac46e978767088cfd9e5422ff2932f1",
+      "sidecar_mtime_ns": 1790433541721226995,
+      "parquet_mtime_ns": 1790433541714071235
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_FINAL_GATE.json",
+      "sidecar_sha256": "72470347057f097119000dda87d69d92d22ba3632961f74832f6e004bdc69ee1",
+      "parquet_sha256": "fdc83eb0ac52dd88ccdf31daff4ab8ec19ae551c6f9b8c02551bdc14382c045c",
+      "sidecar_mtime_ns": 1790433541770951509,
+      "parquet_mtime_ns": 1790433541766129719
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "f30e8d9df6df07fb68d91d158236befa90ee43bac238ddd6e2a41cd41f14e098",
+      "parquet_sha256": "0f04131789b41df843be4d69cee2df294284436e70d11fe8b8a66b863efba6dc",
+      "sidecar_mtime_ns": 1790433542062474538,
+      "parquet_mtime_ns": 1790433542054485277
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_REPORT_TEST.json",
+      "sidecar_sha256": "b118a0e922f3290d38c0bf859399c0b3728331b58e416122d1c5e0fc35d79f90",
+      "parquet_sha256": "46d71180993092be12e18dd6ff88691410a1b38053fb00bd19a54159d06ec713",
+      "sidecar_mtime_ns": 1790433542121097429,
+      "parquet_mtime_ns": 1790433542118596887
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_TCP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "57c7a6db82b6043922ed4ebfdb27bd29918ba1b99d0e8b386a58b0605322051f",
+      "parquet_sha256": "3c2be81a89488fe72a743cb1f4d8fd62eaacf93ef9502381414d6482705f61a4",
+      "sidecar_mtime_ns": 1790433542167780316,
+      "parquet_mtime_ns": 1790433542162673620
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2d831ab5f00795433c96c11249ed22be4355f41ec35e8e40e5901efc0983d248",
+      "parquet_sha256": "ffddf7ca46d6871441ba1cc26f75b3d542cb89234f4e86991539e6919d851baf",
+      "sidecar_mtime_ns": 1790433542302818106,
+      "parquet_mtime_ns": 1790433542298910792
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "349afb78a227cfb8b16e6342bc0aa6e6c8e4fd655b6010f99bc7851819d9f700",
+      "parquet_sha256": "28c822f9851cb13d284447bfd2f54d624ca847537df89e25866d6dc9a201b7bb",
+      "sidecar_mtime_ns": 1790433542375813211,
+      "parquet_mtime_ns": 1790433542371036355
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "0fbe59aeac1e32e0d98bc77dc71482f39260b091490715e89dcadd5f03e886f6",
+      "parquet_sha256": "4d0cc2e03e9f741b80fc6e4478d8b2ff9f205c53ca694b5f7a07554c70413138",
+      "sidecar_mtime_ns": 1790433542424454221,
+      "parquet_mtime_ns": 1790433542423127039
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "455789e639c77d73930d713c27fa8e172d12c4575ee7183dd8cea54ae64973db",
+      "parquet_sha256": "b62128fd7d4c2f40a288b80cd86343d3e3ab55441e2210b96a03ade1c71bdbd9",
+      "sidecar_mtime_ns": 1790433542723565040,
+      "parquet_mtime_ns": 1790433542711629289
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "ad590e338e2dbc885728d03667a946988eac7d34eab31c81dc912cb1dcf7b5b8",
+      "parquet_sha256": "c07d29fc2ef03c6eac7d88c86a658bed881b3aad116f056b83ad01ab55ecc94c",
+      "sidecar_mtime_ns": 1790433542788246333,
+      "parquet_mtime_ns": 1790433542779747874
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_GAFGYT_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "7c2be313579050d4d3afc25f68f467a6f8577c7191bbb305f1e0734eb62e4ca5",
+      "parquet_sha256": "d10ddc3128cfdcd0b7a1a9c470fd4552296e727de7d29c0432bfe7759ca59add",
+      "sidecar_mtime_ns": 1790433542854588316,
+      "parquet_mtime_ns": 1790433542847866460
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "2842ef68bf0c338dc52041fb6660a666e3d6b55c09b1b4177b3a56d9c22fbc94",
+      "parquet_sha256": "37479ef32f6af2754b852542fe37981e73de3fb92e64a70531a608e2a10fadb4",
+      "sidecar_mtime_ns": 1790433542980461794,
+      "parquet_mtime_ns": 1790433542972082705
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "fadf16f358ba9123d7cd0e5259beee6c4e96165a548995648c52d4249b7414b5",
+      "parquet_sha256": "3bcd18e650723281ca156c466df65fc8bed6d9e42d85c5eb47e696870a357cfd",
+      "sidecar_mtime_ns": 1790433543047884438,
+      "parquet_mtime_ns": 1790433543040221257
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_FINAL_GATE.json",
+      "sidecar_sha256": "f514d822cefb2425b88d469c7c7eb9cd390b187d12edfe667350e50d714ca78a",
+      "parquet_sha256": "dec4ab24c39bd423b82e4143e5ca06c24452d7cedcb2b6518f2b8f7e876e9574",
+      "sidecar_mtime_ns": 1790433543138994713,
+      "parquet_mtime_ns": 1790433543132431543
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "6c09ecfa5a94df7dbf068740cd617f9d7cc1fa02b2ddff741e4f761bfd186edd",
+      "parquet_sha256": "3b230323d1718e6421237a9688d702d356b3149abe99cc14d327f53a9e48820e",
+      "sidecar_mtime_ns": 1790433543461385943,
+      "parquet_mtime_ns": 1790433543445144689
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_REPORT_TEST.json",
+      "sidecar_sha256": "c9a0734ac842fab0ddce73d64ffdfdda1e6d17509f2fb1382ecb2c0c44349a6e",
+      "parquet_sha256": "a37cd1f3a23da9e006edb54b2afab61f2e81d35ca268db229e4716cf028b498c",
+      "sidecar_mtime_ns": 1790433543531937135,
+      "parquet_mtime_ns": 1790433543525327549
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_ACK_ROW_VERIFICATION.json",
+      "sidecar_sha256": "1aa4dcb92083d1f2b21e6ba0df5f0248930073262bddcce7654b29fb48f1b8bf",
+      "parquet_sha256": "bda7d1560b99d5571c2cbabebf7ef33bdcb76b7984f1ba068b07037fc1ec06da",
+      "sidecar_mtime_ns": 1790433543596326830,
+      "parquet_mtime_ns": 1790433543589473834
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "95493200d6bbc410b286c5bd1ee479f8e15eaee59124e315f67882553a1e7134",
+      "parquet_sha256": "69457164c138bff87ae281d75fbfaddf9e1b1c8ca337624d6a35b68857c0d0d7",
+      "sidecar_mtime_ns": 1790433543700966206,
+      "parquet_mtime_ns": 1790433543693711550
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "d9f97a58a87f8e6091e127df221af699c5a5dddcf1e0e8b73fb7ef4aa521e24f",
+      "parquet_sha256": "72f837bd2ca9cf7f716926add859eb97c3dbb36e6be56e94a6121348dd1bf68b",
+      "sidecar_mtime_ns": 1790433543763941311,
+      "parquet_mtime_ns": 1790433543757857837
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_FINAL_GATE.json",
+      "sidecar_sha256": "dbba1a66fc99a14f4a670066ff782ac985e554fe359e21b09550b36d55158b97",
+      "parquet_sha256": "76016c7ccf203b4530d85273792b957caf66b4cfbe62dcfd239914856f2dd266",
+      "sidecar_mtime_ns": 1790433543808423680,
+      "parquet_mtime_ns": 1790433543801958408
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "255f0496b30d8a188f489106b9f24a1a9f370c100373aeb3ba84ace0870af72a",
+      "parquet_sha256": "ec204a14ab889f78169427cdde3a01e64cef20bb3aeb19c63800ea800fe8cba0",
+      "sidecar_mtime_ns": 1790433544013233011,
+      "parquet_mtime_ns": 1790433544006426178
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_REPORT_TEST.json",
+      "sidecar_sha256": "528d2dcba6918ed6d761b65ca0b0f27d44ef10f3e555e6e5f15e3ee56bdcc815",
+      "parquet_sha256": "34ff70777672897b28e301e1f73ba3d000a5aea2d3c71cc9b9edcc0ad8f2ed9c",
+      "sidecar_mtime_ns": 1790433544071684027,
+      "parquet_mtime_ns": 1790433544066591767
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SCAN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "ce0ff040ba162316be3fd10674de1daf93eeb4a267c9672bfcce9efdeb452b80",
+      "parquet_sha256": "5c1f9af1ee44d319b994d27e648d44582b14dc2c4b3e58ddf6531578bdf70d24",
+      "sidecar_mtime_ns": 1790433544120423622,
+      "parquet_mtime_ns": 1790433544114724239
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "6b16f44fb7a1fd3c4154b9805bf9c0a8cc0b557da495786a433956f743e3dbc7",
+      "parquet_sha256": "5320daca5382e17818e86d59011a3e38b07fe9115600f0d689c998f89d83d53a",
+      "sidecar_mtime_ns": 1790433544236163065,
+      "parquet_mtime_ns": 1790433544231044376
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "cc7ec97e8c1365e2fd5054550fcbd1c082d692d60b951c553c42875e5d6f4240",
+      "parquet_sha256": "39ae049ad67dc50923a832ec8a8b5f6ea5323624674c29d35f0333c3b4cb2ca0",
+      "sidecar_mtime_ns": 1790433544305511548,
+      "parquet_mtime_ns": 1790433544299232043
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_FINAL_GATE.json",
+      "sidecar_sha256": "d27b4a26aca071934f559b427d3b63e4211ead300af43bf1bc1128aaa83ec243",
+      "parquet_sha256": "4445617469988a66d64725d39ee13af4df0b8b90e349fc168df9b0652e61e42c",
+      "sidecar_mtime_ns": 1790433544359588396,
+      "parquet_mtime_ns": 1790433544351375553
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "ff39b0539db0ef37c5ccb633c208578cf40e2f05e376a17fcfab443382435ee3",
+      "parquet_sha256": "01d39e5f470fffb56a4f4a17689a230f9c24ceba59dd5e72eaba3ad1469f2e4c",
+      "sidecar_mtime_ns": 1790433544635453005,
+      "parquet_mtime_ns": 1790433544624126220
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_REPORT_TEST.json",
+      "sidecar_sha256": "79bbbef5d558e320e25a511e33d5d1cd2182b73cb8da347261e5a50dc6046d54",
+      "parquet_sha256": "8e29973c949df30d75621c59f8226f73eb5370f68b8b165440ed394d036dab68",
+      "sidecar_mtime_ns": 1790433544712234288,
+      "parquet_mtime_ns": 1790433544704347002
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_SYN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "48480de9faae5e18f1ee31127dc3bd60d44399b7289bf10c503563ca730df36d",
+      "parquet_sha256": "432ade0ee33b23e0551369782e602f3799132597a9bde50535bcbd9ef86bbacd",
+      "sidecar_mtime_ns": 1790433544775914600,
+      "parquet_mtime_ns": 1790433544768523631
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "331e78325e42d79a6a807020e8ed0e12f7d0ce620f4f84906cfb0c7e7198f49b",
+      "parquet_sha256": "a5a6443527cdb3e81346451072319ad4c3059238b4a2e12fa84f095b6ce1089b",
+      "sidecar_mtime_ns": 1790433545701975457,
+      "parquet_mtime_ns": 1790433545687334463
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "6400fbf50ceb15a25b9be88ff2bbee8c5986a5a082eee3898d66e15cd3d047c1",
+      "parquet_sha256": "94da5e74cc37229a71f003d0def3e2c18aac987f7ce147414758aefb79f58d14",
+      "sidecar_mtime_ns": 1790433545767667020,
+      "parquet_mtime_ns": 1790433545759563036
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_FINAL_GATE.json",
+      "sidecar_sha256": "5642c8b8d293e7578995b0ed0160359a657a7f2f5daa379c7c0dc6566699bc54",
+      "parquet_sha256": "5769fef93880e60b0205b7e8204f045b409a24b11368a697576c475b94e0012e",
+      "sidecar_mtime_ns": 1790433545833713787,
+      "parquet_mtime_ns": 1790433545823766215
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "1f8a04eded8e63fc6146f9a4e3fc0d701cc45988d611a129bcfcb81618a5e816",
+      "parquet_sha256": "39b5ab064b40fc9f440f8a4537975dfdeee78463a6c6c7d0abb7403c11d305dc",
+      "sidecar_mtime_ns": 1790433546103854044,
+      "parquet_mtime_ns": 1790433546084621032
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_REPORT_TEST.json",
+      "sidecar_sha256": "1e9944a3210803141dc426a7842a8361f4972d11ff4ae89b8084b58a6bd3af04",
+      "parquet_sha256": "2ac969395ba3f73eba8ccec1692bc99bc3f05f75f6a8109250abcfbcbaa71fb6",
+      "sidecar_mtime_ns": 1790433546169176272,
+      "parquet_mtime_ns": 1790433546160889887
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDPPLAIN_ROW_VERIFICATION.json",
+      "sidecar_sha256": "43ebacc55f8d0a1e540705e96d14c6b14d732c7748e5d58ec323be0ea6f433fd",
+      "parquet_sha256": "cf8c8a2c3eaf1f95fa24996da42f4a6056a37e09b00bbe466579845e2e377cfc",
+      "sidecar_mtime_ns": 1790433546236430887,
+      "parquet_mtime_ns": 1790433546229130446
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_ANCHOR_TRAIN.json",
+      "sidecar_sha256": "d07f7f6399958bc548606144aa1b2d9eeef2c10ba50574cdf1cc0ff064cca206",
+      "parquet_sha256": "83d296c7db393a41154525fdb3004e8c6d6f6a9d2dd142d1d287a27a646ef3af",
+      "sidecar_mtime_ns": 1790433544923913645,
+      "parquet_mtime_ns": 1790433544916932081
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_ANCHOR_VALIDATION.json",
+      "sidecar_sha256": "7f84a256971dbf716d552951221a83036fe2893f053ace4fbfd3a6f221e2830a",
+      "parquet_sha256": "45ff5f7e081a6eb984a4114647e458cb4e10dc9d13ece86a4e98f124d1e93dea",
+      "sidecar_mtime_ns": 1790433544999007134,
+      "parquet_mtime_ns": 1790433544993141826
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_FINAL_GATE.json",
+      "sidecar_sha256": "cae9e132dafb6c234f551a6e934e065aa0bb5456c23e7c42e14ea119d71d67e8",
+      "parquet_sha256": "61dffa1d5044fa0212eb18c2a4f747b7aee547a439984c4c891aae3e10bc199f",
+      "sidecar_mtime_ns": 1790433545072056646,
+      "parquet_mtime_ns": 1790433545065366197
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_POST_REFERENCE_REPLAY.json",
+      "sidecar_sha256": "7b12da2a881e18cca4ecf86388a62d866d4dd4ff4e7f623e7136a06f4a665a32",
+      "parquet_sha256": "1c7932204c929e98ab8cc4c8bfc8998501f978138dd5c1a7778b74b8e7ca78b8",
+      "sidecar_mtime_ns": 1790433545439046098,
+      "parquet_mtime_ns": 1790433545426509063
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_REPORT_TEST.json",
+      "sidecar_sha256": "ee8ec31f1a166ad0a694e3db530f6a54322467c67e6c462eef42d160f4c09962",
+      "parquet_sha256": "e943862ad8c7d85a794be19243b249e99e23e0b13e2936a7a1137f3c6e883c2e",
+      "sidecar_mtime_ns": 1790433545508531395,
+      "parquet_mtime_ns": 1790433545502750334
+    },
+    {
+      "sidecar": "SIMPLEHOME_1003_CAMERA_MIRAI_UDP_ROW_VERIFICATION.json",
+      "sidecar_sha256": "965365c6cdaedcb5578949bd6583caee2c39b28dfda3ced9806698f822cb0535",
+      "parquet_sha256": "c1dbe65fd292db150bb6b6270555cd36684db660c9749432cc475b284a44e7a6",
+      "sidecar_mtime_ns": 1790433545568748134,
+      "parquet_mtime_ns": 1790433545562940812
+    }
+  ]
+}

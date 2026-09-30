@@ -1,6 +1,6 @@
 # Artifact dependency and invalidation matrix
 
-This audit was checked against the 21 `ArtifactFamily` members, their publish
+This audit was checked against the 22 `ArtifactFamily` members, their publish
 functions, `ArtifactDependency` declarations, and Roadmap §§26–28. It is
 implementation evidence, not runtime configuration.
 
@@ -31,10 +31,11 @@ invalidation input.
 | Reproduction certificate | Certified row-report identity and verification configuration | Certification changes invalidate certificates and synthesis/final-gate descendants only. |
 | Krum synthesized update/model | Certified reproduction-row identity and synthesis configuration | Krum/synthesis changes invalidate synthesis and final-gate descendants, not reproduction training. |
 | Final-gate evaluation/decision | Production-model identity, capability contract, and final-gate configuration | Admission-rule changes invalidate final-gate results and later metrics/reports. |
-| Domain/seed metric artifact | Prepared evidence and the ablation-reference configuration scope; experiment/scenario/seed slot | A changed ablation prerequisite or its producer inputs invalidates that reference. Readers now compare its expected identity before reuse. |
+| Domain/seed metric artifact | Prepared evidence and ablation-reference configuration for reference slots; exact execution digest plus content digests for each cell, seed, aggregate, raw state-trajectory, trajectory-fraction, and comparison Parquet for report-evidence slots | A changed ablation prerequisite invalidates only that reference. A changed run-side evidence file changes the metric-evidence artifact identity and invalidates table/figure source data and exports. The trajectory-fraction Parquet is derived during completed-run materialization and carries numerator, denominator, and source semantic cell keys. |
 | Statistical comparison/gate artifact | Metric-evidence digest and statistical-analysis configuration (excluding publication rounding) | Statistical changes invalidate comparisons/claim/report descendants; seed metrics and checkpoints remain reusable. |
-| Table/figure source data | Execution-evidence digest, evidence-file digests, rendered table digests, rendered figure digests | Data-selection or rendered-content changes invalidate source data and exports only. |
-| Table/figure/report export | Source-data artifact identity | Source-data changes invalidate the terminal export; rendering does not invalidate scientific products. |
+| Claim-state artifact | Current statistical comparison/gate artifact identities; exact serialized claim summary content; claim-decision procedure identity | Statistical/gate changes or any mechanically derived claim-state change invalidate the claim artifact and project-summary descendants. |
+| Table/figure source data | Named report: execution-evidence digest, metric-evidence identity, evidence-file digests, rendered table/figure digests. Project report: deterministic digest of sorted current upstream manifest identities, typed references to those manifests, and rendered table/figure digests. | Data-selection, upstream identity, or rendered-content changes invalidate source data and exports. Project source data is ownerless and publishes only after mandatory report-material coverage passes. |
+| Table/figure/report export | Source-data artifact identity and the relative paths of every published report product | Source-data changes invalidate the terminal export; named exports are experiment-owned and project exports are ownerless under `results/project_summary`. Rendering does not invalidate scientific products. |
 
 The common artifact store also verifies complete state, payload length, checksum,
 atomic publication, current-pointer identity, and typed artifact-parent edges.

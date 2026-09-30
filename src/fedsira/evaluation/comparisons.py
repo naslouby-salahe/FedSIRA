@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from enum import StrEnum
 
+from pydantic import model_validator
+
 from fedsira.config import BootstrapConfig, MultiplicityConfig
 from fedsira.domain.enums import (
     AblationVariant,
@@ -41,6 +43,7 @@ from fedsira.domain.types import (
     PairedDifference,
     PValue,
     ScenarioName,
+    TextValue,
 )
 from fedsira.evaluation.statistics import (
     bootstrap_percentile_confidence_interval,
@@ -138,6 +141,21 @@ class ComparisonDefinition(FrozenDomainModel):
     margin: ComparisonMargin | None = None
     material_threshold: MaterialThreshold | None = None
 
+    @model_validator(mode="after")
+    def validate_required_comparison_thresholds(self) -> ComparisonDefinition:
+        if self.sidedness is not comparison_sidedness(self.test_kind):
+            raise ValueError(
+                f"comparison {self.comparison_name} requires "
+                f"{comparison_sidedness(self.test_kind).value} sidedness"
+            )
+        _validate_comparison_thresholds(
+            self.test_kind,
+            self.margin,
+            self.material_threshold,
+            str(self.comparison_name),
+        )
+        return self
+
 
 class ComparisonResult(FrozenDomainModel):
     definition: ComparisonDefinition
@@ -167,6 +185,28 @@ class ComparisonTemplate(FrozenDomainModel):
     materiality_direction: MaterialityDirection = MaterialityDirection.BENEFIT_AT_LEAST
     margin: ComparisonMargin | None = None
     material_threshold: MaterialThreshold | None = None
+
+    @model_validator(mode="after")
+    def validate_required_comparison_thresholds(self) -> ComparisonTemplate:
+        _validate_comparison_thresholds(
+            self.test_kind,
+            self.margin,
+            self.material_threshold,
+            self.metric.value,
+        )
+        return self
+
+
+def _validate_comparison_thresholds(
+    test_kind: ComparisonTestKind,
+    margin: ComparisonMargin | None,
+    material_threshold: MaterialThreshold | None,
+    identity: TextValue,
+) -> None:
+    if test_kind is ComparisonTestKind.SUPERIORITY and material_threshold is None:
+        raise ValueError(f"superiority comparison {identity} requires a materiality threshold")
+    if test_kind is ComparisonTestKind.NON_INFERIORITY and margin is None:
+        raise ValueError(f"non-inferiority comparison {identity} requires a margin")
 
 
 def paired_standardized_effect_size(values: tuple[PairedDifference, ...]) -> EffectSize | None:
@@ -270,9 +310,10 @@ def _adjusted_result(
     adjusted_p_value: PValue,
     multiplicity_config: MultiplicityConfig,
 ) -> ComparisonResult:
+    definition = ComparisonDefinition.model_validate(result.definition.model_dump())
     if result.raw_p_value is None:
         return ComparisonResult(
-            definition=result.definition,
+            definition=definition,
             paired_differences=result.paired_differences,
             complete_seed_count=result.complete_seed_count,
             mean_paired_difference=result.mean_paired_difference,
@@ -285,15 +326,34 @@ def _adjusted_result(
             comparison_state=result.comparison_state,
             paired_master_seeds=result.paired_master_seeds,
         )
+    if definition.test_kind is ComparisonTestKind.SUPERIORITY:
+        expected_raw_p_value = exact_sign_flip_two_sided_p_value(result.paired_differences)
+    else:
+        if definition.margin is None:
+            raise ValueError(
+                f"non-inferiority comparison {definition.comparison_name} requires a margin"
+            )
+        expected_raw_p_value = exact_sign_flip_non_inferiority_p_value(
+            result.paired_differences,
+            definition.margin,
+        )
+    if result.raw_p_value != expected_raw_p_value:
+        raise ValueError(
+            f"comparison {definition.comparison_name} raw p-value does not match "
+            "its definition and paired differences"
+        )
     materiality_passes = _materiality_passes(
-        result.definition,
+        definition,
         result.mean_paired_difference,
     )
-    passes = (
-        adjusted_p_value < multiplicity_config.family_wise_alpha and materiality_passes is not False
+    materiality_gate_passes = (
+        materiality_passes is not False
+        if definition.test_kind is ComparisonTestKind.NON_INFERIORITY
+        else materiality_passes is True
     )
+    passes = adjusted_p_value < multiplicity_config.family_wise_alpha and materiality_gate_passes
     return ComparisonResult(
-        definition=result.definition,
+        definition=definition,
         paired_differences=result.paired_differences,
         complete_seed_count=result.complete_seed_count,
         mean_paired_difference=result.mean_paired_difference,
@@ -312,6 +372,30 @@ def apply_holm_adjustment(
     family_result: ComparisonFamilyResult,
     multiplicity_config: MultiplicityConfig,
 ) -> ComparisonFamilyResult:
+    if any(
+        result.definition.family is not family_result.family for result in family_result.comparisons
+    ):
+        raise ValueError("comparison family result contains a different comparison family")
+    registered_definitions = tuple(
+        definition
+        for definition in build_comparison_registry()
+        if definition.family is family_result.family
+    )
+    comparison_names = tuple(
+        result.definition.comparison_name for result in family_result.comparisons
+    )
+    if len(comparison_names) != len(set(comparison_names)):
+        raise ValueError("comparison family result contains duplicate comparison names")
+    for result in family_result.comparisons:
+        definition = ComparisonDefinition.model_validate(result.definition.model_dump())
+        registered_definition: ComparisonDefinition | None = None
+        for item in registered_definitions:
+            if item.comparison_name == definition.comparison_name:
+                registered_definition = item
+        if registered_definition != definition:
+            raise ValueError(
+                f"comparison {definition.comparison_name} does not match its registered definition"
+            )
     raw_values = tuple(
         (
             result.definition.comparison_name,
@@ -342,7 +426,7 @@ def build_comparison_name(
     metric: ComparisonMetric,
     test_kind: ComparisonTestKind,
 ) -> ComparisonName:
-    return f"{family}|{experiment}|{scenario}|{method}__vs__{reference}|" f"{metric}|{test_kind}"
+    return f"{family}|{experiment}|{scenario}|{method}__vs__{reference}|{metric}|{test_kind}"
 
 
 def _reference_label(
@@ -410,7 +494,7 @@ def _definition(
 def _superiority(
     metric: ComparisonMetric,
     orientation: ComparisonOrientation,
-    threshold: MaterialThreshold | None = None,
+    threshold: MaterialThreshold,
     *,
     effect_scale: ComparisonEffectScale = ComparisonEffectScale.ABSOLUTE,
     materiality_direction: MaterialityDirection = MaterialityDirection.BENEFIT_AT_LEAST,

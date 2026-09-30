@@ -31,6 +31,7 @@ from fedsira.domain.models import (
 )
 from fedsira.domain.types import (
     BooleanValue,
+    DeltaScale,
     DomainId,
     MasterSeed,
 )
@@ -110,10 +111,30 @@ from fedsira.runtime import (
 class ProtocolBaselineOutcomes:
     _prepared_root: Path
     _pending_real_report: RealReportSummary | None
+    _last_production_contributor_ids: tuple[DomainId, ...]
+    _last_designated_compromised_ids: tuple[DomainId, ...]
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None: ...
 
     def backdoor_scope_for_cell(self, cell: ScientificCell) -> BackdoorScope | None: ...
+
+    def _model_replacement_training_args(
+        self, cell: ScientificCell
+    ) -> tuple[DomainId | None, BackdoorScope | None, DeltaScale | None]: ...
+
+    def _ordinary_attack_arguments(
+        self, cell: ScientificCell
+    ) -> tuple[DomainId | None, BackdoorScope | None, DeltaScale | None, list[DomainId]]:
+        training_args = self._model_replacement_training_args(cell)
+        designated_client, backdoor_scope, replacement_scale = training_args
+        return designated_client, backdoor_scope, replacement_scale, []
+
+    def _store_ordinary_attack_ancestry(
+        self, accepted: list[DomainId], designated_client: DomainId | None
+    ) -> None:
+        self._last_production_contributor_ids = tuple(accepted)
+        if designated_client is not None:
+            self._last_designated_compromised_ids = (designated_client,)
 
     def candidate_capability_contract_passes(
         self,
@@ -160,12 +181,15 @@ class ProtocolBaselineOutcomes:
                 real_anchor, source_domain, real_anchor.flat_parameters + source_delta
             ):
                 positive_report_count = client_review_reviewer_count
-        return review_style_baseline_outcome(
+        review_state = review_style_baseline_outcome(
             adequate_reviewer_count=client_review_reviewer_count,
             positive_report_count=positive_report_count,
             panel_size=config.protocol.admission_opening.screen_domains,
             required_positive_reports=config.protocol.admission_opening.required_positive_screen_domains,
         )
+        if review_state is AdmissionState.ADMITTED and source_domain is not None:
+            self._last_production_contributor_ids = (source_domain,)
+        return review_state
 
     def _source_update_sanitization_outcome(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
@@ -199,6 +223,7 @@ class ProtocolBaselineOutcomes:
         )
         if review_state is not AdmissionState.ADMITTED:
             return review_state
+        self._last_production_contributor_ids = (source_domain,)
         return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _source_release_after_full_external_check_outcome(
@@ -252,6 +277,7 @@ class ProtocolBaselineOutcomes:
         )
         if review_state is not AdmissionState.ADMITTED:
             return review_state
+        self._last_production_contributor_ids = (source_domain,)
         return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _recovery_after_source_admission_outcome(
@@ -319,8 +345,10 @@ class ProtocolBaselineOutcomes:
             if recovery_delta is None:
                 return AdmissionState.DORMANT
             production_checkpoint = real_anchor.flat_parameters + recovery_delta
+            self._last_production_contributor_ids = ()
         else:
             production_checkpoint = admitted_checkpoint
+            self._last_production_contributor_ids = (source_domain,)
         return self._final_gate_outcome(evidence, source_domain, real_anchor, production_checkpoint)
 
     def _fedavg_reference_outcome(
@@ -330,9 +358,18 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         delta = train_fedavg_reference_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            self._prepared_root,
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
@@ -345,9 +382,18 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         delta = train_krum_reference_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            self._prepared_root,
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
@@ -360,9 +406,18 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         delta = train_density_cluster_trimmed_mean_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            self._prepared_root,
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
@@ -375,9 +430,18 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         delta = train_update_reconstruction_filter_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            self._prepared_root,
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
@@ -394,8 +458,13 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None or source_domain is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         source_delta = train_source_candidate_delta(
-            nbaiot_adapter(self._prepared_root), cell.master_seed, real_anchor, source_domain
+            nbaiot_adapter(self._prepared_root),
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            backdoor_scope=scope if designated == source_domain else None,
         )
         if source_delta is None:
             return AdmissionState.DORMANT
@@ -417,8 +486,16 @@ class ProtocolBaselineOutcomes:
         if review_state is not AdmissionState.ADMITTED:
             return review_state
         delta = train_secure_continual_assessment_delta(
-            self._prepared_root, cell.master_seed, real_anchor, source_domain
+            self._prepared_root,
+            cell.master_seed,
+            real_anchor,
+            source_domain,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if delta is None:
             return AdmissionState.DORMANT
         production_checkpoint = real_anchor.flat_parameters + delta
@@ -488,9 +565,16 @@ class ProtocolBaselineOutcomes:
         real_anchor = self.real_anchor(cell.master_seed)
         if real_anchor is None:
             return AdmissionState.DORMANT
+        designated, scope, scale, accepted = self._ordinary_attack_arguments(cell)
         group_checkpoints = train_certified_ensemble_group_checkpoints(
-            self._prepared_root, cell.master_seed
+            self._prepared_root,
+            cell.master_seed,
+            compromised_client=designated,
+            backdoor_scope=scope,
+            replacement_delta_scale=scale,
+            accepted_compromised=accepted,
         )
+        self._store_ordinary_attack_ancestry(accepted, designated)
         if group_checkpoints is None:
             return AdmissionState.DORMANT
         target_f1_values: list[MetricResult] = []
@@ -654,9 +738,12 @@ class ProtocolBaselineOutcomes:
                 config.metrics_and_statistics.materiality,
             ):
                 positive_report_count += 1
-        return review_style_baseline_outcome(
+        review_state = review_style_baseline_outcome(
             adequate_reviewer_count=len(reviewer_domains),
             positive_report_count=positive_report_count,
             panel_size=independent_local_reference_reviewer_count,
             required_positive_reports=independent_local_reference_required_positive_reviews,
         )
+        if review_state is AdmissionState.ADMITTED:
+            self._last_production_contributor_ids = (source_domain,)
+        return review_state

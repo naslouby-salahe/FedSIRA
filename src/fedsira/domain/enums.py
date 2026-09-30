@@ -35,6 +35,7 @@ class LogEvent(StrEnum):
     COMPARISON_EVIDENCE_PERSISTED = "comparison.evidence.persisted"
     REPORT_STARTED = "report.started"
     REPORT_COMPLETED = "report.completed"
+    WORKFLOW_TERMINAL = "workflow.terminal"
     REPORT_TABLE_STARTED = "report.table.started"
     REPORT_EXPERIMENT_ARTIFACTS_RENDERED = "report.experiment.artifacts.rendered"
     REPORT_PROJECT_TABLES_STARTED = "report.project.tables.started"
@@ -47,6 +48,7 @@ class LogEvent(StrEnum):
     ANCHOR_TRAINING_COMPLETED = "anchor.training.completed"
     ARTIFACT_REUSED = "artifact.reused"
     ARTIFACT_PUBLISHED = "artifact.published"
+    ARTIFACT_PUBLICATION_REJECTED = "artifact.publication.rejected"
 
 
 class DatasetId(StrEnum):
@@ -160,6 +162,12 @@ class FailureClass(StrEnum):
     ASSUMPTION_VIOLATION = "Assumption Violation"
 
 
+class WorkflowTerminalState(StrEnum):
+    COMPLETED = "Completed"
+    BLOCKED = "Blocked"
+    FAILED = "Failed"
+
+
 class ArtifactFamily(StrEnum):
     RAW_DATASET_IDENTITY = "Raw dataset identity"
     DATASET_MANIFEST = "Dataset/schema/exclusion manifest"
@@ -180,6 +188,7 @@ class ArtifactFamily(StrEnum):
     FINAL_GATE_DECISION = "Final-gate evaluation/decision"
     DOMAIN_SEED_METRIC_ARTIFACT = "Domain/seed metric artifact"
     STATISTICAL_COMPARISON_ARTIFACT = "Statistical comparison/gate artifact"
+    CLAIM_STATE_ARTIFACT = "Claim-state artifact"
     TABLE_FIGURE_SOURCE_DATA = "Table/figure source data"
     TABLE_FIGURE_REPORT_EXPORT = "Table/figure/report export"
 
@@ -204,6 +213,7 @@ class ArtifactFamilyDirectoryToken(StrEnum):
     FINAL_GATE_DECISION = "final-gate-decision"
     DOMAIN_SEED_METRIC_ARTIFACT = "domain-seed-metric-artifact"
     STATISTICAL_COMPARISON_ARTIFACT = "statistical-comparison-artifact"
+    CLAIM_STATE_ARTIFACT = "claim-state-artifact"
     TABLE_FIGURE_SOURCE_DATA = "table-figure-source-data"
     TABLE_FIGURE_REPORT_EXPORT = "table-figure-report-export"
 
@@ -220,6 +230,8 @@ class ArtifactInstanceLabel(StrEnum):
     RESOLVED_CORE = "resolved-fedsira-core"
     COMPARISONS = "comparisons"
     SOURCE_DATA = "source-data"
+    METRIC_EVIDENCE = "metric-evidence"
+    CLAIM_DECISIONS = "claim-decisions"
     REPORT_EXPORT = "report-export"
     SMOKE_INVARIANT = "smoke-invariant"
     SMOKE_PARENT = "smoke-parent"
@@ -271,6 +283,9 @@ class ArtifactDependencyLabel(StrEnum):
     EVIDENCE_SYNTHESIS = "evidence-synthesis"
     BASELINE_CALIBRATION = "baseline-calibration"
     STATISTICAL_ANALYSIS = "statistical-analysis-config"
+    CLAIM_EVIDENCE = "claim-evidence"
+    STATISTICAL_ARTIFACT = "statistical-artifact"
+    GATE_ARTIFACT = "gate-artifact"
     DATASET_PREPROCESSING = "dataset-preprocessing-config"
     CHECKPOINT_TRAINING = "checkpoint-training"
     ABLATION_REFERENCE = "ablation-reference-config"
@@ -347,6 +362,7 @@ class ArtifactProducer(StrEnum):
     EVALUATION_PRODUCER = "Evaluation producer"
     REPORTING_SOURCE_DATA = "Reporting source data"
     REPORT_EXPORT = "Report export"
+    CLAIM_DECISION = "Claim decision"
 
 
 class ArtifactPathScope(StrEnum):
@@ -470,6 +486,39 @@ class ExperimentName(StrEnum):
     ADMISSION_DELAY_DECOMPOSITION = "Admission-Delay Decomposition"
     EFFICIENCY_MEASUREMENT = "Efficiency Measurement"
     SECONDARY_DATASET_GENERALIZATION = "Secondary-Dataset Generalization"
+    LEAVE_FAULT_CERTIFICATE_VALIDATION = "Leave-Fault Certificate Validation"
+
+
+class AdmissionDecisionMethod(StrEnum):
+    LEAVE_FAULT_CERTIFICATE = "Leave-Fault Certificate"
+    LIFECYCLE = "Lifecycle"
+    DIRECT_SOURCE = "Direct Source"
+    QUORUM = "Quorum"
+    KRUM_SELECTION = "Krum Selection"
+    COORDINATE_MEDIAN = "Coordinate Median"
+    BULYAN = "Bulyan"
+    WITHOUT_SOURCE_EXCLUSION = "Without Source Exclusion"
+    WITHOUT_WORST_CASE = "Without Worst Case"
+    WITHOUT_GEOMETRIC_MEDIAN = "Without Geometric Median"
+    WITHOUT_LOWER_MEDIAN = "Without Lower Median"
+
+
+class ControlledAdmissionWorld(StrEnum):
+    ALL_HONEST = "All Honest"
+    KRUM_IN_GEOMETRY = "Krum In Geometry"
+    BYZANTINE_LOW_REPORT = "Byzantine Low Report"
+    QUORUM_FALSE_ADMISSION = "Quorum False Admission"
+    QUORUM_FALSE_REJECTION = "Quorum False Rejection"
+    INSUFFICIENT_EVIDENCE = "Insufficient Evidence"
+    CONFLICTING_EVIDENCE = "Conflicting Evidence"
+    SOURCE_COPIED = "Source Copied"
+    SOURCE_PERTURBED = "Source Perturbed"
+    DISAGREEING_SUPPORTERS = "Disagreeing Supporters"
+    SHARP_QUALITY_GAP = "Sharp Quality Gap"
+    ONE_MALICIOUS_REVIEWER = "One Malicious Reviewer"
+    HONEST_MINORITY_STRONG = "Honest Minority Strong"
+    FAULT_AT_BOUND = "Fault At Bound"
+    BYZANTINE_SOURCE = "Byzantine Source"
 
 
 class TableName(StrEnum):
@@ -498,7 +547,8 @@ class FigureName(StrEnum):
     USEFUL_BACKDOORED_SOURCE = "Useful Backdoored Source"
     COLLAPSE_DECISION_EFFECTS = "Collapse Decision Effects"
     COMPROMISED_REPRODUCER_BOUNDARY = "Compromised-Reproducer Boundary"
-    COMPROMISED_VERIFIER_BOUNDARY = "Compromised-Verifier Boundary"
+    COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY = "Compromised-Verifier False-Positive Boundary"
+    COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY = "Compromised-Verifier False-Negative Boundary"
     SHARED_EPISTEMIC_FAILURE = "Shared Epistemic Failure"
     CAPABILITY_GRANULARITY_BOUNDARY = "Capability-Granularity Boundary"
     HETEROGENEITY_SYNTHESIS_BOUNDARY = "Heterogeneity Synthesis Boundary"
@@ -673,6 +723,9 @@ class MetricObservationKey(StrEnum):
     )
     ROOT_CAUSE_A_TARGET_F1 = "root-cause-a-target-f1"
     ROOT_CAUSE_B_TARGET_F1 = "root-cause-b-target-f1"
+    SOURCE_PRODUCTION_WEIGHT = "source-production-weight"
+    PRODUCTION_EQUALS_MALICIOUS = "production-equals-malicious"
+    LEAVE_FAULT_CERTIFICATE_UTILITY = "leave-fault-certificate-utility"
 
 
 class ReportCellLiteral(StrEnum):
@@ -785,6 +838,8 @@ class ReportColumnName(StrEnum):
     CONDITION = "condition"
     CONFIGURATION_DIGEST = "configuration_digest"
     CONFIDENCE_INTERVAL_95 = "confidence_interval_95"
+    CONFIDENCE_INTERVAL_LOWER = "confidence_interval_lower"
+    CONFIDENCE_INTERVAL_UPPER = "confidence_interval_upper"
     CORE_ACTION = "core_action"
     DATA_ROLES = "data_roles"
     DATASET = "dataset"
@@ -829,6 +884,7 @@ class ReportColumnName(StrEnum):
     MATERIALITY_THRESHOLD = "materiality_threshold"
     MATERIALIZED_ROWS = "materialized_rows"
     MATHEMATICAL_ORIENTATION = "mathematical_orientation"
+    MEDIAN_VALUE = "median_value"
     MEAN_DIFFERENCE = "mean_difference"
     MEAN_PAIRED_DIFFERENCE = "mean_paired_difference"
     MEAN_VALUE = "mean_value"
@@ -843,6 +899,11 @@ class ReportColumnName(StrEnum):
     NOMINAL_RUN_COUNT = "nominal_run_count"
     OBSERVATION_COUNT = "observation_count"
     OBSERVATION_ID = "observation_id"
+    FIRST_QUARTILE = "first_quartile"
+    THIRD_QUARTILE = "third_quartile"
+    FRACTION_OF_SEED_INSTANCES = "fraction_of_seed_instances"
+    SEED_COUNT = "seed_count"
+    SAMPLE_STANDARD_DEVIATION = "sample_standard_deviation"
     OBSERVED_OUTCOME = "observed_outcome"
     OPTIMIZER = "optimizer"
     PAIRED_DZ = "paired_dz"
@@ -968,12 +1029,6 @@ class FigurePanelTitle(StrEnum):
     COMPROMISED_REPRODUCER_BOUNDARY_ASR = "Compromised-Reproducer Boundary — ASR"
     FALSE_POSITIVE = "false positive"
     FALSE_NEGATIVE = "false negative"
-    COMPROMISED_VERIFIER_BOUNDARY_FALSE_POSITIVE_MODE = (
-        "Compromised-Verifier Boundary — false-positive mode"
-    )
-    COMPROMISED_VERIFIER_BOUNDARY_FALSE_NEGATIVE_MODE = (
-        "Compromised-Verifier Boundary — false-negative mode"
-    )
     CLEAN_ORACLE = "clean oracle"
     ADMISSION = "admission"
     SHARED_EPISTEMIC_FAILURE_CLEAN_ORACLE = "Shared Epistemic Failure — clean oracle"

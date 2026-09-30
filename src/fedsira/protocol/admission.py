@@ -218,9 +218,15 @@ def final_gate_decision(
     force_first_row_to_source_delta: BooleanValue,
     heterogeneity_scope: HeterogeneityScope | None = None,
     precomputed_updates: OrderedDict[DomainId, torch.Tensor] | None = None,
-) -> tuple[AdmissionState, RealReportSummary | None, torch.Tensor | None, torch.Tensor | None]:
+) -> tuple[
+    AdmissionState,
+    RealReportSummary | None,
+    torch.Tensor | None,
+    torch.Tensor | None,
+    tuple[DomainId, ...],
+]:
     if anchor is None:
-        return (AdmissionState.DORMANT, None, None, None)
+        return (AdmissionState.DORMANT, None, None, None, ())
     config = current_application_context().scientific_config
     base_flat_parameters = anchor.flat_parameters
     committee_deltas: OrderedDict[DomainId, torch.Tensor] = (
@@ -247,9 +253,10 @@ def final_gate_decision(
     )
     if coordinate_median_active:
         if not available_updates:
-            return (AdmissionState.DORMANT, None, None, None)
+            return (AdmissionState.DORMANT, None, None, None, ())
         production_update = coordinate_wise_median_synthesis(available_updates)
         production_checkpoint = apply_production_update(base_flat_parameters, production_update)
+        median_domains = tuple(domain for domain in reproducer_order if domain in committee_deltas)
         median_state, median_report = final_gate_decision_from_production_checkpoint(
             evidence,
             source_domain,
@@ -259,18 +266,21 @@ def final_gate_decision(
             no_final_synthesis_gate_active,
             heterogeneity_scope=heterogeneity_scope,
         )
-        return (median_state, median_report, production_checkpoint, None)
+        return (median_state, median_report, production_checkpoint, None, median_domains)
     krum_selected_update: torch.Tensor | None = None
+    selected_domain: DomainId | None = None
     if is_plurality_active:
         committee = production_committee(committee_deltas, reproducer_order)
         if not committee:
-            return (AdmissionState.DORMANT, None, None, None)
-        krum_selected_update = select_krum_update(
+            return (AdmissionState.DORMANT, None, None, None, ())
+        selected_row = select_krum_update(
             committee, config.protocol.synthesis.maximum_byzantine_reproduction_rows
-        ).update_vector
+        )
+        krum_selected_update = selected_row.update_vector
+        selected_domain = selected_row.reproducer_domain
     first_domain = next((domain for domain in reproducer_order if domain in committee_deltas), None)
     if first_domain is None and not is_plurality_active:
-        return (AdmissionState.DORMANT, None, None, None)
+        return (AdmissionState.DORMANT, None, None, None, ())
     single_reproduction_update = (
         committee_deltas[first_domain] if first_domain is not None else None
     )
@@ -287,7 +297,18 @@ def final_gate_decision(
         no_final_synthesis_gate_active,
         heterogeneity_scope=heterogeneity_scope,
     )
-    return (synthesis_state, synthesis_report, production_checkpoint, krum_selected_update)
+    contributor_ids = (
+        (selected_domain,)
+        if selected_domain is not None
+        else ((first_domain,) if first_domain is not None else ())
+    )
+    return (
+        synthesis_state,
+        synthesis_report,
+        production_checkpoint,
+        krum_selected_update,
+        contributor_ids,
+    )
 
 
 def final_gate_decision_from_production_checkpoint(

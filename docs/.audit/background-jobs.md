@@ -150,3 +150,47 @@ tests/unit/learning/test_training.py: 40 warnings
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 936 passed, 279 warnings in 453.39s (0:07:33), session 98635. Started 2026-09-26; result pending.
+
+## Fresh full-suite rerun after reporting telemetry correction, 2026-09-27
+
+- Command: `.venv/bin/pytest -q`.
+- Unified exec session: `43109`; stdout and stderr are captured by the live session output. This process is running while independent audit work continues.
+- This rerun covers the shared efficiency-summary refactor and failed-cell aggregate filtering. It runs no scientific experiment.
+
+
+## Final full-suite rerun after repository policy fix, 2026-09-27
+
+- Command: .venv/bin/pytest -q.
+- Unified exec session: 69707; output is captured in the live session.
+- The previous full-suite run reported 941 passed and one architecture policy failure because the new aggregation helper had a docstring. The docstring was removed; 54 focused policy/topology/reporting tests passed, followed by clean Ruff, formatting, Pyright, Deptry, and Import Linter checks.
+- This rerun executes tests only; no scientific experiment was run.
+
+
+- Final rerun session 69707 completed: 942 passed, 279 warnings, 921.58 seconds.
+
+## Full suite after persisted trajectory fractions, 2026-09-27
+
+- Command: `.venv/bin/python -m pytest -q`.
+- Unified exec session: 93933; completed with 951 passed and 4 architecture-policy failures, 279 warnings, in 500.45 seconds.
+- All four failures were remediated: remove a new reporting docstring, remove an unconfigured numeric tolerance, strengthen a protocol return type, and regenerate the Graphify dispatch ledger.
+- The rerun executes tests only; no scientific experiment was run.
+
+## Corrected whole-suite rerun after trajectory architecture fixes, 2026-09-27
+
+- Command: `.venv/bin/python -m pytest -q`.
+- Unified exec session: 31369; output is captured by the live session.
+- This run covers all current source and dispatch-ledger changes and executes tests only; no scientific experiment was run.
+- Completed: 955 passed, 279 third-party warnings, no failures, in 177.71 seconds.
+
+## FIG-006 renderer coverage and current static/reporting validation, 2026-09-27
+
+- Reporting tests: `.venv/bin/python -m pytest -q tests/unit/reporting`; completed 58 passed, 14 third-party warnings.
+- Full static set: Ruff, format check, strict Pyright, Deptry, Import Linter, and Vulture confidence 80; all pass.
+- Full suite: `.venv/bin/python -m pytest -q`; completed 960 passed, 279 third-party warnings, no failures, 279.49 seconds. No scientific experiment was run.
+
+## Full suite after report lineage changes, 2026-09-27
+
+- Command: `.venv/bin/pytest -q`.
+- Background PID: `727972`; log: `docs/.audit/pytest-lineage-final-20260927.log`; exit marker: `docs/.audit/pytest-lineage-final-20260927.exit`.
+- The initial run completed with 967 passed and five architecture failures. After fixing all reported architecture and reporting failures, the clean full-suite rerun under PID `753908` completed with exit `0`: 973 passed, 279 upstream warnings, no failures, in 403.39 seconds. Log: `docs/.audit/pytest-lineage-final-20260927.log`; exit marker: `docs/.audit/pytest-lineage-final-20260927.exit`. No experiment was launched.
+- This suite covers the current source, including Statistical Summary and Primary Results source-cell crosswalks. It runs tests only and does not invoke a scientific experiment. Inspect the final log and exit marker before recording its result.

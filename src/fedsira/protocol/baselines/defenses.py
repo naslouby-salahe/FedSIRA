@@ -15,6 +15,7 @@ from fedsira.config import (
     ThreeRowCoordinateMedianConfig,
 )
 from fedsira.datasets.common import (
+    BackdoorScope,
     DatasetAdapter,
     DomainTargetMetrics,
     RealAnchor,
@@ -44,6 +45,7 @@ from fedsira.domain.types import (
     ClusterSize,
     CommitteeSize,
     DbscanEpsilon,
+    DeltaScale,
     DerivedSeed,
     DeterministicInteger,
     DiscardSourceWeights,
@@ -97,6 +99,7 @@ from fedsira.learning.federated import (
     LocalTrainingClient,
     run_anchor_fedavg_training,
     run_fedavg_round,
+    train_one_client_locally,
     training_seed,
 )
 from fedsira.learning.model import (
@@ -115,6 +118,7 @@ from fedsira.learning.training import (
     load_model_state,
     model_state_from_classifier,
 )
+from fedsira.protocol.attacks import model_replacement_client_state
 from fedsira.protocol.baselines.registry import post_reference_retrain_maximum_local_epochs
 from fedsira.protocol.synthesis import CertifiedReproductionRow
 from fedsira.runtime import (
@@ -427,12 +431,14 @@ def _group_post_reference_round_clients(
     group_domains: Sequence[DomainId],
     group_index: GroupIndex,
     round_index: RoundIndex,
-) -> list[LocalTrainingClient]:
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+) -> list[tuple[DomainId, LocalTrainingClient]]:
     manifest_hash = dataset_manifest_hash(prepared_root)
     start_checkpoint_identity = f"certified-ensemble-group-{group_index}-post-reference-start"
     has_target_bearing_member = False
     group_target_row_count = 0
-    clients: list[LocalTrainingClient] = []
+    clients: list[tuple[DomainId, LocalTrainingClient]] = []
     for domain in group_domains:
         target_rows = nbaiot_adapter(prepared_root).load_rows(
             domain, NBaiotClass.GAFGYT_COMBO, Role.REPRODUCTION
@@ -440,9 +446,19 @@ def _group_post_reference_round_clients(
         if target_rows is not None:
             has_target_bearing_member = True
             group_target_row_count += target_rows.row_count
-        combined = combined_post_reference_rows(
-            nbaiot_adapter(prepared_root), domain, Role.REPRODUCTION
+        attack_domain = (
+            compromised_client is not None
+            and backdoor_scope is not None
+            and domain == compromised_client
         )
+        combined = combined_post_reference_rows(
+            nbaiot_adapter(prepared_root),
+            domain,
+            Role.REPRODUCTION,
+            backdoor_scope=backdoor_scope if attack_domain else None,
+        )
+        if combined is None and attack_domain:
+            raise ValueError("model-replacement client lacks its declared poisoned view")
         if combined is not None:
             features, labels, sample_ids, _is_supported = combined
         else:
@@ -469,17 +485,20 @@ def _group_post_reference_round_clients(
             labels = torch.cat(supported_labels, dim=0)
             sample_ids = tuple(supported_sample_ids)
         clients.append(
-            LocalTrainingClient(
-                features=features,
-                labels=labels,
-                sample_ids=sample_ids,
-                training_seed=training_seed(
-                    master_seed,
-                    manifest_hash,
-                    start_checkpoint_identity,
-                    AlgorithmName.CERTIFIED_ENSEMBLE_POST_REFERENCE,
-                    domain,
-                    round_index,
+            (
+                domain,
+                LocalTrainingClient(
+                    features=features,
+                    labels=labels,
+                    sample_ids=sample_ids,
+                    training_seed=training_seed(
+                        master_seed,
+                        manifest_hash,
+                        start_checkpoint_identity,
+                        AlgorithmName.CERTIFIED_ENSEMBLE_POST_REFERENCE,
+                        domain,
+                        round_index,
+                    ),
                 ),
             )
         )
@@ -490,7 +509,12 @@ def _group_post_reference_round_clients(
 
 
 def train_certified_ensemble_group_checkpoints(
-    prepared_root: Path, master_seed: MasterSeed
+    prepared_root: Path,
+    master_seed: MasterSeed,
+    compromised_client: DomainId | None = None,
+    backdoor_scope: BackdoorScope | None = None,
+    replacement_delta_scale: DeltaScale | None = None,
+    accepted_compromised: list[DomainId] | None = None,
 ) -> tuple[GroupCheckpoint, ...] | None:
     config = current_application_context().scientific_config
     domain_partition_namespace_seed = namespace_seed(
@@ -501,6 +525,8 @@ def train_certified_ensemble_group_checkpoints(
         config.baselines.multiple_model_certified_ensemble_group_count,
     )
     checkpoints: list[GroupCheckpoint] = []
+    scale_replacement = replacement_delta_scale is not None and compromised_client is not None
+    post_reference_local_epochs = 1
     for group_index, group_domains in enumerate(groups):
         group_anchor = _group_anchor_checkpoint(
             prepared_root, master_seed, group_domains, group_index
@@ -511,11 +537,49 @@ def train_certified_ensemble_group_checkpoints(
         load_flat_trainable_parameters(model, group_anchor.flat_parameters)
         state = model_state_from_classifier(model)
         for round_index in range(certified_ensemble_post_reference_rounds()):
-            round_clients = _group_post_reference_round_clients(
-                prepared_root, master_seed, group_domains, group_index, round_index
+            round_pairs = _group_post_reference_round_clients(
+                prepared_root,
+                master_seed,
+                group_domains,
+                group_index,
+                round_index,
+                compromised_client,
+                backdoor_scope,
             )
-            if not round_clients:
+            if not round_pairs:
                 continue
+            overrides: list[ModelState | None] = []
+            if scale_replacement and replacement_delta_scale is not None:
+                for domain, client in round_pairs:
+                    if domain == compromised_client and backdoor_scope is not None:
+                        trained = train_one_client_locally(
+                            state,
+                            group_anchor.input_width,
+                            group_anchor.output_width,
+                            config.model.optimizer.anchor_and_standard_fl_learning_rate,
+                            config.model.optimizer,
+                            config.model.training,
+                            post_reference_local_epochs,
+                            client,
+                        )
+                        overrides.append(
+                            model_replacement_client_state(
+                                state,
+                                trained.state,
+                                group_anchor.input_width,
+                                group_anchor.output_width,
+                                replacement_delta_scale,
+                            )
+                        )
+                    else:
+                        overrides.append(None)
+            for domain, _client in round_pairs:
+                if (
+                    domain == compromised_client
+                    and accepted_compromised is not None
+                    and domain not in accepted_compromised
+                ):
+                    accepted_compromised.append(domain)
             state = run_fedavg_round(
                 state,
                 group_anchor.input_width,
@@ -523,8 +587,9 @@ def train_certified_ensemble_group_checkpoints(
                 config.model.optimizer.anchor_and_standard_fl_learning_rate,
                 config.model.optimizer,
                 config.model.training,
-                1,
-                tuple(round_clients),
+                post_reference_local_epochs,
+                tuple(client for _domain, client in round_pairs),
+                tuple(overrides) if scale_replacement else None,
             )
         final_model = FedSIRAClassifier(group_anchor.input_width, group_anchor.output_width)
         load_model_state(final_model, state)
@@ -827,6 +892,29 @@ def trimmed_mean_aggregate(
     upper_bound = sorted_values.shape[0] - trim_each_tail_count
     trimmed = sorted_values[trim_each_tail_count:upper_bound]
     return trimmed.mean(dim=0)
+
+
+def clients_retained_by_trimmed_mean(
+    domains: Sequence[DomainId],
+    raw_updates: tuple[torch.Tensor, ...],
+    minimum_cluster_size_for_trimming: ClusterSize,
+    trim_each_tail_count: TrimCount,
+) -> tuple[DomainId, ...]:
+    update_count = len(raw_updates)
+    if update_count != len(domains):
+        raise ValueError("trimmed-mean ancestry requires one domain per update")
+    if update_count < minimum_cluster_size_for_trimming:
+        return tuple(domains)
+    stacked = torch.stack(tuple(raw_updates), dim=0)
+    order = torch.argsort(stacked, dim=0)
+    upper_bound = update_count - trim_each_tail_count
+    if trim_each_tail_count >= upper_bound:
+        return ()
+    retained_indices: set[int] = set()
+    for coordinate in range(order.shape[1]):
+        for rank in range(trim_each_tail_count, upper_bound):
+            retained_indices.add(int(order[rank, coordinate]))
+    return tuple(domain for index, domain in enumerate(domains) if index in retained_indices)
 
 
 def recovery_alarm_threshold(

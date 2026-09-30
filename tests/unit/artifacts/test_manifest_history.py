@@ -1,6 +1,11 @@
 import json
+import logging
 from pathlib import Path
+from unittest.mock import Mock
 
+import pytest
+
+from fedsira.artifacts import store
 from fedsira.artifacts.store import (
     ARTIFACT_CURRENT_FILE_NAME,
     ARTIFACT_MANIFEST_SUFFIX,
@@ -86,14 +91,30 @@ def test_obsolete_current_schema_is_rejected_as_invalid_evidence(tmp_path: Path)
     assert "obsolete" in invalid[0].failure
 
 
-def test_unreadable_historical_identity_does_not_block_the_gate(tmp_path: Path) -> None:
+def test_unreadable_historical_identity_is_informational_and_does_not_block_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     current = "2" * 64
     _write_manifest(tmp_path, current, _manifest_text(current))
     _point_current_at(tmp_path, current)
-    _write_manifest(tmp_path, "3" * 64, '{"schema_version": "fedsira|artifact_manifest|1"}')
+    obsolete_identity = "3" * 64
+    _write_manifest(
+        tmp_path,
+        obsolete_identity,
+        _manifest_text(obsolete_identity).replace(
+            ARTIFACT_SCHEMA_VERSION,
+            "fedsira|artifact_manifest|2",
+        ),
+    )
+    logger = Mock(spec=logging.Logger)
+    monkeypatch.setattr(store, "ARTIFACT_LOGGER", logger)
     manifests, invalid = load_published_manifests((tmp_path,))
     assert tuple(manifest.identity for manifest in manifests) == (current,)
     assert invalid == ()
+    logger.info.assert_called_once()
+    assert logger.info.call_args.args[0] == "artifact.manifest.superseded_history %s: %s"
+    logger.warning.assert_not_called()
 
 
 def test_unreadable_current_publication_is_invalid_evidence(tmp_path: Path) -> None:

@@ -22,7 +22,7 @@ doctor()
         → dataset_readiness()
         → _artifact_summary()
         → _experiment_summary()
-        → _project_stage()
+        → derive_project_stage()
         → _progress_and_action()
     → render()
       → project/artifact/experiment summary renderers
@@ -62,7 +62,11 @@ preprocess()
 If no dataset is supplied, `_execute_bound()` iterates the two `DatasetId`
 members. The secondary route derives pseudo-domains from the declared shard
 semantics and salt, validates actual headers and labels, and publishes
-prepared evidence only after view validation.
+prepared evidence only after view validation. Preprocessing publishes data,
+role/split, scaler, and prepared-view artifacts without starting an experiment.
+Run `fedsira run "Data and Domain Evidence Validation"` explicitly to execute
+the one-cell primary data/domain validator. `doctor` keeps this gate in the
+preprocessing/data-validation stage until its current terminal record exists.
 
 ## `plan`
 

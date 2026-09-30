@@ -40,6 +40,16 @@ def krum_input_excludes_source(
     return source_row_id not in candidate_row_ids
 
 
+def require_source_identity_excluded_from_synthesis(
+    candidate_row_ids: Sequence[ReproductionRowId],
+    source_row_id: ReproductionRowId | None,
+) -> None:
+    if source_row_id is None:
+        raise ValueError("source identity is absent; exclusion cannot be established")
+    if not krum_input_excludes_source(candidate_row_ids, source_row_id):
+        raise ValueError("source identity entered the synthesis committee")
+
+
 class CertifiedReproductionRow(TensorDomainModel):
     reproducer_domain: DomainId
     update_vector: torch.Tensor

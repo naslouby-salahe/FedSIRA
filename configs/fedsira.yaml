@@ -107,6 +107,13 @@ protocol:
     minimum_domain_target_f1: 0.6
     supported_macro_f1_drop_maximum: 0.02
     benign_false_alarm_rate_increase_maximum: 0.01
+  leave_fault_certificate:
+    fault_bound: 1
+    minimum_support: 3
+    utility_floor: 0.8
+    harm_ceiling: 0.02
+    weiszfeld_iterations: 8
+    weiszfeld_epsilon: 1.0e-08
   diagnostic_random_verifier_profile:
     byzantine_domain_count: 2
     panel_size: 3
@@ -290,7 +297,7 @@ execution:
     manuscript_results: results
   data_loader:
     workers: 0
-    pin_memory: true
+    pin_memory: false
     persistent_workers: false
   timeouts_seconds:
     dataset_preprocessing: 28800
@@ -319,3 +326,4 @@ evidence_thresholds:
 validation_tolerances:
   random_committee_probability_absolute: 1.0e-12
   delay_component_sum_seconds_absolute: 1.0e-09
+  trajectory_fraction_absolute: 1.0e-12

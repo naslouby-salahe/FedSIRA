@@ -1,3 +1,5 @@
+import json
+import logging
 from pathlib import Path
 from typing import cast
 
@@ -9,6 +11,7 @@ from fedsira.domain.enums import (
     ExperimentLifecycleState,
     ExperimentName,
     FailureClass,
+    LogEvent,
     ScientificCellPhase,
     SourceExclusionMethod,
 )
@@ -18,6 +21,7 @@ from fedsira.domain.models import (
 from fedsira.domain.types import ConditionName, MasterSeed, MethodName
 from fedsira.experiments.definitions import experiment_registry
 from fedsira.experiments.engine import (
+    EXECUTION_LOGGER,
     EXECUTION_RECORD_SCHEMA_VERSION,
     TERMINAL_EXPERIMENT_STATES,
     CellExecutionOutcome,
@@ -41,7 +45,7 @@ from fedsira.experiments.execution import (
 from fedsira.experiments.planning import (
     build_plan,
 )
-from fedsira.runtime import FailureDetail
+from fedsira.runtime import FailureDetail, configure_structured_file_logging
 
 
 def _cell(
@@ -501,3 +505,40 @@ def test_record_store_does_not_reuse_an_incomplete_record(tmp_path: Path) -> Non
         _provenance(),
     )
     assert store.reusable_outcome(cell.experiment, cell.semantic_key, _provenance()) is None
+
+
+def test_completed_cell_phase_records_elapsed_seconds(tmp_path: Path) -> None:
+    class CompletingExecutor:
+        def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
+            return _completed_outcome(cell)
+
+    log_path = tmp_path / "execution.log"
+    previous_level = EXECUTION_LOGGER.level
+    configure_structured_file_logging(EXECUTION_LOGGER, log_path)
+    try:
+        cell = _cell(
+            ExperimentName.SINGLE_REPRODUCTION_NECESSITY,
+            SourceExclusionMethod.FULL_FEDSIRA,
+            "All Honest",
+            1,
+        )
+        outcome = execute_cell_with_retry(cell, CompletingExecutor())
+        assert outcome.terminal_state is ExperimentLifecycleState.COMPLETED
+        payloads = [
+            json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines() if line
+        ]
+        completed = [
+            payload for payload in payloads if payload["message"] == LogEvent.CELL_PHASE_COMPLETED
+        ]
+        assert completed
+        assert completed[-1]["elapsed_seconds"] >= 0
+    finally:
+        EXECUTION_LOGGER.setLevel(previous_level)
+        EXECUTION_LOGGER.handlers[:] = [
+            handler
+            for handler in EXECUTION_LOGGER.handlers
+            if not (
+                isinstance(handler, logging.FileHandler)
+                and Path(handler.baseFilename) == log_path.resolve()
+            )
+        ]

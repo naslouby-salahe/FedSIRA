@@ -735,10 +735,13 @@ def prepared_feature_names(prepared_root: Path) -> tuple[FeatureName, ...] | Non
     if not parquet_files:
         return None
     connection = open_tabular_engine()
-    cursor = connection.execute(
-        f"DESCRIBE SELECT * FROM read_parquet({sql_string(parquet_files[0].as_posix())})"
-    )
-    columns = tuple(str(row[0]) for row in cursor.fetchall())
+    try:
+        cursor = connection.execute(
+            f"DESCRIBE SELECT * FROM read_parquet({sql_string(parquet_files[0].as_posix())})"
+        )
+        columns = tuple(str(row[0]) for row in cursor.fetchall())
+    finally:
+        connection.close()
     return tuple(column for column in columns if column not in ("sample_id", "label"))
 
 

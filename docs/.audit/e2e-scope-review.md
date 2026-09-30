@@ -9,3 +9,9 @@ Ran `.venv/bin/pytest -q tests/e2e --durations=0` on 2026-09-26: 8 passed, 14 up
 | `tests/e2e/test_reuse_recovery_overwrite.py` | CLI help exposes `--overwrite` without scientific design overrides. It does not perform artifact reuse, crash recovery, overwrite, or read-only report verification. | 0.02 s. |
 
 Related unit suites exercise actual status rendering, fixture dataset preparation, artifact identity/reuse/corruption/recovery and report verification. They are separate test layers rather than one short workflow integration test. The missing fixture-preprocess-to-plan-to-smoke chain and end-to-end status/reuse/recovery path are why TEST-010 remains partial.
+
+## Recheck on 2026-09-27
+
+The `preprocess` application wiring has E2E coverage for call order: whole-project preprocessing invokes the one-cell primary data/domain validator after materialization; secondary-only preprocessing does not. A project-stage test confirms doctor keeps this pre-experiment gate ahead of baseline validation.
+
+Added a hermetic temporary-repository chain that creates small valid N-BaIoT fixture CSVs, invokes actual CLI preprocessing, corrupts one published Parquet and verifies fallback materialization repairs it, then replaces the materializer with a failure sentinel and verifies the next CLI preprocessing call reuses the validated cache. The chain continues through `plan`, `smoke`, `status`, and fail-closed project `report`. Existing E2E cases cover blocked `run`, unknown/missing run identities, and incomplete report refusal. It launches no scientific experiment. The complete E2E suite passes 12 tests in 18.93 seconds (14 third-party deprecation warnings). TEST-010 is closed.

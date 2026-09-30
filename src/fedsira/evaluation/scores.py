@@ -1,5 +1,5 @@
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 
@@ -49,7 +49,7 @@ _ACTIVE_MODEL_SCORE_ARTIFACTS: ContextVar[list[ArtifactDigest] | None] = Context
 
 
 @contextmanager
-def capture_model_score_artifacts() -> Iterator[list[ArtifactDigest]]:
+def capture_model_score_artifacts() -> Generator[list[ArtifactDigest]]:
     identities: list[ArtifactDigest] = []
     token: Token[list[ArtifactDigest] | None] = _ACTIVE_MODEL_SCORE_ARTIFACTS.set(identities)
     try:

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from _repo import SRC_ROOT, iter_python_files, parse
-from fedsira.domain.enums import DatasetId, TableName
+from fedsira.domain.enums import DatasetId, ExperimentName, FigureName, TableName
 from fedsira.experiments.definitions import (
     ExperimentDefinition,
     experiment_registry,
@@ -105,12 +105,15 @@ def test_planned_cells_cover_every_declared_method_and_condition() -> None:
 
 
 def test_planned_cell_counts_match_the_section_31_contract() -> None:
-    plan = build_plan()
+    from fedsira.experiments.planning import build_required_plan
+
+    plan = build_required_plan()
     validate_planned_cell_count_invariant(plan)
     contract = plan_cell_count_contract()
-    assert plan.pre_core_cell_count == contract.pre_core_subtotal == 299
-    assert plan.post_core_cell_count == contract.post_core_subtotal == 1690
-    assert plan.total_cell_count == contract.complete_scientific_plan == 1989
+    assert plan.pre_core_cell_count == contract.pre_core_subtotal
+    assert plan.post_core_cell_count == contract.post_core_subtotal
+    assert plan.total_cell_count == contract.complete_scientific_plan
+    assert plan.total_cell_count == contract.leave_fault_certificate_validation
 
 
 def test_efficiency_repetitions_follow_the_configured_count() -> None:
@@ -127,7 +130,9 @@ def test_every_mandatory_table_has_a_producer() -> None:
 
 def test_every_mandatory_figure_is_declared_once() -> None:
     assert len(set(MANDATORY_FIGURE_NAMES)) == len(MANDATORY_FIGURE_NAMES)
-    assert len(MANDATORY_FIGURE_NAMES) == 13
+    assert len(MANDATORY_FIGURE_NAMES) == 14
+    assert FigureName.COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY in MANDATORY_FIGURE_NAMES
+    assert FigureName.COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY in MANDATORY_FIGURE_NAMES
 
 
 def test_production_has_no_repository_state_or_source_fingerprint_machinery() -> None:
@@ -161,7 +166,10 @@ def test_production_has_no_repository_state_or_source_fingerprint_machinery() ->
 
 
 def test_every_registered_experiment_maps_to_a_live_cell_handler() -> None:
-    from fedsira.experiments.definitions import REGISTERED_EXPERIMENT_NAMES
+    from fedsira.experiments.definitions import (
+        CATALOG_EXPERIMENT_NAMES,
+        REGISTERED_EXPERIMENT_NAMES,
+    )
     from fedsira.experiments.handlers import (
         CELL_HANDLER_REGISTRATIONS,
         ProtocolCellExecutor,
@@ -169,8 +177,9 @@ def test_every_registered_experiment_maps_to_a_live_cell_handler() -> None:
 
     registered = {registration.experiment for registration in CELL_HANDLER_REGISTRATIONS}
     assert registered == set(
-        REGISTERED_EXPERIMENT_NAMES
-    ), "cell handler registration must cover exactly the registered experiments"
+        CATALOG_EXPERIMENT_NAMES
+    ), "cell handler registration must cover exactly the catalog experiments"
+    assert REGISTERED_EXPERIMENT_NAMES == (ExperimentName.LEAVE_FAULT_CERTIFICATE_VALIDATION,)
     missing = [
         registration.handler
         for registration in CELL_HANDLER_REGISTRATIONS

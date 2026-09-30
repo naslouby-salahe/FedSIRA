@@ -44,3 +44,21 @@ remediation.
 ## Centralized target and benign-FAR metrics
 
 The target-class F1 wrapper is now used in production report-metric construction instead of selecting the target entry separately. The benign false-alarm-rate increase helper now governs deltas across evaluation summaries, screen evidence, protocol admission, baseline outcomes, and experiment handlers. This removes repeated defined/undefined-value handling from those paths. The metric fixture covers positive and undefined inputs; focused metric/protocol suites pass. This is a completed slice, not an exhaustive equivalence audit of every scientific formula.
+
+
+## Efficiency-table aggregation correction, 2026-09-27
+
+The Delay and Efficiency table previously pooled all timing repetitions before
+calculating its median and IQR. That contradicted Roadmap §30.19, which treats
+repetitions as descriptive measurements within a seed and then summarizes the
+seed medians. The calculation now lives in `reporting/telemetry.py` and is
+shared by the figure and table. It covers the seven configured efficiency
+metrics and excludes incomplete/failed outcomes.
+
+Persisted aggregate rows also previously included defined metric values from
+failed or invalid cells. They now select only completed outcomes; raw cell
+metric rows retain terminal-state information for auditability. Regression
+fixtures cover a failed metric source and a 3-seed × 5-repetition timing grid.
+The focused reporting module passes 33 tests; Ruff, formatting, and targeted
+Pyright pass. The full suite and fresh Graphify remain pending after this
+source change.

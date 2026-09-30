@@ -119,23 +119,33 @@ def run_fedavg_round(
     training_config: TrainingConfig,
     local_epochs: LocalEpochCount,
     clients: tuple[LocalTrainingClient, ...],
+    client_state_overrides: tuple[ModelState | None, ...] | None = None,
 ) -> ModelState:
     if not clients:
         raise ValueError("FedAvg round requires at least one client")
-    trained_clients = tuple(
-        train_one_client_locally(
-            global_state,
-            input_width,
-            output_width,
-            learning_rate,
-            optimizer_config,
-            training_config,
-            local_epochs,
-            client,
-        )
-        for client in clients
-    )
-    return federated_averaging(trained_clients)
+    if client_state_overrides is not None and len(client_state_overrides) != len(clients):
+        raise ValueError("FedAvg client state overrides must align with the round clients")
+    trained_clients: list[WeightedModelState] = []
+    for index, client in enumerate(clients):
+        override = None if client_state_overrides is None else client_state_overrides[index]
+        if override is None:
+            trained_clients.append(
+                train_one_client_locally(
+                    global_state,
+                    input_width,
+                    output_width,
+                    learning_rate,
+                    optimizer_config,
+                    training_config,
+                    local_epochs,
+                    client,
+                )
+            )
+        else:
+            trained_clients.append(
+                WeightedModelState(state=override, example_count=_validate_client_rows(client))
+            )
+    return federated_averaging(tuple(trained_clients))
 
 
 def _model_state_parameter_count(state: ModelState) -> TrainableParameterCount:

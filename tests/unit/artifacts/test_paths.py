@@ -45,6 +45,17 @@ def test_project_artifact_family_maps_to_execution_workspace_artifacts() -> None
     )
 
 
+def test_claim_state_artifact_is_a_project_scoped_artifact() -> None:
+    assert (
+        path_scope_for_family(ArtifactFamily.CLAIM_STATE_ARTIFACT)
+        is ArtifactPathScope.PROJECT_ARTIFACT
+    )
+    assert (
+        workspace_root_for_family(ArtifactFamily.CLAIM_STATE_ARTIFACT)
+        == execution_workspace_root() / "artifacts"
+    )
+
+
 def test_experiment_artifact_family_requires_experiment_name() -> None:
     with pytest.raises(ValueError):
         workspace_root_for_family(ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT)

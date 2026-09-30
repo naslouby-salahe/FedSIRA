@@ -67,6 +67,7 @@ from fedsira.domain.enums import (
     MetricObservationKey,
     OpeningMode,
     PluralityCondition,
+    PrimaryScenario,
     ReproducerCondition,
     ScientificCellPhase,
     SeedDerivationLabel,
@@ -97,6 +98,7 @@ from fedsira.domain.types import (
     CellHandlerName,
     CommunicationMessageCount,
     CompromisedProductionAncestry,
+    DeltaScale,
     DomainId,
     FrozenDomainModel,
     MasterSeed,
@@ -118,9 +120,10 @@ from fedsira.evaluation.metrics import (
     compute_source_backdoor_asr,
     evaluate_domain,
     false_launch_rate,
-    malicious_admission_rate,
+    malicious_admission_from_ancestry,
     metrics_from_state,
     non_source_domains,
+    production_depends_on_compromised_contributor,
     reproduction_attempt_count,
     root_cause_partitioned_row_ids,
     supported_macro_f1_harm,
@@ -135,7 +138,9 @@ from fedsira.evaluation.service import (
     compute_capability_under_specification_summary,
     compute_shared_epistemic_failure_summary,
 )
+from fedsira.evaluation.statistics import mean_of_defined_values as mean_of_defined
 from fedsira.experiments.byzantine import (
+    SOURCE_COPY_CONDITIONS,
     compromised_reproducer_count,
     compromised_verifier_count,
 )
@@ -156,6 +161,7 @@ from fedsira.experiments.definitions import (
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
     BYZANTINE_BOUND_VIOLATION_NAME,
     CAPABILITY_UNDER_SPECIFICATION_BOUNDARY_NAME,
+    CATALOG_EXPERIMENT_NAMES,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
@@ -163,11 +169,11 @@ from fedsira.experiments.definitions import (
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     EXTERNAL_VERIFICATION_NECESSITY_NAME,
     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
+    LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
     MECHANISM_ABLATION_NAME,
     PRIMARY_CONFIRMATORY_EVALUATION_NAME,
     PROPOSAL_ASSISTED_OPENING_NECESSITY_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
-    REGISTERED_EXPERIMENT_NAMES,
     SECONDARY_DATASET_GENERALIZATION_NAME,
     SHARED_EPISTEMIC_FAILURE_BOUNDARY_NAME,
     SINGLE_REPRODUCTION_NECESSITY_NAME,
@@ -197,9 +203,9 @@ from fedsira.experiments.execution import (
     run_data_and_domain_evidence_validation,
     run_protocol_invariant_validation,
 )
+from fedsira.experiments.leave_fault_validation import execute_leave_fault_validation_cell
 from fedsira.experiments.observations import (
     declared_contract_scopes,
-    mean_of_defined,
     measurement_cycles,
     observation_value,
     observations_with_replacements,
@@ -257,6 +263,7 @@ from fedsira.protocol.baselines.defenses import (
 from fedsira.protocol.baselines.outcomes import ProtocolBaselineOutcomes
 from fedsira.protocol.baselines.registry import (
     ORDINARY_POST_REFERENCE_DATA_ACCESS,
+    BaselineValidationFixture,
     domain_target_view,
     domain_without_target_view_may_participate,
     first_eligible_non_source_reproducer,
@@ -304,12 +311,13 @@ from fedsira.protocol.rules import (
     holder_count_at_cycle,
     krum_committee_is_admissible,
     reproducer_order_for_cell,
+    reproduction_update_vector,
     resume_dormant_admission,
     validate_no_safety_completion_before_tau_k,
 )
 from fedsira.protocol.synthesis import (
     CertifiedReproductionRow,
-    krum_input_excludes_source,
+    require_source_identity_excluded_from_synthesis,
     select_krum_update,
 )
 from fedsira.protocol.verification import (
@@ -329,6 +337,23 @@ from fedsira.runtime import (
     FailureDetail,
     current_application_context,
     derive_uint32,
+    namespace_seed,
+)
+
+_ORDINARY_CLIENT_ATTACK_METHODS = (
+    BaselineIdentity.FEDAVG_REFERENCE,
+    BaselineIdentity.KRUM_ROBUST_AGGREGATION_REFERENCE,
+    BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
+    BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
+    BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
+    BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
+)
+_SOURCE_POISON_AVERAGING_METHODS = (
+    BaselineIdentity.FEDAVG_REFERENCE,
+    BaselineIdentity.DENSITY_CLUSTER_TRIMMED_MEAN,
+    BaselineIdentity.UPDATE_RECONSTRUCTION_FILTER,
+    BaselineIdentity.SECURE_CONTINUAL_ASSESSMENT_REFERENCE,
+    BaselineIdentity.MULTIPLE_MODEL_CERTIFIED_ENSEMBLE,
 )
 
 
@@ -361,6 +386,9 @@ class ProtocolCellDispatch:
     _pending_real_report: RealReportSummary | None
     _last_protocol_phase_durations: ProtocolPhaseDurations
     _last_committee_deltas: OrderedDict[DomainId, torch.Tensor]
+    _last_synthesis_row_ids: tuple[DomainId, ...]
+    _last_production_contributor_ids: tuple[DomainId, ...]
+    _last_designated_compromised_ids: tuple[DomainId, ...]
     _last_compromised_reproducers: frozenset[DomainId]
     _last_ablation_strategy: AblationReproducerStrategy
     _last_reproduction_attempts: ReproductionAttemptCount
@@ -469,6 +497,8 @@ class ProtocolCellDispatch:
                 if variant == AblationVariant.SOURCE_RELEASE_AFTER_PEER_REVIEW
                 else self._source_release_after_full_external_check_outcome(cell, evidence)
             )
+            released_source = source_domain_for_cell(self._primary_adapter, cell)
+            released_ids = (released_source,) if released_source is not None else ()
             return (
                 state,
                 (
@@ -481,7 +511,14 @@ class ProtocolCellDispatch:
                         if state is AdmissionState.ADMITTED
                         else 0.0,
                     ),
-                    (ComparisonMetric.MALICIOUS_ADMISSION, float(state is AdmissionState.ADMITTED)),
+                    (
+                        ComparisonMetric.MALICIOUS_ADMISSION,
+                        self._ancestry_malicious_admission(
+                            state,
+                            released_source is not None,
+                            released_ids,
+                        ),
+                    ),
                 ),
             )
         if variant in (
@@ -650,6 +687,8 @@ class ProtocolCellDispatch:
             supported_macro_f1_drop=MetricResult(value=None, denominator=0),
             benign_far_increase=MetricResult(value=None, denominator=0),
             clean_oracle_materiality_config=config.attacks_and_boundaries.clean_oracle_materiality,
+            false_certification_count=0,
+            broad_certified_row_count=0,
             is_scoped_contract=is_scoped_contract,
             a_scoped_predicate_passes=False,
             b_scoped_predicate_passes=False,
@@ -1033,10 +1072,23 @@ class ProtocolCellDispatch:
             self._pending_real_report,
             legitimate_admission_eligible=stage.legitimate_admission_eligible,
         )
-        return (state, (*metrics, *self._opening_stage_observations(stage, state)))
+        return (
+            state,
+            (
+                *metrics,
+                *self._opening_stage_observations(
+                    stage,
+                    state,
+                    source_domain_for_cell(self._primary_adapter, cell),
+                ),
+            ),
+        )
 
     def _opening_stage_observations(
-        self, stage: OpeningStageOutcome, state: AdmissionState
+        self,
+        stage: OpeningStageOutcome,
+        state: AdmissionState,
+        source_domain: DomainId | None,
     ) -> tuple[MetricObservation, ...]:
         false_launch_result = false_launch_rate(
             false_launch_count=1
@@ -1070,14 +1122,11 @@ class ProtocolCellDispatch:
             ),
             (
                 ComparisonMetric.MALICIOUS_ADMISSION,
-                malicious_admission_rate(
-                    [
-                        state is AdmissionState.ADMITTED
-                        and stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                    ]
-                ).value
-                if stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT
-                else None,
+                self._ancestry_malicious_admission(
+                    state,
+                    stage.episode is ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+                    (source_domain,) if source_domain is not None else (),
+                ),
             ),
         )
 
@@ -1326,6 +1375,9 @@ class ProtocolCellDispatch:
     ) -> AdmissionState:
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
         self._last_committee_deltas = OrderedDict()
+        self._last_synthesis_row_ids = ()
+        self._last_production_contributor_ids = ()
+        self._last_designated_compromised_ids = ()
         self._last_compromised_reproducers = frozenset()
         self._last_ablation_strategy = AblationReproducerStrategy.NONE
         self._last_reproduction_attempts = 0
@@ -1517,6 +1569,66 @@ class ProtocolCellDispatch:
                 NBaiotDomain(domain) for domain in selected_reproducers
             )
             ablation_strategy = AblationReproducerStrategy.MODEL_REPLACEMENT
+        if cell.condition in SOURCE_COPY_CONDITIONS and not compromised_reproducers:
+            copy_count = compromised_reproducer_count(cell.condition)
+            reproduction_method = cell.method in (
+                BaselineIdentity.ONE_INDEPENDENT_RETRAIN,
+                BaselineIdentity.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN,
+                BaselineIdentity.MULTIPLE_RETRAINS_WITH_DIRECT_KRUM,
+                BaselineIdentity.CANDIDATE_FREE_FULL_PATH,
+                RESOLVED_FEDSIRA_CORE_METHOD,
+                CoreMethodIdentity.FULL_PLURALITY_PATH,
+                SourceExclusionMethod.FULL_FEDSIRA,
+            )
+            if (
+                cell.condition == PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT
+                and not reproduction_method
+            ):
+                copy_count = 0
+            if copy_count and source_domain is not None:
+                if source_delta is None:
+                    copy_scope = self._configured_backdoor_scope(
+                        cell,
+                        config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction,
+                    )
+                    if copy_scope is not None:
+                        source_delta = train_source_candidate_delta(
+                            nbaiot_adapter(self._primary_adapter.prepared_root),
+                            cell.master_seed,
+                            real_anchor,
+                            source_domain,
+                            backdoor_scope=copy_scope,
+                        )
+                selected_copies = select_compromised_reproducers(
+                    reproducer_order_for_cell(self._primary_adapter, cell),
+                    model_replacement_attack_feasible_domains(self._primary_adapter),
+                    copy_count,
+                )
+                if selected_copies is None:
+                    raise ValueError("declared source-copy count exceeds attack-feasible domains")
+                compromised_reproducers = frozenset(
+                    NBaiotDomain(domain) for domain in selected_copies
+                )
+        if cell.condition == ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER:
+            ablation_strategy = AblationReproducerStrategy.VERIFIER_AWARE
+            if backdoor_scope is None:
+                backdoor_scope = self._configured_backdoor_scope(
+                    cell,
+                    config.attacks_and_boundaries.hidden_source_backdoor.confirmatory_poison_fraction,
+                )
+            if not compromised_reproducers:
+                selected_verifier_aware = select_compromised_reproducers(
+                    reproducer_order_for_cell(self._primary_adapter, cell),
+                    model_replacement_attack_feasible_domains(self._primary_adapter),
+                    compromised_reproducer_count(cell.condition),
+                )
+                if selected_verifier_aware is None or backdoor_scope is None:
+                    raise ValueError(
+                        "verifier-aware reproducer fixture lacks its declared attack row"
+                    )
+                compromised_reproducers = frozenset(
+                    NBaiotDomain(domain) for domain in selected_verifier_aware
+                )
         self._last_compromised_reproducers = compromised_reproducers
         self._last_ablation_strategy = ablation_strategy
         if single_verifier_active:
@@ -1527,10 +1639,13 @@ class ProtocolCellDispatch:
                 self._primary_adapter,
                 real_anchor,
                 heterogeneity_scope,
+                compromised_reproducers,
+                source_delta,
             )
             self._last_protocol_phase_durations = ProtocolPhaseDurations(
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
             )
+            self._last_synthesis_row_ids = tuple(updates)
         else:
             reproduction_timer = ElapsedTimer()
             progression_state, attempts, commitment_hashes, updates = reproduction_progression(
@@ -1551,6 +1666,7 @@ class ProtocolCellDispatch:
                 reproduce_seconds=reproduction_timer.elapsed_seconds()
             )
             self._last_committee_deltas = updates
+            self._last_synthesis_row_ids = tuple(updates)
             self._last_reproduction_attempts = len(attempts)
             if progression_state is AdmissionState.VERIFICATION_PENDING:
                 verification_timer = ElapsedTimer()
@@ -1743,6 +1859,7 @@ class ProtocolCellDispatch:
                 self._pending_real_report,
                 production_checkpoint,
                 krum_selected_update,
+                self._last_production_contributor_ids,
             ) = final_gate_decision(
                 evidence,
                 source_domain,
@@ -1777,6 +1894,21 @@ class ProtocolCellDispatch:
             state, logical_cycle=0, resource_horizon_config=config.protocol.resource_horizon
         )
 
+    def _ancestry_malicious_admission(
+        self,
+        state: AdmissionState,
+        fixture_present: BooleanValue,
+        compromised_ids: tuple[DomainId, ...],
+    ) -> MetricValue | None:
+        return malicious_admission_from_ancestry(
+            state is AdmissionState.ADMITTED,
+            fixture_present,
+            production_depends_on_compromised_contributor(
+                self._last_production_contributor_ids,
+                compromised_ids,
+            ),
+        )
+
     def _execute_plurality_cell(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
@@ -1786,15 +1918,10 @@ class ProtocolCellDispatch:
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
         )
-        malicious_value: MetricValue | None = (
-            malicious_admission_rate(
-                [
-                    state is AdmissionState.ADMITTED
-                    and cell.method != CoreMethodIdentity.FULL_PLURALITY_PATH
-                ]
-            ).value
-            if condition is source_copy_condition
-            else None
+        malicious_value = self._ancestry_malicious_admission(
+            state,
+            condition is source_copy_condition,
+            tuple(self._last_compromised_reproducers),
         )
         return (
             state,
@@ -1807,14 +1934,17 @@ class ProtocolCellDispatch:
         method = cell.method
         full_fedsira = SourceExclusionMethod.FULL_FEDSIRA
         validate_source_excluded_production_weight(0.0)
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
         if method in (full_fedsira, SourceExclusionMethod.ONE_INDEPENDENT_RETRAIN):
             state = self._advance_protocol(cell, evidence)
-            krum_input_excludes_source(
-                candidate_row_ids=tuple(domain.name for domain in NBAIOT_DOMAIN_ORDER[:3]),
-                source_row_id=None,
+            require_source_identity_excluded_from_synthesis(
+                self._last_synthesis_row_ids,
+                source_domain,
             )
         elif method == SourceExclusionMethod.CLIENT_REVIEW_WITH_DIRECT_SOURCE_ADMISSION:
             state = self.client_review_outcome(cell)
+            if source_domain is not None:
+                self._last_production_contributor_ids = (source_domain,)
         elif method == SourceExclusionMethod.CLIENT_REVIEW_THEN_ONE_INDEPENDENT_RETRAIN:
             discard_source = client_review_then_retrain_should_discard_source_weights(
                 self.client_review_outcome(cell)
@@ -1822,6 +1952,10 @@ class ProtocolCellDispatch:
             state = (
                 self._advance_protocol(cell, evidence) if discard_source else AdmissionState.DORMANT
             )
+        elif method == SourceExclusionMethod.SOURCE_UPDATE_SANITIZATION_REFERENCE:
+            state = self._source_update_sanitization_outcome(cell, evidence)
+        elif method == SourceExclusionMethod.RECOVERY_AFTER_SOURCE_ADMISSION:
+            state = self._recovery_after_source_admission_outcome(cell, evidence)
         else:
             state = self._advance_protocol(cell, evidence)
         extra: list[MetricObservation] = []
@@ -1858,9 +1992,12 @@ class ProtocolCellDispatch:
             source_backdoor_asr,
             legitimate_admission_eligible=True,
         )
-        malicious_admission = 0.0
-        if method != full_fedsira and state is AdmissionState.ADMITTED:
-            malicious_admission = 1.0
+        compromised_source = (source_domain,) if source_domain is not None else ()
+        malicious_admission = self._ancestry_malicious_admission(
+            state,
+            cell.condition == ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            (*compromised_source, *self._last_compromised_reproducers),
+        )
         return (
             state,
             (*metrics, (ComparisonMetric.MALICIOUS_ADMISSION, malicious_admission), *extra),
@@ -1878,14 +2015,10 @@ class ProtocolCellDispatch:
             ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
             ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
         )
-        malicious_admission: MetricValue | None = (
-            1.0
-            if has_malicious
-            and state is AdmissionState.ADMITTED
-            and cell.method != SourceExclusionMethod.FULL_FEDSIRA
-            else 0.0
-            if has_malicious
-            else None
+        malicious_admission = self._ancestry_malicious_admission(
+            state,
+            has_malicious,
+            tuple(self._last_compromised_reproducers),
         )
         return (
             state,
@@ -1900,7 +2033,7 @@ class ProtocolCellDispatch:
             metrics = metrics_from_state(
                 state, self._pending_real_report, legitimate_admission_eligible=True
             )
-            return (state, metrics)
+            return (state, (*metrics, *self._scenario_malicious_admission(cell, state)))
         return self._execute_baseline_cell(cell, evidence)
 
     def _execute_baseline_cell(
@@ -1993,7 +2126,51 @@ class ProtocolCellDispatch:
         metrics = metrics_from_state(
             state, self._pending_real_report, legitimate_admission_eligible=True
         )
-        return (state, metrics)
+        return (state, (*metrics, *self._scenario_malicious_admission(cell, state)))
+
+    def _scenario_malicious_admission(
+        self, cell: ScientificCell, state: AdmissionState
+    ) -> tuple[MetricObservation, ...]:
+        source_domain = source_domain_for_cell(self._primary_adapter, cell)
+        fixture = cell.condition in (
+            PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
+            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+        )
+        ordinary_client_attack = (
+            cell.method in _ORDINARY_CLIENT_ATTACK_METHODS
+            and cell.condition
+            in (
+                PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
+                BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
+            )
+        )
+        fixture = ordinary_client_attack or cell.condition in (
+            PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
+            ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+        )
+        compromised_ids = list(self._last_compromised_reproducers)
+        source_is_compromised_authority = (
+            source_domain is not None
+            and not ordinary_client_attack
+            and cell.condition
+            in (
+                PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+                ProposalEpisode.USEFUL_BACKDOORED_SOURCE_5_PERCENT,
+            )
+        )
+        if source_is_compromised_authority and source_domain is not None:
+            compromised_ids.insert(0, source_domain)
+        for designated in self._last_designated_compromised_ids:
+            if designated not in compromised_ids:
+                compromised_ids.append(designated)
+        return (
+            (
+                ComparisonMetric.MALICIOUS_ADMISSION,
+                self._ancestry_malicious_admission(state, fixture, tuple(compromised_ids)),
+            ),
+        )
 
     def _execute_reproducer_robustness_cell(
         self,
@@ -2006,6 +2183,7 @@ class ProtocolCellDispatch:
         compromised_count = compromised_reproducer_count(condition)
         real_anchor = self.real_anchor(cell.master_seed)
         source_domain = source_domain_for_cell(self._primary_adapter, cell)
+        source_delta = None
         if condition in (
             ReproducerCondition.ONE_SOURCE_COPY,
             ReproducerCondition.TWO_SOURCE_COPIES,
@@ -2075,6 +2253,7 @@ class ProtocolCellDispatch:
                 real_anchor,
                 strategy=reproducer_strategy,
                 backdoor_scope=self.backdoor_scope_for_cell(replace(cell, condition=condition)),
+                source_delta=source_delta,
             )
             self._last_committee_deltas = updates
             self._last_reproduction_attempts = len(attempts)
@@ -2089,6 +2268,7 @@ class ProtocolCellDispatch:
                     self._pending_real_report,
                     production_checkpoint,
                     krum_selected_update,
+                    self._last_production_contributor_ids,
                 ) = final_gate_decision(
                     evidence,
                     source_domain,
@@ -2551,6 +2731,10 @@ CELL_HANDLER_REGISTRATIONS: tuple[CellHandlerRegistration, ...] = (
     CellHandlerRegistration(
         experiment=SECONDARY_DATASET_GENERALIZATION_NAME, handler="_execute_secondary_cell"
     ),
+    CellHandlerRegistration(
+        experiment=LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
+        handler="_execute_leave_fault_certificate_cell",
+    ),
 )
 
 
@@ -2562,14 +2746,14 @@ def cell_handler_registration(experiment: ExperimentName) -> CellHandlerName | N
 
 
 def validate_cell_handler_registration() -> None:
-    registered = set(REGISTERED_EXPERIMENT_NAMES)
+    catalog = set(CATALOG_EXPERIMENT_NAMES)
     mapped = {registration.experiment for registration in CELL_HANDLER_REGISTRATIONS}
-    missing = registered - mapped
+    missing = catalog - mapped
     if missing:
-        raise ValueError(f"registered experiments without a cell handler: {sorted(missing)}")
-    unknown = mapped - registered
+        raise ValueError(f"catalog experiments without a cell handler: {sorted(missing)}")
+    unknown = mapped - catalog
     if unknown:
-        raise ValueError(f"cell handlers for unregistered experiments: {sorted(unknown)}")
+        raise ValueError(f"cell handlers for experiments outside the catalog: {sorted(unknown)}")
     missing_methods = {
         registration.handler
         for registration in CELL_HANDLER_REGISTRATIONS
@@ -2604,6 +2788,57 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         self._pending_real_report: RealReportSummary | None = None
         self._current_cell: ScientificCell | None = None
         self._last_protocol_phase_durations = ProtocolPhaseDurations()
+        self._last_production_contributor_ids = ()
+        self._last_designated_compromised_ids = ()
+        self._last_compromised_reproducers = frozenset()
+
+    def _model_replacement_training_args(
+        self, cell: ScientificCell
+    ) -> tuple[DomainId | None, BackdoorScope | None, DeltaScale | None]:
+        model_replacement_condition = cell.condition in (
+            PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
+            BaselineValidationFixture.MODEL_REPLACEMENT_BACKDOOR,
+        )
+        if model_replacement_condition and cell.method in _ORDINARY_CLIENT_ATTACK_METHODS:
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
+            feasible = model_replacement_attack_feasible_domains(self._primary_adapter)
+            eligible = tuple(
+                domain
+                for domain in non_source_domains(self._primary_adapter, source_domain)
+                if domain in feasible
+            )
+            selected = select_compromised_reproducers(
+                byzantine_selection_order(
+                    eligible,
+                    namespace_seed(cell.master_seed, SeedDerivationLabel.BYZANTINE_SELECTION),
+                ),
+                feasible,
+                compromised_reproducer_count(
+                    PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT
+                ),
+            )
+            if selected is None:
+                raise ValueError("ordinary-FL model replacement lacks an attack-feasible client")
+            config = current_application_context().scientific_config
+            scope = self._configured_backdoor_scope(
+                cell,
+                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.poison_fraction,
+            )
+            if scope is None:
+                raise ValueError("ordinary-FL model replacement lacks its declared poisoned view")
+            return (
+                selected[0],
+                scope,
+                config.attacks_and_boundaries.byzantine_reproduction.model_replacement.delta_scale,
+            )
+        source_backdoor = cell.condition == PrimaryScenario.USEFUL_BACKDOORED_SOURCE_5_PERCENT
+        if source_backdoor and cell.method in _SOURCE_POISON_AVERAGING_METHODS:
+            source_domain = source_domain_for_cell(self._primary_adapter, cell)
+            scope = self.source_backdoor_scope_for_cell(cell)
+            if source_domain is None or scope is None:
+                raise ValueError("useful backdoored source lacks its declared source update")
+            return source_domain, scope, None
+        return None, None, None
 
     def real_anchor(self, master_seed: MasterSeed) -> RealAnchor | None:
         if master_seed not in self.real_anchor_cache:
@@ -2839,6 +3074,9 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
 
     def execute_cell(self, cell: ScientificCell) -> CellExecutionOutcome:
         self._pending_real_report = None
+        self._last_production_contributor_ids = ()
+        self._last_designated_compromised_ids = ()
+        self._last_compromised_reproducers = frozenset()
         dataset = experiment_by_name(cell.experiment).dataset
         if dataset is DatasetId.CICIOT2023:
             prepared_root = self._secondary_prepared_root
@@ -2846,7 +3084,10 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
         else:
             prepared_root = self._primary_adapter.prepared_root
             target_class_token = self._primary_adapter.target_class_token
-        if cell.experiment == PROTOCOL_INVARIANT_VALIDATION_NAME:
+        if cell.experiment in (
+            PROTOCOL_INVARIANT_VALIDATION_NAME,
+            LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
+        ):
             evidence = PreparedEvidenceCounts(
                 screen_target_count=0,
                 reproduction_target_count=0,
@@ -2948,6 +3189,12 @@ class ProtocolCellExecutor(CellExecutor, ProtocolBaselineOutcomes, ProtocolCellD
             metrics_from_state(AdmissionState.ADMITTED, legitimate_admission_eligible=False),
         )
 
+    def _execute_leave_fault_certificate_cell(
+        self, cell: ScientificCell, evidence: PreparedEvidenceCounts
+    ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
+        del evidence
+        return execute_leave_fault_validation_cell(cell)
+
     def _execute_cell_protocol(
         self, cell: ScientificCell, evidence: PreparedEvidenceCounts
     ) -> tuple[AdmissionState, tuple[MetricObservation, ...]]:
@@ -3002,6 +3249,8 @@ def single_verifier_progression(
     adapter: DatasetAdapter,
     anchor: RealAnchor | None,
     heterogeneity_scope: HeterogeneityScope | None = None,
+    compromised_reproducers: frozenset[DomainId] = frozenset(),
+    source_delta: torch.Tensor | None = None,
 ) -> tuple[
     AdmissionState,
     tuple[ReproductionAttempt, ...],
@@ -3029,13 +3278,22 @@ def single_verifier_progression(
             return (AdmissionState.DORMANT, (), (), OrderedDict())
         next_domain = NBaiotDomain(candidate)
         consumed.add(next_domain)
-        update = train_domain_reproduction_delta(
-            adapter,
-            cell.master_seed,
-            anchor,
-            next_domain,
-            heterogeneity_scope=heterogeneity_scope,
-        )
+        if (
+            next_domain in compromised_reproducers
+            and source_delta is not None
+            and cell.condition in SOURCE_COPY_CONDITIONS
+        ):
+            update = reproduction_update_vector(
+                anchor.flat_parameters, anchor.flat_parameters + source_delta
+            )
+        else:
+            update = train_domain_reproduction_delta(
+                adapter,
+                cell.master_seed,
+                anchor,
+                next_domain,
+                heterogeneity_scope=heterogeneity_scope,
+            )
         if update is None:
             continue
         reproduced = anchor.flat_parameters + update

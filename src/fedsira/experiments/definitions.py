@@ -6,12 +6,14 @@ from fedsira.domain.enums import (
     AblationReproducerStrategy,
     AblationScenario,
     AblationVariant,
+    AdmissionDecisionMethod,
     AdmissionOpeningMode,
     BaselineIdentity,
     BoundCondition,
     CapabilityContractScope,
     ComparisonFamily,
     ComparisonMetric,
+    ControlledAdmissionWorld,
     CoreMethodIdentity,
     DatasetId,
     DescriptiveScientificMetric,
@@ -57,6 +59,7 @@ CELL_METRICS_PARQUET_NAME: ArtifactFileName = "cell-metrics.parquet"
 SEED_METRICS_PARQUET_NAME: ArtifactFileName = "seed-metrics.parquet"
 AGGREGATE_METRICS_PARQUET_NAME: ArtifactFileName = "aggregate-metrics.parquet"
 STATE_TRAJECTORY_PARQUET_NAME: ArtifactFileName = "state-trajectory.parquet"
+STATE_TRAJECTORY_FRACTIONS_PARQUET_NAME: ArtifactFileName = "state-trajectory-fractions.parquet"
 PROTOCOL_SCHEMATIC_FIGURE_NAME: FigureName = FigureName.PROTOCOL_SCHEMATIC
 PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = (
     FigureName.PRIMARY_SECURITY_UTILITY_TRADEOFF
@@ -64,7 +67,12 @@ PRIMARY_SECURITY_UTILITY_TRADEOFF_FIGURE_NAME: FigureName = (
 USEFUL_BACKDOORED_SOURCE_FIGURE_NAME: FigureName = FigureName.USEFUL_BACKDOORED_SOURCE
 COLLAPSE_DECISION_EFFECTS_FIGURE_NAME: FigureName = FigureName.COLLAPSE_DECISION_EFFECTS
 COMPROMISED_REPRODUCER_BOUNDARY_FIGURE_NAME: FigureName = FigureName.COMPROMISED_REPRODUCER_BOUNDARY
-COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME: FigureName = FigureName.COMPROMISED_VERIFIER_BOUNDARY
+COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY_FIGURE_NAME: FigureName = (
+    FigureName.COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY
+)
+COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY_FIGURE_NAME: FigureName = (
+    FigureName.COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY
+)
 SHARED_EPISTEMIC_FAILURE_FIGURE_NAME: FigureName = FigureName.SHARED_EPISTEMIC_FAILURE
 CAPABILITY_GRANULARITY_BOUNDARY_FIGURE_NAME: FigureName = FigureName.CAPABILITY_GRANULARITY_BOUNDARY
 HETEROGENEITY_SYNTHESIS_BOUNDARY_FIGURE_NAME: FigureName = (
@@ -159,8 +167,11 @@ EFFICIENCY_MEASUREMENT_NAME: ExperimentName = ExperimentName.EFFICIENCY_MEASUREM
 SECONDARY_DATASET_GENERALIZATION_NAME: ExperimentName = (
     ExperimentName.SECONDARY_DATASET_GENERALIZATION
 )
+LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME: ExperimentName = (
+    ExperimentName.LEAVE_FAULT_CERTIFICATE_VALIDATION
+)
 
-REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
+CATALOG_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     PROTOCOL_INVARIANT_VALIDATION_NAME,
     BASELINE_IMPLEMENTATION_VALIDATION_NAME,
@@ -180,6 +191,7 @@ REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     ADMISSION_DELAY_DECOMPOSITION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     SECONDARY_DATASET_GENERALIZATION_NAME,
+    LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
 )
 
 COLLAPSE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
@@ -204,7 +216,18 @@ POST_CORE_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (
     SECONDARY_DATASET_GENERALIZATION_NAME,
 )
 
+REGISTERED_EXPERIMENT_NAMES: tuple[ExperimentName, ...] = (LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,)
+
 _SMOKE_SEED_COUNT: SeedCount = 1
+
+CERTIFICATE_VALIDATION_CELL_COUNT: ScientificCellCount = (
+    len(AdmissionDecisionMethod) * len(ControlledAdmissionWorld) * _SMOKE_SEED_COUNT
+)
+
+_CERTIFICATE_VALIDATION_METRICS: tuple[ScientificMetric, ...] = (
+    DescriptiveScientificMetric.TERMINAL_STATE,
+    ComparisonMetric.LEGITIMATE_ADMISSION,
+)
 
 _VALIDATION_METRICS: tuple[ScientificMetric, ...] = (DescriptiveScientificMetric.VALIDATION_GATE,)
 _OPENING_NECESSITY_METRICS: tuple[ScientificMetric, ...] = (
@@ -544,10 +567,10 @@ def experiment_registry() -> tuple[ExperimentDefinition, ...]:
     confirmatory_seed_count = _confirmatory_seed_count()
     definitions = _experiment_definitions(confirmatory_seed_count)
     registered = tuple(definition.name for definition in definitions)
-    if registered != REGISTERED_EXPERIMENT_NAMES:
+    if registered != CATALOG_EXPERIMENT_NAMES:
         raise ValueError(
             f"experiment registry {registered} does not match the declared "
-            f"registered experiment names {REGISTERED_EXPERIMENT_NAMES}"
+            f"catalog experiment names {CATALOG_EXPERIMENT_NAMES}"
         )
     return definitions
 
@@ -724,7 +747,10 @@ def _experiment_definitions(confirmatory_seed_count: SeedCount) -> tuple[Experim
             comparison_family=ComparisonFamily.VERIFIER_ROBUSTNESS,
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
             dataset=DatasetId.N_BAIOT,
-            artifacts=experiment_artifacts(COMPROMISED_VERIFIER_BOUNDARY_FIGURE_NAME),
+            artifacts=experiment_artifacts(
+                COMPROMISED_VERIFIER_FALSE_POSITIVE_BOUNDARY_FIGURE_NAME,
+                COMPROMISED_VERIFIER_FALSE_NEGATIVE_BOUNDARY_FIGURE_NAME,
+            ),
         ),
         ExperimentDefinition(
             name=BYZANTINE_BOUND_VIOLATION_NAME,
@@ -755,7 +781,10 @@ def _experiment_definitions(confirmatory_seed_count: SeedCount) -> tuple[Experim
             dataset=DatasetId.N_BAIOT,
             artifacts=experiment_artifacts(
                 EVIDENCE_ARRIVAL_STATE_TRAJECTORY_FIGURE_NAME,
-                additional_metric_artifacts=(STATE_TRAJECTORY_PARQUET_NAME,),
+                additional_metric_artifacts=(
+                    STATE_TRAJECTORY_PARQUET_NAME,
+                    STATE_TRAJECTORY_FRACTIONS_PARQUET_NAME,
+                ),
             ),
         ),
         ExperimentDefinition(
@@ -859,6 +888,19 @@ def _experiment_definitions(confirmatory_seed_count: SeedCount) -> tuple[Experim
             prerequisites=(PRIMARY_CONFIRMATORY_EVALUATION_NAME,),
             dataset=DatasetId.CICIOT2023,
             artifacts=experiment_artifacts(SECONDARY_GENERALIZATION_FIGURE_NAME),
+        ),
+        ExperimentDefinition(
+            name=LEAVE_FAULT_CERTIFICATE_VALIDATION_NAME,
+            experiment_class=ExperimentClass.VALIDATION,
+            methods=tuple(AdmissionDecisionMethod),
+            conditions=tuple(ControlledAdmissionWorld),
+            seed_count=_SMOKE_SEED_COUNT,
+            nominal_cell_count=CERTIFICATE_VALIDATION_CELL_COUNT,
+            primary_metrics=_CERTIFICATE_VALIDATION_METRICS,
+            comparison_family=None,
+            prerequisites=(),
+            dataset=DatasetId.N_BAIOT,
+            artifacts=experiment_artifacts(),
         ),
     )
 

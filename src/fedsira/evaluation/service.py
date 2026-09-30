@@ -441,7 +441,7 @@ class SingleProcessTimingWorker:
     def measure(
         self,
         action: Callable[[], TimingWorkerResult],
-        warmup_forward_passes: WarmupPassCount = 0,
+        warmup_forward_passes: WarmupPassCount,
     ) -> TimingWorkerObservation:
         for _ in range(warmup_forward_passes):
             action()

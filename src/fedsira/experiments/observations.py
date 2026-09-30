@@ -3,19 +3,14 @@ from fedsira.domain.enums import (
     AdmissionState,
     CapabilityContractScope,
     DescriptiveScientificMetric,
-    ExperimentName,
 )
 from fedsira.domain.types import (
     EligibleEvidenceHolderCount,
     EvidenceCycleIndex,
-    MethodName,
     MetricName,
     MetricObservation,
     MetricValue,
-    ScenarioName,
 )
-from fedsira.evaluation.statistics import mean_of_defined_values as mean_of_defined
-from fedsira.experiments.engine import CellExecutionOutcome
 from fedsira.runtime import current_application_context
 
 
@@ -70,34 +65,3 @@ def observations_with_replacements(
         if not any(name == replacement[0] for name, _value in observations)
     )
     return (*replaced, *appended)
-
-
-def outcome_metric_values(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    scenario: ScenarioName,
-    metric: MetricName,
-) -> tuple[MetricValue, ...]:
-    return tuple(
-        value
-        for outcome in sorted(outcomes, key=lambda item: item.cell.master_seed)
-        if (
-            outcome.completed
-            and outcome.cell.experiment == experiment
-            and outcome.cell.method == method
-            and outcome.cell.condition == scenario
-        )
-        for metric_name, value in outcome.metrics
-        if metric_name == metric and value is not None
-    )
-
-
-def outcome_metric_mean(
-    outcomes: tuple[CellExecutionOutcome, ...],
-    experiment: ExperimentName,
-    method: MethodName,
-    scenario: ScenarioName,
-    metric: MetricName,
-) -> MetricValue | None:
-    return mean_of_defined(outcome_metric_values(outcomes, experiment, method, scenario, metric))

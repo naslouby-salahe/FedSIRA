@@ -56,6 +56,7 @@ from fedsira.domain.types import (
     LossWeight,
     MasterSeed,
     MatchedControlCount,
+    MaximumByzantineReproductionRows,
     MetricTolerance,
     MinimumCompletePairCount,
     MinimumExampleCount,
@@ -93,6 +94,7 @@ from fedsira.domain.types import (
     UciDatasetId,
     VerifierCount,
     WarmupPassCount,
+    WeiszfeldIterationCount,
     WeightDecay,
     WorkerCount,
     YamlMappingKey,
@@ -309,6 +311,21 @@ class SynthesisConfig(FrozenConfigModel):
         return self
 
 
+class LeaveFaultCertificateConfig(FrozenConfigModel):
+    fault_bound: MaximumByzantineReproductionRows
+    minimum_support: DomainCount
+    utility_floor: TargetF1
+    harm_ceiling: SupportedMacroF1Drop
+    weiszfeld_iterations: WeiszfeldIterationCount
+    weiszfeld_epsilon: NumericalEpsilon
+
+    @model_validator(mode="after")
+    def _support_covers_the_fault_bound(self) -> Self:
+        if self.minimum_support < 2 * self.fault_bound + 1:
+            raise ValueError("minimum_support must cover two faults plus one")
+        return self
+
+
 class FinalGateConfig(FrozenConfigModel):
     minimum_adequate_non_source_domains: DomainCount
     median_target_f1_minimum: TargetF1
@@ -345,6 +362,7 @@ class ProtocolConfig(FrozenConfigModel):
     verification: VerificationConfig
     synthesis: SynthesisConfig
     final_gate: FinalGateConfig
+    leave_fault_certificate: LeaveFaultCertificateConfig
     diagnostic_random_verifier_profile: DiagnosticRandomVerifierProfileConfig
 
 
@@ -695,6 +713,7 @@ class ScientificEvidenceThresholdsConfig(FrozenConfigModel):
 class ValidationTolerancesConfig(FrozenConfigModel):
     random_committee_probability_absolute: ProbabilityTolerance
     delay_component_sum_seconds_absolute: DurationToleranceSeconds
+    trajectory_fraction_absolute: ProbabilityTolerance
 
 
 class ScientificConfig(FrozenConfigModel):

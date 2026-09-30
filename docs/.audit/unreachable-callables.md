@@ -1,10 +1,9 @@
 # Production callables outside the prospective CLI union
 
-Count: 23 (9 functions, 14 class methods). Static absence is not proof of dead code.
+Count: 24 (9 functions, 15 class methods). Static absence is not proof of dead code.
 
 | Source | Callable | Graphify id |
 |---|---|---|
-| `src/fedsira/artifacts/store.py` | `.family()` | `src_fedsira_artifacts_store_artifactmanifest_family` |
 | `src/fedsira/datasets/ciciot2023/schema.py` | `.raw_token()` | `src_fedsira_datasets_ciciot2023_schema_ciciot2023targetfamilymember_raw_token` |
 | `src/fedsira/datasets/common.py` | `.row_count()` | `src_fedsira_datasets_common_preparedrows_row_count` |
 | `src/fedsira/datasets/common.py` | `.supported_class_tokens()` | `src_fedsira_datasets_common_datasetadapter_supported_class_tokens` |
@@ -22,7 +21,9 @@ Count: 23 (9 functions, 14 class methods). Static absence is not proof of dead c
 | `src/fedsira/learning/training.py` | `.step()` | `src_fedsira_learning_training_steppableoptimizer_step` |
 | `src/fedsira/protocol/reproduction.py` | `.tolist()` | `src_fedsira_protocol_reproduction_listconvertibletensor_tolist` |
 | `src/fedsira/protocol/rules.py` | `reproducer_order()` | `src_fedsira_protocol_rules_reproducer_order` |
+| `src/fedsira/reporting/aggregate.py` | `.tolist()` | `src_fedsira_reporting_aggregate_parquetstringarray_tolist` |
 | `src/fedsira/reporting/figures.py` | `draw_admission()` | `src_fedsira_reporting_figures_render_heterogeneity_synthesis_boundary_draw_admission` |
+| `src/fedsira/reporting/state_trajectory.py` | `.tolist()` | `src_fedsira_reporting_state_trajectory_parquetstringarray_tolist` |
 | `src/fedsira/runtime.py` | `.__call__()` | `src_fedsira_runtime_torchseedfunction_call` |
 | `src/fedsira/runtime.py` | `.format()` | `src_fedsira_runtime_structuredjsonformatter_format` |
 | `src/fedsira/runtime.py` | `get_structured_logger()` | `src_fedsira_runtime_get_structured_logger` |

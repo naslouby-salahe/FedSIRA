@@ -26,14 +26,15 @@ def _called_names(path: Path) -> frozenset[str]:
     return _called_names_for_node(tree)
 
 
-def test_run_workflow_reaches_execution_evaluation_and_evidence_export() -> None:
+def test_run_workflow_reaches_execution_evaluation_and_metric_materialization() -> None:
     calls = _called_names(REPO_ROOT / "src" / "fedsira" / "application.py")
     expected: frozenset[str] = frozenset(
         (
             "ProtocolCellExecutor",
             "execute_experiment",
             "build_comparison_results_for_experiment",
-            "export_experiment_report",
+            "materialize_experiment_evidence",
+            "publish_metric_evidence",
         )
     )
     expected_calls = expected - {"build_comparison_results_for_experiment"}
@@ -45,12 +46,13 @@ def test_run_workflow_reaches_execution_evaluation_and_evidence_export() -> None
     assert "build_comparison_results_for_experiment" in names
 
 
-def test_report_workflow_reaches_persisted_evidence_without_reexporting_products() -> None:
+def test_report_workflow_exports_and_verifies_persisted_products() -> None:
     calls = _called_names(REPO_ROOT / "src" / "fedsira" / "reporting" / "export.py")
     expected: frozenset[str] = frozenset(
         (
             "ExecutionRecordStore",
             "verify_persisted_experiment_report",
+            "export_experiment_report",
             "export_project_summary",
         )
     )
@@ -59,7 +61,7 @@ def test_report_workflow_reaches_persisted_evidence_without_reexporting_products
     ), f"report workflow bypasses required publication path: {expected - calls}"
     assert "current_comparison_evidence" in calls
     assert "build_comparison_results_for_experiment" not in calls
-    assert "export_experiment_report" not in calls
+    assert "export_experiment_report" in calls
     bound = _method_node(
         REPO_ROOT / "src" / "fedsira" / "reporting" / "export.py", "_execute_bound"
     )
@@ -76,8 +78,7 @@ def test_report_workflow_reaches_persisted_evidence_without_reexporting_products
         for node in ast.walk(named_report)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
     )
-    assert "verify_persisted_experiment_report" in named_calls
-    assert "export_experiment_report" not in named_calls
+    assert "export_experiment_report" in named_calls
 
 
 def test_report_workflow_does_not_accept_stale_data_validation_records() -> None:
@@ -227,7 +228,7 @@ def test_config_loader_dispatches_every_pydantic_validator() -> None:
             for row in csv.DictReader(stream)
             if row["dispatch_basis"] == "Pydantic model/field validator metadata"
         }
-    assert len(validator_lines) == 15
+    assert len(validator_lines) == 16
     assert config_validator_ids <= dispatched_ids
     assert len(dispatched_ids) >= len(config_validator_ids)
 
@@ -376,9 +377,7 @@ def test_plan_workflow_reaches_plan_construction() -> None:
 
 
 def test_workflow_topology_detects_a_removed_required_edge() -> None:
-    tree = ast.parse(
-        "def execute():\n" "    execute_experiment()\n" "    export_experiment_report()\n"
-    )
+    tree = ast.parse("def execute():\n    execute_experiment()\n    export_experiment_report()\n")
     workflow = tree.body[0]
     assert isinstance(workflow, ast.FunctionDef)
     expected: frozenset[str] = frozenset(("execute_experiment", "export_experiment_report"))
@@ -458,6 +457,8 @@ def test_opening_stage_observations_consume_the_callers_stage() -> None:
         and call.func.attr == "_opening_stage_observations"
     )
     assert observation_calls, "the opening cell must emit its opening-stage observations"
+    assert "state" in argument_names
+    expected_positional = len(argument_names) - 1
     assert all(
-        len(call.args) == 2 for call in observation_calls
-    ), "every opening-stage observation call must pass the stage and the state"
+        len(call.args) == expected_positional for call in observation_calls
+    ), "every opening-stage observation call must pass each explicit argument"

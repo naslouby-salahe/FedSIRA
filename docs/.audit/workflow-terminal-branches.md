@@ -13,9 +13,9 @@ reachable leaves are enumerated separately in
 |---|---|---|
 | `doctor` | Invalid configuration | `diagnose()` returns a blocked report before dataset and artifact inspection; application renders it and exits 1. |
 | `doctor` | Valid configuration | `_diagnose_bound()` checks layout, plan, prepared-data readiness, artifact summaries, experiment summaries, project stage, and next action; render; exit reflects deterministic execution readiness. |
-| `preprocess` | Dataset supplied | `execute_preprocess()` passes the selected `DatasetId` into bounded dispatch; only that dataset preparer runs. |
-| `preprocess` | Dataset omitted | Bounded dispatch iterates both configured `DatasetId` values, invoking N-BaIoT and CICIoT2023 preparation in registry order. |
-| `preprocess` | Preparation succeeds / fails | Success publishes and validates prepared-view evidence; validation or preparation exceptions propagate from the bounded command and produce a nonzero CLI result. |
+| `preprocess` | CICIoT2023 only | `execute_preprocess()` prepares only the selected secondary dataset; it does not run the primary N-BaIoT data/domain validation cell. |
+| `preprocess` | N-BaIoT or dataset omitted | After successful preparation, the application runs the registered one-cell Data and Domain Evidence Validation workflow and persists its current outcome/provenance before returning. |
+| `preprocess` | Preparation or validation fails | Preparation/validation errors propagate from the command and produce a nonzero CLI result; baseline/model experiments are not reached. |
 | `plan` | Resolved core absent / present | `execute_plan()` builds the corresponding prerequisite plan and renders all registered cells without dispatching a cell executor. |
 | `smoke` | Synthetic invariant suite passes / fails | `execute_smoke()` publishes its separate smoke record and renders the result; CLI exits 0 for `passed`, otherwise nonzero. |
 | `run` | Blocking environment mismatch | `execute_run()` raises `SystemExit` before backend configuration, plan execution, or cell dispatch. |

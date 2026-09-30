@@ -1,9 +1,22 @@
-from fedsira.domain.enums import ByzantineVerifierBehavior, ReproducerCondition, VerifierCondition
+from fedsira.datasets.nbaiot.schema import NBaiotDomain
+from fedsira.domain.enums import (
+    ByzantineVerifierBehavior,
+    ExternalVerificationCondition,
+    PluralityCondition,
+    PrimaryScenario,
+    ReproducerCondition,
+    SecondaryScenario,
+    VerifierCondition,
+)
 from fedsira.domain.types import (
+    AtLeastTwoByzantineProbability,
     ByzantineDomainCount,
     CompromisedReproducerCount,
     ConditionName,
+    EligiblePoolSize,
+    VerifierCount,
 )
+from fedsira.protocol.rules import diagnostic_at_least_two_byzantine_probability
 from fedsira.runtime import current_application_context
 
 BYZANTINE_BEHAVIOUR_CONDITIONS: tuple[tuple[ByzantineVerifierBehavior, ConditionName], ...] = (
@@ -12,6 +25,25 @@ BYZANTINE_BEHAVIOUR_CONDITIONS: tuple[tuple[ByzantineVerifierBehavior, Condition
     (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.ONE_FALSE_NEGATIVE),
     (ByzantineVerifierBehavior.FALSE_NEGATIVE, VerifierCondition.TWO_FALSE_NEGATIVES),
 )
+BYZANTINE_VERIFIER_SOURCE_DOMAINS: tuple[NBaiotDomain, ...] = (
+    NBaiotDomain.DANMINI_DOORBELL,
+    NBaiotDomain.ENNIO_DOORBELL,
+)
+
+
+def random_verifier_eligible_pool_size() -> EligiblePoolSize:
+    return len(NBaiotDomain) - len(BYZANTINE_VERIFIER_SOURCE_DOMAINS)
+
+
+def random_verifier_contamination_probability(
+    byzantine_domain_count: ByzantineDomainCount,
+    committee_size: VerifierCount,
+) -> AtLeastTwoByzantineProbability:
+    return diagnostic_at_least_two_byzantine_probability(
+        random_verifier_eligible_pool_size(),
+        byzantine_domain_count,
+        committee_size,
+    )
 
 
 def validate_byzantine_vocabulary() -> None:
@@ -48,11 +80,26 @@ def validate_byzantine_vocabulary() -> None:
         )
 
 
+SOURCE_COPY_CONDITIONS: tuple[ConditionName, ...] = (
+    ReproducerCondition.ONE_SOURCE_COPY,
+    ReproducerCondition.TWO_SOURCE_COPIES,
+    PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+    ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+    SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+    PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
+)
+
+
 def compromised_reproducer_count(condition: ConditionName) -> CompromisedReproducerCount:
     if condition in (
         ReproducerCondition.ONE_SOURCE_COPY,
         ReproducerCondition.ONE_MODEL_REPLACEMENT_BACKDOOR,
         ReproducerCondition.ONE_VERIFIER_AWARE_BACKDOOR,
+        PluralityCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        ExternalVerificationCondition.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        ExternalVerificationCondition.ONE_VERIFIER_AWARE_BACKDOOR_REPRODUCER,
+        SecondaryScenario.ONE_BYZANTINE_SOURCE_COPY_REPRODUCER,
+        PrimaryScenario.ONE_BYZANTINE_POST_REFERENCE_PARTICIPANT,
     ):
         return 1
     if condition in (

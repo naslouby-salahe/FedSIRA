@@ -8,6 +8,8 @@ from fedsira.artifacts.paths import (
     artifact_slot_directory,
     current_repository_root,
     execution_workspace_root,
+    experiment_metric_evidence_root,
+    experiment_telemetry_evidence_root,
     manuscript_tables_root,
     project_summary_root,
     smoke_record_path,
@@ -32,9 +34,11 @@ from fedsira.domain.enums import (
     EnvironmentReadinessEffect,
     ExperimentLifecycleState,
     ExperimentName,
+    FailureClass,
     ProjectStage,
     RepositoryRootName,
     RuntimeComponentName,
+    WorkflowTerminalState,
     WorkspaceDirectoryToken,
 )
 from fedsira.domain.types import (
@@ -72,6 +76,7 @@ from fedsira.experiments.definitions import (
     COLLAPSE_EXPERIMENT_NAMES,
     COMPROMISED_REPRODUCER_ROBUSTNESS_NAME,
     COMPROMISED_VERIFIER_ROBUSTNESS_NAME,
+    DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME,
     EFFICIENCY_MEASUREMENT_NAME,
     EVIDENCE_SCARCITY_AND_DORMANCY_NAME,
     HETEROGENEOUS_REPRODUCTION_BOUNDARY_NAME,
@@ -101,7 +106,11 @@ from fedsira.experiments.planning import (
     build_plan,
     execute_plan,
 )
-from fedsira.reporting.export import execute_report, export_experiment_report
+from fedsira.reporting.export import (
+    execute_report,
+    materialize_experiment_evidence,
+)
+from fedsira.reporting.publication import publish_metric_evidence
 from fedsira.runtime import (
     REPOSITORY_ROOT,
     ApplicationContext,
@@ -112,6 +121,7 @@ from fedsira.runtime import (
     configure_deterministic_backend,
     current_application_context,
     get_structured_logger,
+    log_workflow_terminal,
 )
 
 _LOGGER = get_structured_logger(RuntimeComponentName.DOCTOR)
@@ -163,6 +173,13 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
         context = ApplicationContext.load(REPOSITORY_ROOT, config_path)
     except ValueError as error:
         _LOGGER.info("configuration load failed")
+        log_workflow_terminal(
+            _LOGGER,
+            RuntimeComponentName.DOCTOR,
+            WorkflowTerminalState.BLOCKED,
+            FailureClass.CONFIGURATION_INVALID,
+            str(error),
+        )
         return DoctorReport(
             environment_mismatches=(),
             configuration_loadable=False,
@@ -180,7 +197,16 @@ def diagnose(config_path: Path | None = None) -> DoctorReport:
     raw_archives_present = rar_archives_present(raw_data_root)
     with bound_application_context(context):
         environment_mismatches = collect_environment_mismatches(raw_archives_present)
-        return _diagnose_bound(context, environment_mismatches)
+        report = _diagnose_bound(context, environment_mismatches)
+        ready = report.is_deterministic_execution_ready
+        log_workflow_terminal(
+            _LOGGER,
+            RuntimeComponentName.DOCTOR,
+            WorkflowTerminalState.COMPLETED if ready else WorkflowTerminalState.BLOCKED,
+            None if ready else FailureClass.EVIDENCE_INSUFFICIENT,
+            None if ready else report.next_valid_action,
+        )
+        return report
 
 
 REPOSITORY_ROOT_EXPECTATIONS: tuple[tuple[RepositoryRootName, EnvironmentExpectation], ...] = (
@@ -231,16 +257,17 @@ def _diagnose_bound(
     readiness = dataset_readiness()
     artifact_summary = _artifact_summary(readiness, resolved_core is not None)
     experiment_summary = _experiment_summary(plan, store)
-    project_stage = _project_stage(
+    project_stage = derive_project_stage(
         environment_mismatches=blocking_environment_mismatches(environment_mismatches),
         dataset_readiness=readiness,
         plan=plan,
         store=store,
         resolved_core_present=resolved_core is not None,
     )
-    project_progress, next_valid_action = _progress_and_action(
+    project_progress, next_valid_action = progress_and_action(
         blocking_environment_mismatches(environment_mismatches),
         project_stage,
+        readiness,
     )
     _LOGGER.info("doctor diagnosis complete")
     return DoctorReport(
@@ -328,7 +355,7 @@ def _all_complete(
     )
 
 
-def _project_stage(
+def derive_project_stage(
     environment_mismatches: tuple[EnvironmentMismatch, ...],
     dataset_readiness: ExperimentLifecycleState,
     plan: ExperimentPlan,
@@ -338,6 +365,10 @@ def _project_stage(
     if environment_mismatches:
         return ProjectStage.DOCTOR_READINESS
     if dataset_readiness is not ExperimentLifecycleState.COMPLETED:
+        return ProjectStage.PREPROCESSING_AND_DATA_VALIDATION
+    if _experiment_state(plan, store, DATA_AND_DOMAIN_EVIDENCE_VALIDATION_NAME) is not (
+        ExperimentLifecycleState.COMPLETED
+    ):
         return ProjectStage.PREPROCESSING_AND_DATA_VALIDATION
     if not _smoke_complete():
         return ProjectStage.PROTOCOL_INVARIANT_SMOKE
@@ -387,7 +418,7 @@ STAGE_GUIDANCE: tuple[StageGuidance, ...] = (
     ),
     StageGuidance(
         stage=ProjectStage.PREPROCESSING_AND_DATA_VALIDATION,
-        progress="raw inputs identified; preprocessing is incomplete",
+        progress="prepared data or pre-experiment data validation is incomplete",
         action="run fedsira preprocess to prepare roadmap datasets",
     ),
     StageGuidance(
@@ -463,14 +494,23 @@ STAGE_GUIDANCE: tuple[StageGuidance, ...] = (
 )
 
 
-def _progress_and_action(
+def progress_and_action(
     environment_mismatches: tuple[EnvironmentMismatch, ...],
     project_stage: ProjectStage,
+    dataset_readiness: ExperimentLifecycleState,
 ) -> tuple[ProjectProgressDescription, NextValidAction]:
     if environment_mismatches:
         return (
             "doctor blocked by environment mismatch",
             "resolve the reported environment mismatches",
+        )
+    prepared = dataset_readiness is ExperimentLifecycleState.COMPLETED
+    validating = project_stage is ProjectStage.PREPROCESSING_AND_DATA_VALIDATION
+    if prepared and validating:
+        validation = ExperimentName.DATA_AND_DOMAIN_EVIDENCE_VALIDATION
+        return (
+            "prepared datasets exist; data and domain evidence validation is incomplete",
+            f'run fedsira run "{validation}"',
         )
     for guidance in STAGE_GUIDANCE:
         if guidance.stage is project_stage:
@@ -631,16 +671,17 @@ def _materialize_core_if_complete(experiment: ExperimentName) -> None:
 def _export_completed_experiment(result: ExperimentExecutionResult) -> None:
     if result.lifecycle_state is not ExperimentLifecycleState.COMPLETED:
         return
-    experiment_root = current_repository_root() / workspace_root_for_family(
-        ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
-        result.experiment,
+    evidence = materialize_experiment_evidence(
+        result,
+        experiment_metric_evidence_root(result.experiment),
+        experiment_telemetry_evidence_root(result.experiment),
     )
-    export = export_experiment_report(result, experiment_root)
-    if not export.verification.passed:
-        raise RuntimeError(
-            f"completed experiment report export failed: {', '.join(export.verification.failures)}"
-        )
-    for path in export.exported_paths:
+    publish_metric_evidence(
+        result.experiment,
+        result.execution_digest,
+        evidence.paths,
+    )
+    for path in evidence.paths:
         print(f"exported {path}")
 
 

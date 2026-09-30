@@ -6,13 +6,148 @@ FedSIRA's fixed authority principle is:
 
 > An unsupported post-reference capability first exposed by a potentially Byzantine participant cannot obtain production authority through approval of that participant's model artifact. Production authority requires a fixed source-independent capability claim, clean non-source construction, post-commitment external verification, aggregator-aware reproducibility, source-excluded robust synthesis, and a final fresh admission gate.
 
-The source artifact may assist claim discovery but has zero direct production influence and is never an honest-path reproduction or synthesis input. The project, algorithm, CLI, and manuscript method name are **FedSIRA**.
+The source artifact may assist claim discovery but has zero direct production influence and is never an honest-path reproduction or synthesis input. The project, CLI, and manuscript method name are **FedSIRA**. The admission decision is the **Leave-Fault Geometric Median Certificate**.
+
+The lifecycle in Sections 6 and 7 is the problem scaffold and the comparison baseline. It is not the algorithm.
+
+# 0. Leave-Fault Geometric Median Certificate
+
+Canonical specification: `docs/algorithms/leave-fault-geometric-median-certificate.md`. This section is the roadmap statement of that decision. The shipped function is `decide_leave_fault_certificate`.
+
+We introduce the Leave-Fault Geometric Median Certificate, a source-independent algorithm for safely admitting post-reference capabilities under unreliable or Byzantine evidence. The study evaluates that algorithm. The study is not the contribution.
+
+## Inputs
+
+- Source identity `s`.
+- Proposal claim `π`. It names the capability under investigation. It is not a weight.
+- Source update `u_s`, source utility `q_s`, and source harm `h_s`. Recorded. The full mechanism does not put them in a coalition, a mean, a median, or a weight.
+- Independent evidence `{(i, u_i, q_i, h_i)}` with `i ≠ s`.
+- Configuration `(f, q, τ, η, T, ε)` from `protocol.leave_fault_certificate`.
+
+Loaded profile: `f = 1`, `q = 3`, `τ = 0.8`, `η = 0.02`, `T = 8`, `ε = 1e-8`. `τ`, `η`, and `f` equal the lifecycle median floor, harm ceiling, and synthesis fault bound. `q = 2f + 1` is the support rule.
+
+## Output
+
+State in `{Admitted, Rejected Admission, Dormant}`, certificate utility `J*` or absent, certificate harm `H*` or absent, production update `w` or absent, source production weight `α_s`, and participant weights. `α_s = 0` whenever source exclusion is on.
+
+## Definitions
+
+Sort non-source evidence by domain id. Let `N` be that set and `n = |N|`. For every `B ⊂ N` with `|B| = f`, the coalition is `C_B = N \ B`.
+
+```text
+μ_B = mean { u_i : i ∈ C_B }
+U_B = lower median { q_i : i ∈ C_B }
+H_B = upper median { h_i : i ∈ C_B }
+J*  = min_B U_B
+H*  = max_B H_B
+w   = GeoMed { μ_B }
+```
+
+The lower median of a sorted length-`k` sample is index `(k - 1) // 2`. The upper median is index `k // 2`. `GeoMed` is Weiszfeld for `T` iterations, initialized at the coordinate-wise median of the coalition means, returning the nearest mean when a distance is at most `ε`.
+
+## Objective
+
+```text
+minimize over the adversary's choice of f evidence domains
+    the lower-median utility of what remains
+```
+
+and deploy the geometric median of every such leave-`f` coalition mean, subject to `α_s = 0`, `n ≥ q`, and `n ≥ 2f + 1`.
+
+```text
+J* = min_{|B|=f} lower-median { q_i : i ∈ N \ B }
+H* = max_{|B|=f} upper-median { h_i : i ∈ N \ B }
+w  = GeoMed { mean { u_i : i ∈ N \ B } : |B| = f }
+α_s = 0
+```
+
+## Constraints
+
+- Direct source production authority is 0. Proposal information may select the claim. It does not enter `w`.
+- The declared fault bound is `f`. The claim is not stated above `f`.
+- Admission requires `J* ≥ τ` and `H* ≤ η`.
+- Support below `q` or below `2f + 1` is Dormant.
+
+## Algorithm
+
+1. Drop `s` and set `α_s = 0`. Sort the remaining evidence by domain id.
+2. Fail on a repeated domain, an empty panel, an empty update, or a ragged dimension.
+3. Return Dormant when `n < q` or `n < 2f + 1`.
+4. Enumerate every fault set of size `f`.
+5. Compute each coalition mean, lower-median utility, and upper-median harm.
+6. Set `J*` and `H*` to the worst of those statistics.
+7. Return Rejected Admission when `J* < τ` or `H* > η`.
+8. Set `w` to the Weiszfeld geometric median of the coalition means.
+9. Map inverse-distance coalition coefficients back onto members and renormalize.
+10. Return Admitted with `w` and `α_s = 0`.
+
+## Decision
+
+```text
+Dormant,              if n < q or n < 2f + 1
+Admitted with w,      if J* ≥ τ and H* ≤ η
+Rejected Admission,   otherwise
+```
+
+The regime is deterministic. Evidence order is normalized by domain id. Weiszfeld uses a fixed iteration budget and no random source.
+
+## Complexity
+
+Time `O(C(n, f) · n · d · T)`. Memory `O(C(n, f) · d)`. Communication: each non-source domain sends one `d`-vector and two scalars; the source sends the claim identifier and an authority payload of 0.
+
+## Threat tolerance
+
+Up to `f` compromised non-source evidence domains. At `n = 7` and `f = 1`, a leave-1 coalition has size 6 and its lower median is sorted index 2. One low utility report occupies index 0 of every coalition that keeps it, so `J*` stays at the high utility. Two low reports do the same: the worst coalition keeps both, and index 2 is still high. An in-geometry malicious vector can be the Krum selection of the raw panel; it is not the certificate's production update, because `w` is a geometric median of coalition means rather than one submitted vector.
+
+## Failure conditions
+
+Repeated domains, empty evidence, empty updates, and ragged dimensions raise. A useful capability supported by only a minority that cannot survive deletion of `f` domains is rejected. At `n = 7` and `f = 1`, `J*` equals a low report when the worst coalition contains at least three low reports, because sorted index 2 is then low. Two low reports leave that index high and the certificate admits. Faults above `f` are outside the claim. The production vector may equal a copied source vector numerically; `α_s` remains 0.
+
+## Limiting case
+
+`f = 0` with source exclusion and the lower median leaves one coalition, the full non-source panel. `w` is the mean of the non-source updates. `J*` is their lower-median utility. That reduction is the non-source lower-median mean gate.
+
+## Relationship to FedSIRA
+
+Sections 6 and 7 still specify the lifecycle baseline: screen, quorum, source-identity exclusion, Krum, and the final gate. Algorithm 1 replaces that chain as the admission decision. It keeps `τ`, `η`, and `f`. It does not call the six-domain sample-size rule or the minimum-domain predicate. Those baseline predicates are why the lifecycle can install an in-geometry vector and can reject one low report. The certificate's support rule is `n ≥ max(q, 2f + 1)`.
+
+## Relationship to prior work
+
+Krum selects one submitted vector and therefore installs an in-geometry attacker. The coordinate-wise median can equal an attacker who sits at the median coordinate. Bulyan aggregates one training round and has no source-authority constraint; classical Bulyan also requires `n ≥ 4f + 3`. The geometric median alone is a location estimator, not an admit / reject / dormant certificate. Wald and Huber sequential tests, covariance intersection, and Yager combination do not return a source-excluded production update under this support rule. The separation, including the candidates that were executed and not promoted, is in the canonical specification.
+
+```text
+Algorithm 1: Leave-Fault Geometric Median Certificate
+
+Input: source s, claim π, source record (u_s, q_s, h_s),
+       evidence {(i, u_i, q_i, h_i)}, configuration (f, q, τ, η, T, ε)
+Output: state, J*, H*, w, α_s, participant weights
+
+1:  E ← { (i, u_i, q_i, h_i) : i ≠ s }
+2:  sort E by domain id
+3:  α_s ← 0
+4:  if E is empty, ragged, or contains a repeated domain then fail
+5:  n ← |E|
+6:  if n < q or n < 2f + 1 then
+7:      return Dormant, J* absent, H* absent, w absent, α_s = 0
+8:  for each B ⊂ domains(E) with |B| = f, in combination order do
+9:      C ← domains(E) \ B
+10:     μ_B ← mean { u_i : i ∈ C }
+11:    U_B ← lower median { q_i : i ∈ C }
+12:    H_B ← upper median { h_i : i ∈ C }
+13: J* ← min U_B
+14: H* ← max H_B
+15: if J* < τ or H* > η then
+16:     return Rejected Admission, J*, H*, w absent, α_s = 0
+17: w ← Weiszfeld({μ_B}, iterations = T, tolerance = ε)
+18: weights ← renormalized member sums of inverse-distance coefficients of {μ_B} about w
+19: return Admitted, J*, H*, w, α_s = 0, weights
+```
 
 # 1. Scientific problem, contribution boundary, and claims
 
 ## 1.1 Research problem
 
-FedSIRA addresses safe admission of a **post-reference capability** that is initially unsupported by trusted evidence and is first exposed by a potentially Byzantine federated participant.
+FedSIRA addresses safe admission of a **post-reference capability** that is initially unsupported by trusted evidence and is first exposed by a potentially Byzantine federated participant. The decision that admits, rejects, or leaves that capability dormant is the Leave-Fault Geometric Median Certificate in Section 0.
 
 Before independent post-reference evidence appears, an honest unsupported capability and an adaptive Byzantine mimic can be observationally indistinguishable to the server. FedSIRA therefore does not attempt to infer trust from a more elaborate source-side score. It creates new evidence that the source does not control.
 
@@ -114,6 +249,12 @@ The study must not claim any of the following:
 | Does the fixed mechanism generalize?                                                       | The fixed mechanism preserves the primary directional conclusions on a distinct IoT intrusion dataset without retuning core scientific thresholds.                 | `Secondary-Dataset Generalization`                                                                  | Generalization claim becomes `Not Supported`; primary evidence remains unchanged.                                                     |
 
 ---
+
+### Manuscript-level evidence hierarchy
+
+For the paper, combine the first and direct-source-exclusion questions into one **primary safety–utility question**: does the source-excluded admission path reduce compromised production admission while retaining legitimate target capability under the declared bound and device-domain-proxy construction? Proposal assistance, plurality, and external verification are **secondary component-necessity questions**; a null result for one removes or simplifies that component without invalidating an independently measured primary result. Byzantine-bound, evidence-scarcity, shared-epistemic, capability-granularity, and heterogeneity questions are **diagnostic boundary questions**. Delay, efficiency, and CICIoT2023 are **exploratory/secondary transportability questions**.
+
+The full registered program may still be incomplete when a secondary or diagnostic condition is unrun, and the full-project report must state that accurately. However, missing secondary evidence must not be described as a negative primary result or as a failure of a separately complete primary comparison. Untested items remain `Not Tested`; a partial study report must distinguish primary-result completeness from whole-program completeness. No result may be selected or reclassified after observing outcomes.
 
 # 3. System model and notation
 
@@ -641,6 +782,10 @@ The supported set consists of all 10 non-target labels. Domain-local metrics inc
 The original N-BaIoT malicious files do not provide a timestamp field sufficient for a natural longitudinal post-reference study. Therefore the post-reference experiment uses **controlled disjoint replay order defined by stable row order**. This is an experimental chronology, not a claim that the malicious CSV row order is an authentic deployment timeline.
 
 For benign data, stable file order is likewise preserved; the split manifest, not ad-hoc random splitting, controls evidence roles.
+
+Every source, reproduction, verifier, final-gate, and report role for a given device/class stream is selected from disjoint row intervals of the same raw CSV capture. The sample identities are disjoint, but the role samples are not independent capture replications: they share device, attack execution, collection setup, and feature-extraction context. The primary evidence therefore supports controlled cross-device/device-domain-proxy replay within this release; it does not establish independent organizational, site, or capture replication. N-BaIoT feature records include overlapping temporal summaries, so within-stream dependence and role-window distribution shifts are relevant diagnostics even when row IDs and exact feature rows do not overlap.
+
+The raw-data POC in `docs/audit/POC Results.md` found no exact target-row duplicates across the inspected roles in any of the nine Gafgyt Combo device captures, but it found strong lag-1 feature dependence and consistent role-window shifts. This is descriptive feasibility evidence only. It does not establish leakage-driven model performance, independent-capture generalization, or any confirmatory effect. The claim and reporting boundary must retain these limitations.
 
 ---
 
@@ -1736,7 +1881,7 @@ Compute ASR within each non-source domain with a defined `GAFGYT_UDP` report-tes
 * direct source deployment, clipped/sanitized source deployment, or any source-derived production update from a compromised source => compromised production contributor;
 * a single-reproduction production model => compromised iff the selected reproduction row is compromised;
 * Krum => compromised iff the Krum-selected row is compromised; presence of a rejected/nonselected malicious row alone does not count;
-* FedAvg, ensemble/group FedAvg, reconstruction-filtered FedAvg, density-cluster aggregation, or another averaging baseline => compromised iff at least one accepted compromised post-reference client update receives nonzero aggregation/ensemble ancestry in the final production checkpoint;
+* FedAvg, ensemble/group FedAvg, reconstruction-filtered FedAvg, density-cluster aggregation, or another averaging baseline => compromised iff at least one accepted compromised post-reference client update receives nonzero aggregation/ensemble ancestry in the final production checkpoint. The ordinary-client family is FedAvg, the Krum reference, density-cluster trimmed mean, the update reconstruction filter, secure continual assessment, and the multiple-model certified ensemble. `ProtocolCellExecutor._model_replacement_training_args` selects the first attack-feasible non-source client for `One Byzantine Post-Reference Participant` and the source itself, without replacement scaling, for `Useful Backdoored Source — 5%` on the averaging members of that family. Krum records the client only when its selected row is that client. Density records the client only when coordinate trimming retains it. Reconstruction records the client only when the filter accepts the submitted update. The ensemble applies the same acceptance rule inside each group's post-reference FedAvg round. A designated client who does not enter the accepted aggregate is not a compromised production contributor;
 * a rollback to the clean anchor followed solely by source-excluded honest recovery removes prior source/update ancestry; the recovered production object is not marked compromised solely because an earlier discarded artifact was malicious;
 * a compromised verifier does not by itself create malicious admission. It contributes to `malicious_admission=1` only when its behavior enables a compromised production row/object to become admitted.
 
@@ -2624,6 +2769,7 @@ claim_support_thresholds:
 validation_tolerances:
   random_committee_probability_absolute: 1.0e-12
   delay_component_sum_seconds_absolute: 1.0e-09
+  trajectory_fraction_absolute: 1.0e-12
 ```
 
 The typed loader may expose enums and immutable objects generated from this YAML, but generated objects are representations of configuration data rather than a second authority. Fixed methodology is implemented from the corresponding roadmap contracts; raw-data manifests, observed values, derived quantities, artifact identities, declared dependency versions, and runtime measurements are not hand-configured values.
@@ -3061,7 +3207,7 @@ A technical failure blocks only dependent science. A valid null or boundary resu
 
 **Authoritative experiment registry:** this section defines the complete experiment identities, methods, conditions, seeds, dependencies, metrics, interpretation, and failure consequences. These fixed scientific matrices are not duplicated in YAML; numerical values used by their cells come from the applicable configuration keys.
 
-Scientific execution experiments below use their descriptive name as the positional identity in `fedsira run <experiment name>`. The data/domain validation contract in Section 30.1 is owned by `preprocess`, and the protocol-invariant validation contract in Section 30.2 is owned by `smoke`. No opaque experiment number is used as an experiment identity.
+Scientific execution experiments below use their descriptive name as the positional identity in `fedsira run <experiment name>`. `preprocess` materializes the Section 9–11 prepared datasets. Once those datasets are ready, `fedsira run "Data and Domain Evidence Validation"` records the Section 30.1 pass or fail. `fedsira smoke` owns the Section 30.2 protocol-invariant contract. No opaque experiment number is used as an experiment identity.
 
 ## 30.1 `Data and Domain Evidence Validation`
 
@@ -3224,7 +3370,7 @@ Krum Robust Aggregation Reference
 
 For `One Byzantine Post-Reference Participant`, every seed contains the legitimate target capability and one declared Byzantine authority participant. The attack mapping is fixed by mechanism family:
 
-* source-admission/sanitization/recovery methods: the selected source uses `Useful Backdoored Source — 5%`; that source artifact/update is the compromised authority object;
+* source-admission, sanitization, recovery, and independent local reference with source admission: the source remains the clean legitimate target capability from Section 7.1. Malicious admission is 1 only when an accepted production contributor is compromised. Admitting only that clean source scores 0;
 * reproduction-based methods: the selected source uses `Useful Backdoored Source — 5%`, and the first attack-feasible non-source compromised reproducer submits `Source Copy`;
 * ordinary FL/filtering/clustering/robust-aggregation methods: the first attack-feasible post-reference client chosen by `Byzantine Selection` executes `Model-Replacement Backdoor` under the round-level semantics in Section 15.2.
 
@@ -3685,7 +3831,7 @@ Every required figure is generated from verified machine-readable result/statist
 
 **Type:** step plot.
 **X-axis:** logical evidence cycle.
-**Y-axis:** fraction of seed instances in `Dormant`, `Verification Pending`, `Admitted`, `Expired`; one panel per schedule.
+**Y-axis:** fraction of seed instances in `Dormant`, `Verification Pending`, `Admitted`, `Rejected Admission`, `Expired`; one panel per schedule. Rejected admissions are shown separately so the plotted states partition every seed instance at every cycle.
 **Purpose:** show safe dormancy and evidence-arrival lower-bound behavior.
 
 ## 34.8 `Shared Epistemic Failure`

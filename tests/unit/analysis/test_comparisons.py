@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from fedsira.config import PRODUCTION_CONFIG_PATH, load_scientific_config
 from fedsira.domain.enums import (
     AblationVariant,
@@ -8,10 +11,13 @@ from fedsira.domain.enums import (
     ReproducerCondition,
 )
 from fedsira.evaluation.comparisons import (
+    ComparisonDefinition,
     ComparisonFamilyResult,
     ComparisonMetric,
     ComparisonOrientation,
+    ComparisonSidedness,
     ComparisonState,
+    ComparisonTemplate,
     ComparisonTestKind,
     apply_holm_adjustment,
     build_comparison_name,
@@ -34,6 +40,165 @@ def test_registry_has_all_ten_claim_families() -> None:
 def test_registry_has_unique_comparison_names() -> None:
     names = tuple(definition.comparison_name for definition in build_comparison_registry())
     assert len(names) == len(frozenset(names))
+
+
+def test_registry_comparisons_have_their_required_effect_thresholds() -> None:
+    for definition in build_comparison_registry():
+        if definition.test_kind is ComparisonTestKind.SUPERIORITY:
+            assert definition.material_threshold is not None
+        else:
+            assert definition.margin is not None
+
+
+def test_superiority_comparison_cannot_omit_materiality_threshold() -> None:
+    with pytest.raises(ValidationError, match="requires a materiality threshold"):
+        ComparisonTemplate(
+            metric=ComparisonMetric.TARGET_F1,
+            orientation=ComparisonOrientation.HIGHER_IS_BETTER,
+            test_kind=ComparisonTestKind.SUPERIORITY,
+        )
+
+
+def test_superiority_definition_cannot_omit_materiality_threshold() -> None:
+    definition = build_comparison_registry()[0]
+    definition_data = definition.model_dump()
+    definition_data["material_threshold"] = None
+
+    with pytest.raises(ValidationError, match="requires a materiality threshold"):
+        ComparisonDefinition.model_validate(definition_data)
+
+
+def test_missing_superiority_threshold_cannot_pass_after_model_copy() -> None:
+    definition = build_comparison_registry()[0]
+    result = evaluate_comparison(
+        definition,
+        (1.0,) * 10,
+        CONFIG.metrics_and_statistics.bootstrap,
+        CONFIG.seeds_and_determinism.analysis_seed,
+    )
+    valid_adjusted = apply_holm_adjustment(
+        ComparisonFamilyResult(family=definition.family, comparisons=(result,)),
+        CONFIG.metrics_and_statistics.multiplicity,
+    )
+    assert valid_adjusted.comparisons[0].comparison_state is ComparisonState.PASSED
+
+    invalid_definition = definition.model_copy(update={"material_threshold": None})
+    invalid_result = result.model_copy(update={"definition": invalid_definition})
+    with pytest.raises(ValidationError, match="requires a materiality threshold"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(family=definition.family, comparisons=(invalid_result,)),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+
+def test_noninferiority_margin_remains_the_materiality_gate() -> None:
+    definition = next(
+        item
+        for item in build_comparison_registry()
+        if item.test_kind is ComparisonTestKind.NON_INFERIORITY
+    )
+    result = evaluate_comparison(
+        definition,
+        (0.0,) * 10,
+        CONFIG.metrics_and_statistics.bootstrap,
+        CONFIG.seeds_and_determinism.analysis_seed,
+    )
+    adjusted = apply_holm_adjustment(
+        ComparisonFamilyResult(family=definition.family, comparisons=(result,)),
+        CONFIG.metrics_and_statistics.multiplicity,
+    )
+
+    assert adjusted.comparisons[0].comparison_state is ComparisonState.PASSED
+
+    invalid_definition = definition.model_copy(update={"margin": None})
+    invalid_result = result.model_copy(update={"definition": invalid_definition})
+    with pytest.raises(ValidationError, match="requires a margin"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(family=definition.family, comparisons=(invalid_result,)),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+
+def test_noninferiority_margin_change_cannot_reuse_a_stale_p_value() -> None:
+    definition = next(
+        item
+        for item in build_comparison_registry()
+        if item.test_kind is ComparisonTestKind.NON_INFERIORITY
+    )
+    result = evaluate_comparison(
+        definition,
+        (0.2, 0.1, -0.05, -0.2),
+        CONFIG.metrics_and_statistics.bootstrap,
+        CONFIG.seeds_and_determinism.analysis_seed,
+    )
+    altered_p_value = result.model_copy(update={"raw_p_value": 0.0})
+    with pytest.raises(ValueError, match="raw p-value does not match"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(
+                family=definition.family,
+                comparisons=(altered_p_value,),
+            ),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+    changed_margin = definition.model_copy(update={"margin": 0.5})
+    stale_margin_result = result.model_copy(update={"definition": changed_margin})
+    with pytest.raises(ValueError, match="does not match its registered definition"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(
+                family=definition.family,
+                comparisons=(stale_margin_result,),
+            ),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+    changed_orientation = definition.model_copy(
+        update={"orientation": ComparisonOrientation.LOWER_IS_BETTER}
+    )
+    orientation_result = result.model_copy(update={"definition": changed_orientation})
+    with pytest.raises(ValueError, match="does not match its registered definition"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(
+                family=definition.family,
+                comparisons=(orientation_result,),
+            ),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+    wrong_sidedness = definition.model_copy(update={"sidedness": ComparisonSidedness.TWO_SIDED})
+    invalid_sidedness_result = result.model_copy(update={"definition": wrong_sidedness})
+    with pytest.raises(ValidationError, match="requires one-sided sidedness"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(
+                family=definition.family,
+                comparisons=(invalid_sidedness_result,),
+            ),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+
+def test_holm_adjustment_rejects_a_comparison_from_another_family() -> None:
+    definition = build_comparison_registry()[0]
+    result = evaluate_comparison(
+        definition,
+        (1.0,) * 10,
+        CONFIG.metrics_and_statistics.bootstrap,
+        CONFIG.seeds_and_determinism.analysis_seed,
+    )
+    other_family = next(family for family in ComparisonFamily if family is not definition.family)
+
+    with pytest.raises(ValueError, match="different comparison family"):
+        apply_holm_adjustment(
+            ComparisonFamilyResult(family=other_family, comparisons=(result,)),
+            CONFIG.metrics_and_statistics.multiplicity,
+        )
+
+    duplicate_result = ComparisonFamilyResult(
+        family=definition.family,
+        comparisons=(result, result),
+    )
+    with pytest.raises(ValueError, match="duplicate comparison names"):
+        apply_holm_adjustment(duplicate_result, CONFIG.metrics_and_statistics.multiplicity)
 
 
 def test_comparison_name_follows_section_18_9_pattern() -> None:

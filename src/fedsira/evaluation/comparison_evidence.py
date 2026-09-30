@@ -18,22 +18,39 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactInstanceLabel,
     ArtifactProducer,
+    ComparisonFamily,
     ExperimentName,
 )
 from fedsira.domain.types import (
     ArtifactDigest,
+    ComparisonName,
     FailureMessage,
     FramingField,
     FrozenDomainModel,
     ProcedureIdentity,
     SchemaVersion,
 )
-from fedsira.evaluation.comparisons import ComparisonFamilyResult, build_comparison_registry
+from fedsira.evaluation.comparisons import (
+    ComparisonDefinition,
+    ComparisonFamilyResult,
+    build_comparison_registry,
+)
 from fedsira.experiments.engine import PersistedExecutionRecord
 from fedsira.runtime import current_application_context, framed_bytes
 
 COMPARISON_EVIDENCE_SCHEMA_VERSION: SchemaVersion = "fedsira|comparison_evidence|2"
 COMPARISON_EVIDENCE_PROCEDURE_IDENTITY: ProcedureIdentity = "fedsira|statistical_comparison|2"
+
+
+def _last_registered_definition(
+    definitions: tuple[ComparisonDefinition, ...],
+    comparison_name: ComparisonName,
+) -> ComparisonDefinition | None:
+    found: ComparisonDefinition | None = None
+    for definition in definitions:
+        if definition.comparison_name == comparison_name:
+            found = definition
+    return found
 
 
 class PersistedComparisonEvidence(FrozenDomainModel):
@@ -161,6 +178,47 @@ def comparison_evidence_failures(
 ) -> tuple[FailureMessage, ...]:
     current = current_comparison_evidence(experiment, records)
     if current is not None:
+        evidence = current[1]
+        expected_definitions = tuple(
+            definition
+            for definition in build_comparison_registry()
+            if definition.experiment == experiment
+        )
+        expected_families: list[ComparisonFamily] = []
+        for definition in expected_definitions:
+            if definition.family not in expected_families:
+                expected_families.append(definition.family)
+        actual_families = tuple(item.family for item in evidence.families)
+        if len(actual_families) != len(set(actual_families)) or set(actual_families) != set(
+            expected_families
+        ):
+            return (
+                f"{experiment}: persisted comparison evidence does not contain "
+                "the complete registered family set",
+            )
+        for family_result in evidence.families:
+            expected = tuple(
+                definition
+                for definition in expected_definitions
+                if definition.family is family_result.family
+            )
+            actual_names = tuple(
+                result.definition.comparison_name for result in family_result.comparisons
+            )
+            expected_names = tuple(definition.comparison_name for definition in expected)
+            if (
+                len(actual_names) != len(set(actual_names))
+                or set(actual_names) != set(expected_names)
+                or any(
+                    _last_registered_definition(expected, result.definition.comparison_name)
+                    != result.definition
+                    for result in family_result.comparisons
+                )
+            ):
+                return (
+                    f"{experiment}/{family_result.family}: persisted comparison evidence "
+                    "does not match the complete registered comparison set",
+                )
         return ()
     expected = any(
         definition.experiment == experiment for definition in build_comparison_registry()

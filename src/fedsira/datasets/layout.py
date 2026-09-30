@@ -62,7 +62,7 @@ def validate_repository_layout() -> tuple[RepositoryLayoutFailure, ...]:
             RepositoryLayoutFailure(
                 root=RepositoryRootName.MANUSCRIPT_RESULTS,
                 message=(
-                    "configured manuscript results root is missing: " f"{layout.manuscript_results}"
+                    f"configured manuscript results root is missing: {layout.manuscript_results}"
                 ),
             )
         )

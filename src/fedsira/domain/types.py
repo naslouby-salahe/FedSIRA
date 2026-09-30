@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from fedsira.domain.enums import (
     AblationVariant,
+    AdmissionDecisionMethod,
     BaselineIdentity,
     CapabilityContractScope,
     ComparisonMetric,
@@ -62,6 +63,7 @@ Doi = Annotated[
 ArtifactFileName = TextValue
 RepositoryPath = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True)]
 DomainId = TextValue
+ProposalClaim = TextValue
 ClassLabel = TextValue
 DatasetClassToken = ClassLabel
 MessageEndpoint = TextValue
@@ -127,6 +129,7 @@ MethodName: TypeAlias = (
     | AblationVariant
     | VerifierProfile
     | CapabilityContractScope
+    | AdmissionDecisionMethod
 )
 ScenarioName = TextValue
 ScientificMetric: TypeAlias = ComparisonMetric | DescriptiveScientificMetric
@@ -186,6 +189,7 @@ WarmupPassCount = NonNegativeInt
 GigabyteCount = PositiveInt
 GpuCount = PositiveInt
 AdmissionCount = NonNegativeInt
+ProvenanceViolationCount = NonNegativeInt
 HashModulus = PositiveInt
 UciDatasetId = PositiveInt
 SeedCount = PositiveInt
@@ -207,6 +211,7 @@ PreparedSupportedReplayCount = NonNegativeInt
 RequiredReproductionRowCount = PositiveInt
 MaximumByzantineReproductionRows = NonNegativeInt
 KrumNeighborCount = PositiveInt
+WeiszfeldIterationCount = PositiveInt
 SignFlipSampleCount = NonNegativeInt
 ObservedPositiveReportCount = NonNegativeInt
 MaximumByzantineReportCount = NonNegativeInt
@@ -305,6 +310,10 @@ ResolvedCoreDependent = BooleanValue
 OverwriteExisting = BooleanValue
 RetainMaterializedViews = BooleanValue
 CellCompletionStatus = BooleanValue
+SafeDormancyEvidenceVerified = BooleanValue
+ByzantineOperatingRegionEvidenceVerified = BooleanValue
+CellIdentityMatches = BooleanValue
+CollapseDecisionMatchesFamily = BooleanValue
 ConfigurationLoadable = BooleanValue
 DeterministicExecutionReady = BooleanValue
 ArtifactReuseDecision = BooleanValue

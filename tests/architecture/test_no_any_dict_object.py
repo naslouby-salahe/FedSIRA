@@ -112,7 +112,7 @@ def test_stringified_forbidden_annotations_are_detected() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         offending = Path(tmp) / "offending.py"
         offending.write_text(
-            "def handler(value: 'dict[str, Any]') -> 'object':\n" "    return value\n"
+            "def handler(value: 'dict[str, Any]') -> 'object':\n    return value\n"
         )
         assert annotation_violations(parse(offending)) == ["Any", "dict", "object"]
 

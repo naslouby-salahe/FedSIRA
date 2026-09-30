@@ -7,6 +7,7 @@ from fedsira.domain.enums import (
     ArtifactFamily,
     ArtifactFamilyDirectoryToken,
     ArtifactFileToken,
+    ArtifactInstanceLabel,
     ArtifactPathScope,
     DatasetId,
     ExperimentName,
@@ -69,6 +70,7 @@ PROJECT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
         ArtifactFamily.SCREEN_MATCHING_ARTIFACT,
         ArtifactFamily.BASELINE_CALIBRATION_ARTIFACT,
         ArtifactFamily.FIXED_PROTOCOL_CONFIGURATION,
+        ArtifactFamily.CLAIM_STATE_ARTIFACT,
     )
 )
 EXPERIMENT_ARTIFACT_FAMILIES: frozenset[ArtifactFamily] = frozenset(
@@ -133,6 +135,7 @@ ARTIFACT_FAMILY_DIRECTORY_TOKENS: tuple[
         ArtifactFamily.STATISTICAL_COMPARISON_ARTIFACT,
         ArtifactFamilyDirectoryToken.STATISTICAL_COMPARISON_ARTIFACT,
     ),
+    (ArtifactFamily.CLAIM_STATE_ARTIFACT, ArtifactFamilyDirectoryToken.CLAIM_STATE_ARTIFACT),
     (
         ArtifactFamily.TABLE_FIGURE_SOURCE_DATA,
         ArtifactFamilyDirectoryToken.TABLE_FIGURE_SOURCE_DATA,
@@ -251,8 +254,25 @@ def experiment_metrics_root(root: Path) -> Path:
     return root / WorkspaceDirectoryToken.METRICS / WorkspaceDirectoryToken.PRIMARY
 
 
-def experiment_telemetry_root(root: Path) -> Path:
-    return root / WorkspaceDirectoryToken.TELEMETRY
+def experiment_metric_evidence_slot(experiment: ExperimentName) -> ArtifactSlot:
+    return ArtifactSlot(
+        family=ArtifactFamily.DOMAIN_SEED_METRIC_ARTIFACT,
+        instance=ArtifactInstanceLabel.METRIC_EVIDENCE,
+        experiment=experiment,
+    )
+
+
+def experiment_metric_evidence_root(experiment: ExperimentName) -> Path:
+    return (
+        current_repository_root()
+        / artifact_slot_directory(experiment_metric_evidence_slot(experiment))
+        / WorkspaceDirectoryToken.METRICS
+        / WorkspaceDirectoryToken.PRIMARY
+    )
+
+
+def experiment_telemetry_evidence_root(experiment: ExperimentName) -> Path:
+    return experiment_metric_evidence_root(experiment).parent / WorkspaceDirectoryToken.TELEMETRY
 
 
 def project_summary_root() -> Path:
@@ -279,6 +299,10 @@ def workspace_root_for_family(
     family: ArtifactFamily,
     experiment: ExperimentName | None = None,
 ) -> Path:
+    if family is ArtifactFamily.TABLE_FIGURE_SOURCE_DATA and experiment is None:
+        return artifact_publication_root()
+    if family is ArtifactFamily.TABLE_FIGURE_REPORT_EXPORT and experiment is None:
+        return manuscript_results_root() / WorkspaceDirectoryToken.PROJECT_SUMMARY
     scope = path_scope_for_family(family)
     if scope is ArtifactPathScope.PREPROCESSING:
         return preprocessing_root()

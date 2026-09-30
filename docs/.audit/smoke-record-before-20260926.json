@@ -1,0 +1,168 @@
+{
+  "schema_version": "fedsira|smoke_record|2",
+  "passed": true,
+  "checks": [
+    {
+      "name": "no target sample in anchor roles",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "no cross-role sample overlap",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "one-batch forward/backward finite",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "one-round FedAvg matches weighted average fixture",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "checkpoint restore reproduces predictions",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "report-test loader cannot be requested by training",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "post-reference minibatch with no supported rows keeps KL defined",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "honest reproduction constructor has no source-artifact parameter",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "source cannot be verifier",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "canonical cell phase sequence is well-formed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "2 positives with f_V=1 implies at least one honest positive",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "Krum n=5 f=1 admissible",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "Krum n=3 f=1 rejected",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "verifier assignment before commitment throws",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "random committee contamination probability 1/7 for b=2",
+      "passed": true,
+      "detail": "observed 0.142857142857"
+    },
+    {
+      "name": "source direct production weight cannot become nonzero",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "Abstain cannot be cast to boolean vote",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "fewer than five certified rows cannot call primary Krum synthesis",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "final admission without final-gate artifact is impossible",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "all eight collapse combinations resolve",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "source/reproducer/verifier/final/report roles are disjoint",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "exact sign-flip test enumerates all assignments",
+      "passed": true,
+      "detail": "p=0.0019531250"
+    },
+    {
+      "name": "Holm adjustment matches hand fixture",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "random-committee exact probability is 0 for compromised-verifier counts 0/1",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "post-evidence wall-clock components sum to T_post",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "type-7 quantiles match NumPy linear fixtures",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "sample SD uses ddof=1",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "confusion-derived metrics match hand calculations",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "zero denominators return NA plus reason",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "bootstrap draws are deterministic under the analysis seed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "complete artifact manifest is readable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "changing one parent identity marks transitive descendants stale",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "configuration_digest": "c5b6ef0ad90b94317aa29ce685f466d88765860d896f670952f60ba6ac26f79c",
+  "code_revision": "0487221d3ed6da1587296a210cb8547a0763e060"
+}
